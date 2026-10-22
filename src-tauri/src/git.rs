@@ -1096,3 +1096,117 @@ fn commit_diff(root: &str, hash: &str) -> Result<CommitDiff, String> {
         binary,
     })
 }
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct BlameLine {
+    pub line: u32,
+    pub hash: String,
+    pub author: String,
+    pub subject: String,
+}
+
+/// Cap on parsed blame lines, so a generated file cannot exhaust memory.
+const BLAME_CAP: usize = 20_000;
+
+/// Per-line blame for one file. Read-only.
+#[tauri::command]
+pub async fn git_blame(root: String, path: String) -> Result<Vec<BlameLine>, String> {
+    let validated = validate_path(&root, &path)?;
+    let relative = relative_path(&root, &validated);
+    tauri::async_runtime::spawn_blocking(move || blame(&root, &relative))
+        .await
+        .map_err(|error| format!("git blame failed: {error}"))?
+}
+
+fn blame(root: &str, relative: &str) -> Result<Vec<BlameLine>, String> {
+    let program = git_program()?;
+    let output = run(
+        &program,
+        root,
+        &["blame", "--line-porcelain", "--", relative],
+    )?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if is_not_a_repository(&stderr) {
+            return Err(format!("not a git repository: {root}"));
+        }
+        if stderr.contains("no such path") {
+            return Ok(Vec::new());
+        }
+        return Err(operation_error("git blame", &stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(parse_blame(&stdout, BLAME_CAP))
+}
+
+/// Parses `git blame --line-porcelain` output into one entry per final file line.
+pub fn parse_blame(stdout: &str, cap: usize) -> Vec<BlameLine> {
+    parse_git_blame(stdout, cap)
+}
+
+/// Alias kept for callers that name the parser after the command.
+pub fn parse_git_blame(stdout: &str, cap: usize) -> Vec<BlameLine> {
+    let mut out: Vec<BlameLine> = Vec::new();
+    let mut current: Option<(String, u32, usize, String, String)> = None;
+
+    for line in stdout.lines() {
+        if line.starts_with('\t') {
+            continue;
+        }
+        let fields: Vec<&str> = line.split_whitespace().collect();
+        if fields.len() >= 3
+            && fields[0].len() >= 40
+            && fields[0].chars().all(|c| c.is_ascii_hexdigit())
+        {
+            if let Some((hash, start, count, author, subject)) = current.take() {
+                for offset in 0..count {
+                    if out.len() >= cap {
+                        break;
+                    }
+                    out.push(BlameLine {
+                        line: start + offset as u32,
+                        hash: hash.clone(),
+                        author: author.clone(),
+                        subject: subject.clone(),
+                    });
+                }
+            }
+            let hash: String = fields[0].chars().take(8).collect();
+            let start: u32 = fields[2].parse().unwrap_or(0);
+            let count: usize = fields
+                .get(3)
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(1)
+                .max(1);
+            current = Some((hash, start, count, String::new(), String::new()));
+            continue;
+        }
+        if let Some(entry) = current.as_mut() {
+            if let Some(rest) = line.strip_prefix("author ") {
+                entry.3 = rest.to_string();
+            } else if let Some(rest) = line.strip_prefix("summary ") {
+                entry.4 = rest.to_string();
+            }
+        }
+    }
+
+    if let Some((hash, start, count, author, subject)) = current.take() {
+        for offset in 0..count {
+            if out.len() >= cap {
+                break;
+            }
+            out.push(BlameLine {
+                line: start + offset as u32,
+                hash: hash.clone(),
+                author: author.clone(),
+                subject: subject.clone(),
+            });
+        }
+    }
+
+    out.truncate(cap);
+    out
+}
