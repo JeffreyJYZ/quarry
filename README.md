@@ -116,12 +116,18 @@ bun check             # type check (bun builtin, all cores)
 bun fmt               # biome format --write .
 bun lint              # biome lint --write .
 bun run verify        # type check + biome check, the commit gate
+bun test              # frontend unit tests over pure helpers (rank, splitArgs, hex, buffer)
+bun run gate          # verify + tests, the commit gate
 bun run build         # type check + vite build
 ```
 
 Rust tests run from the Tauri crate: `cd src-tauri && cargo test`.
 
 The formatter for TypeScript, CSS and Markdown is Biome; `bun run verify` is the commit gate.
+
+## Tests
+
+Rust tests live in `src-tauri` and run with `cd src-tauri && cargo test`. Frontend unit tests are `bun test` over pure helpers: `src/quickopen/rank.ts`, `src/run/splitArgs.ts`, `src/debug/memory/hex.ts` and `src/project/buffer.ts`. The smoke scripts under `scripts/` are the only place real language servers and debuggers are exercised. The commit gate is `bun run gate` (`bun run verify` plus `bun test`).
 
 ## Smoke scripts
 
