@@ -1,12 +1,17 @@
+import { useEffect, useState } from "react";
+import Editor from "@/editor/Editor";
+import { type ToolchainReport, toolchains, version } from "@/project/api";
 import "./styles.css";
 
-const stack = [
-	["parser", "clangd · rust-analyzer"],
-	["debugger", "lldb-dap"],
-	["format", "clang-format · rustfmt"],
-];
-
 export default function App() {
+	const [report, setReport] = useState<ToolchainReport | null>(null);
+	const [appVersion, setAppVersion] = useState("");
+
+	useEffect(() => {
+		toolchains().then(setReport, () => setReport(null));
+		version().then(setAppVersion, () => setAppVersion(""));
+	}, []);
+
 	return (
 		<div className="shell">
 			<header className="titlebar">
@@ -18,34 +23,19 @@ export default function App() {
 				<aside className="rail">
 					<span className="label">explorer</span>
 					<p className="empty">Nothing loaded.</p>
-					<span className="label">outline</span>
-					<p className="empty">Nothing loaded.</p>
 				</aside>
 
 				<main className="canvas">
-					<div className="welcome">
-						<h1>Open a Rust or C/C++ project</h1>
-						<p>
-							quarry detects <code>Cargo.toml</code>, <code>CMakeLists.txt</code> and{" "}
-							<code>compile_commands.json</code>, then attaches the language server
-							for that project.
-						</p>
-						<ul className="stack">
-							{stack.map(([role, tool]) => (
-								<li key={role}>
-									<span className="label">{role}</span>
-									<span className="value">{tool}</span>
-								</li>
-							))}
-						</ul>
-						<p className="note">Scaffold only — the project model lands in P0.</p>
-					</div>
+					{/* STUB: unit U4 replaces this layout with the project flow. */}
+					<Editor path={null} value="" onChange={() => {}} />
 				</main>
 			</div>
 
 			<footer className="statusbar">
-				<span>quarry 0.1.0</span>
-				<span>toolchains detected at launch</span>
+				<span>quarry {appVersion || "0.1.0"}</span>
+				<span>
+					{report ? `${report.tools.length} tools probed` : "toolchains: probing"}
+				</span>
 			</footer>
 		</div>
 	);

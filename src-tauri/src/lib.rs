@@ -1,3 +1,9 @@
+mod project;
+mod protocol_pipe;
+mod toolchain;
+mod types;
+mod workspace;
+
 #[tauri::command]
 fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
@@ -7,7 +13,13 @@ fn version() -> &'static str {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![version])
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![
+            version,
+            toolchain::toolchains,
+            project::open_project,
+            workspace::list_dir
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
