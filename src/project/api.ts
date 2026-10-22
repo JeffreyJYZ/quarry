@@ -431,3 +431,64 @@ export function gitStatus(root: string): Promise<GitStatus> {
 export function gitFileDiff(root: string, path: string): Promise<GitFileDiff> {
 	return invoke<GitFileDiff>("git_file_diff", { root, path });
 }
+
+export type RunOutputEvent = { runId: string; stream: "stdout" | "stderr"; line: string };
+export type RunExitedEvent = { runId: string; code: number | null };
+
+export function runProgram(program: string, args: string[], cwd: string): Promise<string> {
+	return invoke<string>("run_program", { program, args, cwd });
+}
+
+export function stopProgram(runId: string): Promise<void> {
+	return invoke<void>("stop_program", { runId });
+}
+
+export function onRunOutput(handler: (event: RunOutputEvent) => void): Promise<() => void> {
+	return listen<RunOutputEvent>("run://output", (event) => handler(event.payload));
+}
+
+export function onRunExited(handler: (event: RunExitedEvent) => void): Promise<() => void> {
+	return listen<RunExitedEvent>("run://exited", (event) => handler(event.payload));
+}
+
+export type Symbol = { name: string; kind: number; range: Range; depth: number };
+
+export function lspSymbols(root: string, path: string): Promise<Symbol[]> {
+	return invoke<Symbol[]>("lsp_symbols", { root, path });
+}
+
+export type TextEdit = { range: Range; newText: string };
+export type FileEdit = { path: string; edits: TextEdit[] };
+export type CodeAction = { title: string; kind: string | null; edits: FileEdit[] };
+
+export function lspRename(
+	root: string,
+	path: string,
+	line: number,
+	character: number,
+	newName: string,
+): Promise<FileEdit[]> {
+	return invoke<FileEdit[]>("lsp_rename", { root, path, line, character, newName });
+}
+
+export function lspCodeActions(
+	root: string,
+	path: string,
+	line: number,
+	character: number,
+): Promise<CodeAction[]> {
+	return invoke<CodeAction[]>("lsp_code_actions", { root, path, line, character });
+}
+
+export function dapWriteMemory(session: string, address: string, bytes: number[]): Promise<void> {
+	return invoke<void>("dap_write_memory", { session, address, bytes });
+}
+
+export function dapSetVariable(
+	session: string,
+	variablesReference: number,
+	name: string,
+	value: string,
+): Promise<void> {
+	return invoke<void>("dap_set_variable", { session, variablesReference, name, value });
+}

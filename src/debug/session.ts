@@ -16,6 +16,7 @@ import {
 	dapSetBreakpoints,
 	dapSetBreakpointsEx,
 	dapSetDataBreakpoints,
+	dapSetVariable,
 	dapStackTrace,
 	dapStop,
 	dapThreads,
@@ -169,6 +170,8 @@ export type DebugController = {
 	toggleVariable: (row: VariableRow) => void;
 	selectedVariable: VariableRow | null;
 	selectVariable: (row: VariableRow) => void;
+	/** Write a new value into the debuggee, then refresh the owning scope. */
+	setVariable: (row: VariableRow, value: string) => Promise<void>;
 	watchPoints: WatchRow[];
 	addWatchPoint: (containerRef: number, name: string) => void;
 	removeWatchPoint: (dataId: string) => void;
@@ -486,6 +489,41 @@ export function useDebugSession(root: string | null): DebugController {
 		setSelectedVariable((current) =>
 			current !== null && current.key === row.key ? null : row,
 		);
+	}, []);
+
+	const setVariable = useCallback(async (row: VariableRow, value: string) => {
+		const session = sessionRef.current;
+		if (session === null) {
+			setError("Set variable needs a live debug session");
+			throw new Error("no session");
+		}
+		await dapSetVariable(session, row.containerRef, row.name, value);
+		try {
+			const values = await dapVariables(session, row.containerRef);
+			if (sessionRef.current !== session) return;
+			const next = new Map(childrenRef.current);
+			next.set(row.containerRef, values);
+			childrenRef.current = next;
+			setChildren(next);
+		} catch (reason) {
+			if (sessionRef.current === session) {
+				setError(`Variables: ${describeError(reason)}`);
+			}
+		}
+		if (row.variablesReference > 0 && expandedRef.current.has(row.key)) {
+			try {
+				const values = await dapVariables(session, row.variablesReference);
+				if (sessionRef.current !== session) return;
+				const next = new Map(childrenRef.current);
+				next.set(row.variablesReference, values);
+				childrenRef.current = next;
+				setChildren(next);
+			} catch (reason) {
+				if (sessionRef.current === session) {
+					setError(`Variables: ${describeError(reason)}`);
+				}
+			}
+		}
 	}, []);
 
 	const addWatchPoint = useCallback(async (containerRef: number, name: string) => {
@@ -1069,6 +1107,7 @@ export function useDebugSession(root: string | null): DebugController {
 		toggleVariable,
 		selectedVariable,
 		selectVariable,
+		setVariable,
 		watchPoints,
 		addWatchPoint: (containerRef, name) => {
 			void addWatchPoint(containerRef, name);

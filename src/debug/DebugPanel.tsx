@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useState } from "react";
 import BreakpointItem from "@/debug/BreakpointItem";
 import DisasmPane from "@/debug/memory/DisasmPane";
 import MemoryPane from "@/debug/memory/MemoryPane";
@@ -47,14 +48,56 @@ function VariableList({ variables, containerRef, prefix, depth, debug }: Variabl
 
 function VariableBranch({ row, debug }: { row: VariableRow; debug: DebugController }) {
 	const expandable = row.variablesReference > 0;
+	const editable = !expandable;
 	const open = expandable && debug.expanded.has(row.key);
 	const children = open ? (debug.children.get(row.variablesReference) ?? null) : null;
 	const selected = debug.selectedVariable !== null && debug.selectedVariable.key === row.key;
 	const watching = debug.status === "stopped";
+	const [editing, setEditing] = useState(false);
+	const [draft, setDraft] = useState(row.value);
+	const [inFlight, setInFlight] = useState(false);
+
+	const submit = useCallback(async () => {
+		if (inFlight) return;
+		if (draft === row.value) {
+			setEditing(false);
+			return;
+		}
+		setInFlight(true);
+		try {
+			await debug.setVariable(row, draft);
+			setEditing(false);
+		} catch {
+			setDraft(row.value);
+			setEditing(false);
+		} finally {
+			setInFlight(false);
+		}
+	}, [debug, draft, inFlight, row]);
+
+	const cancel = useCallback(() => {
+		setDraft(row.value);
+		setEditing(false);
+	}, [row.value]);
+
+	// Keep draft in sync if the row value changes externally.
+	useEffect(() => {
+		if (!editing) setDraft(row.value);
+	}, [editing, row.value]);
 
 	return (
 		<>
-			<div className={selected ? "debug-var selected" : "debug-var"}>
+			<div
+				className={
+					selected
+						? inFlight
+							? "debug-var selected dimmed"
+							: "debug-var selected"
+						: inFlight
+							? "debug-var dimmed"
+							: "debug-var"
+				}
+			>
 				<span className="debug-var-indent" style={{ width: row.depth * 10 }} />
 				<button
 					type="button"
@@ -75,7 +118,42 @@ function VariableBranch({ row, debug }: { row: VariableRow; debug: DebugControll
 					onClick={() => debug.selectVariable(row)}
 				>
 					<span className="debug-var-name">{row.name}</span>
-					<span className="debug-var-value">{row.value}</span>
+					{editing ? (
+						<input
+							className="debug-var-input"
+							value={draft}
+							disabled={inFlight}
+							// biome-ignore lint/a11y/noAutofocus: inline edit needs focus
+							autoFocus
+							onChange={(event) => setDraft(event.target.value)}
+							onKeyDown={(event) => {
+								if (event.key === "Enter") {
+									event.preventDefault();
+									void submit();
+								} else if (event.key === "Escape") {
+									event.preventDefault();
+									cancel();
+								}
+							}}
+							onBlur={() => {
+								if (draft !== row.value) void submit();
+								else cancel();
+							}}
+						/>
+					) : editable ? (
+						// biome-ignore lint/a11y/noStaticElementInteractions: double-click to edit
+						<span
+							className="debug-var-value"
+							onDoubleClick={() => {
+								setDraft(row.value);
+								setEditing(true);
+							}}
+						>
+							{row.value}
+						</span>
+					) : (
+						<span className="debug-var-value">{row.value}</span>
+					)}
 					{row.memoryReference === null ? null : (
 						<span className="debug-var-mem">{row.memoryReference}</span>
 					)}
