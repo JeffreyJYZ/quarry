@@ -16,3 +16,9 @@ Rust and C/C++ IDE. Tauri 2 + React 19 shell; clangd, rust-analyzer and lldb-dap
 - **Never publish a crate named `quarry`** — use `quarry-app`, `quarry-lsp`, `quarry-dap`; frontend `@jyz/quarry-*`.
 - **MIT.** Zed is GPL-3.0: read its debugger code for patterns, copy nothing.
 - **`.gitignore` carries `.DS_Store`** at the top level.
+- **`lldb-dap` is Xcode's LLVM 21.0.0**; `readMemory`, `disassemble` and data breakpoints work — measured in `docs/spikes/dap.md`.
+- **Rust pretty printing needs `initCommands: ["command script import <sysroot>/lib/rustlib/etc/lldb_lookup.py"]`** — without it `Vec`/`String` arrive as raw structs, silently.
+- **Never gate memory or disassembly on `supportsMemoryReferences`** — it is false while frames carry `instructionPointerReference` and both requests work.
+- **`evaluate` is broken for Rust** (falls back to Objective-C++, errors) — no watch-expression pane until a workaround is measured.
+- **Data breakpoint `dataId` is `<hex>/<size>` with no `0x`**, `hitBreakpointIds` is null, and the stop reports the line after the store.
+- **`realpath` the project directory before `launch`** — `/var/…` versus `/private/var/…` leaves every breakpoint unverified.

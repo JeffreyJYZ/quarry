@@ -116,25 +116,29 @@ P4's representation follows Zed's `crates/project/src/debugger/memory.rs` — pa
 unmapped, and unmapped pages allocate nothing. Read it for the pattern; Zed is GPL-3.0 and no code is
 copied into this MIT repo.
 
-## 6. Spike before P3
+## 6. Spike before P3 — done
 
-One hour, before any debugger UI is written: a bun script that speaks DAP to `lldb-dap` on a
-`cargo build` binary and asserts, in order:
-1. `initialize` → `launch` → `setBreakpoints` → `configurationDone`
-2. `stackTrace` → `scopes` → `variables`
-3. `readMemory` returns bytes for a known buffer
-4. `disassemble` returns instructions for the stopped frame
-5. `dataBreakpointInfo` + `setDataBreakpoints` is accepted
-6. a `Vec<u8>` and a `String` render as Rust values, not raw `{ptr, len, cap}`
-
-Item 6 is the one place parity could quietly slip: if LLDB's formatters are not active, a Rust
-visualizer shim moves into P4 scope.
+Run and measured: [`dap.md`](../spikes/dap.md), reproducible with `bun run scripts/dap-spike.ts`.
+- `readMemory`, `disassemble` and hardware data breakpoints all work against Xcode's `lldb-dap`
+  (LLVM 21.0.0); `readMemory` returned exactly the planted bytes.
+- Rust pretty printing is off by default: a `Vec<u8>` arrives as `{buf, len}`. One `initCommands`
+  entry importing `<sysroot>/lib/rustlib/etc/lldb_lookup.py` fixes it (`size=8`, element children,
+  `"quarry"`, `Some(1234)`). P4 needs a launch flag, not a visualizer shim.
+- `supportsMemoryReferences: false` is an advertisement gap only — frames still carry
+  `instructionPointerReference` and `disassemble` accepts it.
+- Data breakpoints fire, but `hitBreakpointIds` is `null` and the stop lands on the line after the store,
+  so stops are attributed by `description` and address.
+- `evaluate` is unusable for Rust: lldb-dap falls back to Objective-C++ and errors. No watch-expression
+  pane until a workaround is measured.
+- `realpath` the project directory before `launch`, or DWARF path canonicalisation leaves every
+  breakpoint unverified.
 
 `cargo run` is not a debugger launch. Build first, then hand `lldb-dap` the binary path from cargo JSON.
 
 ## 7. Risks
 
-- **Pretty printers.** Covered by the spike above.
+- **Rust expression evaluation.** Measured broken in the spike; a debugger watch pane does not ship until
+  an escape hatch is verified.
 - **`cmake` and `ninja` are not installed on the development machine.** Plain `clang++` builds must be
   first-class; CMake integration ships behind a detection hint.
 - **rust-analyzer `checkOnSave` cost.** Default to `check`; expose `clippy` as a setting.
