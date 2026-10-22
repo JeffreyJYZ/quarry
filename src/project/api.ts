@@ -408,3 +408,26 @@ export function dapSetBreakpointsEx(
 ): Promise<DapBreakpoint[]> {
 	return invoke<DapBreakpoint[]>("dap_set_breakpoints_ex", { session, path, breakpoints });
 }
+
+export type GitStatusEntry = {
+	path: string;
+	status: "modified" | "added" | "deleted" | "renamed" | "untracked" | "conflicted";
+	staged: boolean;
+};
+
+export type GitStatus = {
+	branch: string | null;
+	entries: GitStatusEntry[];
+	ahead: number;
+	behind: number;
+};
+
+export type GitFileDiff = { path: string; diff: string; binary: boolean };
+
+export function gitStatus(root: string): Promise<GitStatus> {
+	return invoke<GitStatus>("git_status", { root });
+}
+
+export function gitFileDiff(root: string, path: string): Promise<GitFileDiff> {
+	return invoke<GitFileDiff>("git_file_diff", { root, path });
+}

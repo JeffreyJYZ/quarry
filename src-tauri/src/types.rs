@@ -356,3 +356,31 @@ pub struct CompletionList {
     pub items: Vec<CompletionItem>,
     pub is_incomplete: bool,
 }
+
+/// One changed path in the working tree.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GitStatusEntry {
+    pub path: String,
+    /// `modified`, `added`, `deleted`, `renamed`, `untracked` or `conflicted`.
+    pub status: String,
+    pub staged: bool,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GitStatus {
+    pub branch: Option<String>,
+    pub entries: Vec<GitStatusEntry>,
+    pub ahead: u32,
+    pub behind: u32,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GitFileDiff {
+    pub path: String,
+    /// Unified diff text, empty when the file is unchanged or binary.
+    pub diff: String,
+    pub binary: bool,
+}

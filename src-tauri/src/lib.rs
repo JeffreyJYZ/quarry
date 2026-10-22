@@ -1,6 +1,7 @@
 mod build_task;
 mod dap;
 mod format;
+mod git;
 mod launch;
 mod lsp;
 mod project;
@@ -72,7 +73,9 @@ pub fn run() {
             test_task::list_tests,
             test_task::run_test,
             settings::read_settings,
-            settings::write_settings
+            settings::write_settings,
+            git::git_status,
+            git::git_file_diff
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
