@@ -10,6 +10,7 @@
 	--hover: #14191f;
 	--danger: #d98b8b;
 	--warn: #d9b26a;
+	--good: #7fc98f;
 
 	--mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
 
@@ -345,10 +346,61 @@ body {
 }
 
 .tree-row .tree-name {
+	flex: 1 1 auto;
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.tree-row .tree-badge-slot {
+	flex: 0 0 16px;
+	width: 16px;
+	text-align: right;
+	font-family: var(--mono);
+	font-size: 11px;
+	font-weight: 600;
+	line-height: 1;
+}
+
+.tree-badge {
+	display: inline-block;
+	width: 100%;
+}
+
+.tree-badge.modified {
+	color: var(--accent);
+}
+
+.tree-badge.added {
+	color: var(--good);
+}
+
+.tree-badge.deleted {
+	color: var(--danger);
+}
+
+.tree-badge.renamed {
+	color: var(--muted);
+}
+
+.tree-badge.untracked {
+	color: var(--muted);
+}
+
+.tree-badge.conflicted {
+	color: var(--danger);
+	font-weight: 700;
+}
+
+.tree-dir-dot {
+	display: inline-block;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--muted);
+	opacity: 0.5;
+	margin-left: auto;
 }
 
 .tree-row .caret {

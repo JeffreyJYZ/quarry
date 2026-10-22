@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { type FileEntry, listDir } from "@/project/api";
+import { type FileEntry, type GitStatusEntry, listDir } from "@/project/api";
 import { describeError } from "@/project/errors";
 
 type DirState =
@@ -11,6 +11,7 @@ export type FileTreeProps = {
 	root: string;
 	activePath: string | null;
 	onOpenFile: (entry: FileEntry) => void;
+	changes?: Record<string, GitStatusEntry["status"]>;
 };
 
 type TreeLevelProps = {
@@ -22,6 +23,7 @@ type TreeLevelProps = {
 	onToggle: (path: string) => void;
 	onRetry: (path: string) => void;
 	onOpenFile: (entry: FileEntry) => void;
+	changes: Record<string, GitStatusEntry["status"]>;
 };
 
 function indent(depth: number): { paddingLeft: string } {
@@ -38,6 +40,7 @@ function TreeLevel({
 	onToggle,
 	onRetry,
 	onOpenFile,
+	changes,
 }: TreeLevelProps) {
 	const state = dirs[path];
 	const noteStyle = indent(depth + 1);
@@ -72,10 +75,43 @@ function TreeLevel({
 		);
 	}
 
+	const hasChangeUnder = (dirPath: string) =>
+		Object.keys(changes).some((p) => p === dirPath || p.startsWith(`${dirPath}/`));
+
+	const badgeFor = (status: GitStatusEntry["status"] | undefined) => {
+		if (status === undefined) return null;
+		const letter =
+			status === "modified"
+				? "M"
+				: status === "added"
+					? "A"
+					: status === "deleted"
+						? "D"
+						: status === "renamed"
+							? "R"
+							: status === "untracked"
+								? "?"
+								: "!";
+		const cls =
+			status === "modified"
+				? "tree-badge modified"
+				: status === "added"
+					? "tree-badge added"
+					: status === "deleted"
+						? "tree-badge deleted"
+						: status === "renamed"
+							? "tree-badge renamed"
+							: status === "untracked"
+								? "tree-badge untracked"
+								: "tree-badge conflicted";
+		return <span className={cls}>{letter}</span>;
+	};
+
 	return (
 		<ul className="tree">
 			{state.entries.map((entry) => {
 				const isOpen = entry.isDir && expanded.has(entry.path);
+				const status = changes[entry.path];
 				return (
 					<li key={entry.path}>
 						{entry.isDir ? (
@@ -89,6 +125,11 @@ function TreeLevel({
 							>
 								<span className="caret" aria-hidden="true" />
 								<span className="tree-name">{entry.name}</span>
+								<span className="tree-badge-slot">
+									{hasChangeUnder(entry.path) ? (
+										<span className="tree-dir-dot" aria-hidden="true" />
+									) : null}
+								</span>
 							</button>
 						) : (
 							<button
@@ -104,6 +145,7 @@ function TreeLevel({
 							>
 								<span className="spacer" aria-hidden="true" />
 								<span className="tree-name">{entry.name}</span>
+								<span className="tree-badge-slot">{badgeFor(status) ?? null}</span>
 							</button>
 						)}
 						{isOpen ? (
@@ -116,6 +158,7 @@ function TreeLevel({
 								onToggle={onToggle}
 								onRetry={onRetry}
 								onOpenFile={onOpenFile}
+								changes={changes}
 							/>
 						) : null}
 					</li>
@@ -125,7 +168,8 @@ function TreeLevel({
 	);
 }
 
-export default function FileTree({ root, activePath, onOpenFile }: FileTreeProps) {
+export default function FileTree({ root, activePath, onOpenFile, changes }: FileTreeProps) {
+	const changeMap = changes ?? {};
 	const [dirs, setDirs] = useState<Record<string, DirState>>({});
 	const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 	const pending = useRef<Set<string>>(new Set());
@@ -187,6 +231,7 @@ export default function FileTree({ root, activePath, onOpenFile }: FileTreeProps
 				onToggle={toggle}
 				onRetry={load}
 				onOpenFile={onOpenFile}
+				changes={changeMap}
 			/>
 		</div>
 	);

@@ -1175,6 +1175,12 @@ export default function App() {
 									root={project.root}
 									activePath={activePath}
 									onOpenFile={handleOpenFile}
+									changes={Object.fromEntries(
+										(gitStatusState?.entries ?? []).map((entry) => [
+											entry.path,
+											entry.status,
+										]),
+									)}
 								/>
 								<Outline
 									root={project.root}
