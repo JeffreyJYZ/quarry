@@ -37,7 +37,9 @@ export default function Welcome({ project }: WelcomeProps) {
 					</ul>
 				) : null}
 				<p className="note">
-					No save yet in this build; edits stay in memory for the session.
+					{project
+						? "Cmd+S saves and formats through the project's own formatter; Cmd+Alt+S saves every dirty tab."
+						: "Opening a folder starts its language server, so errors and warnings appear as you read."}
 				</p>
 			</div>
 		</div>

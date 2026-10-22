@@ -391,6 +391,63 @@ button.tree-note {
 	color: var(--accent);
 }
 
+/* a write in flight: one dimmed dot, deliberately static so the row never flickers */
+.tab .tab-saving {
+	color: var(--muted);
+	font-size: 12px;
+	line-height: 1;
+	opacity: 0.7;
+}
+
+/* dirty close: the row asks inline, so no modal dialog can steal the editor */
+.tab.confirming {
+	gap: 6px;
+	background: var(--hover);
+	color: var(--text);
+}
+
+.tab-confirm-name {
+	cursor: default;
+	opacity: 0.8;
+}
+
+.tab-choice {
+	flex: 0 0 auto;
+	padding: 1px 6px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: none;
+	color: var(--muted);
+	font-family: inherit;
+	font-size: 10px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	cursor: pointer;
+}
+
+.tab-choice:hover:not(:disabled) {
+	border-color: #2a313a;
+	color: var(--text);
+}
+
+.tab-choice.save {
+	color: var(--accent);
+}
+
+.tab-choice.discard:hover:not(:disabled) {
+	color: var(--danger);
+}
+
+.tab-choice:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.tab-choice:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: 1px;
+}
+
 .tab-close {
 	display: grid;
 	place-items: center;
@@ -604,6 +661,19 @@ button.tree-note {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+/* transient save line: same slot as the server and counts, cleared by its own timer */
+.statusbar .status-save {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text);
+}
+
+.statusbar .status-save.error {
+	color: var(--danger);
 }
 
 /* problems dock: editor above, panel below, each scrolling on its own */

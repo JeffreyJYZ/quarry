@@ -29,12 +29,19 @@ import {
 	toolchains,
 	version,
 } from "@/project/api";
-import type { FileBuffer } from "@/project/buffer";
+import { type FileBuffer, isDirty } from "@/project/buffer";
 import { describeError } from "@/project/errors";
+import { type SaveOutcome, saveBuffer, saveErrorMessage, saveMessage } from "@/project/save";
 import SearchPalette from "@/search/SearchPalette";
 import "./styles.css";
 
 const NO_BREAKPOINTS: BreakpointRow[] = [];
+
+/** How long the transient save line stays in the status bar. */
+const SAVE_STATUS_MS = 4000;
+
+/** The transient line the save flow puts in the status bar's `extra` slot. */
+type SaveStatus = { text: string; failed: boolean };
 
 export default function App() {
 	const [appVersion, setAppVersion] = useState("");
@@ -53,7 +60,16 @@ export default function App() {
 	const [panelOpen, setPanelOpen] = useState<boolean | null>(null);
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [debugOpen, setDebugOpen] = useState(false);
+	/** Paths with a write in flight; the tab row dims its mark while the promise resolves. */
+	const [saving, setSaving] = useState<ReadonlySet<string>>(() => new Set<string>());
+	/** Path whose dirty close is waiting on the inline Save/Discard choice. */
+	const [confirmClose, setConfirmClose] = useState<string | null>(null);
+	const [saveStatus, setSaveStatus] = useState<SaveStatus | null>(null);
 	const reading = useRef<Set<string>>(new Set());
+	/** Mirrors of the live state so the global key handler and the save loop never read a stale run. */
+	const buffersRef = useRef<FileBuffer[]>([]);
+	const activePathRef = useRef<string | null>(null);
+	const saveTimer = useRef<number | null>(null);
 
 	useEffect(() => {
 		version().then(setAppVersion, () => setAppVersion(""));
@@ -71,6 +87,100 @@ export default function App() {
 
 	const root = project?.root ?? null;
 	const active = buffers.find((buffer) => buffer.path === activePath) ?? null;
+
+	useEffect(() => {
+		buffersRef.current = buffers;
+	}, [buffers]);
+	useEffect(() => {
+		activePathRef.current = activePath;
+	}, [activePath]);
+
+	const showSaveStatus = useCallback((status: SaveStatus) => {
+		setSaveStatus(status);
+		if (saveTimer.current !== null) {
+			window.clearTimeout(saveTimer.current);
+		}
+		saveTimer.current = window.setTimeout(() => {
+			saveTimer.current = null;
+			setSaveStatus(null);
+		}, SAVE_STATUS_MS);
+	}, []);
+
+	useEffect(
+		() => () => {
+			if (saveTimer.current !== null) {
+				window.clearTimeout(saveTimer.current);
+				saveTimer.current = null;
+			}
+		},
+		[],
+	);
+
+	/** Writes the paths in order, stopping at the first failure; the failed row reports itself. */
+	const savePaths = useCallback(
+		async (paths: string[]): Promise<boolean> => {
+			if (root === null) {
+				return false;
+			}
+			let saved = 0;
+			let warned = false;
+			for (const path of paths) {
+				const buffer = buffersRef.current.find((entry) => entry.path === path);
+				if (!buffer) {
+					continue;
+				}
+				setSaving((current) => new Set(current).add(path));
+				try {
+					let outcome: SaveOutcome;
+					try {
+						outcome = await saveBuffer(root, buffer);
+					} catch (error) {
+						showSaveStatus({
+							text: saveErrorMessage(buffer.name, error),
+							failed: true,
+						});
+						return false;
+					}
+					const written = outcome.buffer;
+					setBuffers((current) =>
+						current.map((entry) => (entry.path === path ? written : entry)),
+					);
+					saved += 1;
+					if (outcome.warning !== null) {
+						warned = true;
+					}
+					showSaveStatus({
+						text: saveMessage(written.name, outcome.warning),
+						failed: false,
+					});
+				} finally {
+					setSaving((current) => {
+						const next = new Set(current);
+						next.delete(path);
+						return next;
+					});
+				}
+			}
+			if (saved > 1 && !warned) {
+				showSaveStatus({ text: `Saved ${saved} files`, failed: false });
+			}
+			return saved === paths.length;
+		},
+		[root, showSaveStatus],
+	);
+
+	const saveActive = useCallback(() => {
+		const path = activePathRef.current;
+		return savePaths(path === null ? [] : [path]);
+	}, [savePaths]);
+
+	const saveAll = useCallback(
+		() =>
+			savePaths(
+				buffersRef.current.filter((buffer) => isDirty(buffer)).map((buffer) => buffer.path),
+			),
+		[savePaths],
+	);
 
 	const reportNotice = useCallback((message: string) => setNotice(message), []);
 	const lsp = useLspServer(root, reportNotice);
@@ -147,6 +257,8 @@ export default function App() {
 			setProject(next);
 			setBuffers([]);
 			setActivePath(null);
+			setConfirmClose(null);
+			setSaveStatus(null);
 			setServerDiagnostics(new Map());
 			setBuildDiagnostics(new Map());
 			setBuildSummary(null);
@@ -160,13 +272,24 @@ export default function App() {
 		}
 	}, []);
 
-	/** `Cmd+F` opens the palette everywhere except inside the editor, which keeps its own keys. */
+	/** `Cmd+S` saves, `Cmd+Alt+S` saves everything, `Cmd+F` opens the palette outside the editor. */
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
-			if (!event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+			if (!event.metaKey || event.ctrlKey) {
 				return;
 			}
-			if (event.key.toLowerCase() !== "f" || root === null) {
+			const key = event.key.toLowerCase();
+			if (key === "s" && !event.shiftKey) {
+				/* Swallowed unconditionally: the webview must never raise its own save dialog. */
+				event.preventDefault();
+				if (event.altKey) {
+					void saveAll();
+				} else {
+					void saveActive();
+				}
+				return;
+			}
+			if (event.altKey || event.shiftKey || key !== "f" || root === null) {
 				return;
 			}
 			const focused = document.activeElement;
@@ -178,7 +301,7 @@ export default function App() {
 		};
 		window.addEventListener("keydown", handleKeyDown, true);
 		return () => window.removeEventListener("keydown", handleKeyDown, true);
-	}, [root]);
+	}, [root, saveActive, saveAll]);
 
 	const openPath = useCallback(
 		async (path: string, name: string) => {
@@ -247,7 +370,7 @@ export default function App() {
 		[activePath],
 	);
 
-	const handleClose = useCallback(
+	const closeNow = useCallback(
 		(path: string) => {
 			const index = buffers.findIndex((buffer) => buffer.path === path);
 			if (index === -1) {
@@ -262,6 +385,50 @@ export default function App() {
 		},
 		[buffers, activePath],
 	);
+
+	/** A clean tab closes at once; a dirty one asks inline on its own row before anything is lost. */
+	const handleClose = useCallback(
+		(path: string) => {
+			const buffer = buffers.find((entry) => entry.path === path);
+			if (!buffer) {
+				return;
+			}
+			if (!isDirty(buffer)) {
+				closeNow(path);
+				return;
+			}
+			setConfirmClose(path);
+		},
+		[buffers, closeNow],
+	);
+
+	/** Saving from the inline prompt writes first, then closes, so a failed write keeps the tab. */
+	const handleSaveClose = useCallback(
+		async (path: string) => {
+			const ok = await savePaths([path]);
+			setConfirmClose(null);
+			if (ok) {
+				closeNow(path);
+			}
+		},
+		[savePaths, closeNow],
+	);
+
+	const handleDiscardClose = useCallback(
+		(path: string) => {
+			setConfirmClose(null);
+			closeNow(path);
+		},
+		[closeNow],
+	);
+
+	const handleCancelClose = useCallback(() => setConfirmClose(null), []);
+
+	/** Switching tabs abandons a pending close, so no row keeps asking about a buffer it lost. */
+	const handleActivate = useCallback((path: string) => {
+		setConfirmClose(null);
+		setActivePath(path);
+	}, []);
 
 	const handleBuild = useCallback(async () => {
 		if (root === null || building) {
@@ -356,8 +523,13 @@ export default function App() {
 							<TabStrip
 								buffers={buffers}
 								activePath={activePath}
-								onActivate={setActivePath}
+								saving={saving}
+								confirmClose={confirmClose}
+								onActivate={handleActivate}
 								onClose={handleClose}
+								onSaveClose={handleSaveClose}
+								onDiscardClose={handleDiscardClose}
+								onCancelClose={handleCancelClose}
 							/>
 							<div className="editor-pane">
 								<Editor
@@ -400,6 +572,19 @@ export default function App() {
 				reportFailed={reportFailed}
 				extra={
 					<>
+						{saveStatus === null ? null : (
+							<>
+								<span
+									className={
+										saveStatus.failed ? "status-save error" : "status-save"
+									}
+									title={saveStatus.text}
+								>
+									{saveStatus.text}
+								</span>
+								<span className="sep">·</span>
+							</>
+						)}
 						<span className="label">lsp</span>
 						<span className="status-server" title={lsp?.root}>
 							{serverLabel}
