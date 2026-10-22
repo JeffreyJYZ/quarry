@@ -66,6 +66,7 @@ export default function Outline({ root, activePath, onNavigate, cursor }: Outlin
 	const [kbIndex, setKbIndex] = useState(0);
 	const highlightRef = useRef<HTMLButtonElement | null>(null);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: a path change must clear the per-file filter
 	useEffect(() => {
 		setFilter("");
 		setKbIndex(0);
@@ -150,6 +151,7 @@ export default function Outline({ root, activePath, onNavigate, cursor }: Outlin
 	}
 	const caretVisibleIndex = caretIndex >= 0 ? visibleIndices.indexOf(caretIndex) : -1;
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the scroll target depends on the visible set
 	useEffect(() => {
 		if (highlightRef.current !== null) {
 			highlightRef.current.scrollIntoView({ block: "nearest" });
@@ -161,7 +163,7 @@ export default function Outline({ root, activePath, onNavigate, cursor }: Outlin
 		onNavigate(activePath, symbol.range.start.line, symbol.range.start.character);
 	};
 
-	const handleKeyDown = (event: React.KeyboardEvent<HTMLUListElement>) => {
+	const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
 		if (shownSymbols.length === 0) return;
 		if (event.key === "ArrowDown") {
 			event.preventDefault();
@@ -205,13 +207,13 @@ export default function Outline({ root, activePath, onNavigate, cursor }: Outlin
 					) : shownSymbols.length === 0 ? (
 						<p className="empty">No symbols match</p>
 					) : (
-						<ul className="outline-list" tabIndex={0} onKeyDown={handleKeyDown}>
+						<ul className="outline-list">
 							{shownSymbols.map((symbol, i) => {
 								const isCaret = i === caretVisibleIndex;
 								const isKb = i === kbIndex;
 								return (
 									<li
-										key={`${symbol.name}-${symbol.range.start.line}-${symbol.range.start.character}-${i}`}
+										key={`${symbol.name}-${symbol.range.start.line}-${symbol.range.start.character}-${symbol.depth}`}
 									>
 										<button
 											type="button"
@@ -223,6 +225,7 @@ export default function Outline({ root, activePath, onNavigate, cursor }: Outlin
 											}
 											style={{ paddingLeft: `${8 + symbol.depth * 12}px` }}
 											onClick={() => navigateSymbol(symbol)}
+											onKeyDown={handleKeyDown}
 										>
 											<span className="outline-name">{symbol.name}</span>
 											<span className="outline-kind">

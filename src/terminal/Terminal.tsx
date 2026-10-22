@@ -17,106 +17,179 @@ export type TerminalProps = {
 	root: string;
 };
 
+type Session = {
+	id: number;
+	ptyId: string | null;
+	lines: string[];
+	dropped: number;
+	exited: number | null;
+	error: string | null;
+	opening: boolean;
+	stick: boolean;
+};
+
+function describe(err: unknown): string {
+	if (err instanceof Error) return err.message;
+	if (typeof err === "string") return err;
+	return String(err);
+}
+
+function appendData(prev: Session, data: string): Session {
+	const next = [...prev.lines];
+	const parts = data.split("\n");
+	for (let i = 0; i < parts.length; i += 1) {
+		if (i > 0) {
+			next.push("");
+		}
+		const last = next.length - 1;
+		if (last >= 0) {
+			next[last] = (next[last] ?? "") + parts[i];
+		} else {
+			next.push(parts[i]);
+		}
+	}
+	let dropped = prev.dropped;
+	if (next.length > MAX_LINES) {
+		const overflow = next.length - MAX_LINES;
+		dropped += overflow;
+		return { ...prev, lines: next.slice(next.length - MAX_LINES), dropped };
+	}
+	return { ...prev, lines: next, dropped };
+}
+
 export default function Terminal({ root }: TerminalProps) {
-	const [lines, setLines] = useState<string[]>([]);
-	const [dropped, setDropped] = useState(0);
-	const [error, setError] = useState<string | null>(null);
-	const [exited, setExited] = useState<number | null>(null);
-	const [size, setSize] = useState<{ cols: number; rows: number }>({ cols: 80, rows: 24 });
-	const [restartToken, setRestartToken] = useState(0);
+	const [sessions, setSessions] = useState<Session[]>([]);
+	const [activeId, setActiveId] = useState<number | null>(null);
+	const nextId = useRef(1);
 	const containerRef = useRef<HTMLDivElement | null>(null);
 	const inputRef = useRef<HTMLTextAreaElement | null>(null);
-	const sessionRef = useRef<string | null>(null);
-	const stickRef = useRef(true);
 	const resizeTimer = useRef<number | null>(null);
+	const sessionsRef = useRef<Session[]>([]);
+	const activeIdRef = useRef<number | null>(null);
+	const listenersReady = useRef(false);
 
-	const append = useCallback((data: string) => {
-		setLines((current) => {
-			const next = [...current];
-			const parts = data.split("\n");
-			for (let i = 0; i < parts.length; i += 1) {
-				if (i > 0) {
-					next.push("");
-				}
-				const last = next.length - 1;
-				if (last >= 0) {
-					next[last] = (next[last] ?? "") + parts[i];
-				} else {
-					next.push(parts[i]);
-				}
+	useEffect(() => {
+		sessionsRef.current = sessions;
+	}, [sessions]);
+	useEffect(() => {
+		activeIdRef.current = activeId;
+	}, [activeId]);
+
+	const updateSession = useCallback((id: number, updater: (s: Session) => Session) => {
+		setSessions((current) => current.map((s) => (s.id === id ? updater(s) : s)));
+	}, []);
+
+	const openSession = useCallback(async () => {
+		const id = nextId.current;
+		nextId.current += 1;
+		const session: Session = {
+			id,
+			ptyId: null,
+			lines: [],
+			dropped: 0,
+			exited: null,
+			error: null,
+			opening: true,
+			stick: true,
+		};
+		setSessions((current) => [...current, session]);
+		setActiveId(id);
+		try {
+			const el = containerRef.current;
+			const width = el ? el.clientWidth : 800;
+			const cols = Math.max(20, Math.floor(width / 8));
+			const h = el ? el.clientHeight : 200;
+			const rows = Math.max(8, Math.floor(h / 18));
+			const ptyId = await ptyOpen(root, rows, cols);
+			if (sessionsRef.current.find((s) => s.id === id) === undefined) {
+				void ptyClose(ptyId).catch(() => undefined);
+				return;
 			}
-			if (next.length > MAX_LINES) {
-				const overflow = next.length - MAX_LINES;
-				setDropped((currentDropped) => currentDropped + overflow);
-				return next.slice(next.length - MAX_LINES);
+			updateSession(id, (s) => ({ ...s, ptyId, opening: false }));
+		} catch (err) {
+			updateSession(id, (s) => ({
+				...s,
+				error: `Terminal unavailable: ${describe(err)}`,
+				opening: false,
+			}));
+		}
+	}, [root, updateSession]);
+
+	const closeSession = useCallback((id: number) => {
+		const session = sessionsRef.current.find((s) => s.id === id);
+		if (session !== undefined && session.ptyId !== null) {
+			void ptyClose(session.ptyId).catch(() => undefined);
+		}
+		setSessions((current) => {
+			const remaining = current.filter((s) => s.id !== id);
+			if (activeIdRef.current === id) {
+				const idx = current.findIndex((s) => s.id === id);
+				const neighbour = remaining[idx] ?? remaining[idx - 1] ?? null;
+				setActiveId(neighbour ? neighbour.id : null);
 			}
-			return next;
+			return remaining;
 		});
 	}, []);
 
-	const send = useCallback((data: string) => {
-		const id = sessionRef.current;
-		if (id === null) return;
-		void ptyWrite(id, data).catch(() => undefined);
-	}, []);
-
-	const restart = useCallback(() => {
-		setLines([]);
-		setDropped(0);
-		setExited(null);
-		setError(null);
-		setRestartToken((current) => current + 1);
-	}, []);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: restartToken triggers a new session
+	// global listeners once
 	useEffect(() => {
-		let cancelled = false;
 		let unOutput: (() => void) | undefined;
 		let unExited: (() => void) | undefined;
-		const open = async () => {
+		let cancelled = false;
+		void (async () => {
 			try {
 				unOutput = await onPtyOutput((event: PtyOutputEvent) => {
-					if (event.id !== sessionRef.current) return;
-					append(event.data);
+					setSessions((current) =>
+						current.map((s) => {
+							if (s.ptyId !== event.id) return s;
+							return appendData(s, event.data);
+						}),
+					);
 				});
 				unExited = await onPtyExited((event: PtyExitedEvent) => {
-					if (event.id !== sessionRef.current) return;
-					setExited(event.code);
-					append(`\nexited with code ${event.code ?? 0}`);
+					setSessions((current) =>
+						current.map((s) => {
+							if (s.ptyId !== event.id) return s;
+							const next = appendData(s, `\nexited with code ${event.code ?? 0}`);
+							return { ...next, exited: event.code };
+						}),
+					);
 				});
-				if (cancelled) return;
-				const el = containerRef.current;
-				const width = el ? el.clientWidth : 800;
-				const cols = Math.max(20, Math.floor(width / 8));
-				const h = el ? el.clientHeight : 200;
-				const rows = Math.max(8, Math.floor(h / 18));
-				setSize({ cols, rows });
-				const id = await ptyOpen(root, rows, cols);
-				if (cancelled) {
-					void ptyClose(id).catch(() => undefined);
-					return;
-				}
-				sessionRef.current = id;
-			} catch (err) {
-				if (!cancelled) {
-					setError(`Terminal unavailable: ${describe(err)}`);
-				}
+			} catch {
+				/* ignore */
 			}
-		};
-		void open();
+			if (cancelled) {
+				unOutput?.();
+				unExited?.();
+			}
+		})();
+		listenersReady.current = true;
 		return () => {
 			cancelled = true;
 			unOutput?.();
 			unExited?.();
-			const id = sessionRef.current;
-			sessionRef.current = null;
-			if (id !== null) {
-				void ptyClose(id).catch(() => undefined);
+		};
+	}, []);
+
+	// close all on unmount
+	useEffect(() => {
+		return () => {
+			for (const s of sessionsRef.current) {
+				if (s.ptyId !== null) {
+					void ptyClose(s.ptyId).catch(() => undefined);
+				}
 			}
 		};
-	}, [root, restartToken, append]);
+	}, []);
 
-	// resize observer, debounced
+	// open first session on mount
+	// biome-ignore lint/correctness/useExhaustiveDependencies: mount only
+	useEffect(() => {
+		void openSession();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
+	// resize observer
 	useEffect(() => {
 		const el = containerRef.current;
 		if (el === null) return;
@@ -126,12 +199,15 @@ export default function Terminal({ root }: TerminalProps) {
 			}
 			resizeTimer.current = window.setTimeout(() => {
 				resizeTimer.current = null;
-				const id = sessionRef.current;
-				if (id === null) return;
+				const id = activeIdRef.current;
+				const session = sessionsRef.current.find((s) => s.id === id);
+				if (session?.ptyId === null || session?.ptyId === undefined) return;
 				const cols = Math.max(20, Math.floor(el.clientWidth / 8));
 				const rows = Math.max(8, Math.floor(el.clientHeight / 18));
-				setSize({ cols, rows });
-				void ptyResize(id, rows, cols).catch(() => undefined);
+				setSessions((current) =>
+					current.map((s) => (s.id === id ? { ...s, stick: s.stick } : s)),
+				);
+				void ptyResize(session.ptyId, rows, cols).catch(() => undefined);
 			}, RESIZE_DEBOUNCE_MS);
 		};
 		const ro = new ResizeObserver(() => schedule());
@@ -145,25 +221,90 @@ export default function Terminal({ root }: TerminalProps) {
 		};
 	}, []);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: scroll trigger depends on line count
+	// scroll stick
 	useEffect(() => {
 		const el = containerRef.current;
 		if (el === null) return;
-		if (stickRef.current) {
+		const session = sessions.find((s) => s.id === activeId);
+		if (session === null || session === undefined) return;
+		if (session.stick) {
 			el.scrollTop = el.scrollHeight;
 		}
-	}, [lines.length, dropped]);
+	}, [sessions, activeId]);
+
+	const active = sessions.find((s) => s.id === activeId) ?? null;
+
+	const send = useCallback((data: string) => {
+		const session = sessionsRef.current.find((s) => s.id === activeIdRef.current);
+		if (session?.ptyId === null || session?.ptyId === undefined) return;
+		void ptyWrite(session.ptyId, data).catch(() => undefined);
+	}, []);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: restart reads sessions via closure
+	const restart = useCallback(() => {
+		if (activeId === null) return;
+		const session = sessions.find((s) => s.id === activeId);
+		if (session?.ptyId !== null && session?.ptyId !== undefined) {
+			void ptyClose(session.ptyId).catch(() => undefined);
+		}
+		updateSession(activeId, (s) => ({
+			...s,
+			ptyId: null,
+			lines: [],
+			dropped: 0,
+			exited: null,
+			error: null,
+			opening: true,
+			stick: true,
+		}));
+		void (async () => {
+			try {
+				const el = containerRef.current;
+				const width = el ? el.clientWidth : 800;
+				const cols = Math.max(20, Math.floor(width / 8));
+				const h = el ? el.clientHeight : 200;
+				const rows = Math.max(8, Math.floor(h / 18));
+				const ptyId = await ptyOpen(root, rows, cols);
+				updateSession(activeId, (s) => ({ ...s, ptyId, opening: false }));
+			} catch (err) {
+				updateSession(activeId, (s) => ({
+					...s,
+					error: `Terminal unavailable: ${describe(err)}`,
+					opening: false,
+				}));
+			}
+		})();
+	}, [active, activeId, root, updateSession]);
+
+	// Cmd+T / Cmd+W inside terminal
+	useEffect(() => {
+		const handler = (event: KeyboardEvent) => {
+			if (!event.metaKey || event.ctrlKey || event.altKey) return;
+			const key = event.key.toLowerCase();
+			if (key === "t") {
+				event.preventDefault();
+				void openSession();
+			} else if (key === "w") {
+				if (activeIdRef.current === null) return;
+				event.preventDefault();
+				closeSession(activeIdRef.current);
+			}
+		};
+		window.addEventListener("keydown", handler, true);
+		return () => window.removeEventListener("keydown", handler, true);
+	}, [openSession, closeSession]);
 
 	const onScroll = useCallback(() => {
 		const el = containerRef.current;
-		if (el === null) return;
+		if (el === null || activeId === null) return;
 		const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
-		stickRef.current = atBottom;
-	}, []);
+		updateSession(activeId, (s) => ({ ...s, stick: atBottom }));
+	}, [activeId, updateSession]);
 
 	const onKeyDown = useCallback(
 		(event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-			if (exited !== null && event.key === "Enter") {
+			if (active === null) return;
+			if (active.exited !== null && event.key === "Enter") {
 				event.preventDefault();
 				restart();
 				return;
@@ -171,14 +312,25 @@ export default function Terminal({ root }: TerminalProps) {
 			if (event.metaKey && (event.key === "k" || event.key === "K")) {
 				event.preventDefault();
 				event.stopPropagation();
-				setLines([]);
-				setDropped(0);
+				updateSession(active.id, (s) => ({ ...s, lines: [], dropped: 0 }));
 				return;
 			}
 			if (event.metaKey && (event.key === "l" || event.key === "L")) {
 				event.preventDefault();
 				event.stopPropagation();
 				send("\x0c");
+				return;
+			}
+			if (event.metaKey && (event.key === "t" || event.key === "T")) {
+				event.preventDefault();
+				event.stopPropagation();
+				void openSession();
+				return;
+			}
+			if (event.metaKey && (event.key === "w" || event.key === "W")) {
+				event.preventDefault();
+				event.stopPropagation();
+				closeSession(active.id);
 				return;
 			}
 			if (event.metaKey && (event.key === "c" || event.key === "C")) {
@@ -247,26 +399,79 @@ export default function Terminal({ root }: TerminalProps) {
 				send(event.key);
 			}
 		},
-		[exited, restart, send],
+		[active, send, restart, openSession, closeSession, updateSession],
 	);
 
-	const displayed: string[] = dropped > 0 ? [`… ${dropped} lines dropped`, ...lines] : lines;
+	const displayed: string[] =
+		active === null
+			? []
+			: active.dropped > 0
+				? [`… ${active.dropped} lines dropped`, ...active.lines]
+				: active.lines;
+
+	const size = { cols: 80, rows: 24 };
 
 	return (
 		<section className="terminal" aria-label="Terminal">
+			<div className="terminal-tabs">
+				{sessions.map((s, i) => (
+					<button
+						key={s.id}
+						type="button"
+						className={`terminal-tab${s.id === activeId ? " active" : ""}${s.exited !== null ? " exited" : ""}`}
+						onClick={() => setActiveId(s.id)}
+					>
+						<span>{i + 1}</span>
+						<button
+							type="button"
+							className="terminal-tab-close"
+							onClick={(e) => {
+								e.stopPropagation();
+								closeSession(s.id);
+							}}
+						>
+							×
+						</button>
+					</button>
+				))}
+				<button
+					type="button"
+					className="terminal-tab terminal-tab-add"
+					onClick={() => void openSession()}
+				>
+					+
+				</button>
+			</div>
 			<div className="terminal-head">
 				<span className="label">terminal</span>
 				<span className="terminal-shell">{root}</span>
-				<span className="terminal-size">
-					{size.cols}x{size.rows}
-				</span>
-				<button type="button" className="terminal-restart" onClick={restart}>
-					Restart
-				</button>
-				{exited !== null ? <span className="terminal-exit">exited {exited}</span> : null}
+				{active !== null ? (
+					<>
+						<span className="terminal-size">
+							{size.cols}x{size.rows}
+						</span>
+						<button type="button" className="terminal-restart" onClick={restart}>
+							Restart
+						</button>
+						{active.exited !== null ? (
+							<span className="terminal-exit">exited {active.exited}</span>
+						) : null}
+					</>
+				) : null}
 			</div>
-			{error !== null ? (
-				<div className="terminal-error">{error}</div>
+			{active === null ? (
+				<div className="terminal-empty">
+					<p>No terminal open.</p>
+					<button
+						type="button"
+						className="terminal-restart"
+						onClick={() => void openSession()}
+					>
+						New terminal
+					</button>
+				</div>
+			) : active.error !== null ? (
+				<div className="terminal-error">{active.error}</div>
 			) : (
 				<div ref={containerRef} className="terminal-body" onScroll={onScroll}>
 					<pre className="terminal-pre">{displayed.join("\n")}</pre>
@@ -282,10 +487,4 @@ export default function Terminal({ root }: TerminalProps) {
 			/>
 		</section>
 	);
-}
-
-function describe(err: unknown): string {
-	if (err instanceof Error) return err.message;
-	if (typeof err === "string") return err;
-	return String(err);
 }

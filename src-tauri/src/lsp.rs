@@ -1951,3 +1951,53 @@ pub fn parse_call_hierarchy_calls(result: &Value, incoming: bool) -> Vec<CallHie
     }
     out
 }
+
+/// Ranges of the same symbol under the cursor, for occurrence highlighting.
+#[tauri::command]
+pub async fn lsp_document_highlights(
+    state: State<'_, LspState>,
+    root: String,
+    path: String,
+    line: u32,
+    character: u32,
+) -> Result<Vec<Range>, String> {
+    let session = session_for(&state, &root)?;
+    let result = send_request(
+        &session,
+        "textDocument/documentHighlight",
+        position_params(&path_to_uri(&path), line, character),
+    )
+    .await?;
+    Ok(parse_document_highlights(&result))
+}
+
+/// Read the ranges out of a `textDocument/documentHighlight` answer.
+///
+/// The answer is `null` or an array of `{ range, kind? }` entries. `kind` is ignored: the editor
+/// styles every occurrence the same way. Entries without a usable `range` are skipped, and a null
+/// answer reads as an empty vector.
+pub fn parse_document_highlights(result: &Value) -> Vec<Range> {
+    if result.is_null() {
+        return Vec::new();
+    }
+    let Some(entries) = result.as_array() else {
+        return Vec::new();
+    };
+    entries
+        .iter()
+        .filter_map(parse_document_highlight)
+        .collect()
+}
+
+fn parse_document_highlight(value: &Value) -> Option<Range> {
+    let range = value.get("range")?;
+    // Require both endpoints to be objects with line/character numbers.
+    let start = range.get("start")?;
+    let end = range.get("end")?;
+    if !start.is_object() || !end.is_object() {
+        return None;
+    }
+    Some(parse_range(range))
+}
+
+// Aliases removed: keep one parser name per shape.
