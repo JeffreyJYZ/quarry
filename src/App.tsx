@@ -199,6 +199,35 @@ export default function App() {
 	const editorRef = useRef<EditorHandle | null>(null);
 	const saveTimer = useRef<number | null>(null);
 	const restoredRef = useRef(false);
+	const snapshotRef = useRef<{
+		project: ProjectInfo | null;
+		buffers: FileBuffer[];
+		activePath: string | null;
+		railCollapsed: boolean;
+		debugOpen: boolean;
+		gitOpen: boolean;
+		panelOpen: boolean | null;
+		dockTab: DockTab;
+	}>({
+		project: null,
+		buffers: [],
+		activePath: null,
+		railCollapsed: false,
+		debugOpen: false,
+		gitOpen: false,
+		panelOpen: null,
+		dockTab: "problems",
+	});
+	snapshotRef.current = {
+		project,
+		buffers,
+		activePath,
+		railCollapsed,
+		debugOpen,
+		gitOpen,
+		panelOpen,
+		dockTab,
+	};
 
 	useEffect(() => {
 		version().then(setAppVersion, () => setAppVersion(""));
@@ -220,6 +249,14 @@ export default function App() {
 			try {
 				const settings = await readSettings();
 				if (cancelled) return;
+				setRailCollapsed(settings.railCollapsed ?? false);
+				setDebugOpen(settings.debugOpen ?? false);
+				setGitOpen(settings.gitOpen ?? false);
+				setPanelOpen(settings.dockExpanded ?? null);
+				const storedTab = settings.dockTab;
+				setDockTab(
+					storedTab === "tests" || storedTab === "problems" ? storedTab : "problems",
+				);
 				if (settings.lastRoot !== null) {
 					try {
 						const next = await openProject(settings.lastRoot);
@@ -278,11 +315,39 @@ export default function App() {
 				lastRoot: project?.root ?? null,
 				openFiles: buffers.map((buffer) => buffer.path),
 				activeFile: activePath,
+				railCollapsed,
+				debugOpen,
+				gitOpen,
+				dockTab,
+				dockExpanded: panelOpen,
 			};
 			void writeSettings(settings).catch((error) => setNotice(describeError(error)));
 		}, 400);
 		return () => window.clearTimeout(timer);
-	}, [project, buffers, activePath]);
+	}, [project, buffers, activePath, railCollapsed, debugOpen, gitOpen, dockTab, panelOpen]);
+
+	useEffect(() => {
+		const flush = () => {
+			if (!restoredRef.current) return;
+			const snap = snapshotRef.current;
+			const settings: Settings = {
+				lastRoot: snap.project?.root ?? null,
+				openFiles: snap.buffers.map((buffer: FileBuffer) => buffer.path),
+				activeFile: snap.activePath,
+				railCollapsed: snap.railCollapsed,
+				debugOpen: snap.debugOpen,
+				gitOpen: snap.gitOpen,
+				dockTab: snap.dockTab as Settings["dockTab"],
+				dockExpanded: snap.panelOpen,
+			};
+			void writeSettings(settings).catch((error) => setNotice(describeError(error)));
+		};
+		const handleVisibility = () => {
+			if (document.visibilityState === "hidden") flush();
+		};
+		document.addEventListener("visibilitychange", handleVisibility);
+		return () => document.removeEventListener("visibilitychange", handleVisibility);
+	}, []);
 
 	const root = project?.root ?? null;
 

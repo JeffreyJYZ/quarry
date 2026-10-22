@@ -1200,6 +1200,31 @@ button.tree-note {
 	color: var(--muted);
 }
 
+.search-toggle {
+	flex: 0 0 auto;
+	min-width: 24px;
+	height: 20px;
+	padding: 0 4px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: var(--rail);
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10.5px;
+	cursor: pointer;
+}
+
+.search-toggle.active {
+	color: var(--text);
+	background: var(--hover);
+	border-color: #2a313a;
+}
+
+.search-toggle:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: 1px;
+}
+
 .search-state {
 	margin: 0;
 	padding: 7px 12px;

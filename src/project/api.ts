@@ -379,6 +379,11 @@ export type Settings = {
 	lastRoot: string | null;
 	openFiles: string[];
 	activeFile: string | null;
+	railCollapsed?: boolean;
+	debugOpen?: boolean;
+	gitOpen?: boolean;
+	dockTab?: "tests" | "problems" | "refs" | "run";
+	dockExpanded?: boolean | null;
 };
 
 export function readSettings(): Promise<Settings> {

@@ -7,6 +7,12 @@ export const SEARCH_RENDER_LIMIT = 300;
 /** How much of one matched line a row keeps; CSS clamps it to the real palette width. */
 const LINE_CLIP = 240;
 
+export type SearchOptions = {
+	caseSensitive: boolean;
+	regex: boolean;
+	wholeWord: boolean;
+};
+
 export type SearchRow = {
 	match: SearchMatch;
 	/** Position in the flat, capped result list; the palette's highlight index. */
@@ -58,10 +64,30 @@ export function clipLine(text: string): string {
 	return trimmed.length > LINE_CLIP ? `${trimmed.slice(0, LINE_CLIP)}…` : trimmed;
 }
 
-/** `12 results · 3 ms`, or `300+ results (truncated) · 5 ms` when the backend hit its cap. */
-export function resultSummary(report: SearchReport, rendered: number): string {
+/**
+ * Transform the raw palette text into the regex the backend (rg) receives. The backend cannot take
+ * flags, so every option becomes query text:
+ *   - regex off: escape every regex metacharacter so `.` is literal.
+ *   - whole word: wrap as `\b(?:<query>)\b`.
+ *   - case sensitive: prefix `(?-i)` (rg defaults to case-insensitive via smart-case).
+ */
+export function transformQuery(raw: string, options: SearchOptions): string {
+	let query = raw;
+	if (!options.regex) {
+		query = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	}
+	if (options.wholeWord) {
+		query = `\\b(?:${query})\\b`;
+	}
+	if (options.caseSensitive) {
+		query = `(?-i)${query}`;
+	}
+	return query;
+}
+
+/** `12 results in 3 files · 5 ms`, or `12+ results in 3 files (truncated) · 5 ms`. */
+export function resultSummary(report: SearchReport, rendered: number, fileCount: number): string {
 	const total = report.truncated ? `${rendered}+` : `${rendered}`;
-	const noun = !report.truncated && rendered === 1 ? "result" : "results";
 	const suffix = report.truncated ? " (truncated)" : "";
-	return `${total} ${noun}${suffix} · ${report.durationMs} ms`;
+	return `${total} results in ${fileCount} files${suffix} · ${report.durationMs} ms`;
 }
