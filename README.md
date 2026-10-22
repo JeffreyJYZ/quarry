@@ -11,41 +11,45 @@ exactly what this is built around. Those engines already exist; quarry is the ID
 
 ## Status
 
-Most of the daily loop runs end to end for a Cargo project; the run and test panels are the two gaps in
-it. This is what the app actually does today, read off `src-tauri/src/lib.rs` and `src/`:
+Most of the daily loop runs end to end for a Cargo project. This is what the app actually does today,
+read off `src-tauri/src/lib.rs` and `src/`:
 - **Project and shell**: open a folder, detect `cargo` / `CMakeLists.txt` / `compile_commands.json`,
   report which toolchains were found on `PATH` or via `xcrun`, browse a lazily expanded file tree, open
-  files in tabs, save.
-- **Editor**: CodeMirror 6 with Rust and C/C++ highlighting, a breakpoint gutter, and diagnostics drawn
-  as squiggles plus gutter markers.
-- **Language servers**: one server per project root — `rust-analyzer` for Cargo, `clangd` for CMake or
+  files in tabs, save, restore the last project and open tabs on startup.
+- **Editing**: CodeMirror 6 with Rust and C/C++ highlighting, a breakpoint gutter, diagnostics drawn
+  as squiggles plus gutter markers, format on save through `rustfmt` or `clang-format` (with a warning
+  when the formatter is unavailable or fails), and format on demand. Shortcuts: `Cmd+S` save,
+  `Cmd+Alt+S` save all, `Cmd+Alt+L` format, `Cmd+F` in-file search, `Cmd+Alt+F` project search,
+  `F12` / `Shift+F12` / `Cmd+Click` for definition and references, `Cmd+K` for the shortcut sheet.
+- **Insight**: one language server per project root — `rust-analyzer` for Cargo, `clangd` for CMake or
   `compile_commands.json` — with full-document sync. Diagnostics stream into the editor and the Problems
-  dock, grouped by file with severity, line and message.
+  dock, grouped by file with severity, line and message. Hover, go-to-definition, references and
+  completion commands are wired; completion is present but unverified against a live server.
 - **Build**: `build_project` runs `cargo build --message-format=json` and merges its machine-readable
   diagnostics into the Problems dock.
+- **Run**: `run_program` / `stop_program` stream `run://output` lines and one `run://exited`. Backend
+  and event contract only; no run panel in the UI yet.
+- **Debug**: `lldb-dap` sessions launched from a `.quarry/launch.json` preset, composed for an
+  unconfigured Cargo project (which also passes the Rust formatter `initCommands`), or attached to a
+  running process by pid. Line breakpoints with verified and pending states, conditional and hit-count
+  breakpoints, threads, frames, scopes, variables, hardware watchpoints, a paged hex memory pane and a
+  disassembly pane.
 - **Search**: `rg`-backed palette with results grouped by file, keyboard navigation, and a visible cap
   when the result set is truncated.
-- **Run**: `run_program` / `stop_program` stream `run://output` lines and one `run://exited`. Backend and
-  event contract only; no run panel in the UI yet.
-- **Debug**: `lldb-dap` sessions launched from a `.quarry/launch.json` preset, or composed for an
-  unconfigured Cargo project (which also passes the Rust formatter `initCommands`). Line breakpoints
-  with verified and pending states, threads, frames, scopes, variables, hardware watchpoints, a paged
-  hex memory pane and a disassembly pane.
-- **Formatting**: format-on-save through `rustfmt` for Rust and `clang-format` for C/C++, with the
-  unformatted write and a warning when the formatter is unavailable or fails.
-- **Tests**: `list_tests` and `run_test` exist as commands with typed frontend wrappers. No test panel
-  UI consumes them.
+- **Tests**: `list_tests` and `run_test` feed a Tests dock with pass/fail status.
+- **Source control**: a Git view with status, per-file diff, and an open-in-editor flow, plus
+  `git_status` and `git_file_diff` commands.
 
 Still missing, and named here so it is not mistaken for done:
-- **No completion, hover, go-to-definition, references, rename, code actions or inlay hints.** The LSP
-  session sends only `initialize`, document sync and `shutdown`.
-- **C/C++ builds are not wired.** `build_project` refuses any project kind other than Cargo, and the
-  no-preset launch composition is Cargo-only. A preset that names an already-built binary is the
-  C/C++ debug path.
-- **No attach mode.** The debugger launches a process; it cannot attach to a running one.
-- **No `evaluate`**, so no watch expressions — Rust expression evaluation is broken in `lldb-dap` (see
+- **Completion is present but unverified against a live server.** Hover, definition and references share
+  the same path and are exercised by it.
+- **No `evaluate`, so no watch expressions** — Rust expression evaluation is broken in `lldb-dap` (see
   the spike).
-- **No test panel UI**, no embedded terminal, no git integration.
+- **C/C++ builds are not wired.** `build_project` refuses any project kind other than Cargo, and the
+  no-preset launch composition is Cargo-only. A preset that names an already-built binary is the C/C++
+  debug path. C/C++ builds also need `cmake`, which is not installed on this machine.
+- **No embedded terminal.**
+- **No remote development, embedded targets, profilers, databases, Docker, AI assistance or plugin API.**
 
 ## What "parity" means here
 
