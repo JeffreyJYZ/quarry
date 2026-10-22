@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { GitCommitEntry } from "@/project/api";
 import {
 	type Branch,
 	type GitStatus,
@@ -7,6 +8,7 @@ import {
 	gitCheckout,
 	gitCommit,
 	gitFileDiff,
+	gitLog,
 	gitStage,
 	gitUnstage,
 } from "@/project/api";
@@ -19,6 +21,7 @@ export type SourceControlProps = {
 	onRefresh: () => Promise<void>;
 	onOpenFile: (path: string) => void;
 	onDiff: (path: string | null) => void;
+	onCommitDiff: (hash: string | null) => void;
 	diffPath: string | null;
 };
 
@@ -51,6 +54,22 @@ function nameOf(path: string): string {
 	return index >= 0 ? path.slice(index + 1) : path;
 }
 
+function relativeTime(iso: string): string {
+	const then = Date.parse(iso);
+	if (Number.isNaN(then)) return iso;
+	const seconds = Math.round((Date.now() - then) / 1000);
+	if (seconds < 60) return "just now";
+	const minutes = Math.round(seconds / 60);
+	if (minutes < 60) return `${minutes}m ago`;
+	const hours = Math.round(minutes / 60);
+	if (hours < 24) return `${hours}h ago`;
+	const days = Math.round(hours / 24);
+	if (days < 30) return `${days}d ago`;
+	const months = Math.round(days / 30);
+	if (months < 12) return `${months}mo ago`;
+	return `${Math.round(months / 12)}y ago`;
+}
+
 export default function SourceControl({
 	root,
 	refreshToken,
@@ -58,6 +77,7 @@ export default function SourceControl({
 	onRefresh,
 	onOpenFile,
 	onDiff,
+	onCommitDiff,
 	diffPath,
 }: SourceControlProps) {
 	const status = statusProp;
@@ -79,6 +99,12 @@ export default function SourceControl({
 	const [branchSwitching, setBranchSwitching] = useState(false);
 	const [branchSwitched, setBranchSwitched] = useState<string | null>(null);
 	const [missingDiff, setMissingDiff] = useState<string | null>(null);
+	const [tab, setTab] = useState<"changes" | "history">("changes");
+	const [history, setHistory] = useState<GitCommitEntry[] | null>(null);
+	const [historyLimit, setHistoryLimit] = useState(50);
+	const [historyLoading, setHistoryLoading] = useState(false);
+	const [historyError, setHistoryError] = useState<string | null>(null);
+	const [historySelected, setHistorySelected] = useState<number | null>(null);
 	const switchedTimer = useRef<number | null>(null);
 	const filterRef = useRef<HTMLInputElement | null>(null);
 
@@ -92,7 +118,8 @@ export default function SourceControl({
 		} finally {
 			setLoading(false);
 		}
-	}, [onRefresh]);
+		onCommitDiff(null);
+	}, [onRefresh, onCommitDiff]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: refreshToken is an explicit refresh trigger
 	useEffect(() => {
@@ -166,6 +193,24 @@ export default function SourceControl({
 		[root, refresh],
 	);
 
+	const loadHistory = useCallback(
+		async (limit: number) => {
+			setHistoryLoading(true);
+			setHistoryError(null);
+			try {
+				const entries = await gitLog(root, limit);
+				setHistory(entries);
+				setHistoryLimit(limit);
+				setHistorySelected(null);
+			} catch (err) {
+				setHistoryError(describeError(err));
+			} finally {
+				setHistoryLoading(false);
+			}
+		},
+		[root],
+	);
+
 	const commit = useCallback(async () => {
 		const trimmed = message.trim();
 		if (trimmed === "" || stagedCount === 0 || committing) return;
@@ -183,13 +228,31 @@ export default function SourceControl({
 				setCommitted(null);
 			}, 4000);
 			await refresh();
+			await loadHistory(historyLimit);
 			onDiff(null);
+			onCommitDiff(null);
 		} catch (err) {
 			setCommitError(describeError(err));
 		} finally {
 			setCommitting(false);
 		}
-	}, [message, stagedCount, committing, root, refresh, onDiff]);
+	}, [
+		message,
+		stagedCount,
+		committing,
+		root,
+		refresh,
+		onDiff,
+		onCommitDiff,
+		loadHistory,
+		historyLimit,
+	]);
+
+	// Refresh history when the History tab is opened.
+	useEffect(() => {
+		if (tab !== "history") return;
+		void loadHistory(historyLimit);
+	}, [tab, loadHistory, historyLimit]);
 
 	useEffect(() => {
 		return () => {
@@ -201,6 +264,65 @@ export default function SourceControl({
 			}
 		};
 	}, []);
+
+	useEffect(() => {
+		const handler = (event: KeyboardEvent) => {
+			if (tab !== "history") return;
+			const target = event.target as HTMLElement | null;
+			if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+			if (event.key === "Tab") {
+				event.preventDefault();
+				setTab("changes");
+				onCommitDiff(null);
+				return;
+			}
+			const list = history ?? [];
+			if (list.length === 0) return;
+			if (event.key === "ArrowDown") {
+				event.preventDefault();
+				setHistorySelected((current) => {
+					if (current === null) return 0;
+					return Math.min(current + 1, list.length - 1);
+				});
+				return;
+			}
+			if (event.key === "ArrowUp") {
+				event.preventDefault();
+				setHistorySelected((current) => {
+					if (current === null) return 0;
+					return Math.max(current - 1, 0);
+				});
+				return;
+			}
+			if (event.key === "Enter") {
+				event.preventDefault();
+				const entry =
+					historySelected !== null ? (history?.[historySelected] ?? null) : null;
+				if (entry !== null) {
+					setHistorySelected(historySelected);
+					onCommitDiff(entry.hash);
+					onDiff(null);
+				}
+			}
+		};
+		window.addEventListener("keydown", handler);
+		return () => window.removeEventListener("keydown", handler);
+	}, [tab, history, historySelected, onCommitDiff, onDiff]);
+
+	// Tab switches from Changes to History too.
+	useEffect(() => {
+		const handler = (event: KeyboardEvent) => {
+			if (tab !== "changes") return;
+			const target = event.target as HTMLElement | null;
+			if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+			if (event.key === "Tab") {
+				event.preventDefault();
+				setTab("history");
+			}
+		};
+		window.addEventListener("keydown", handler);
+		return () => window.removeEventListener("keydown", handler);
+	}, [tab]);
 
 	useEffect(() => {
 		if (branchOpen) {
@@ -236,8 +358,10 @@ export default function SourceControl({
 			try {
 				await gitCheckout(root, branch);
 				await onRefresh();
+				await loadHistory(historyLimit);
 				setBranches(await gitBranches(root).catch(() => branches ?? []));
 				setBranchOpen(false);
+				onCommitDiff(null);
 				if (diffPath !== null) {
 					try {
 						await gitFileDiff(root, diffPath);
@@ -262,7 +386,17 @@ export default function SourceControl({
 				setBranchSwitching(false);
 			}
 		},
-		[root, onRefresh, branchSwitching, branches, diffPath, onDiff],
+		[
+			root,
+			onRefresh,
+			branchSwitching,
+			branches,
+			diffPath,
+			onDiff,
+			loadHistory,
+			historyLimit,
+			onCommitDiff,
+		],
 	);
 
 	if (status === null && error === null && loading) {
@@ -438,98 +572,181 @@ export default function SourceControl({
 			</div>
 			{branchSwitched !== null ? <p className="git-committed">{branchSwitched}</p> : null}
 			{missingDiff !== null ? <p className="git-committed">{missingDiff}</p> : null}
-			<div className="git-commit-box">
-				<textarea
-					className="git-commit-input"
-					rows={Math.min(5, Math.max(2, message.split("\\n").length))}
-					placeholder="Commit message"
-					value={message}
-					onChange={(event) => {
-						setMessage(event.target.value);
-						setCommitError(null);
-					}}
-					onKeyDown={(event) => {
-						if (event.key === "Escape") {
-							event.currentTarget.blur();
-							return;
-						}
-						if (
-							event.metaKey &&
-							!event.ctrlKey &&
-							!event.altKey &&
-							event.key === "Enter"
-						) {
-							event.preventDefault();
-							event.stopPropagation();
-							void commit();
-						}
-					}}
-				/>
-				<div className="git-commit-row">
-					<button
-						type="button"
-						className="git-commit-btn"
-						disabled={message.trim() === "" || stagedCount === 0 || committing}
-						onClick={() => void commit()}
-					>
-						{committing ? "Committing…" : "Commit"}
-					</button>
-					<span className="git-staged-count">{stagedCount} staged</span>
-				</div>
-				{commitError !== null ? <p className="git-commit-error">{commitError}</p> : null}
-				{committed !== null ? <p className="git-committed">Committed {committed}</p> : null}
-			</div>
-			<div className="git-meta">
-				<span className="git-counts">
-					↑{status.ahead} ↓{status.behind}
-				</span>
+			<div className="git-tabs">
 				<button
 					type="button"
-					className="git-refresh"
-					onClick={() => void refresh()}
-					disabled={loading}
+					className={`git-tab${tab === "changes" ? " git-tab-active" : ""}`}
+					onClick={() => {
+						setTab("changes");
+						onCommitDiff(null);
+					}}
 				>
-					Refresh
+					Changes
+				</button>
+				<button
+					type="button"
+					className={`git-tab${tab === "history" ? " git-tab-active" : ""}`}
+					onClick={() => setTab("history")}
+				>
+					History
 				</button>
 			</div>
-			{error !== null ? <p className="empty error">{error}</p> : null}
-			<div className="tree-scroll">
-				{staged.length > 0 ? (
-					<>
-						<div className="git-group-head">
-							<span>Staged</span>
+			{tab === "changes" ? (
+				<>
+					<div className="git-commit-box">
+						<textarea
+							className="git-commit-input"
+							rows={Math.min(5, Math.max(2, message.split("\\n").length))}
+							placeholder="Commit message"
+							value={message}
+							onChange={(event) => {
+								setMessage(event.target.value);
+								setCommitError(null);
+							}}
+							onKeyDown={(event) => {
+								if (event.key === "Escape") {
+									event.currentTarget.blur();
+									return;
+								}
+								if (
+									event.metaKey &&
+									!event.ctrlKey &&
+									!event.altKey &&
+									event.key === "Enter"
+								) {
+									event.preventDefault();
+									event.stopPropagation();
+									void commit();
+								}
+							}}
+						/>
+						<div className="git-commit-row">
 							<button
 								type="button"
-								className="git-stage-btn git-group-action"
-								disabled={staged.some((entry) => busy.has(entry.path))}
-								onClick={() => void unstage(staged.map((entry) => entry.path))}
+								className="git-commit-btn"
+								disabled={message.trim() === "" || stagedCount === 0 || committing}
+								onClick={() => void commit()}
 							>
-								Unstage all
+								{committing ? "Committing…" : "Commit"}
 							</button>
+							<span className="git-staged-count">{stagedCount} staged</span>
 						</div>
-						<ul className="git-list">{staged.map(renderRow)}</ul>
-					</>
-				) : null}
-				{changes.length > 0 ? (
-					<>
-						<div className="git-group-head">
-							<span>Changes</span>
-							<button
-								type="button"
-								className="git-stage-btn git-group-action"
-								disabled={changes.some((entry) => busy.has(entry.path))}
-								onClick={() => void stage(changes.map((entry) => entry.path))}
-							>
-								Stage all
-							</button>
-						</div>
-						<ul className="git-list">{changes.map(renderRow)}</ul>
-					</>
-				) : null}
-				{staged.length === 0 && changes.length === 0 ? (
-					<p className="empty">No changes</p>
-				) : null}
-			</div>
+						{commitError !== null ? (
+							<p className="git-commit-error">{commitError}</p>
+						) : null}
+						{committed !== null ? (
+							<p className="git-committed">Committed {committed}</p>
+						) : null}
+					</div>
+					<div className="git-meta">
+						<span className="git-counts">
+							↑{status.ahead} ↓{status.behind}
+						</span>
+						<button
+							type="button"
+							className="git-refresh"
+							onClick={() => void refresh()}
+							disabled={loading}
+						>
+							Refresh
+						</button>
+					</div>
+					{error !== null ? <p className="empty error">{error}</p> : null}
+					<div className="tree-scroll">
+						{staged.length > 0 ? (
+							<>
+								<div className="git-group-head">
+									<span>Staged</span>
+									<button
+										type="button"
+										className="git-stage-btn git-group-action"
+										disabled={staged.some((entry) => busy.has(entry.path))}
+										onClick={() =>
+											void unstage(staged.map((entry) => entry.path))
+										}
+									>
+										Unstage all
+									</button>
+								</div>
+								<ul className="git-list">{staged.map(renderRow)}</ul>
+							</>
+						) : null}
+						{changes.length > 0 ? (
+							<>
+								<div className="git-group-head">
+									<span>Changes</span>
+									<button
+										type="button"
+										className="git-stage-btn git-group-action"
+										disabled={changes.some((entry) => busy.has(entry.path))}
+										onClick={() =>
+											void stage(changes.map((entry) => entry.path))
+										}
+									>
+										Stage all
+									</button>
+								</div>
+								<ul className="git-list">{changes.map(renderRow)}</ul>
+							</>
+						) : null}
+						{staged.length === 0 && changes.length === 0 ? (
+							<p className="empty">No changes</p>
+						) : null}
+					</div>
+				</>
+			) : (
+				<div className="tree-scroll">
+					{historyError !== null ? <p className="empty error">{historyError}</p> : null}
+					{historyLoading && history === null ? <p className="empty">Loading…</p> : null}
+					{history !== null && history.length === 0 ? (
+						<p className="empty">No commits yet</p>
+					) : null}
+					{history !== null && history.length > 0 ? (
+						<ul className="git-list">
+							{history.map((entry, index) => (
+								<li
+									key={entry.hash}
+									className={`git-row${historySelected === index ? " git-row-selected" : ""}`}
+								>
+									<button
+										type="button"
+										className="git-row-main"
+										onClick={() => {
+											setHistorySelected(index);
+											onCommitDiff(entry.hash);
+											onDiff(null);
+										}}
+										title={entry.subject}
+									>
+										<span className="git-commit-hash">
+											{entry.hash.slice(0, 7)}
+										</span>
+										<span className="git-row-name" title={entry.subject}>
+											{entry.subject}
+										</span>
+										<span className="git-row-dir">
+											{entry.author} · {relativeTime(entry.when)}
+										</span>
+									</button>
+								</li>
+							))}
+						</ul>
+					) : null}
+					{history !== null &&
+					history.length > 0 &&
+					history.length < 500 &&
+					historyLimit < 500 ? (
+						<button
+							type="button"
+							className="git-refresh"
+							disabled={historyLoading}
+							onClick={() => void loadHistory(Math.min(historyLimit + 50, 500))}
+						>
+							Load more
+						</button>
+					) : null}
+				</div>
+			)}
 		</aside>
 	);
 }

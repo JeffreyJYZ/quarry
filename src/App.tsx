@@ -164,6 +164,7 @@ export default function App() {
 	const [railCollapsed, setRailCollapsed] = useState(false);
 	const [gitRefresh, setGitRefresh] = useState(0);
 	const [gitDiffPath, setGitDiffPath] = useState<string | null>(null);
+	const [gitCommitDiffHash, setGitCommitDiffHash] = useState<string | null>(null);
 	const [terminalOpen, setTerminalOpen] = useState(false);
 	/** Paths with a write in flight; the tab row dims its mark while the promise resolves. */
 	const [saving, setSaving] = useState<ReadonlySet<string>>(() => new Set<string>());
@@ -631,6 +632,7 @@ export default function App() {
 			setActivePath(null);
 			setGitRefresh((current) => current + 1);
 			setGitDiffPath(null);
+			setGitCommitDiffHash(null);
 			setConfirmClose(null);
 			setSaveStatus(null);
 			setServerDiagnostics(new Map());
@@ -1266,6 +1268,7 @@ export default function App() {
 						onRefresh={refreshGit}
 						onOpenFile={(path) => void openPath(path, fileName(path))}
 						onDiff={setGitDiffPath}
+						onCommitDiff={setGitCommitDiffHash}
 						diffPath={gitDiffPath}
 					/>
 				) : (
@@ -1455,6 +1458,12 @@ export default function App() {
 			) : null}
 			{gitDiffPath !== null && root !== null ? (
 				<DiffView root={root} path={gitDiffPath} onClose={() => setGitDiffPath(null)} />
+			) : gitCommitDiffHash !== null && root !== null ? (
+				<DiffView
+					root={root}
+					commit={gitCommitDiffHash}
+					onClose={() => setGitCommitDiffHash(null)}
+				/>
 			) : null}
 			<StatusBar
 				version={appVersion}

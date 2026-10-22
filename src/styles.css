@@ -2379,6 +2379,31 @@ button.tree-note {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+.git-tabs {
+	display: flex;
+	gap: 4px;
+	padding: 6px 12px 4px;
+	border-bottom: 1px solid var(--line);
+}
+.git-tab {
+	padding: 2px 8px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: transparent;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10px;
+	cursor: pointer;
+}
+.git-tab-active {
+	color: var(--text);
+	border-color: var(--accent);
+}
+.git-commit-hash {
+	flex: 0 0 auto;
+	color: var(--accent);
+	font-family: var(--mono);
+}
 .git-diff-btn {
 	flex: 0 0 auto;
 	padding: 1px 6px;

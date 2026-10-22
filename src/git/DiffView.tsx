@@ -1,15 +1,18 @@
 import { useEffect, useState } from "react";
-import { type GitFileDiff, gitFileDiff } from "@/project/api";
+import { type CommitDiff, type GitFileDiff, gitCommitDiff, gitFileDiff } from "@/project/api";
 import { describeError } from "@/project/errors";
 
 export type DiffViewProps = {
 	root: string;
-	path: string;
+	path?: string | null;
+	commit?: string | null;
 	onClose: () => void;
 };
 
-export default function DiffView({ root, path, onClose }: DiffViewProps) {
-	const [diff, setDiff] = useState<GitFileDiff | null>(null);
+export default function DiffView({ root, path, commit, onClose }: DiffViewProps) {
+	const isCommit = commit !== null && commit !== undefined;
+	const key = isCommit ? (commit as string) : (path as string);
+	const [diff, setDiff] = useState<GitFileDiff | CommitDiff | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 
@@ -20,7 +23,9 @@ export default function DiffView({ root, path, onClose }: DiffViewProps) {
 		setDiff(null);
 		void (async () => {
 			try {
-				const next = await gitFileDiff(root, path);
+				const next = isCommit
+					? await gitCommitDiff(root, key)
+					: await gitFileDiff(root, key);
 				if (cancelled) return;
 				setDiff(next);
 			} catch (err) {
@@ -33,21 +38,22 @@ export default function DiffView({ root, path, onClose }: DiffViewProps) {
 		return () => {
 			cancelled = true;
 		};
-	}, [root, path]);
+	}, [root, key, isCommit]);
 
-	const lines = diff && !diff.binary ? diff.diff.split("\n") : [];
+	const lines = diff !== null && !diff.binary ? diff.diff.split("\n") : [];
+	const title = isCommit ? `commit ${key}` : key;
 
 	return (
 		<section className="git-diff" aria-label="Diff">
 			<div className="git-diff-head">
-				<span className="git-diff-title">{path}</span>
+				<span className="git-diff-title">{title}</span>
 				<button type="button" className="git-diff-close" onClick={onClose}>
-					close
+					{isCommit ? "Back to changes" : "close"}
 				</button>
 			</div>
 			<div className="git-diff-body">
 				{loading ? (
-					<p className="git-diff-line">Loading…</p>
+					<p className="git-diff-line">{isCommit ? `Loading ${key}…` : "Loading…"}</p>
 				) : error !== null ? (
 					<p className="git-diff-line error">{error}</p>
 				) : diff === null ? (
