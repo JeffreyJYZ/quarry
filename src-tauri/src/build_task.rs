@@ -57,8 +57,8 @@ fn build(root: &str, release: bool) -> Result<BuildReport, String> {
             run_build(&info.build_root, release)
         }
         ProjectKind::Cmake => run_cmake_build(&info.root, &info.build_root, release),
-        ProjectKind::CompileCommands => Err(compile_commands_not_wired()),
-        ProjectKind::Unknown => Err(no_build_system()),
+        ProjectKind::CompileCommands => run_plain_clang_build(&info.root, &info.name),
+        ProjectKind::Unknown => run_plain_clang_build(&info.root, &info.name),
     }
 }
 
@@ -95,6 +95,7 @@ fn cpp_not_wired(marker: &str) -> String {
 
 /// A `compile_commands.json` project names no build system, so the message names the kind and
 /// points at the `build` hint in the launch config.
+#[allow(dead_code)]
 fn compile_commands_not_wired() -> String {
     format!(
         "compile-commands project (compile_commands.json): no build system is known, so quarry \
@@ -443,6 +444,15 @@ fn missing_cmake_error() -> String {
     format!("{CMAKE_PROGRAM} is not on PATH: C/C++ support needs CMake installed")
 }
 
+/// Cap on source files gathered for a plain-clang build.
+const PLAIN_CLANG_SOURCE_CAP: usize = 200;
+/// Directories skipped while gathering sources.
+const PLAIN_CLANG_IGNORED_DIRS: [&str; 5] = ["target", "node_modules", ".git", ".quarry", "build"];
+/// Diagnostics from a plain-clang build carry this source.
+const PLAIN_CLANG_SOURCE: &str = "clang";
+/// Status-bar summary for a plain-clang build that printed nothing.
+const DEFAULT_CLANG_SUMMARY: &str = "clang build finished";
+
 /// The severities a C/C++ compiler prints, matched as `path:line:column: severity: message`.
 const TEXT_SEVERITIES: [(&str, u8); 5] = [
     (": fatal error:", 1),
@@ -451,6 +461,168 @@ const TEXT_SEVERITIES: [(&str, u8); 5] = [
     (": note:", 3),
     (": remark:", 3),
 ];
+
+/// Builds a C/C++ project with clang directly, for projects without a build system.
+pub fn run_plain_clang_build(root: &str, name: &str) -> Result<BuildReport, String> {
+    let root_path = Path::new(root);
+    let sources = collect_plain_clang_sources(root_path)?;
+    if sources.is_empty() {
+        return Err(no_build_system());
+    }
+
+    let compiler = if sources
+        .iter()
+        .all(|path| path.extension().map(|e| e == "c").unwrap_or(false))
+    {
+        "clang"
+    } else {
+        "clang++"
+    };
+
+    let resolved = crate::resolve::resolve(compiler).ok_or_else(|| {
+        format!("{compiler} is not on PATH: C/C++ support needs {compiler} installed")
+    })?;
+
+    let build_dir = root_path.join(".quarry").join("build");
+    std::fs::create_dir_all(&build_dir)
+        .map_err(|error| format!("cannot create {}: {error}", build_dir.display()))?;
+
+    let argv = plain_clang_argv(root, name, &sources);
+
+    let started = Instant::now();
+    let mut command = Command::new(&resolved.path);
+    command.args(&argv[1..]).current_dir(root);
+    let output = command
+        .output()
+        .map_err(|error| format!("cannot run {compiler} in {root}: {error}"))?;
+    let duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+
+    let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
+    text.push('\n');
+    text.push_str(&String::from_utf8_lossy(&output.stderr));
+
+    let mut diagnostics = parse_text_diagnostics(&text, root_path);
+    for diagnostic in &mut diagnostics {
+        diagnostic.source = Some(PLAIN_CLANG_SOURCE.to_string());
+    }
+
+    Ok(BuildReport {
+        success: output.status.success(),
+        diagnostics,
+        duration_ms,
+        summary: summarize_text_with(&text, DEFAULT_CLANG_SUMMARY),
+    })
+}
+
+pub fn collect_plain_clang_sources(root: &Path) -> Result<Vec<std::path::PathBuf>, String> {
+    let mut sources: Vec<std::path::PathBuf> = Vec::new();
+    let entries = std::fs::read_dir(root)
+        .map_err(|error| format!("cannot read {}: {error}", root.display()))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|error| format!("cannot read entry: {error}"))?;
+        let path = entry.path();
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+
+        if path.is_dir() {
+            if PLAIN_CLANG_IGNORED_DIRS.contains(&name_str.as_ref()) {
+                continue;
+            }
+            if let Ok(child_entries) = std::fs::read_dir(&path) {
+                for child in child_entries {
+                    let child = child.map_err(|error| format!("cannot read entry: {error}"))?;
+                    let child_path = child.path();
+                    if child_path.is_file() && is_plain_clang_source(&child_path) {
+                        sources.push(
+                            std::path::PathBuf::from(name_str.as_ref()).join(child.file_name()),
+                        );
+                    }
+                }
+            }
+        } else if path.is_file() && is_plain_clang_source(&path) {
+            sources.push(std::path::PathBuf::from(name_str.as_ref()));
+        }
+    }
+
+    sources.sort();
+    if sources.len() > PLAIN_CLANG_SOURCE_CAP {
+        return Err(format!(
+            "too many source files (cap {}): {} found",
+            PLAIN_CLANG_SOURCE_CAP,
+            sources.len()
+        ));
+    }
+    Ok(sources)
+}
+
+pub fn is_plain_clang_source(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(|ext| ext.to_str()),
+        Some("c") | Some("cc") | Some("cpp")
+    )
+}
+
+pub fn plain_clang_argv<P: AsRef<Path>>(root: &str, name: &str, sources: &[P]) -> Vec<String> {
+    let c_only = sources.iter().all(|source| {
+        source
+            .as_ref()
+            .extension()
+            .map(|ext| ext == "c")
+            .unwrap_or(false)
+    });
+    let compiler = if c_only { "clang" } else { "clang++" };
+    let std_flag = if c_only { "-std=c17" } else { "-std=c++20" };
+    let output = format!("{}/.quarry/build/{}", root.trim_end_matches('/'), name);
+
+    let mut argv = vec![
+        compiler.to_string(),
+        std_flag.to_string(),
+        "-g".to_string(),
+        "-O0".to_string(),
+        "-fno-color-diagnostics".to_string(),
+        "-o".to_string(),
+        output,
+    ];
+    for source in sources {
+        argv.push(source.as_ref().to_string_lossy().into_owned());
+    }
+    argv
+}
+
+/// Alias names kept for test discoverability.
+#[allow(dead_code)]
+fn clang_argv<P: AsRef<Path>>(root: &str, name: &str, sources: &[P]) -> Vec<String> {
+    plain_clang_argv(root, name, sources)
+}
+#[allow(dead_code)]
+fn clang_build_argv<P: AsRef<Path>>(root: &str, name: &str, sources: &[P]) -> Vec<String> {
+    plain_clang_argv(root, name, sources)
+}
+#[allow(dead_code)]
+pub fn collect_sources(root: &Path) -> Result<Vec<std::path::PathBuf>, String> {
+    collect_plain_clang_sources(root)
+}
+#[allow(dead_code)]
+fn compiler_for_sources(sources: &[std::path::PathBuf]) -> &'static str {
+    if sources
+        .iter()
+        .all(|p| p.extension().map(|e| e == "c").unwrap_or(false))
+    {
+        "clang"
+    } else {
+        "clang++"
+    }
+}
+
+fn summarize_text_with(text: &str, default: &str) -> String {
+    let last = text
+        .lines()
+        .rev()
+        .find(|line| !line.trim().is_empty())
+        .map(|line| line.trim());
+    truncate(last.unwrap_or(default), SUMMARY_LIMIT)
+}
 
 /// Parses every compiler diagnostic in the text, dropping duplicates and keeping the order.
 ///
