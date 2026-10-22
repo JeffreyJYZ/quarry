@@ -1,5 +1,7 @@
 mod build_task;
 mod dap;
+mod format;
+mod launch;
 mod lsp;
 mod project;
 mod protocol_pipe;
@@ -35,6 +37,8 @@ pub fn run() {
             lsp::lsp_change_document,
             lsp::lsp_close_document,
             build_task::build_project,
+            format::format_document,
+            format::formatter_for,
             search::search_project,
             dap::dap_launch,
             dap::dap_configuration_done,
@@ -54,7 +58,8 @@ pub fn run() {
             run_config::write_launch_config,
             run_config::resolve_launch_config,
             run_task::run_program,
-            run_task::stop_program
+            run_task::stop_program,
+            launch::default_launch_config
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
