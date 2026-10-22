@@ -18,7 +18,8 @@ pub fn run() {
             version,
             toolchain::toolchains,
             project::open_project,
-            workspace::list_dir
+            workspace::list_dir,
+            workspace::read_text_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

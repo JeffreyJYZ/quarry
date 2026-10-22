@@ -40,6 +40,10 @@ export function listDir(path: string): Promise<FileEntry[]> {
 	return invoke<FileEntry[]>("list_dir", { path });
 }
 
+export function readTextFile(path: string): Promise<string> {
+	return invoke<string>("read_text_file", { path });
+}
+
 export function version(): Promise<string> {
 	return invoke<string>("version");
 }
