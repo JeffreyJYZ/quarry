@@ -1,5 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import CallsPanel from "@/calls/CallsPanel";
 import FileTree from "@/components/FileTree";
 import RefsPanel from "@/components/RefsPanel";
 import StatusBar from "@/components/StatusBar";
@@ -139,6 +140,11 @@ export default function App() {
 	);
 	const [revealToken, setRevealToken] = useState(0);
 	const [refsOpen, setRefsOpen] = useState(false);
+	const [callsOpen, setCallsOpen] = useState(false);
+	const [callsCursor, setCallsCursor] = useState<{ line: number; character: number } | null>(
+		null,
+	);
+	const [cursor, setCursor] = useState<{ line: number; character: number } | null>(null);
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
 	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -736,6 +742,19 @@ export default function App() {
 		return () => window.removeEventListener("keydown", handleKeyDown, true);
 	}, []);
 
+	/** Shift+Alt+H opens call hierarchy panel. */
+	useEffect(() => {
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (!event.shiftKey || !event.altKey || event.metaKey || event.ctrlKey) return;
+			if (event.key.toLowerCase() !== "h") return;
+			event.preventDefault();
+			setCallsCursor(cursor);
+			setCallsOpen(true);
+		};
+		window.addEventListener("keydown", handleKeyDown, true);
+		return () => window.removeEventListener("keydown", handleKeyDown, true);
+	}, [cursor]);
+
 	const openPath = useCallback(
 		async (path: string, name: string) => {
 			if (buffers.some((buffer) => buffer.path === path)) {
@@ -1240,6 +1259,7 @@ export default function App() {
 									onToggleBreakpoint={handleToggleBreakpoint}
 									onNavigate={handleNavigate}
 									onReferences={handleReferences}
+									onCursor={setCursor}
 									onApplyEdits={handleApplyEdits}
 									reveal={
 										revealTarget === null
@@ -1254,6 +1274,34 @@ export default function App() {
 					)}
 					{project && terminalOpen ? (
 						<Terminal key={project.root} root={project.root} />
+					) : project &&
+						callsOpen &&
+						root !== null &&
+						activePath !== null &&
+						callsCursor !== null ? (
+						<CallsPanel
+							root={root}
+							path={activePath}
+							cursor={callsCursor}
+							onNavigate={handleNavigate}
+							onClose={() => setCallsOpen(false)}
+						/>
+					) : project && callsOpen && root !== null ? (
+						<section className="calls-panel" aria-label="Call hierarchy">
+							<div className="calls-head">
+								<span className="calls-title">Calls</span>
+								<button
+									type="button"
+									className="calls-close"
+									onClick={() => setCallsOpen(false)}
+								>
+									close
+								</button>
+							</div>
+							<div className="calls-body">
+								<p className="calls-empty">Place the caret on a symbol</p>
+							</div>
+						</section>
 					) : project ? (
 						<TestsDock
 							tab={dockTab}

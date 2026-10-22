@@ -550,3 +550,42 @@ export function lspInlayHints(root: string, path: string): Promise<InlayHint[]> 
 export function dapRestart(session: string): Promise<DapSession> {
 	return invoke<DapSession>("dap_restart", { session });
 }
+
+export function gitStage(root: string, paths: string[]): Promise<void> {
+	return invoke<void>("git_stage", { root, paths });
+}
+
+export function gitUnstage(root: string, paths: string[]): Promise<void> {
+	return invoke<void>("git_unstage", { root, paths });
+}
+
+export type CallHierarchyNode = {
+	name: string;
+	kind: number;
+	path: string;
+	line: number;
+	character: number;
+	itemId: number;
+};
+
+export function lspCallHierarchyPrepare(
+	root: string,
+	path: string,
+	line: number,
+	character: number,
+): Promise<CallHierarchyNode[]> {
+	return invoke<CallHierarchyNode[]>("lsp_call_hierarchy_prepare", {
+		root,
+		path,
+		line,
+		character,
+	});
+}
+
+export function lspCallHierarchyCalls(
+	root: string,
+	itemId: number,
+	direction: "incoming" | "outgoing",
+): Promise<CallHierarchyNode[]> {
+	return invoke<CallHierarchyNode[]>("lsp_call_hierarchy_calls", { root, itemId, direction });
+}
