@@ -41,7 +41,6 @@ Each line names the command or component that proves the capability, taken from
 4. **Profiler.** Explicit non-goal. Do not schedule.
 5. **Plugin API.** Explicit non-goal. Do not schedule.
 6. **Watch-expression pane.** Blocked on item 1; can only offer variables-tree watching and memory views until a different adapter or toolchain is measured. Estimate: unknown.
-7. ~~**Exception-breakpoint panel.**~~ Shipped: `src/debug/DebugPanel.tsx` renders the adapter's own filter list and toggles it through `dap_set_exception_breakpoints`, preserving the checked set across a restart.
 
 ## 3. Definition of done for the daily loop at parity
 
