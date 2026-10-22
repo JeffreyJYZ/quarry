@@ -16,8 +16,8 @@ use crate::project::open_project;
 use crate::protocol_pipe::{FrameError, ProcessPipe};
 use crate::resolve;
 use crate::types::{
-    CompletionItem, CompletionList, Diagnostic, DiagnosticsEvent, HoverInfo, Location, LspStatus,
-    Position, ProjectKind, Range, Symbol,
+    CodeAction, CompletionItem, CompletionList, Diagnostic, DiagnosticsEvent, FileEdit, HoverInfo,
+    Location, LspStatus, Position, ProjectKind, Range, Symbol, TextEdit,
 };
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -1365,5 +1365,234 @@ fn collect_document_symbols(value: &Value, depth: u32, out: &mut Vec<Symbol>) {
         for child in children {
             collect_document_symbols(child, depth + 1, out);
         }
+    }
+}
+
+#[tauri::command]
+pub async fn lsp_rename(
+    state: State<'_, LspState>,
+    root: String,
+    path: String,
+    line: u32,
+    character: u32,
+    new_name: String,
+) -> Result<Vec<FileEdit>, String> {
+    let session = session_for(&state, &root)?;
+    let params = json!({
+        "textDocument": { "uri": path_to_uri(&path) },
+        "position": { "line": line, "character": character },
+        "newName": new_name,
+    });
+    let result = send_request(&session, "textDocument/rename", params).await?;
+    Ok(parse_workspace_edit(&result))
+}
+
+#[tauri::command]
+pub async fn lsp_code_actions(
+    state: State<'_, LspState>,
+    root: String,
+    path: String,
+    line: u32,
+    character: u32,
+) -> Result<Vec<CodeAction>, String> {
+    let session = session_for(&state, &root)?;
+    let params = json!({
+        "textDocument": { "uri": path_to_uri(&path) },
+        "range": {
+            "start": { "line": line, "character": character },
+            "end": { "line": line, "character": character },
+        },
+        "context": { "diagnostics": [] },
+    });
+    let result = send_request(&session, "textDocument/codeAction", params).await?;
+    Ok(parse_code_actions(&result))
+}
+
+/// Flatten a `WorkspaceEdit` into the IDE's `FileEdit` list.
+///
+/// Supports both `changes: { uri: TextEdit[] }` and
+/// `documentChanges: [{ textDocument: { uri }, edits }]`. `create`/`rename`/`delete`
+/// file operations are ignored; URIs that are not file URIs are skipped. A null
+/// result reads as an empty vector.
+pub fn parse_workspace_edit(result: &Value) -> Vec<FileEdit> {
+    let mut out = Vec::new();
+    if result.is_null() {
+        return out;
+    }
+
+    if let Some(changes) = result.get("changes").and_then(Value::as_object) {
+        for (uri, edits) in changes {
+            let Some(path) = uri_to_path(uri) else {
+                continue;
+            };
+            let mut file_edits = Vec::new();
+            if let Some(entries) = edits.as_array() {
+                for entry in entries {
+                    if let Some(edit) = parse_text_edit(entry) {
+                        file_edits.push(edit);
+                    }
+                }
+            }
+            if !file_edits.is_empty() {
+                out.push(FileEdit {
+                    path,
+                    edits: file_edits,
+                });
+            }
+        }
+    }
+
+    if let Some(document_changes) = result.get("documentChanges").and_then(Value::as_array) {
+        for entry in document_changes {
+            if entry.get("kind").is_some() {
+                continue;
+            }
+            let uri = entry
+                .get("textDocument")
+                .and_then(|td| td.get("uri"))
+                .and_then(Value::as_str)
+                .or_else(|| entry.get("uri").and_then(Value::as_str));
+            let Some(uri) = uri else {
+                continue;
+            };
+            let Some(path) = uri_to_path(uri) else {
+                continue;
+            };
+            let Some(edits) = entry.get("edits").and_then(Value::as_array) else {
+                continue;
+            };
+            let mut file_edits = Vec::new();
+            for edit_entry in edits {
+                let candidate = edit_entry.get("textEdit").unwrap_or(edit_entry);
+                if let Some(edit) = parse_text_edit(candidate) {
+                    file_edits.push(edit);
+                }
+            }
+            if !file_edits.is_empty() {
+                out.push(FileEdit {
+                    path,
+                    edits: file_edits,
+                });
+            }
+        }
+    }
+
+    out
+}
+
+fn parse_text_edit(value: &Value) -> Option<TextEdit> {
+    let range = value.get("range")?;
+    let new_text = value.get("newText").and_then(Value::as_str)?;
+    Some(TextEdit {
+        range: parse_range(range),
+        new_text: new_text.to_string(),
+    })
+}
+
+/// Read code actions out of a `textDocument/codeAction` answer.
+///
+/// Only actions carrying an `edit` (a `WorkspaceEdit`) are kept; actions that
+/// carry only a `command` are dropped. `isPreferred` is ignored.
+pub fn parse_code_actions(result: &Value) -> Vec<CodeAction> {
+    let mut out = Vec::new();
+    let Some(entries) = result.as_array() else {
+        return out;
+    };
+    for entry in entries {
+        let Some(edit) = entry.get("edit") else {
+            continue;
+        };
+        let title = entry
+            .get("title")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        let kind = entry
+            .get("kind")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        out.push(CodeAction {
+            title,
+            kind,
+            edits: parse_workspace_edit(edit),
+        });
+    }
+    out
+}
+
+#[cfg(test)]
+mod rename_extra_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn rename_changes_shape() {
+        let v = json!({
+            "changes": {
+                path_to_uri("/p/src/main.rs"): [
+                    { "range": { "start": {"line":0,"character":0}, "end": {"line":0,"character":1} }, "newText": "x" }
+                ]
+            }
+        });
+        let out = parse_workspace_edit(&v);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].path, "/p/src/main.rs");
+    }
+
+    #[test]
+    fn rename_document_changes_shape() {
+        let v = json!({
+            "documentChanges": [
+                { "textDocument": { "uri": path_to_uri("/p/src/other.rs") }, "edits": [
+                    { "range": { "start": {"line":1,"character":2}, "end": {"line":1,"character":3} }, "newText": "y" }
+                ] }
+            ]
+        });
+        let out = parse_workspace_edit(&v);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].path, "/p/src/other.rs");
+    }
+
+    #[test]
+    fn rename_null_empty() {
+        assert!(parse_workspace_edit(&Value::Null).is_empty());
+    }
+
+    #[test]
+    fn code_action_keeps_edit_drops_command() {
+        let v = json!([
+            { "title": "fix", "kind": "quickfix", "edit": { "changes": {} } },
+            { "title": "cmd", "command": { "title": "x", "command": "y" } }
+        ]);
+        let out = parse_code_actions(&v);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].title, "fix");
+    }
+
+    #[test]
+    fn non_file_uri_skipped() {
+        let v = json!({
+            "changes": {
+                "untitled:Untitled-1": [
+                    { "range": { "start": {"line":0,"character":0}, "end": {"line":0,"character":1} }, "newText": "x" }
+                ]
+            }
+        });
+        assert!(parse_workspace_edit(&v).is_empty());
+    }
+
+    #[test]
+    fn malformed_edit_ignored() {
+        let v = json!({
+            "changes": {
+                path_to_uri("/p/src/main.rs"): [
+                    { "range": { "start": {"line":0,"character":0} }, "newText": 5 },
+                    { "range": { "start": {"line":0,"character":0}, "end": {"line":0,"character":1} }, "newText": "ok" }
+                ]
+            }
+        });
+        let out = parse_workspace_edit(&v);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].edits.len(), 1);
     }
 }

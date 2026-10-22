@@ -396,3 +396,26 @@ pub struct Symbol {
     /// Nesting depth, 0 for top-level symbols.
     pub depth: u32,
 }
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct TextEdit {
+    pub range: Range,
+    pub new_text: String,
+}
+
+/// All edits a rename or a code action makes, grouped by file.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FileEdit {
+    pub path: String,
+    pub edits: Vec<TextEdit>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeAction {
+    pub title: String,
+    pub kind: Option<String>,
+    pub edits: Vec<FileEdit>,
+}

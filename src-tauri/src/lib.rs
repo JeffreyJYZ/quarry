@@ -46,6 +46,8 @@ pub fn run() {
             lsp::lsp_references,
             lsp::lsp_completion,
             lsp::lsp_symbols,
+            lsp::lsp_rename,
+            lsp::lsp_code_actions,
             build_task::build_project,
             format::format_document,
             format::formatter_for,
