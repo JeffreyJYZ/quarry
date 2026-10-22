@@ -1,3 +1,4 @@
+import BreakpointItem from "@/debug/BreakpointItem";
 import DisasmPane from "@/debug/memory/DisasmPane";
 import MemoryPane from "@/debug/memory/MemoryPane";
 import type { DebugController, VariableRow } from "@/debug/session";
@@ -123,6 +124,9 @@ export default function DebugPanel({ debug }: { debug: DebugController }) {
 			<div className="debug-head">
 				<span className="label">debug</span>
 				<span className={`debug-status ${debug.status}`}>{debug.status}</span>
+				{debug.sessionKind === null ? null : (
+					<span className="debug-session">{debug.sessionKind}</span>
+				)}
 			</div>
 
 			{debug.error === null ? null : (
@@ -177,6 +181,25 @@ export default function DebugPanel({ debug }: { debug: DebugController }) {
 						onClick={debug.launch}
 					>
 						Launch
+					</button>
+				</div>
+				<div className="debug-row debug-row-wrap">
+					<input
+						className="debug-pid"
+						type="number"
+						inputMode="numeric"
+						placeholder="pid"
+						value={debug.pidInput}
+						disabled={session !== null}
+						onChange={(event) => debug.setPidInput(event.target.value)}
+					/>
+					<button
+						type="button"
+						className="button"
+						disabled={session !== null || debug.status === "launching"}
+						onClick={debug.attach}
+					>
+						Attach
 					</button>
 				</div>
 				{debug.presets.length === 0 ? (
@@ -377,41 +400,19 @@ export default function DebugPanel({ debug }: { debug: DebugController }) {
 									</div>
 									<ul className="debug-list">
 										{rows.map((breakpoint) => (
-											<li
+											<BreakpointItem
 												key={breakpoint.key}
-												className={
-													breakpoint.verified === false
-														? "debug-item unverified"
-														: breakpoint.verified === null
-															? "debug-item pending"
-															: "debug-item"
+												row={breakpoint}
+												onEdit={(field, value) =>
+													debug.setBreakpointField(
+														breakpoint.path,
+														breakpoint.line,
+														field,
+														value,
+													)
 												}
-												title={breakpoint.message ?? breakpoint.path}
-											>
-												<span className="debug-pos">
-													{fileName(breakpoint.path)}:{breakpoint.line}
-												</span>
-												<span className="debug-mem">
-													{breakpoint.verified === false
-														? "unverified"
-														: breakpoint.verified === null
-															? "pending"
-															: "verified"}
-												</span>
-												<button
-													type="button"
-													className="debug-remove"
-													aria-label={`Remove breakpoint at ${fileName(breakpoint.path)}:${breakpoint.line}`}
-													onClick={() =>
-														debug.removeBreakpoint(
-															breakpoint.path,
-															breakpoint.line,
-														)
-													}
-												>
-													×
-												</button>
-											</li>
+												onRemove={debug.removeBreakpoint}
+											/>
 										))}
 									</ul>
 								</div>

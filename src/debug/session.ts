@@ -1,20 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { dapContinueOn, dapStepOn } from "@/debug/dap";
 import { fileName } from "@/problems/model";
 import {
 	buildProject,
+	type DapBreakpoint,
 	type DapFrame,
 	type DapScope,
 	type DapStoppedEvent,
 	type DapVariable,
+	dapAttach,
 	dapConfigurationDone,
-	dapContinue,
 	dapDataBreakpointInfo,
 	dapLaunch,
 	dapScopes,
 	dapSetBreakpoints,
+	dapSetBreakpointsEx,
 	dapSetDataBreakpoints,
 	dapStackTrace,
-	dapStep,
 	dapStop,
 	dapThreads,
 	dapVariables,
@@ -77,13 +79,27 @@ export type StopView = {
 	scopes: DapScope[];
 };
 
+export type BreakpointField = "condition" | "hitCondition" | "logMessage";
+
+export type BreakpointEntry = {
+	condition: string | null;
+	hitCondition: string | null;
+	logMessage: string | null;
+	enabled: boolean;
+	verified: boolean | null;
+	message: string | null;
+};
+
 export type BreakpointRow = {
 	key: string;
 	path: string;
 	line: number;
-	/** `null` until an adapter has confirmed the line. */
 	verified: boolean | null;
 	message: string | null;
+	condition: string | null;
+	hitCondition: string | null;
+	logMessage: string | null;
+	enabled: boolean;
 };
 
 /** `path:line`, the identity of one set breakpoint across both the panel and the editor gutter. */
@@ -123,8 +139,15 @@ export type DebugController = {
 	error: string | null;
 	configError: string | null;
 	sessionId: string | null;
+	/** How the live session started; null with no session. */
+	sessionKind: string | null;
 	/** Every row the launch select renders, in order. */
 	presetEntries: PresetEntry[];
+	/** The pid the attach box holds. */
+	pidInput: string;
+	setPidInput: (value: string) => void;
+	/** Attach to a running process; a rejection is one error line. */
+	attach: () => void;
 	presets: LaunchPreset[];
 	preset: string;
 	setPreset: (name: string) => void;
@@ -152,6 +175,13 @@ export type DebugController = {
 	breakpoints: BreakpointRow[];
 	/** The same rows grouped by absolute path, in line order — what a gutter renders. */
 	breakpointsByPath: Map<string, BreakpointRow[]>;
+	/** Sets one of a breakpoint's extras; empty text clears it. */
+	setBreakpointField: (
+		path: string,
+		line: number,
+		field: BreakpointField,
+		value: string | null,
+	) => void;
 	/** Adds or removes one line for one absolute path; safe with no live session. */
 	toggleBreakpoint: (path: string, line: number) => void;
 	/** Adds the selected frame's line once; the panel's button. */
@@ -176,11 +206,16 @@ export function useDebugSession(root: string | null): DebugController {
 	const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 	const [selectedVariable, setSelectedVariable] = useState<VariableRow | null>(null);
 	const [watchPoints, setWatchPoints] = useState<WatchRow[]>([]);
-	const [breakpoints, setBreakpoints] = useState<BreakpointRow[]>([]);
+	const [breakpointMap, setBreakpointMap] = useState<Map<string, Map<number, BreakpointEntry>>>(
+		() => new Map(),
+	);
 	/** Project kind decides whether the preset-free Cargo entry is offered at all. */
 	const [kind, setKind] = useState<ProjectKind | null>(null);
 	/** The configuration the last launch resolved, shown under the select. */
 	const [resolved, setResolved] = useState<LaunchConfig | null>(null);
+	const [sessionKind, setSessionKind] = useState<string | null>(null);
+	const [attachPid, setAttachPid] = useState<number | null>(null);
+	const [pidInput, setPidInputState] = useState("");
 	/** The missing-binary message while one build is still on offer; null once used. */
 	const [buildNeeded, setBuildNeeded] = useState<string | null>(null);
 	const [building, setBuilding] = useState(false);
@@ -191,7 +226,7 @@ export function useDebugSession(root: string | null): DebugController {
 	const presetRef = useRef("");
 	const stopRef = useRef<StopView | null>(null);
 	const watchRef = useRef<WatchRow[]>([]);
-	const breakpointsRef = useRef<BreakpointRow[]>([]);
+	const breakpointMapRef = useRef<Map<string, Map<number, BreakpointEntry>>>(breakpointMap);
 	const childrenRef = useRef<Map<number, DapVariable[]>>(children);
 	const expandedRef = useRef<Set<string>>(expanded);
 	const generationRef = useRef(0);
@@ -200,7 +235,7 @@ export function useDebugSession(root: string | null): DebugController {
 	presetRef.current = preset;
 	stopRef.current = stopView;
 	watchRef.current = watchPoints;
-	breakpointsRef.current = breakpoints;
+	breakpointMapRef.current = breakpointMap;
 	childrenRef.current = children;
 	expandedRef.current = expanded;
 
@@ -249,13 +284,16 @@ export function useDebugSession(root: string | null): DebugController {
 		setExpanded(new Set());
 		setSelectedVariable(null);
 		setWatchPoints([]);
-		setBreakpoints([]);
+		setBreakpointMap(new Map());
 		setError(null);
 		setConfigError(null);
 		setPresets([]);
 		setPresetState("");
 		setKind(null);
 		setResolved(null);
+		setSessionKind(null);
+		setAttachPid(null);
+		setPidInputState("");
 		setBuildNeeded(null);
 		setBuilding(false);
 		if (previous !== null) {
@@ -506,31 +544,59 @@ export function useDebugSession(root: string | null): DebugController {
 	 * Commit one breakpoint set, then fold the adapter's verdicts back onto the matching lines.
 	 * With no live session the set is only recorded: a launch re-sends everything.
 	 */
-	const applyBreakpoints = useCallback(async (next: BreakpointRow[]) => {
-		const ordered = sortBreakpoints(next);
-		breakpointsRef.current = ordered;
-		setBreakpoints(ordered);
-		const session = sessionRef.current;
-		if (session === null) {
-			return;
-		}
-		const byPath = new Map<string, number[]>();
-		for (const breakpoint of ordered) {
-			const lines = byPath.get(breakpoint.path) ?? [];
-			lines.push(breakpoint.line);
-			byPath.set(breakpoint.path, lines);
-		}
-		const verdicts = new Map<string, { verified: boolean; message: string | null }>();
-		let failure: string | null = null;
-		for (const [path, lines] of byPath) {
+	const commitMap = useCallback((next: Map<string, Map<number, BreakpointEntry>>) => {
+		breakpointMapRef.current = next;
+		setBreakpointMap(next);
+	}, []);
+
+	const syncFile = useCallback(
+		async (path: string) => {
+			const session = sessionRef.current;
+			const lines = breakpointMapRef.current.get(path);
+			if (session === null) {
+				return;
+			}
+			const rows = [...(lines ?? new Map<number, BreakpointEntry>()).entries()].sort(
+				(left, right) => left[0] - right[0],
+			);
+			const plain = rows.every(
+				([, entry]) =>
+					entry.enabled &&
+					entry.condition === null &&
+					entry.hitCondition === null &&
+					entry.logMessage === null,
+			);
+			let results: DapBreakpoint[];
 			try {
-				const results = await dapSetBreakpoints(session, path, lines);
-				if (sessionRef.current !== session) {
-					return;
-				}
-				/* The adapter answers one row per requested line, in order, and may resolve it onto a
-				 * different line. That moved line is reported, not silently turned into a verified dot. */
-				lines.forEach((line, index) => {
+				results = plain
+					? await dapSetBreakpoints(
+							session,
+							path,
+							rows.map(([line]) => line),
+						)
+					: await dapSetBreakpointsEx(
+							session,
+							path,
+							rows
+								.filter(([, entry]) => entry.enabled)
+								.map(([line, entry]) => ({
+									line,
+									condition: entry.condition,
+									hitCondition: entry.hitCondition,
+									logMessage: entry.logMessage,
+									enabled: true,
+								})),
+						);
+			} catch (reason) {
+				setError(`Breakpoints: ${fileName(path)}: ${describeError(reason)}`);
+				return;
+			}
+			if (sessionRef.current !== session) {
+				return;
+			}
+			const verdicts = new Map<string, { verified: boolean; message: string | null }>();
+			if (plain || results.length === rows.length) {
+				rows.forEach(([line], index) => {
 					const result = results[index];
 					if (result === undefined) {
 						verdicts.set(breakpointKey(path, line), {
@@ -545,24 +611,40 @@ export function useDebugSession(root: string | null): DebugController {
 						message: result.message ?? (moved ? `moved to line ${result.line}` : null),
 					});
 				});
-			} catch (reason) {
-				failure = `${fileName(path)}: ${describeError(reason)}`;
+			} else {
+				for (const [line] of rows) {
+					const result = results.find((candidate) => candidate.line === line);
+					verdicts.set(breakpointKey(path, line), {
+						verified: result?.verified ?? false,
+						message: result?.message ?? null,
+					});
+				}
 			}
+			if (verdicts.size > 0) {
+				const next = new Map(breakpointMapRef.current);
+				const lines = new Map(next.get(path) ?? []);
+				for (const [line] of rows) {
+					const entry = lines.get(line);
+					const verdict = verdicts.get(breakpointKey(path, line));
+					if (entry === undefined || verdict === undefined) continue;
+					lines.set(line, {
+						...entry,
+						verified: verdict.verified,
+						message: verdict.message,
+					});
+				}
+				next.set(path, lines);
+				commitMap(next);
+			}
+		},
+		[commitMap],
+	);
+
+	const syncAll = useCallback(async () => {
+		for (const path of [...breakpointMapRef.current.keys()]) {
+			await syncFile(path);
 		}
-		if (verdicts.size > 0) {
-			setBreakpoints((current) =>
-				current.map((breakpoint) => {
-					const verdict = verdicts.get(breakpoint.key);
-					return verdict === undefined
-						? breakpoint
-						: { ...breakpoint, verified: verdict.verified, message: verdict.message };
-				}),
-			);
-		}
-		if (failure !== null) {
-			setError(`Breakpoints: ${failure}`);
-		}
-	}, []);
+	}, [syncFile]);
 
 	/** The gutter path: one line of one absolute file, added or removed. */
 	const toggleBreakpoint = useCallback(
@@ -570,16 +652,34 @@ export function useDebugSession(root: string | null): DebugController {
 			if (path === "" || !Number.isInteger(line) || line < 1) {
 				return;
 			}
-			const key = breakpointKey(path, line);
-			const current = breakpointsRef.current;
 			setError(null);
-			void applyBreakpoints(
-				current.some((row) => row.key === key)
-					? current.filter((row) => row.key !== key)
-					: [...current, { key, path, line, verified: null, message: null }],
-			);
+			const current = breakpointMapRef.current;
+			const lines = current.get(path);
+			const exists = lines?.has(line);
+			if (exists) {
+				const next = new Map(current);
+				const nextLines = new Map(lines ?? []);
+				nextLines.delete(line);
+				if (nextLines.size === 0) next.delete(path);
+				else next.set(path, nextLines);
+				commitMap(next);
+			} else {
+				const next = new Map(current);
+				const nextLines = new Map(lines ?? []);
+				nextLines.set(line, {
+					condition: null,
+					hitCondition: null,
+					logMessage: null,
+					enabled: true,
+					verified: null,
+					message: null,
+				});
+				next.set(path, nextLines);
+				commitMap(next);
+			}
+			void syncFile(path);
 		},
-		[applyBreakpoints],
+		[commitMap, syncFile],
 	);
 
 	/** Only offered while stopped: the new line comes from the selected frame's source. */
@@ -590,23 +690,56 @@ export function useDebugSession(root: string | null): DebugController {
 			setError("Stop first: a breakpoint needs a frame source");
 			return;
 		}
-		const key = breakpointKey(top.source, top.line);
-		if (breakpointsRef.current.some((breakpoint) => breakpoint.key === key)) {
+		const path = top.source;
+		const line = top.line;
+		const lines = breakpointMapRef.current.get(path);
+		if (lines?.has(line)) {
 			return;
 		}
 		setError(null);
-		void applyBreakpoints([
-			...breakpointsRef.current,
-			{ key, path: top.source, line: top.line, verified: null, message: null },
-		]);
-	}, [applyBreakpoints]);
+		const next = new Map(breakpointMapRef.current);
+		const nextLines = new Map(lines ?? []);
+		nextLines.set(line, {
+			condition: null,
+			hitCondition: null,
+			logMessage: null,
+			enabled: true,
+			verified: null,
+			message: null,
+		});
+		next.set(path, nextLines);
+		commitMap(next);
+		void syncFile(path);
+	}, [commitMap, syncFile]);
 
 	const removeBreakpoint = useCallback(
 		(path: string, line: number) => {
-			const key = breakpointKey(path, line);
-			void applyBreakpoints(breakpointsRef.current.filter((row) => row.key !== key));
+			const lines = breakpointMapRef.current.get(path);
+			if (lines === undefined || !lines.has(line)) return;
+			const next = new Map(breakpointMapRef.current);
+			const nextLines = new Map(lines);
+			nextLines.delete(line);
+			if (nextLines.size === 0) next.delete(path);
+			else next.set(path, nextLines);
+			commitMap(next);
+			void syncFile(path);
 		},
-		[applyBreakpoints],
+		[commitMap, syncFile],
+	);
+
+	const setBreakpointField = useCallback(
+		(path: string, line: number, field: BreakpointField, value: string | null) => {
+			const lines = breakpointMapRef.current.get(path);
+			const entry = lines?.get(line);
+			if (entry === undefined) return;
+			const next = new Map(breakpointMapRef.current);
+			const nextLines = new Map(lines ?? []);
+			nextLines.set(line, { ...entry, [field]: value, verified: null, message: null });
+			next.set(path, nextLines);
+			commitMap(next);
+			void syncFile(path);
+		},
+		[commitMap, syncFile],
 	);
 
 	/** The one place a select value becomes a configuration; a preset and the Cargo default differ only here. */
@@ -666,18 +799,17 @@ export function useDebugSession(root: string | null): DebugController {
 			}
 			sessionRef.current = id;
 			setSessionId(id);
+			setSessionKind("launch");
 			setLaunching(false);
 			/* A fresh adapter knows nothing about rows from an earlier session. */
-			if (breakpointsRef.current.length > 0) {
-				await applyBreakpoints(breakpointsRef.current);
-			}
+			await syncAll();
 			try {
 				await dapConfigurationDone(id);
 			} catch (reason) {
 				setError(`Configuration done: ${describeError(reason)}`);
 			}
 		},
-		[applyBreakpoints, resolveConfig],
+		[syncAll, resolveConfig],
 	);
 
 	/** Build the project, then retry the launch once; a second failure is a plain error line. */
@@ -708,13 +840,57 @@ export function useDebugSession(root: string | null): DebugController {
 		await launch(false);
 	}, [buildNeeded, building, launch]);
 
+	const setPidInput = useCallback((value: string) => {
+		setPidInputState(value);
+	}, []);
+
+	const attach = useCallback(async () => {
+		const rootNow = rootRef.current;
+		if (rootNow === null) {
+			setError("Open a project first");
+			return;
+		}
+		if (sessionRef.current !== null) {
+			setError("A debug session is already running");
+			return;
+		}
+		const pid = Number(pidInput.trim());
+		if (!Number.isInteger(pid) || pid <= 0) {
+			setError("Attach: invalid pid");
+			return;
+		}
+		setLaunching(true);
+		setError(null);
+		setStopView(null);
+		let session: { id: string; program: string };
+		try {
+			session = await dapAttach(pid);
+		} catch (reason) {
+			setError(`Attach: ${describeError(reason)}`);
+			setLaunching(false);
+			return;
+		}
+		const id = session.id;
+		sessionRef.current = id;
+		setSessionId(id);
+		setSessionKind("attach");
+		setAttachPid(pid);
+		setLaunching(false);
+		await syncAll();
+		try {
+			await dapConfigurationDone(id);
+		} catch (reason) {
+			setError(`Configuration done: ${describeError(reason)}`);
+		}
+	}, [pidInput, syncAll]);
+
 	const continueRun = useCallback(async () => {
 		const session = sessionRef.current;
 		if (session === null) {
 			return;
 		}
 		try {
-			await dapContinue(session);
+			await dapContinueOn(session, stopRef.current?.threadId ?? undefined);
 			setStopView(null);
 			setError(null);
 		} catch (reason) {
@@ -728,7 +904,7 @@ export function useDebugSession(root: string | null): DebugController {
 			return;
 		}
 		try {
-			await dapStep(session, kind);
+			await dapStepOn(session, kind, stopRef.current?.threadId ?? undefined);
 			setStopView(null);
 			setError(null);
 		} catch (reason) {
@@ -830,13 +1006,40 @@ export function useDebugSession(root: string | null): DebugController {
 				? "running"
 				: "stopped";
 
+	const breakpoints = useMemo(() => {
+		const rows: BreakpointRow[] = [];
+		for (const [path, lines] of breakpointMap) {
+			for (const [line, entry] of lines) {
+				rows.push({
+					key: breakpointKey(path, line),
+					path,
+					line,
+					verified: entry.verified,
+					message: entry.message,
+					condition: entry.condition,
+					hitCondition: entry.hitCondition,
+					logMessage: entry.logMessage,
+					enabled: entry.enabled,
+				});
+			}
+		}
+		return sortBreakpoints(rows);
+	}, [breakpointMap]);
+
 	const breakpointsByPath = useMemo(() => groupByPath(breakpoints), [breakpoints]);
+	void attachPid;
 
 	return {
 		status,
 		error,
 		configError,
 		sessionId,
+		sessionKind,
+		pidInput,
+		setPidInput,
+		attach: () => {
+			void attach();
+		},
 		presetEntries,
 		presets,
 		preset,
@@ -873,6 +1076,7 @@ export function useDebugSession(root: string | null): DebugController {
 		removeWatchPoint,
 		breakpoints,
 		breakpointsByPath,
+		setBreakpointField,
 		toggleBreakpoint,
 		addBreakpoint,
 		removeBreakpoint,
