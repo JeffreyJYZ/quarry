@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 import type { ProjectInfo, ToolchainReport } from "@/project/api";
 import { kindLabel } from "@/project/kind";
 
@@ -7,9 +7,17 @@ export type StatusBarProps = {
 	project: ProjectInfo | null;
 	report: ToolchainReport | null;
 	reportFailed: boolean;
+	/** Middle slot, after the project line: language server, diagnostic totals, last build. */
+	extra?: ReactNode;
 };
 
-export default function StatusBar({ version, project, report, reportFailed }: StatusBarProps) {
+export default function StatusBar({
+	version,
+	project,
+	report,
+	reportFailed,
+	extra,
+}: StatusBarProps) {
 	const missing = report ? report.tools.filter((tool) => tool.source === "missing").length : 0;
 	const middle = project
 		? `${project.name} · ${kindLabel(project.kind)} · ${project.buildRoot}`
@@ -19,7 +27,8 @@ export default function StatusBar({ version, project, report, reportFailed }: St
 		<footer className="statusbar">
 			<span className="status-left">quarry {version || "0.1.0"}</span>
 			<span className="status-middle" title={middle}>
-				{middle}
+				<span className="status-project">{middle}</span>
+				{extra ? <span className="status-extra">{extra}</span> : null}
 			</span>
 			<span className="status-right">
 				{report ? (

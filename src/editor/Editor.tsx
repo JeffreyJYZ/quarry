@@ -1,5 +1,6 @@
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { indentUnit, syntaxHighlighting } from "@codemirror/language";
+import { lintGutter, setDiagnostics } from "@codemirror/lint";
 import { Compartment, EditorState } from "@codemirror/state";
 import {
 	drawSelection,
@@ -11,24 +12,32 @@ import {
 } from "@codemirror/view";
 import { type JSX, useEffect, useRef } from "react";
 import "@/editor/editor.css";
+import { lintSignature, toLintDiagnostics } from "@/editor/diagnostics";
 import { languageForPath } from "@/editor/languages";
 import { quarryHighlightStyle, quarryTheme } from "@/editor/theme";
+import type { Diagnostic } from "@/project/api";
 
 export type EditorProps = {
 	/** Absolute path of the open file, or null for an empty buffer. */
 	path: string | null;
 	value: string;
 	onChange: (value: string) => void;
+	/** Diagnostics for this document only. The editor renders them; it never fetches them. */
+	diagnostics?: Diagnostic[];
 };
 
 /**
  * CodeMirror 6 surface. One `EditorView` per mount; `value` stays caller-owned and is pushed into the
  * document only when it actually differs, so local edits keep their selection and scroll position.
  */
-export default function Editor({ path, value, onChange }: EditorProps): JSX.Element {
+export default function Editor({ path, value, onChange, diagnostics }: EditorProps): JSX.Element {
 	const hostRef = useRef<HTMLDivElement | null>(null);
 	const viewRef = useRef<EditorView | null>(null);
 	const languageRef = useRef<Compartment | null>(null);
+	const publishedRef = useRef<{ view: EditorView | null; signature: string }>({
+		view: null,
+		signature: "",
+	});
 	const latestRef = useRef({ path, value, onChange });
 	latestRef.current = { path, value, onChange };
 
@@ -45,6 +54,7 @@ export default function Editor({ path, value, onChange }: EditorProps): JSX.Elem
 				doc: latestRef.current.value,
 				extensions: [
 					lineNumbers(),
+					lintGutter(),
 					highlightActiveLineGutter(),
 					highlightActiveLine(),
 					drawSelection(),
@@ -92,6 +102,20 @@ export default function Editor({ path, value, onChange }: EditorProps): JSX.Elem
 		if (current === value) return;
 		view.dispatch({ changes: { from: 0, to: current.length, insert: value } });
 	}, [value]);
+
+	// Diagnostics-only transaction: it carries an effect and no document change, so the update
+	// listener above stays quiet and an edit never enters here. The guard is keyed to the view so a
+	// re-created view (StrictMode remount) still publishes.
+	useEffect(() => {
+		const view = viewRef.current;
+		if (view === null) return;
+		const mapped = toLintDiagnostics(view.state, diagnostics);
+		const signature = lintSignature(mapped);
+		const published = publishedRef.current;
+		if (published.view === view && published.signature === signature) return;
+		publishedRef.current = { view, signature };
+		view.dispatch(setDiagnostics(view.state, mapped));
+	}, [diagnostics]);
 
 	return <div className="editor-host" ref={hostRef} />;
 }

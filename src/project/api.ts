@@ -104,6 +104,29 @@ export function buildProject(root: string, profile: "debug" | "release"): Promis
 	return invoke<BuildReport>("build_project", { root, profile });
 }
 
+export type SearchMatch = {
+	path: string;
+	/** 1-based. */
+	line: number;
+	/** 1-based byte column. */
+	column: number;
+	text: string;
+};
+
+export type SearchReport = {
+	matches: SearchMatch[];
+	truncated: boolean;
+	durationMs: number;
+};
+
+export function searchProject(
+	root: string,
+	query: string,
+	maxResults?: number,
+): Promise<SearchReport> {
+	return invoke<SearchReport>("search_project", { root, query, maxResults: maxResults ?? null });
+}
+
 export async function onDiagnostics(
 	handler: (event: DiagnosticsEvent) => void,
 ): Promise<() => void> {

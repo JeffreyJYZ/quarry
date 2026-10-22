@@ -312,17 +312,6 @@ function findVariable(
 	return vars.find((v) => v.name === name);
 }
 
-function showsRustValue(value: string | undefined, kind: "vec" | "string"): boolean {
-	if (!value) return false;
-	if (kind === "vec") {
-		// A real Rust presentation lists elements or a struct summary; a raw view
-		// is `{ ptr = ..., cap = ..., len = ... }` / `{pointer, ...}`.
-		const raw = /ptr\s*=|cap\s*=|len\s*=|\{\s*pointer/i.test(value);
-		return !raw && value.trim().length > 0;
-	}
-	return !/ptr\s*=|len\s*=|\{\s*pointer/i.test(value) || /"/.test(value);
-}
-
 interface Measure {
 	name: string;
 	required: boolean;
@@ -461,12 +450,6 @@ async function main() {
 		encoding: "utf8",
 	}).stdout?.trim();
 	if (!adapterPath) throw new Error("xcrun --find lldb-dap returned nothing");
-	const versionLine =
-		versionProbe.stdout
-			?.split("\n")
-			.map((l) => l.trim())
-			.filter(Boolean)
-			.find((l) => /lldb-dap:|LLVM version|liblldb/i.test(l)) ?? "";
 	const llvmVersion = /LLVM version ([\d.]+)/.exec(versionProbe.stdout ?? "")?.[1] ?? "unknown";
 	const liblldb = /liblldb: (lldb-[\d.a-z]+)/.exec(versionProbe.stdout ?? "")?.[1] ?? "unknown";
 
@@ -479,9 +462,7 @@ async function main() {
 	};
 
 	const client = new DapClient(adapterPath);
-	let failures = 0;
 	const fail = (name: string, detail: string) => {
-		failures += 1;
 		measure(name, false, detail, true);
 	};
 
@@ -587,6 +568,7 @@ async function main() {
 		const threadList = (threads.threads as Array<Json> | undefined) ?? [];
 		report.threads = threadList.map((t) => ({ id: t.id, name: t.name }));
 
+		// biome-ignore lint/suspicious/noConfusingLabels: a labeled block gives an early exit across a long await section
 		matchTopFrame: {
 			const top = frames[0];
 			if (!top) {
