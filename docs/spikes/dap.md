@@ -129,3 +129,29 @@ So a Rust watch/expression pane cannot rely on `evaluate` as-is: lldb-dap falls 
 ## Gotcha found while building this
 
 `mktemp -d` yields `/var/folders/…`, which is a symlink to `/private/var/folders/…`. LLDB canonicalises the DWARF source path, so `setBreakpoints` sent with the `/var/…` path never verifies. Resolve the project directory with `realpath` before launching, or every breakpoint stays pending.
+
+## Evaluate probe (2026-10-22)
+
+Reproduce with `bun run scripts/dap-eval-probe.ts`. Throwaway cargo project, stopped at `dap_spike::inspect` line 12, rustup providers loaded. One session per initCommands set.
+
+| Variant | Result | Verbatim error (failures) |
+| --- | --- | --- |
+| (a) `context: "repl"`, expr `n` | OK (empty result) | — |
+| (b) `context: "watch"`, expr `*raw@8` | FAIL | `evaluate failed: can't evaluate expressions when the process is running.` |
+| (c) `context: "hover"`, expr `n` | FAIL | `evaluate failed: error: No value` |
+| (d) same three after `initCommands` adds `settings set target.language rust` | repl OK (empty); watch FAIL; hover FAIL | watch: `evaluate failed: can't evaluate expressions when the process is running.`; hover: `evaluate failed: error: No value` |
+| (e) `evaluate` with top-frame `frameId`, expr `n`, repl | FAIL | `OK error: Command requires a process which is currently stopped.` |
+| (f) `expressions` request, repl | FAIL | `OK error: Command requires a process which is currently stopped.` |
+| (f) `expressions` request, watch | FAIL | `evaluate failed: can't evaluate expressions when the process is running.` |
+| (i) `variables` default vs `filter: "named"` | OK both | count=6, same names (`tag,v,s,o,raw,n`) in both |
+| (ii) `setExpression` then `variables` | FAIL | crashes lldb-dap (adapter exited) |
+| (iii) `readMemory` via `raw` pointer from `variables` output | OK | bytes `de ad be ef 00 11 22 33` |
+
+Verdict: **Rust expression evaluation cannot be made to work through lldb-dap here** — every variant either returns empty/`No value`, reports the process as running, or crashes the adapter. `settings set target.language rust` is not a usable escape hatch (adapter's own response unchanged). `setExpression` is unusable (kills the adapter).
+
+What a watch pane can do instead:
+- Use `variables` (default or `filter: "named"`) for locals — both return the same set here; no expression needed.
+- Render a `Vec<u8>` as bytes via `readMemory` using the pointer taken from the `raw`/`ptr` variable's value (leading `0x…` token) — measured working (`de ad be ef 00 11 22 33`).
+- Use `dataBreakpointInfo`/`setDataBreakpoints` for watchpoints instead of `evaluate`-based watches.
+
+Unverified: whether a different adapter (Linux/LLVM upstream, other Xcode) behaves differently; whether `evaluate` works with a `frameId` on a process that stays stopped (here it reported "process which is currently stopped" required, suggesting state drift); C/C++ targets not tested.
