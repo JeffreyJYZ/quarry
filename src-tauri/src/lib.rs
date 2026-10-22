@@ -6,6 +6,7 @@ mod launch;
 mod lsp;
 mod project;
 mod protocol_pipe;
+mod resolve;
 mod run_config;
 mod run_task;
 mod search;

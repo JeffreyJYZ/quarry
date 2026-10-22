@@ -9,13 +9,13 @@
 //! only locks a session for the short write that answers a server request.
 
 use crate::protocol_pipe::{FrameError, ProcessPipe};
+use crate::resolve;
 use crate::types::{
     BreakpointSpec, DapBreakpoint, DapFrame, DapScope, DapSession, DapStoppedEvent, DapThread,
     DapVariable, DataBreakpointInfo, DisassembledInstruction, LaunchConfig, MemoryDump,
 };
 use serde_json::{Map, Value, json};
 use std::collections::HashMap;
-use std::env;
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -190,6 +190,7 @@ pub async fn dap_launch(
 
     let mut command = Command::new(&adapter);
     command.current_dir(&cwd);
+    command.env("PATH", resolve::child_path(Path::new(&adapter)));
     let mut pipe = ProcessPipe::spawn(&mut command)
         .map_err(|error| format!("cannot start {ADAPTER} ({adapter}) for {root}: {error}"))?;
 
@@ -221,6 +222,7 @@ pub async fn dap_attach(
     let adapter = resolve_adapter()?;
 
     let mut command = Command::new(&adapter);
+    command.env("PATH", resolve::child_path(Path::new(&adapter)));
     let mut pipe = ProcessPipe::spawn(&mut command).map_err(|error| {
         format!("cannot start {ADAPTER} ({adapter}) to attach to {pid}: {error}")
     })?;
@@ -1184,11 +1186,8 @@ fn base64_decode(text: &str) -> Result<Vec<u8>, String> {
 /// `PATH` first, then `xcrun`: a GUI-launched app inherits launchd's `PATH`, so the Apple-shipped
 /// `lldb-dap` is only reachable through `xcrun`.
 fn resolve_adapter() -> Result<String, String> {
-    if let Some(found) = find_on_path(ADAPTER) {
-        return Ok(found);
-    }
-    if let Some(found) = find_with_xcrun(ADAPTER) {
-        return Ok(found);
+    if let Some(found) = resolve::resolve(ADAPTER) {
+        return Ok(found.path.to_string_lossy().into_owned());
     }
 
     Err(format!(
@@ -1203,51 +1202,6 @@ fn real_directory(path: &str) -> Result<String, String> {
         .map_err(|error| format!("cannot resolve the launch directory {path}: {error}"))?;
 
     Ok(resolved.to_string_lossy().into_owned())
-}
-
-fn find_on_path(name: &str) -> Option<String> {
-    let path = env::var_os("PATH")?;
-
-    env::split_paths(&path).find_map(|directory| {
-        if directory.as_os_str().is_empty() {
-            return None;
-        }
-
-        let candidate = directory.join(name);
-        is_executable(&candidate).then(|| candidate.to_string_lossy().into_owned())
-    })
-}
-
-#[cfg(unix)]
-fn is_executable(path: &Path) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-
-    // `metadata` follows symlinks, so a shim that links to the real binary counts as a hit.
-    fs::metadata(path)
-        .map(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
-        .unwrap_or(false)
-}
-
-#[cfg(not(unix))]
-fn is_executable(path: &Path) -> bool {
-    fs::metadata(path)
-        .map(|meta| meta.is_file())
-        .unwrap_or(false)
-}
-
-fn find_with_xcrun(name: &str) -> Option<String> {
-    let output = Command::new("xcrun").args(["--find", name]).output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let found = stdout.lines().next()?.trim();
-    if found.is_empty() || !Path::new(found).exists() {
-        return None;
-    }
-
-    Some(found.to_string())
 }
 
 #[cfg(test)]

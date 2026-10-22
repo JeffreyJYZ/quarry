@@ -4,11 +4,7 @@
 //! falling back to `xcrun --find` (a GUI-launched app inherits launchd's `PATH` and cannot see the
 //! rustup shims). Never bundle or download a tool.
 
-use std::env;
-use std::fs;
-use std::path::Path;
-use std::process::Command;
-
+use crate::resolve::{self, Source};
 use crate::types::{ToolInfo, ToolSource, ToolchainReport};
 
 /// Tools the IDE looks for, in status-bar order.
@@ -33,12 +29,15 @@ pub fn toolchains() -> ToolchainReport {
 /// `PATH` first, then `xcrun`: a GUI-launched app inherits launchd's `PATH`, so Apple-shipped tools
 /// like `lldb-dap` and `clang-format` are only reachable through `xcrun`.
 fn probe(name: &str) -> ToolInfo {
-    let (path, source) = match find_on_path(name) {
-        Some(found) => (Some(found), ToolSource::Path),
-        None => match find_with_xcrun(name) {
-            Some(found) => (Some(found), ToolSource::Xcrun),
-            None => (None, ToolSource::Missing),
-        },
+    let (path, source) = match resolve::resolve(name) {
+        Some(found) => {
+            let source = match found.source {
+                Source::Path => ToolSource::Path,
+                Source::Xcrun => ToolSource::Xcrun,
+            };
+            (Some(found.path.to_string_lossy().into_owned()), source)
+        }
+        None => (None, ToolSource::Missing),
     };
 
     ToolInfo {
@@ -46,54 +45,6 @@ fn probe(name: &str) -> ToolInfo {
         path,
         source,
     }
-}
-
-/// Walk `PATH` by hand rather than shelling out, so a directory is never interpreted or expanded.
-fn find_on_path(name: &str) -> Option<String> {
-    let path = env::var_os("PATH")?;
-
-    env::split_paths(&path).find_map(|dir| {
-        if dir.as_os_str().is_empty() {
-            return None;
-        }
-
-        let candidate = dir.join(name);
-        is_executable(&candidate).then(|| candidate.to_string_lossy().into_owned())
-    })
-}
-
-#[cfg(unix)]
-fn is_executable(path: &Path) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-
-    // `metadata` follows symlinks, so a link to a regular file counts as a hit.
-    fs::metadata(path)
-        .map(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
-        .unwrap_or(false)
-}
-
-#[cfg(not(unix))]
-fn is_executable(path: &Path) -> bool {
-    fs::metadata(path)
-        .map(|meta| meta.is_file())
-        .unwrap_or(false)
-}
-
-/// Ask `xcrun` for the tool's path. A missing `xcrun`, a non-zero status or a path that does not
-/// exist all fall back to "not found" instead of failing the whole report.
-fn find_with_xcrun(name: &str) -> Option<String> {
-    let output = Command::new("xcrun").args(["--find", name]).output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let found = stdout.lines().next()?.trim();
-    if found.is_empty() || !Path::new(found).exists() {
-        return None;
-    }
-
-    Some(found.to_string())
 }
 
 #[cfg(test)]
@@ -116,6 +67,6 @@ mod tests {
 
     #[test]
     fn xcrun_reports_nothing_for_an_unknown_tool() {
-        assert!(find_with_xcrun("quarry-tool-that-does-not-exist").is_none());
+        assert!(resolve::via_xcrun("quarry-tool-that-does-not-exist").is_none());
     }
 }

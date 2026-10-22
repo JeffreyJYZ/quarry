@@ -14,14 +14,13 @@
 
 use crate::project::open_project;
 use crate::protocol_pipe::{FrameError, ProcessPipe};
+use crate::resolve;
 use crate::types::{
     CompletionItem, CompletionList, Diagnostic, DiagnosticsEvent, HoverInfo, Location, LspStatus,
     Position, ProjectKind, Range,
 };
 use serde_json::{Value, json};
 use std::collections::HashMap;
-use std::env;
-use std::fs;
 use std::path::Path;
 use std::process::Command;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
@@ -594,31 +593,12 @@ fn language_id(path: &str) -> &'static str {
 /// `rust-analyzer` then dies at startup because it cannot find `cargo`. Put the server's own directory
 /// and the usual toolchain directories in front of the inherited value.
 fn server_path(binary: &str) -> std::ffi::OsString {
-    let mut dirs: Vec<std::path::PathBuf> = Vec::new();
-    if let Some(parent) = Path::new(binary).parent() {
-        dirs.push(parent.to_path_buf());
-    }
-    for extra in [
-        "/opt/homebrew/opt/rustup/bin",
-        "/opt/homebrew/bin",
-        "/usr/local/bin",
-        "/usr/bin",
-        "/bin",
-    ] {
-        dirs.push(std::path::PathBuf::from(extra));
-    }
-    if let Some(inherited) = env::var_os("PATH") {
-        dirs.extend(env::split_paths(&inherited));
-    }
-    env::join_paths(dirs).unwrap_or_default()
+    resolve::child_path(Path::new(binary))
 }
 
 fn resolve_server(server: &str) -> Result<String, String> {
-    if let Some(found) = find_on_path(server) {
-        return Ok(found);
-    }
-    if let Some(found) = find_with_xcrun(server) {
-        return Ok(found);
+    if let Some(found) = resolve::resolve(server) {
+        return Ok(found.path.to_string_lossy().into_owned());
     }
 
     Err(format!(
@@ -633,51 +613,6 @@ fn fix_for(server: &str) -> &'static str {
         "rust-analyzer" => "install it with `rustup component add rust-analyzer`",
         _ => "install the Xcode command line tools with `xcode-select --install`",
     }
-}
-
-fn find_on_path(name: &str) -> Option<String> {
-    let path = env::var_os("PATH")?;
-
-    env::split_paths(&path).find_map(|directory| {
-        if directory.as_os_str().is_empty() {
-            return None;
-        }
-
-        let candidate = directory.join(name);
-        is_executable(&candidate).then(|| candidate.to_string_lossy().into_owned())
-    })
-}
-
-#[cfg(unix)]
-fn is_executable(path: &Path) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-
-    // `metadata` follows symlinks, so a shim that links to the real binary counts as a hit.
-    fs::metadata(path)
-        .map(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
-        .unwrap_or(false)
-}
-
-#[cfg(not(unix))]
-fn is_executable(path: &Path) -> bool {
-    fs::metadata(path)
-        .map(|meta| meta.is_file())
-        .unwrap_or(false)
-}
-
-fn find_with_xcrun(name: &str) -> Option<String> {
-    let output = Command::new("xcrun").args(["--find", name]).output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let found = stdout.lines().next()?.trim();
-    if found.is_empty() || !Path::new(found).exists() {
-        return None;
-    }
-
-    Some(found.to_string())
 }
 
 #[cfg(test)]

@@ -6,11 +6,11 @@
 //! Every read-only command runs off the async runtime on a blocking thread. A directory that is
 //! not a repository is not an error: the status comes back empty so the UI can hide the panel.
 
-use std::env;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+use crate::resolve;
 use crate::types::{GitFileDiff, GitStatus, GitStatusEntry};
 
 /// Program used to talk to git; it is never bundled.
@@ -437,57 +437,12 @@ fn run(program: &str, root: &str, args: &[&str]) -> Result<std::process::Output,
 
 /// Finds git on `PATH`, then through `xcrun`, like the toolchain probe does.
 fn git_program() -> Result<String, String> {
-    if let Some(found) = find_on_path(GIT_PROGRAM) {
-        return Ok(found);
-    }
-    if let Some(found) = find_with_xcrun(GIT_PROGRAM) {
-        return Ok(found);
+    if let Some(found) = resolve::resolve(GIT_PROGRAM) {
+        return Ok(found.path.to_string_lossy().into_owned());
     }
     Err(format!(
         "{GIT_PROGRAM} is not installed: it is not on PATH and xcrun cannot find it"
     ))
-}
-
-/// Walk `PATH` by hand rather than shelling out.
-fn find_on_path(name: &str) -> Option<String> {
-    let path = env::var_os("PATH")?;
-    env::split_paths(&path).find_map(|dir| {
-        if dir.as_os_str().is_empty() {
-            return None;
-        }
-        let candidate = dir.join(name);
-        is_executable(&candidate).then(|| candidate.to_string_lossy().into_owned())
-    })
-}
-
-#[cfg(unix)]
-fn is_executable(path: &Path) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-
-    fs::metadata(path)
-        .map(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
-        .unwrap_or(false)
-}
-
-#[cfg(not(unix))]
-fn is_executable(path: &Path) -> bool {
-    fs::metadata(path)
-        .map(|meta| meta.is_file())
-        .unwrap_or(false)
-}
-
-/// Ask `xcrun` for the tool's path; a failure only means "not found".
-fn find_with_xcrun(name: &str) -> Option<String> {
-    let output = Command::new("xcrun").args(["--find", name]).output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let found = stdout.lines().next()?.trim();
-    if found.is_empty() || !Path::new(found).exists() {
-        return None;
-    }
-    Some(found.to_string())
 }
 
 #[cfg(test)]
