@@ -384,6 +384,7 @@ export type Settings = {
 	gitOpen?: boolean;
 	dockTab?: "tests" | "problems" | "refs" | "run";
 	dockExpanded?: boolean | null;
+	recentRoots?: string[];
 };
 
 export function readSettings(): Promise<Settings> {
@@ -392,6 +393,10 @@ export function readSettings(): Promise<Settings> {
 
 export function writeSettings(settings: Settings): Promise<void> {
 	return invoke<void>("write_settings", { settings });
+}
+
+export function rememberRoot(root: string): Promise<string[]> {
+	return invoke<string[]>("remember_root", { root });
 }
 
 export type BreakpointSpec = {
@@ -624,4 +629,16 @@ export function gitBranches(root: string): Promise<Branch[]> {
 
 export function gitCheckout(root: string, branch: string): Promise<void> {
 	return invoke<void>("git_checkout", { root, branch });
+}
+
+export type GitCommitEntry = { hash: string; subject: string; author: string; when: string };
+
+export function gitLog(root: string, limit?: number): Promise<GitCommitEntry[]> {
+	return invoke<GitCommitEntry[]>("git_log", { root, limit: limit ?? null });
+}
+
+export type CommitDiff = { hash: string; diff: string; binary: boolean };
+
+export function gitCommitDiff(root: string, hash: string): Promise<CommitDiff> {
+	return invoke<CommitDiff>("git_commit_diff", { root, hash });
 }

@@ -16,6 +16,30 @@ fn dock_tab_default() -> String {
     "problems".to_string()
 }
 
+fn deserialize_recent_roots<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let values: Vec<String> = Vec::deserialize(deserializer).unwrap_or_default();
+    let mut out: Vec<String> = Vec::new();
+    for value in values {
+        let path = std::path::Path::new(&value);
+        if !path.is_absolute() {
+            continue;
+        }
+        if !path.exists() {
+            continue;
+        }
+        if !out.contains(&value) {
+            out.push(value);
+        }
+    }
+    if out.len() > 10 {
+        out.truncate(10);
+    }
+    Ok(out)
+}
+
 fn deserialize_dock_tab<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -55,6 +79,9 @@ pub struct Settings {
     /// Whether the dock is expanded; None means follow the error count.
     #[serde(default)]
     pub dock_expanded: Option<bool>,
+    /// Recently opened project roots, most-recent-first, deduplicated, capped at 10.
+    #[serde(default, deserialize_with = "deserialize_recent_roots")]
+    pub recent_roots: Vec<String>,
 }
 
 impl Default for Settings {
@@ -68,6 +95,7 @@ impl Default for Settings {
             git_open: false,
             dock_tab: dock_tab_default(),
             dock_expanded: None,
+            recent_roots: Vec::new(),
         }
     }
 }
@@ -99,6 +127,32 @@ pub fn write_settings(app: AppHandle, settings: Settings) -> Result<(), String> 
         .map_err(|error| format!("cannot serialize settings: {error}"))?;
     fs::write(&path, format!("{text}\n"))
         .map_err(|error| format!("cannot write {}: {error}", path.display()))
+}
+
+pub fn remember_root_value(settings: &mut Settings, root: String) -> Result<Vec<String>, String> {
+    let path = std::path::Path::new(&root);
+    if !path.is_absolute() {
+        return Err(format!("root must be an absolute path: {root}"));
+    }
+    if !path.exists() {
+        return Err(format!("directory does not exist: {root}"));
+    }
+    let mut list = settings.recent_roots.clone();
+    list.retain(|entry| entry != &root);
+    list.insert(0, root);
+    if list.len() > 10 {
+        list.truncate(10);
+    }
+    settings.recent_roots = list.clone();
+    Ok(list)
+}
+
+#[tauri::command]
+pub fn remember_root(app: AppHandle, root: String) -> Result<Vec<String>, String> {
+    let mut settings = read_settings(app.clone());
+    let list = remember_root_value(&mut settings, root)?;
+    write_settings(app, settings)?;
+    Ok(list)
 }
 
 #[cfg(test)]
@@ -135,6 +189,7 @@ mod tests {
             git_open: false,
             dock_tab: "run".to_string(),
             dock_expanded: Some(true),
+            recent_roots: vec!["/tmp".to_string()],
         };
         let text = serde_json::to_string_pretty(&settings).expect("serializes");
         let back: Settings = serde_json::from_str(&text).expect("parses");
@@ -146,6 +201,7 @@ mod tests {
         assert_eq!(back.git_open, settings.git_open);
         assert_eq!(back.dock_tab, settings.dock_tab);
         assert_eq!(back.dock_expanded, settings.dock_expanded);
+        assert_eq!(back.recent_roots, settings.recent_roots);
     }
 
     #[test]
@@ -161,5 +217,73 @@ mod tests {
                 .expect("old file parses");
         assert_eq!(parsed.last_root.as_deref(), Some("/tmp/p"));
         assert_eq!(parsed.dock_tab, "problems");
+        assert!(parsed.recent_roots.is_empty());
+    }
+
+    #[test]
+    fn remember_root_moves_to_front_and_dedupes() {
+        let mut settings = Settings::default();
+        settings.recent_roots = vec!["/private/tmp".to_string(), "/tmp".to_string()];
+        let list = super::remember_root_value(&mut settings, "/tmp".to_string()).expect("ok");
+        assert_eq!(list, vec!["/tmp".to_string(), "/private/tmp".to_string()]);
+        assert_eq!(settings.recent_roots, list);
+    }
+
+    #[test]
+    fn remember_root_caps_at_ten() {
+        let mut s2 = Settings::default();
+        s2.recent_roots = vec![];
+        for _ in 0..12 {
+            let _ = super::remember_root_value(&mut s2, "/tmp".to_string());
+        }
+        assert!(s2.recent_roots.len() <= 10);
+    }
+
+    #[test]
+    fn remember_root_rejects_relative() {
+        let mut settings = Settings::default();
+        let err =
+            super::remember_root_value(&mut settings, "relative/project".to_string()).unwrap_err();
+        assert!(err.contains("absolute"));
+    }
+
+    #[test]
+    fn missing_directory_dropped_on_read() {
+        let parsed: Settings =
+            serde_json::from_str(r#"{"recentRoots":["/tmp","/definitely/missing/quarry-dir"]}"#)
+                .expect("parses");
+        assert_eq!(parsed.recent_roots, vec!["/tmp".to_string()]);
+    }
+
+    #[test]
+    fn unrelated_fields_survive_remember() {
+        let mut settings = Settings {
+            last_root: Some("/tmp/project".to_string()),
+            open_files: vec!["/tmp/project/src/main.rs".to_string()],
+            active_file: Some("/tmp/project/src/main.rs".to_string()),
+            rail_collapsed: true,
+            debug_open: true,
+            git_open: false,
+            dock_tab: "run".to_string(),
+            dock_expanded: Some(true),
+            recent_roots: vec![],
+        };
+        let before_last = settings.last_root.clone();
+        let before_open = settings.open_files.clone();
+        let before_active = settings.active_file.clone();
+        let before_rail = settings.rail_collapsed;
+        let before_debug = settings.debug_open;
+        let before_git = settings.git_open;
+        let before_tab = settings.dock_tab.clone();
+        let before_expanded = settings.dock_expanded;
+        let _ = super::remember_root_value(&mut settings, "/tmp".to_string()).expect("ok");
+        assert_eq!(settings.last_root, before_last);
+        assert_eq!(settings.open_files, before_open);
+        assert_eq!(settings.active_file, before_active);
+        assert_eq!(settings.rail_collapsed, before_rail);
+        assert_eq!(settings.debug_open, before_debug);
+        assert_eq!(settings.git_open, before_git);
+        assert_eq!(settings.dock_tab, before_tab);
+        assert_eq!(settings.dock_expanded, before_expanded);
     }
 }
