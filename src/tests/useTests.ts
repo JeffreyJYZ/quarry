@@ -18,12 +18,16 @@ export type TestsController = {
 	running: ReadonlySet<string>;
 	/** One line summarising the last `Run all`. */
 	summary: string | null;
+	/** Progress of an in-flight `Run all`, or null. */
+	runAllProgress: { done: number; total: number } | null;
 	/** Loads the test list once per project; later calls are ignored. */
 	load: () => void;
 	/** Runs one test; a second call while it runs is ignored. */
 	runOne: (name: string) => void;
 	/** Runs the given names in order, stopping after the first failure. */
 	runAll: (names: string[]) => void;
+	/** Empties the results map without touching the list. */
+	clearResults: () => void;
 };
 
 /**
@@ -41,6 +45,9 @@ export function useTests(root: string | null): TestsController {
 	const [loading, setLoading] = useState(false);
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const [summary, setSummary] = useState<string | null>(null);
+	const [runAllProgress, setRunAllProgress] = useState<{ done: number; total: number } | null>(
+		null,
+	);
 	const loadingRef = useRef(false);
 	const loadedFor = useRef<string | null>(null);
 	const runningRef = useRef<Set<string>>(new Set());
@@ -55,6 +62,7 @@ export function useTests(root: string | null): TestsController {
 		setRunning(new Set());
 		setLoadError(null);
 		setSummary(null);
+		setRunAllProgress(null);
 		loadedFor.current = null;
 		runningRef.current = new Set();
 	}, [root]);
@@ -116,12 +124,16 @@ export function useTests(root: string | null): TestsController {
 				return;
 			}
 			runningAll.current = true;
+			setRunAllProgress({ done: 0, total: names.length });
 			let passed = 0;
 			let failed = 0;
 			let stopped: string | null = null;
+			let done = 0;
 			try {
 				for (const name of names) {
 					const report = await runOne(name);
+					done += 1;
+					setRunAllProgress({ done, total: names.length });
 					if (report === null) {
 						continue;
 					}
@@ -135,6 +147,7 @@ export function useTests(root: string | null): TestsController {
 				}
 			} finally {
 				runningAll.current = false;
+				setRunAllProgress(null);
 			}
 			const total = passed + failed;
 			setSummary(
@@ -145,6 +158,11 @@ export function useTests(root: string | null): TestsController {
 		},
 		[root, runOne],
 	);
+
+	const clearResults = useCallback(() => {
+		setResults(new Map());
+		setResultsFor(root);
+	}, [root]);
 
 	/* Results from another project never show up in this one. */
 	const visibleItems = itemsFor === root ? items : [];
@@ -157,6 +175,7 @@ export function useTests(root: string | null): TestsController {
 		results: visibleResults,
 		running: running.size > 0 ? running : NO_RUNNING,
 		summary,
+		runAllProgress,
 		load,
 		runOne: (name: string) => {
 			void runOne(name);
@@ -164,5 +183,6 @@ export function useTests(root: string | null): TestsController {
 		runAll: (names: string[]) => {
 			void runAll(names);
 		},
+		clearResults,
 	};
 }

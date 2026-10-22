@@ -1,3 +1,4 @@
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ProblemFile } from "@/problems/model";
 import ProblemsPanel from "@/problems/ProblemsPanel";
@@ -49,6 +50,8 @@ export default function TestsDock({
 	tests,
 }: TestsDockProps) {
 	const [filter, setFilter] = useState("");
+	const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+	const [highlighted, setHighlighted] = useState(-1);
 	const filterRef = useRef<HTMLInputElement | null>(null);
 	const { load } = tests;
 	const filtered = useMemo(() => filterTests(tests.items, filter), [tests.items, filter]);
@@ -82,6 +85,50 @@ export default function TestsDock({
 	const testsCount = failed > 0 ? "dock-tab-count bad" : "dock-tab-count";
 	const problemsCount = problems.errors > 0 ? "dock-tab-count bad" : "dock-tab-count";
 
+	const runningAll = tests.runAllProgress !== null;
+	const progressLabel =
+		tests.runAllProgress === null
+			? null
+			: `running ${tests.runAllProgress.done}/${tests.runAllProgress.total}`;
+
+	const toggleGroup = (binary: string) => {
+		setCollapsedGroups((current) => {
+			const next = new Set(current);
+			if (next.has(binary)) {
+				next.delete(binary);
+			} else {
+				next.add(binary);
+			}
+			return next;
+		});
+	};
+
+	const onKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+		if (event.key === "ArrowDown") {
+			event.preventDefault();
+			setHighlighted((current) => {
+				if (filtered.length === 0) {
+					return -1;
+				}
+				if (current < 0) {
+					return 0;
+				}
+				return Math.min(current + 1, filtered.length - 1);
+			});
+			return;
+		}
+		if (event.key === "Enter") {
+			if (highlighted >= 0 && highlighted < filtered.length) {
+				event.preventDefault();
+				tests.runOne(filtered[highlighted].name);
+			}
+			return;
+		}
+		if (event.key === "Escape") {
+			setHighlighted(-1);
+		}
+	};
+
 	return (
 		<section className={expanded ? "dock" : "dock collapsed"} aria-label="Bottom dock">
 			<div className="dock-head">
@@ -106,6 +153,9 @@ export default function TestsDock({
 					>
 						Tests
 						<span className={testsCount}>{tests.items.length}</span>
+						{failed > 0 ? (
+							<span className="dock-tab-count bad">{failed} failed</span>
+						) : null}
 					</button>
 					<button
 						type="button"
@@ -126,8 +176,23 @@ export default function TestsDock({
 							value={filter}
 							placeholder="filter tests"
 							aria-label="Filter tests"
-							onChange={(event) => setFilter(event.target.value)}
+							disabled={runningAll}
+							onChange={(event) => {
+								setFilter(event.target.value);
+								setHighlighted(-1);
+							}}
+							onKeyDown={onKeyDown}
 						/>
+						{progressLabel === null ? null : (
+							<span className="dock-progress">{progressLabel}</span>
+						)}
+						<button
+							type="button"
+							className="dock-action"
+							onClick={() => tests.clearResults()}
+						>
+							clear results
+						</button>
 						<button
 							type="button"
 							className="dock-action"
@@ -149,6 +214,9 @@ export default function TestsDock({
 							results={tests.results}
 							running={tests.running}
 							summary={tests.summary}
+							collapsedGroups={collapsedGroups}
+							onToggleGroup={toggleGroup}
+							highlighted={highlighted}
 							onRun={tests.runOne}
 						/>
 					) : (

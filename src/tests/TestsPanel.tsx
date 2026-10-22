@@ -14,6 +14,9 @@ export type TestsPanelProps = {
 	results: ReadonlyMap<string, TestReport>;
 	running: ReadonlySet<string>;
 	summary: string | null;
+	collapsedGroups: ReadonlySet<string>;
+	onToggleGroup: (binary: string) => void;
+	highlighted: number;
 	onRun: (name: string) => void;
 };
 
@@ -57,6 +60,27 @@ function capOutput(output: string): { text: string; truncated: boolean } {
 	return { text: lines.slice(0, OUTPUT_LINE_CAP).join("\n"), truncated: true };
 }
 
+/** First informative line of a failing report's output. */
+function failureReason(output: string): string {
+	const lines = output.split("\n");
+	for (const line of lines) {
+		const trimmed = line.trim();
+		if (trimmed === "") {
+			continue;
+		}
+		if (/panicked at/i.test(trimmed) || /\berror\b/i.test(trimmed)) {
+			return trimmed;
+		}
+	}
+	for (let i = lines.length - 1; i >= 0; i -= 1) {
+		const trimmed = lines[i].trim();
+		if (trimmed !== "") {
+			return trimmed;
+		}
+	}
+	return "";
+}
+
 /** The status dot of a row: no result yet, a pass, or a failure. */
 function dotClass(result: TestReport | undefined): string {
 	if (result === undefined) {
@@ -69,10 +93,11 @@ type TestRowProps = {
 	item: TestItem;
 	result: TestReport | undefined;
 	running: boolean;
+	highlighted: boolean;
 	onRun: (name: string) => void;
 };
 
-function TestRow({ item, result, running, onRun }: TestRowProps) {
+function TestRow({ item, result, running, highlighted, onRun }: TestRowProps) {
 	const [expanded, setExpanded] = useState(false);
 	const [copyNote, setCopyNote] = useState<string | null>(null);
 	const { module, leaf } = splitName(item.name);
@@ -93,10 +118,17 @@ function TestRow({ item, result, running, onRun }: TestRowProps) {
 		}
 	};
 
-	const duration = result === undefined ? "" : `${result.durationMs} ms`;
+	const duration =
+		result === undefined
+			? ""
+			: result.durationMs >= 1000
+				? `${(result.durationMs / 1000).toFixed(1)} s`
+				: `${result.durationMs} ms`;
+
+	const reason = result === undefined || result.passed ? "" : failureReason(result.output);
 
 	return (
-		<li className="tests-item">
+		<li className={highlighted ? "tests-item highlighted" : "tests-item"}>
 			<div className="tests-row">
 				<span className={dotClass(result)} aria-hidden="true" />
 				<span className="test-name" title={item.name}>
@@ -104,6 +136,7 @@ function TestRow({ item, result, running, onRun }: TestRowProps) {
 					<span className="test-leaf">{leaf}</span>
 				</span>
 				<span className="test-duration">{duration}</span>
+				{failed && reason !== "" ? <span className="test-reason">{reason}</span> : null}
 				{failed ? (
 					<button
 						type="button"
@@ -163,39 +196,65 @@ function TestGroups({
 	groups,
 	results,
 	running,
+	collapsedGroups,
+	onToggleGroup,
+	highlighted,
 	onRun,
 }: {
 	groups: TestGroup[];
 	results: ReadonlyMap<string, TestReport>;
 	running: ReadonlySet<string>;
+	collapsedGroups: ReadonlySet<string>;
+	onToggleGroup: (binary: string) => void;
+	highlighted: number;
 	onRun: (name: string) => void;
 }) {
 	if (groups.length === 0) {
 		return <p className="problems-empty">No tests found</p>;
 	}
+	let index = 0;
 	return (
 		<>
-			{groups.map((group) => (
-				<div key={group.binary} className="tests-group">
-					<div className="tests-group-head">
-						<span className="tests-binary" title={group.binary}>
-							{group.binary}
-						</span>
-						<span className="tests-group-count">{group.tests.length}</span>
+			{groups.map((group) => {
+				const collapsed = collapsedGroups.has(group.binary);
+				const startIndex = index;
+				index += group.tests.length;
+				return (
+					<div key={group.binary} className="tests-group">
+						<div className="tests-group-head">
+							<button
+								type="button"
+								className="tests-group-toggle"
+								aria-expanded={!collapsed}
+								onClick={() => onToggleGroup(group.binary)}
+							>
+								<span
+									className={collapsed ? "tests-caret" : "tests-caret open"}
+									aria-hidden="true"
+								/>
+								<span className="tests-binary" title={group.binary}>
+									{group.binary}
+								</span>
+							</button>
+							<span className="tests-group-count">{group.tests.length}</span>
+						</div>
+						{collapsed ? null : (
+							<ul className="tests-list">
+								{group.tests.map((item, i) => (
+									<TestRow
+										key={`${group.binary}::${item.name}`}
+										item={item}
+										result={results.get(item.name)}
+										running={running.has(item.name)}
+										highlighted={highlighted === startIndex + i}
+										onRun={onRun}
+									/>
+								))}
+							</ul>
+						)}
 					</div>
-					<ul className="tests-list">
-						{group.tests.map((item) => (
-							<TestRow
-								key={`${group.binary}::${item.name}`}
-								item={item}
-								result={results.get(item.name)}
-								running={running.has(item.name)}
-								onRun={onRun}
-							/>
-						))}
-					</ul>
-				</div>
-			))}
+				);
+			})}
 		</>
 	);
 }
@@ -211,6 +270,9 @@ export default function TestsPanel({
 	results,
 	running,
 	summary,
+	collapsedGroups,
+	onToggleGroup,
+	highlighted,
 	onRun,
 }: TestsPanelProps) {
 	const groups = groupByBinary(items);
@@ -222,7 +284,15 @@ export default function TestsPanel({
 			{loading ? <p className="problems-empty">Loading tests…</p> : null}
 			{loadError === null ? null : <p className="problems-empty error">{loadError}</p>}
 			{loading || loadError !== null ? null : (
-				<TestGroups groups={groups} results={results} running={running} onRun={onRun} />
+				<TestGroups
+					groups={groups}
+					results={results}
+					running={running}
+					collapsedGroups={collapsedGroups}
+					onToggleGroup={onToggleGroup}
+					highlighted={highlighted}
+					onRun={onRun}
+				/>
 			)}
 		</div>
 	);
