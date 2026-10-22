@@ -15,11 +15,13 @@ const RESIZE_DEBOUNCE_MS = 120;
 
 export type TerminalProps = {
 	root: string;
+	activePath?: string | null;
 };
 
 type Session = {
 	id: number;
 	ptyId: string | null;
+	cwd: string;
 	lines: string[];
 	dropped: number;
 	exited: number | null;
@@ -57,7 +59,18 @@ function appendData(prev: Session, data: string): Session {
 	return { ...prev, lines: next, dropped };
 }
 
-export default function Terminal({ root }: TerminalProps) {
+function dirOf(path: string): string {
+	const idx = path.lastIndexOf("/");
+	return idx > 0 ? path.slice(0, idx) : path;
+}
+
+function shortCwd(cwd: string): string {
+	const parts = cwd.split("/").filter((p) => p.length > 0);
+	const tail = parts.slice(-2).join("/");
+	return `…/${tail}`;
+}
+
+export default function Terminal({ root, activePath }: TerminalProps) {
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [activeId, setActiveId] = useState<number | null>(null);
 	const nextId = useRef(1);
@@ -82,9 +95,11 @@ export default function Terminal({ root }: TerminalProps) {
 	const openSession = useCallback(async () => {
 		const id = nextId.current;
 		nextId.current += 1;
+		const cwd = activePath !== null && activePath !== undefined ? dirOf(activePath) : root;
 		const session: Session = {
 			id,
 			ptyId: null,
+			cwd,
 			lines: [],
 			dropped: 0,
 			exited: null,
@@ -100,7 +115,7 @@ export default function Terminal({ root }: TerminalProps) {
 			const cols = Math.max(20, Math.floor(width / 8));
 			const h = el ? el.clientHeight : 200;
 			const rows = Math.max(8, Math.floor(h / 18));
-			const ptyId = await ptyOpen(root, rows, cols);
+			const ptyId = await ptyOpen(cwd, rows, cols);
 			if (sessionsRef.current.find((s) => s.id === id) === undefined) {
 				void ptyClose(ptyId).catch(() => undefined);
 				return;
@@ -113,7 +128,7 @@ export default function Terminal({ root }: TerminalProps) {
 				opening: false,
 			}));
 		}
-	}, [root, updateSession]);
+	}, [root, activePath, updateSession]);
 
 	const closeSession = useCallback((id: number) => {
 		const session = sessionsRef.current.find((s) => s.id === id);
@@ -247,6 +262,9 @@ export default function Terminal({ root }: TerminalProps) {
 		if (session?.ptyId !== null && session?.ptyId !== undefined) {
 			void ptyClose(session.ptyId).catch(() => undefined);
 		}
+		const cwd =
+			session?.cwd ??
+			(activePath !== null && activePath !== undefined ? dirOf(activePath) : root);
 		updateSession(activeId, (s) => ({
 			...s,
 			ptyId: null,
@@ -264,7 +282,7 @@ export default function Terminal({ root }: TerminalProps) {
 				const cols = Math.max(20, Math.floor(width / 8));
 				const h = el ? el.clientHeight : 200;
 				const rows = Math.max(8, Math.floor(h / 18));
-				const ptyId = await ptyOpen(root, rows, cols);
+				const ptyId = await ptyOpen(cwd, rows, cols);
 				updateSession(activeId, (s) => ({ ...s, ptyId, opening: false }));
 			} catch (err) {
 				updateSession(activeId, (s) => ({
@@ -274,7 +292,7 @@ export default function Terminal({ root }: TerminalProps) {
 				}));
 			}
 		})();
-	}, [active, activeId, root, updateSession]);
+	}, [active, activeId, root, activePath, updateSession]);
 
 	// Cmd+T / Cmd+W inside terminal
 	useEffect(() => {
@@ -414,14 +432,15 @@ export default function Terminal({ root }: TerminalProps) {
 	return (
 		<section className="terminal" aria-label="Terminal">
 			<div className="terminal-tabs">
-				{sessions.map((s, i) => (
+				{sessions.map((s) => (
 					<button
 						key={s.id}
 						type="button"
 						className={`terminal-tab${s.id === activeId ? " active" : ""}${s.exited !== null ? " exited" : ""}`}
 						onClick={() => setActiveId(s.id)}
+						title={s.cwd}
 					>
-						<span>{i + 1}</span>
+						<span>{shortCwd(s.cwd)}</span>
 						<button
 							type="button"
 							className="terminal-tab-close"
@@ -444,7 +463,9 @@ export default function Terminal({ root }: TerminalProps) {
 			</div>
 			<div className="terminal-head">
 				<span className="label">terminal</span>
-				<span className="terminal-shell">{root}</span>
+				<span className="terminal-cwd" title={active !== null ? active.cwd : root}>
+					{active !== null ? active.cwd : root}
+				</span>
 				{active !== null ? (
 					<>
 						<span className="terminal-size">
