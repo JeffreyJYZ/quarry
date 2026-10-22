@@ -1,6 +1,7 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FileTree from "@/components/FileTree";
+import RefsPanel from "@/components/RefsPanel";
 import StatusBar from "@/components/StatusBar";
 import TabStrip from "@/components/TabStrip";
 import Welcome from "@/components/Welcome";
@@ -21,6 +22,7 @@ import {
 	buildProject,
 	type Diagnostic,
 	type FileEntry,
+	type Location,
 	openProject,
 	type ProjectInfo,
 	readTextFile,
@@ -60,6 +62,8 @@ export default function App() {
 	/** `null` means "follow the default": open when there is an error, collapsed otherwise. */
 	const [panelOpen, setPanelOpen] = useState<boolean | null>(null);
 	const [dockTab, setDockTab] = useState<DockTab>("problems");
+	const [references, setReferences] = useState<Location[]>([]);
+	const [refsOpen, setRefsOpen] = useState(false);
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [debugOpen, setDebugOpen] = useState(false);
 	/** Paths with a write in flight; the tab row dims its mark while the promise resolves. */
@@ -362,6 +366,18 @@ export default function App() {
 
 	const closeSearch = useCallback(() => setSearchOpen(false), []);
 
+	const handleNavigate = useCallback(
+		(path: string, _line: number, _character: number) => {
+			void openPath(path, fileName(path));
+		},
+		[openPath],
+	);
+
+	const handleReferences = useCallback((locations: Location[]) => {
+		setReferences(locations);
+		setRefsOpen(true);
+	}, []);
+
 	const handleChange = useCallback(
 		(value: string) => {
 			setBuffers((current) =>
@@ -556,6 +572,8 @@ export default function App() {
 									breakpointLines={breakpointLines}
 									unverifiedLines={unverifiedLines}
 									onToggleBreakpoint={handleToggleBreakpoint}
+									onNavigate={handleNavigate}
+									onReferences={handleReferences}
 								/>
 							</div>
 						</>
@@ -586,6 +604,13 @@ export default function App() {
 				{debugOpen && root !== null ? <DebugPanel debug={debug} /> : null}
 			</div>
 
+			{refsOpen ? (
+				<RefsPanel
+					locations={references}
+					onNavigate={handleNavigate}
+					onClose={() => setRefsOpen(false)}
+				/>
+			) : null}
 			<StatusBar
 				version={appVersion}
 				project={project}
