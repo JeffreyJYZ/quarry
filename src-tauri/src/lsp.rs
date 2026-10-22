@@ -34,6 +34,12 @@ use tokio::sync::oneshot;
 /// How long `initialize` may take before the session is declared dead.
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(20);
 
+/// How long to wait for a dead server's stderr to be drained into the failure message.
+const STDERR_WAIT: Duration = Duration::from_millis(500);
+
+/// How much of the server's stderr reaches the failure message.
+const STDERR_MESSAGE_LIMIT: usize = 2000;
+
 /// How long any other request may take before it is given up on.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 
@@ -135,6 +141,23 @@ pub async fn start_lsp(
     state: State<'_, LspState>,
     root: String,
 ) -> Result<LspStatus, String> {
+    match start_lsp_session(app, state.inner(), &root).await {
+        Ok(status) => Ok(status),
+        Err(error) => {
+            // A failed start must leave nothing behind: a half-registered session would make
+            // later document syncs talk to a server that is not there.
+            lock(&state.sessions).remove(&root);
+            Err(error)
+        }
+    }
+}
+
+async fn start_lsp_session(
+    app: AppHandle,
+    state: &LspState,
+    root: &str,
+) -> Result<LspStatus, String> {
+    let root = root.to_string();
     if let Some(existing) = lock(&state.sessions).get(&root).cloned() {
         let server = lock(&existing).server.clone();
         return Ok(LspStatus {
@@ -162,12 +185,18 @@ pub async fn start_lsp(
     let mut command = Command::new(&binary);
     command.current_dir(&info.root);
     command.env("PATH", server_path(&binary));
-    let mut pipe = ProcessPipe::spawn(&mut command)
-        .map_err(|error| format!("cannot start {server} ({binary}): {error}"))?;
+    let (mut pipe, stderr) = ProcessPipe::spawn_with_stderr(&mut command).map_err(|error| {
+        format_start_failure(server, &format!("cannot start ({binary}): {error}"), "")
+    })?;
 
     // The handshake runs on the receiver before any session exists, so no mutex is held while it
     // waits for the server.
-    handshake(server, &mut pipe, &root_uri, &info.name)?;
+    if let Err(reason) = handshake(&mut pipe, &root_uri, &info.name) {
+        // The child is already gone, so its stderr ends within a moment; wait for it briefly so
+        // the message can carry the server's own reason.
+        let said = stderr.wait(STDERR_WAIT);
+        return Err(format_start_failure(server, &reason, &said));
+    }
 
     let frames = pipe.take_frames();
     let session = Arc::new(Mutex::new(Session {
@@ -311,12 +340,7 @@ fn notification(method: &str, params: Value) -> Value {
 ///
 /// While waiting, server-to-client requests are answered, because a server that asks about
 /// configuration before replying would otherwise deadlock against our own wait.
-fn handshake(
-    server: &str,
-    pipe: &mut ProcessPipe,
-    root_uri: &str,
-    name: &str,
-) -> Result<(), String> {
+fn handshake(pipe: &mut ProcessPipe, root_uri: &str, name: &str) -> Result<(), String> {
     let params = json!({
         "processId": std::process::id(),
         "rootUri": root_uri,
@@ -324,14 +348,14 @@ fn handshake(
         "workspaceFolders": [{ "uri": root_uri, "name": name }],
     });
     pipe.send(&request(INITIALIZE_ID, "initialize", params))
-        .map_err(|error| format!("cannot send initialize to {server}: {error}"))?;
+        .map_err(|error| format!("cannot send initialize: {error}"))?;
 
     let deadline = Instant::now() + HANDSHAKE_TIMEOUT;
     loop {
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
             return Err(format!(
-                "{server} did not answer initialize within {}s",
+                "did not answer initialize within {}s",
                 HANDSHAKE_TIMEOUT.as_secs()
             ));
         }
@@ -341,7 +365,7 @@ fn handshake(
                 let is_response = message.get("method").is_none();
                 if is_response && message.get("id") == Some(&json!(INITIALIZE_ID)) {
                     if let Some(error) = message.get("error") {
-                        return Err(format!("{server} rejected initialize: {error}"));
+                        return Err(format!("rejected initialize: {error}"));
                     }
                     break;
                 }
@@ -350,24 +374,22 @@ fn handshake(
                 }
             }
             Ok(Err(error)) => {
-                return Err(format!(
-                    "{server} stopped before answering initialize: {error}"
-                ));
+                return Err(format!("stopped before answering initialize: {error}"));
             }
             Err(RecvTimeoutError::Timeout) => {
                 return Err(format!(
-                    "{server} did not answer initialize within {}s",
+                    "did not answer initialize within {}s",
                     HANDSHAKE_TIMEOUT.as_secs()
                 ));
             }
             Err(RecvTimeoutError::Disconnected) => {
-                return Err(format!("{server} exited before answering initialize"));
+                return Err(format!("exited before answering initialize"));
             }
         }
     }
 
     pipe.send(&notification("initialized", json!({})))
-        .map_err(|error| format!("cannot send initialized to {server}: {error}"))
+        .map_err(|error| format!("cannot send initialized: {error}"))
 }
 
 /// Read frames until the child goes away, forwarding diagnostics and keeping the server unblocked.
@@ -591,7 +613,8 @@ fn server_path(binary: &str) -> std::ffi::OsString {
     env::join_paths(dirs).unwrap_or_default()
 }
 
-fn resolve_server(server: &str) -> Result<String, String> {    if let Some(found) = find_on_path(server) {
+fn resolve_server(server: &str) -> Result<String, String> {
+    if let Some(found) = find_on_path(server) {
         return Ok(found);
     }
     if let Some(found) = find_with_xcrun(server) {
@@ -904,6 +927,29 @@ mod tests {
     }
 
     #[test]
+    fn start_failure_composes_one_actionable_line() {
+        let message = format_start_failure(
+            "rust-analyzer",
+            "stopped before answering initialize: protocol: unexpected end of stream before frame header",
+            "info: `rust-analyzer` is unavailable for the active toolchain\ninfo: falling back to \"/opt/homebrew/opt/rustup/bin/rust-analyzer\"\n",
+        );
+        assert!(message.contains("rust-analyzer could not start"));
+        assert!(message.contains("server said:"));
+        assert!(message.contains("is unavailable for the active toolchain"));
+        assert!(message.contains("rustup component add rust-analyzer"));
+        assert!(!message.contains('\n'));
+    }
+
+    #[test]
+    fn stderr_truncation_marks_the_cut() {
+        let input = "a".repeat(100);
+        let output = truncate_stderr(&input, 10);
+        assert_eq!(output.chars().count(), 10 + "… (truncated)".chars().count());
+        assert!(output.ends_with("… (truncated)"));
+        assert_eq!(truncate_stderr(&input, 200), input);
+    }
+
+    #[test]
     fn client_capabilities_advertise_the_navigation_requests() {
         let capabilities = client_capabilities();
         assert_eq!(
@@ -919,6 +965,48 @@ mod tests {
             json!(true)
         );
     }
+}
+
+/// Compose the one line the user sees when a server will not start.
+///
+/// The protocol error alone only says the connection died; the server's own stderr is where the
+/// reason lives, so it is folded into the message on a single line.
+fn format_start_failure(server: &str, reason: &str, stderr: &str) -> String {
+    let mut line = format!("{server} could not start: {reason}");
+    let detail = one_line(&truncate_stderr(stderr, STDERR_MESSAGE_LIMIT));
+    if !detail.is_empty() {
+        line.push_str(" — server said: ");
+        line.push_str(&detail);
+        if let Some(fix) = start_hint(server, &detail) {
+            line.push_str(&format!(" (fix: {fix})"));
+        }
+    }
+    line
+}
+
+/// What the user can do about a start that failed, when the server named the reason itself.
+fn start_hint(server: &str, stderr: &str) -> Option<String> {
+    if server == "rust-analyzer" && stderr.contains("is unavailable for the active toolchain") {
+        return Some(format!("run `rustup component add {server}`"));
+    }
+    None
+}
+
+/// Trim a string to at most `limit` characters, cutting on a character boundary.
+fn truncate_stderr(text: &str, limit: usize) -> String {
+    if text.chars().count() <= limit {
+        return text.to_string();
+    }
+    let mut end = limit;
+    while end > 0 && !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}… (truncated)", &text[..end])
+}
+
+/// Collapse any run of whitespace into a single space so the failure message stays one line.
+fn one_line(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// Client capabilities this IDE advertises. Only what the navigation requests need is declared;

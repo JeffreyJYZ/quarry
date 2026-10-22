@@ -8,14 +8,20 @@
 // calls it, so dead-code warnings here would be noise about the intended shape rather than a defect.
 #![allow(dead_code)]
 
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{self, Receiver};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
+use std::time::Duration;
 
 /// Largest body this crate is willing to allocate for a single frame. A declared length beyond this
 /// is treated as a protocol error rather than trusted with an allocation.
 const MAX_FRAME_BYTES: usize = 64 * 1024 * 1024;
+
+/// Largest number of stderr bytes kept for a failure message. A server that dies at startup
+/// explains itself there, and a protocol error on its own says nothing.
+pub const STDERR_CAPTURE_LIMIT: usize = 2000;
 
 #[derive(Debug)]
 pub enum FrameError {
@@ -124,6 +130,76 @@ pub struct ProcessPipe {
     stdin: ChildStdin,
     /// Set once the child has been killed and reaped, so `Drop` cannot signal a recycled pid.
     finished: bool,
+    /// The child's stderr, drained and kept to [`STDERR_CAPTURE_LIMIT`] bytes.
+    stderr: StderrCapture,
+}
+
+/// A bounded capture of what a child wrote to stderr.
+///
+/// The child's stderr is drained either way, so a chatty server never blocks on a full pipe. This
+/// keeps the first [`STDERR_CAPTURE_LIMIT`] bytes, because a server that dies at startup says
+/// why there and nowhere else.
+#[derive(Clone, Default)]
+pub struct StderrCapture {
+    inner: Arc<(Mutex<StderrBuffer>, Condvar)>,
+}
+
+#[derive(Default)]
+struct StderrBuffer {
+    bytes: Vec<u8>,
+    /// Set when the child's stderr reached its end.
+    complete: bool,
+}
+
+impl StderrCapture {
+    /// Keep the beginning of `chunk`, dropping whatever no longer fits.
+    fn push(&self, chunk: &[u8]) {
+        let (lock, _) = &*self.inner;
+        let mut buffer = lock.lock().unwrap_or_else(|poison| poison.into_inner());
+        if buffer.bytes.len() >= STDERR_CAPTURE_LIMIT {
+            return;
+        }
+        let room = STDERR_CAPTURE_LIMIT - buffer.bytes.len();
+        buffer
+            .bytes
+            .extend_from_slice(&chunk[..room.min(chunk.len())]);
+    }
+
+    /// Mark the capture as finished, so a waiter stops waiting.
+    fn finish(&self) {
+        let (lock, condvar) = &*self.inner;
+        let mut buffer = lock.lock().unwrap_or_else(|poison| poison.into_inner());
+        buffer.complete = true;
+        condvar.notify_all();
+    }
+
+    /// The captured bytes, as text.
+    pub fn text(&self) -> String {
+        let (lock, _) = &*self.inner;
+        let buffer = lock.lock().unwrap_or_else(|poison| poison.into_inner());
+        String::from_utf8_lossy(&buffer.bytes).into_owned()
+    }
+
+    /// Wait until the child's stderr ends, or the timeout passes, and return what it said.
+    pub fn wait(&self, timeout: Duration) -> String {
+        let deadline = std::time::Instant::now() + timeout;
+        let (lock, condvar) = &*self.inner;
+        let mut buffer = lock.lock().unwrap_or_else(|poison| poison.into_inner());
+        while !buffer.complete {
+            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+            if remaining.is_zero() {
+                break;
+            }
+            let (next, result) = condvar
+                .wait_timeout(buffer, remaining)
+                .unwrap_or_else(|poison| poison.into_inner());
+            buffer = next;
+            if result.timed_out() {
+                break;
+            }
+        }
+        String::from_utf8_lossy(&buffer.bytes).into_owned()
+    }
 }
 
 impl ProcessPipe {
@@ -132,6 +208,14 @@ impl ProcessPipe {
     /// Stderr is piped as well and drained on its own thread: a chatty server that fills its stderr
     /// buffer would otherwise block on the write and look like a hang.
     pub fn spawn(command: &mut Command) -> io::Result<Self> {
+        Self::spawn_with_stderr(command).map(|(pipe, _)| pipe)
+    }
+
+    /// Spawn the command and hand back the capture of its stderr alongside the pipe.
+    ///
+    /// The stderr capture is what makes a server that dies at startup diagnosable: the protocol
+    /// error alone only says the stream ended.
+    pub fn spawn_with_stderr(command: &mut Command) -> io::Result<(Self, StderrCapture)> {
         command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -147,11 +231,21 @@ impl ProcessPipe {
             .take()
             .ok_or_else(|| io::Error::other("child stdin was not piped"))?;
 
+        let stderr_capture = StderrCapture::default();
         if let Some(mut stderr) = child.stderr.take() {
+            let capture = stderr_capture.clone();
             let spawned = thread::Builder::new()
                 .name("protocol-pipe-stderr".to_string())
                 .spawn(move || {
-                    let _ = io::copy(&mut stderr, &mut io::sink());
+                    let mut chunk = [0u8; 4096];
+                    loop {
+                        match stderr.read(&mut chunk) {
+                            Ok(0) => break,
+                            Ok(count) => capture.push(&chunk[..count]),
+                            Err(_) => break,
+                        }
+                    }
+                    capture.finish();
                 });
             if spawned.is_err() {
                 // Losing the drain thread is not fatal: the child keeps running and we stay usable.
@@ -189,12 +283,21 @@ impl ProcessPipe {
             )));
         }
 
-        Ok(ProcessPipe {
-            frames,
-            child,
-            stdin,
-            finished: false,
-        })
+        Ok((
+            ProcessPipe {
+                frames,
+                child,
+                stdin,
+                finished: false,
+                stderr: stderr_capture.clone(),
+            },
+            stderr_capture,
+        ))
+    }
+
+    /// The child's stderr, as captured so far.
+    pub fn stderr_text(&self) -> String {
+        self.stderr.text()
     }
 
     /// Frame and send one JSON message.
