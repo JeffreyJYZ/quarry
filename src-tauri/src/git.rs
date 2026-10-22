@@ -621,6 +621,42 @@ mod tests {
         let argv = commit_argv("-foo");
         assert_eq!(argv, vec!["commit", "-m", "-foo"]);
     }
+
+    #[test]
+    fn commit_hash_too_short_is_rejected() {
+        assert!(validate_commit_hash("abc").is_err());
+    }
+
+    #[test]
+    fn commit_hash_non_hex_is_rejected() {
+        assert!(validate_commit_hash("zzzz").is_err());
+    }
+
+    #[test]
+    fn commit_hash_40_hex_is_accepted() {
+        let hash = "a".repeat(40);
+        assert!(validate_commit_hash(&hash).is_ok());
+    }
+
+    #[test]
+    fn binary_diff_detects_binary_files_fixture() {
+        let output = "diff --git a/logo.png b/logo.png\nindex 111..222\nBinary files a/logo.png and b/logo.png differ\n";
+        assert!(is_binary_diff(output));
+    }
+
+    #[test]
+    fn binary_diff_detects_empty_diff() {
+        assert!(is_binary_diff(""));
+    }
+
+    #[test]
+    fn commit_diff_argv_builds_expected() {
+        let argv = commit_diff_argv("abc123");
+        assert_eq!(
+            argv,
+            vec!["show", "--no-color", "--unified=3", "--format=", "abc123"]
+        );
+    }
 }
 
 /// Stage paths (relative to `root` or absolute inside it). Never a shell, never outside the root.
@@ -1014,4 +1050,92 @@ pub fn clamp_log_limit(limit: Option<u32>) -> Result<u32, String> {
 #[allow(dead_code)]
 pub fn normalize_limit(limit: Option<u32>) -> Result<u32, String> {
     resolve_log_limit(limit)
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitDiff {
+    pub hash: String,
+    pub diff: String,
+    pub binary: bool,
+}
+
+/// Validates a commit hash: 4 to 40 hex characters. Prevents flag injection.
+pub fn validate_commit_hash(hash: &str) -> Result<(), String> {
+    if hash.len() < 4 || hash.len() > 40 {
+        return Err("commit hash must be 4 to 40 hex characters".to_string());
+    }
+    if !hash.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err("commit hash must contain only hex characters [0-9a-fA-F]".to_string());
+    }
+    Ok(())
+}
+
+/// Builds the argv for `git show` of one commit.
+pub fn commit_diff_argv(hash: &str) -> Vec<String> {
+    vec![
+        "show".to_string(),
+        "--no-color".to_string(),
+        "--unified=3".to_string(),
+        "--format=".to_string(),
+        hash.to_string(),
+    ]
+}
+
+/// True when the output is a binary diff or has no text hunk.
+pub fn is_binary_diff(output: &str) -> bool {
+    if output.contains("Binary files") && output.contains("differ") {
+        return true;
+    }
+    let has_hunk = output.lines().any(|line| line.starts_with("@@"));
+    let has_pair = output.contains("---") && output.contains("+++");
+    !(has_hunk || has_pair)
+}
+
+fn trim_trailing_blank_lines(text: &str) -> String {
+    if text.is_empty() {
+        return String::new();
+    }
+    let trimmed = text.trim_end_matches('\n');
+    let mut out = trimmed.to_string();
+    out.push('\n');
+    out
+}
+
+/// Unified diff of one commit against its first parent.
+#[tauri::command]
+pub async fn git_commit_diff(root: String, hash: String) -> Result<CommitDiff, String> {
+    validate_commit_hash(&hash)?;
+    tauri::async_runtime::spawn_blocking(move || commit_diff(&root, &hash))
+        .await
+        .map_err(|error| format!("git show failed: {error}"))?
+}
+
+fn commit_diff(root: &str, hash: &str) -> Result<CommitDiff, String> {
+    let program = git_program()?;
+    let argv = commit_diff_argv(hash);
+    let args: Vec<&str> = argv.iter().map(String::as_str).collect();
+    let output = run(&program, root, &args)?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if is_not_a_repository(&stderr) {
+            return Err(format!("not a git repository: {root}"));
+        }
+        return Err(operation_error("git show", &stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let binary = is_binary_diff(&stdout);
+    let diff = if binary {
+        String::new()
+    } else {
+        trim_trailing_blank_lines(&stdout)
+    };
+
+    Ok(CommitDiff {
+        hash: hash.to_string(),
+        diff,
+        binary,
+    })
 }
