@@ -193,11 +193,60 @@ pub async fn dap_launch(
     let mut pipe = ProcessPipe::spawn(&mut command)
         .map_err(|error| format!("cannot start {ADAPTER} ({adapter}) for {root}: {error}"))?;
 
-    if let Err(error) = handshake(&mut pipe, &adapter, &config, &cwd) {
+    if let Err(error) = handshake_launch(&mut pipe, &adapter, &config, &cwd) {
         let _ = pipe.kill();
         return Err(error);
     }
 
+    let id = register_session(app, &state, pipe)?;
+
+    Ok(DapSession {
+        id,
+        program: config.program,
+    })
+}
+
+/// Attach to a running process and return a session every other command can drive.
+///
+/// The session is the same kind the launch makes: breakpoints, stepping, threads and memory all
+/// work on it. `program` is the process path when the adapter reported one and otherwise an empty
+/// string; lldb-dap names the attached executable without a directory, so the value is normally
+/// empty.
+#[tauri::command]
+pub async fn dap_attach(
+    app: AppHandle,
+    state: State<'_, DapState>,
+    pid: u32,
+) -> Result<DapSession, String> {
+    let adapter = resolve_adapter()?;
+
+    let mut command = Command::new(&adapter);
+    let mut pipe = ProcessPipe::spawn(&mut command).map_err(|error| {
+        format!("cannot start {ADAPTER} ({adapter}) to attach to {pid}: {error}")
+    })?;
+
+    let process_name = match handshake_attach(&mut pipe, &adapter, pid) {
+        Ok(name) => name,
+        Err(error) => {
+            let _ = pipe.kill();
+            return Err(error);
+        }
+    };
+
+    let id = register_session(app, &state, pipe)?;
+
+    Ok(DapSession {
+        id,
+        program: program_path(process_name.as_deref()),
+    })
+}
+
+/// Register a live session and start the reader thread that drives it.
+fn register_session(
+    app: AppHandle,
+    state: &DapState,
+    mut pipe: ProcessPipe,
+) -> Result<String, String> {
     let frames = pipe.take_frames();
     let id = format!("dap-{}", state.counter.fetch_add(1, Ordering::SeqCst) + 1);
     let session = Arc::new(Session::new(id.clone(), pipe));
@@ -220,10 +269,7 @@ pub async fn dap_launch(
 
     lock(&state.sessions).insert(id.clone(), session);
 
-    Ok(DapSession {
-        id,
-        program: config.program,
-    })
+    Ok(id)
 }
 
 #[tauri::command]
@@ -256,30 +302,93 @@ pub async fn dap_set_breakpoints(
     Ok(breakpoints_from(&body))
 }
 
+/// Set the breakpoints of one file with the DAP extras: conditions, hit counts and log messages.
+///
+/// The plain command stays as it is; this one carries what a breakpoint needs beyond its line. A
+/// disabled breakpoint is left out of the request, so the adapter stops holding it.
 #[tauri::command]
-pub async fn dap_continue(state: State<'_, DapState>, session: String) -> Result<(), String> {
+pub async fn dap_set_breakpoints_ex(
+    state: State<'_, DapState>,
+    session: String,
+    path: String,
+    breakpoints: Vec<BreakpointSpec>,
+) -> Result<Vec<DapBreakpoint>, String> {
+    let body = session_for(&state, &session)?.request(
+        "setBreakpoints",
+        json!({
+            "source": { "path": path },
+            "breakpoints": source_breakpoints(&breakpoints),
+            "sourceModified": false,
+        }),
+    )?;
+
+    Ok(breakpoints_from(&body))
+}
+
+/// Map the UI's specs to DAP `SourceBreakpoint`s, dropping the ones the UI disabled.
+///
+/// Only the fields the UI set are sent: an adapter that does not know a field must not see it.
+fn source_breakpoints(specs: &[BreakpointSpec]) -> Vec<Value> {
+    specs
+        .iter()
+        .filter(|spec| spec.enabled)
+        .map(|spec| {
+            let mut breakpoint = Map::new();
+            breakpoint.insert("line".to_string(), json!(spec.line));
+            if let Some(condition) = &spec.condition {
+                breakpoint.insert("condition".to_string(), Value::String(condition.clone()));
+            }
+            if let Some(hit_condition) = &spec.hit_condition {
+                breakpoint.insert(
+                    "hitCondition".to_string(),
+                    Value::String(hit_condition.clone()),
+                );
+            }
+            if let Some(log_message) = &spec.log_message {
+                breakpoint.insert("logMessage".to_string(), Value::String(log_message.clone()));
+            }
+            Value::Object(breakpoint)
+        })
+        .collect()
+}
+
+/// Continue the debuggee, on the thread the UI named or on the thread that stopped last.
+#[tauri::command]
+pub async fn dap_continue(
+    state: State<'_, DapState>,
+    session: String,
+    thread_id: Option<u32>,
+) -> Result<(), String> {
     let session = session_for(&state, &session)?;
-    let thread_id = session.stopped_thread.load(Ordering::SeqCst);
+    let thread_id = select_thread(thread_id, session.stopped_thread.load(Ordering::SeqCst));
 
     session
         .request("continue", json!({ "threadId": thread_id }))
         .map(|_| ())
 }
 
+/// Step, on the thread the UI named or on the thread that stopped last.
+///
 /// `kind` is `next`, `stepIn` or `stepOut`.
 #[tauri::command]
 pub async fn dap_step(
     state: State<'_, DapState>,
     session: String,
     kind: String,
+    thread_id: Option<u32>,
 ) -> Result<(), String> {
     let command = step_command(&kind)?;
     let session = session_for(&state, &session)?;
-    let thread_id = session.stopped_thread.load(Ordering::SeqCst);
+    let thread_id = select_thread(thread_id, session.stopped_thread.load(Ordering::SeqCst));
 
     session
         .request(command, json!({ "threadId": thread_id }))
         .map(|_| ())
+}
+
+/// The thread a command acts on: the one the UI named, else the thread that stopped last.
+fn select_thread(explicit: Option<u32>, recorded: u32) -> u32 {
+    explicit.unwrap_or(recorded)
 }
 
 #[tauri::command]
@@ -568,14 +677,98 @@ impl Pump {
 }
 
 /// `initialize`, `launch`, then wait for `initialized`. `configurationDone` is the caller's job.
-fn handshake(
+fn handshake_launch(
     pipe: &mut ProcessPipe,
     adapter: &str,
     config: &LaunchConfig,
     cwd: &str,
 ) -> Result<(), String> {
     let mut reverse_seq = FIRST_REQUEST_SEQ;
+    initialize(pipe, adapter, &mut reverse_seq)?;
 
+    pipe.send(&json!({
+        "seq": SESSION_SEQ,
+        "type": "request",
+        "command": "launch",
+        "arguments": {
+            "program": &config.program,
+            "args": &config.args,
+            "cwd": cwd,
+            "stopOnEntry": config.stop_on_entry,
+            "initCommands": &config.init_commands,
+        },
+    }))
+    .map_err(|error| format!("cannot send launch to {adapter}: {error}"))?;
+
+    let mut launched = false;
+    let mut initialized = false;
+    pump_until(pipe, adapter, "launch", &mut reverse_seq, |message| {
+        match message.get("type").and_then(Value::as_str) {
+            Some("response")
+                if message.get("request_seq").and_then(Value::as_i64) == Some(SESSION_SEQ) =>
+            {
+                response_result(message)
+                    .map_err(|error| format!("{adapter} rejected launch: {error}"))?;
+                launched = true;
+            }
+            Some("event")
+                if message.get("event").and_then(Value::as_str) == Some("initialized") =>
+            {
+                initialized = true;
+            }
+            _ => {}
+        }
+
+        Ok(launched && initialized)
+    })
+}
+
+/// `initialize`, then `attach` to a running process.
+///
+/// The attach response is what the handshake waits for: lldb-dap does not promise an `initialized`
+/// event for an attach, so requiring it would turn a working attach into a timeout. The name the
+/// adapter reports for the process comes back with it, when it reports one.
+fn handshake_attach(
+    pipe: &mut ProcessPipe,
+    adapter: &str,
+    pid: u32,
+) -> Result<Option<String>, String> {
+    let mut reverse_seq = FIRST_REQUEST_SEQ;
+    initialize(pipe, adapter, &mut reverse_seq)?;
+
+    pipe.send(&json!({
+        "seq": SESSION_SEQ,
+        "type": "request",
+        "command": "attach",
+        "arguments": attach_arguments(pid),
+    }))
+    .map_err(|error| format!("cannot send attach to {adapter}: {error}"))?;
+
+    let mut attached = false;
+    let mut process_name: Option<String> = None;
+    pump_until(pipe, adapter, "attach", &mut reverse_seq, |message| {
+        match message.get("type").and_then(Value::as_str) {
+            Some("response")
+                if message.get("request_seq").and_then(Value::as_i64) == Some(SESSION_SEQ) =>
+            {
+                response_result(message)
+                    .map_err(|error| format!("{adapter} rejected attach: {error}"))?;
+                attached = true;
+            }
+            Some("event") if message.get("event").and_then(Value::as_str) == Some("process") => {
+                process_name = process_name_from(message.get("body"));
+            }
+            _ => {}
+        }
+
+        Ok(attached)
+    })?;
+
+    Ok(process_name)
+}
+
+/// The `initialize` request; the adapter answers with its capabilities.
+fn initialize(pipe: &mut ProcessPipe, adapter: &str, reverse_seq: &mut i64) -> Result<(), String> {
     pipe.send(&json!({
         "seq": INITIALIZE_SEQ,
         "type": "request",
@@ -595,50 +788,43 @@ fn handshake(
     }))
     .map_err(|error| format!("cannot send initialize to {adapter}: {error}"))?;
 
-    pump_until(pipe, adapter, "initialize", &mut reverse_seq, |message| {
+    pump_until(pipe, adapter, "initialize", reverse_seq, |message| {
         if message.get("request_seq").and_then(Value::as_i64) != Some(INITIALIZE_SEQ) {
             return Ok(false);
         }
         response_result(message)
             .map_err(|error| format!("{adapter} rejected initialize: {error}"))?;
         Ok(true)
-    })?;
-
-    pipe.send(&json!({
-        "seq": LAUNCH_SEQ,
-        "type": "request",
-        "command": "launch",
-        "arguments": {
-            "program": &config.program,
-            "args": &config.args,
-            "cwd": cwd,
-            "stopOnEntry": config.stop_on_entry,
-            "initCommands": &config.init_commands,
-        },
-    }))
-    .map_err(|error| format!("cannot send launch to {adapter}: {error}"))?;
-
-    let mut launched = false;
-    let mut initialized = false;
-    pump_until(pipe, adapter, "launch", &mut reverse_seq, |message| {
-        match message.get("type").and_then(Value::as_str) {
-            Some("response")
-                if message.get("request_seq").and_then(Value::as_i64) == Some(LAUNCH_SEQ) =>
-            {
-                response_result(message)
-                    .map_err(|error| format!("{adapter} rejected launch: {error}"))?;
-                launched = true;
-            }
-            Some("event")
-                if message.get("event").and_then(Value::as_str) == Some("initialized") =>
-            {
-                initialized = true;
-            }
-            _ => {}
-        }
-
-        Ok(launched && initialized)
     })
+}
+
+/// The `attach` arguments: the pid under both spellings, and no stop on entry.
+///
+/// The DAP spec names the field `processId`; lldb-dap has also accepted `pid`, so both are sent
+/// and the adapter takes the one it knows.
+fn attach_arguments(pid: u32) -> Value {
+    json!({
+        "pid": pid,
+        "processId": pid,
+        "stopOnEntry": false,
+    })
+}
+
+/// The name the adapter reports for a process, when it reports one.
+fn process_name_from(body: Option<&Value>) -> Option<String> {
+    body.and_then(|body| body.get("name"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
+/// The process path the adapter reported, or an empty string when it reported only a name.
+///
+/// lldb-dap names the attached executable without a directory, so this is normally empty.
+fn program_path(name: Option<&str>) -> String {
+    match name {
+        Some(name) if name.contains('/') => name.to_string(),
+        _ => String::new(),
+    }
 }
 
 /// Read frames until `check` says the handshake step is done, answering server requests on the way.
@@ -1180,5 +1366,78 @@ mod tests {
         assert_eq!(info.data_id.as_deref(), Some("16FDFDCBC/4"));
         assert_eq!(info.description, "4 bytes at 16FDFDCBC n");
         assert_eq!(info.access_types, vec!["read", "write", "readWrite"]);
+    }
+
+    #[test]
+    fn breakpoint_specs_map_to_dap_source_breakpoints() {
+        let specs = vec![
+            BreakpointSpec {
+                line: 12,
+                ..Default::default()
+            },
+            BreakpointSpec {
+                line: 20,
+                condition: Some("n == 4".to_string()),
+                hit_condition: Some("> 2".to_string()),
+                ..Default::default()
+            },
+            BreakpointSpec {
+                line: 30,
+                log_message: Some("n={n}".to_string()),
+                ..Default::default()
+            },
+            BreakpointSpec {
+                line: 40,
+                condition: Some("never".to_string()),
+                enabled: false,
+                ..Default::default()
+            },
+        ];
+
+        let mapped = source_breakpoints(&specs);
+
+        // The disabled one is not sent at all, so the adapter stops holding it.
+        assert_eq!(mapped.len(), 3);
+        assert_eq!(mapped[0], json!({ "line": 12 }));
+        assert_eq!(
+            mapped[1],
+            json!({ "line": 20, "condition": "n == 4", "hitCondition": "> 2" })
+        );
+        assert_eq!(mapped[2], json!({ "line": 30, "logMessage": "n={n}" }));
+    }
+
+    #[test]
+    fn a_breakpoint_spec_is_enabled_unless_it_says_otherwise() {
+        assert!(BreakpointSpec::default().enabled);
+        assert!(
+            BreakpointSpec {
+                line: 3,
+                ..Default::default()
+            }
+            .enabled
+        );
+    }
+
+    #[test]
+    fn attach_arguments_name_the_pid_and_do_not_stop_on_entry() {
+        let arguments = attach_arguments(4242);
+
+        assert_eq!(arguments["pid"], json!(4242));
+        assert_eq!(arguments["processId"], json!(4242));
+        assert_eq!(arguments["stopOnEntry"], json!(false));
+    }
+
+    #[test]
+    fn an_explicit_thread_wins_over_the_recorded_one() {
+        assert_eq!(select_thread(Some(9), 3), 9);
+        assert_eq!(select_thread(None, 3), 3);
+        assert_eq!(select_thread(None, 0), 0);
+    }
+
+    #[test]
+    fn the_program_path_is_empty_when_the_adapter_names_no_path() {
+        assert_eq!(program_path(Some("dap_spike")), "");
+        assert_eq!(program_path(Some("/tmp/dap_spike")), "/tmp/dap_spike");
+        assert_eq!(program_path(None), "");
     }
 }

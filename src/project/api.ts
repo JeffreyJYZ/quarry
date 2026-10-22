@@ -388,3 +388,23 @@ export function readSettings(): Promise<Settings> {
 export function writeSettings(settings: Settings): Promise<void> {
 	return invoke<void>("write_settings", { settings });
 }
+
+export type BreakpointSpec = {
+	line: number;
+	condition?: string | null;
+	hitCondition?: string | null;
+	logMessage?: string | null;
+	enabled?: boolean;
+};
+
+export function dapAttach(pid: number): Promise<DapSession> {
+	return invoke<DapSession>("dap_attach", { pid });
+}
+
+export function dapSetBreakpointsEx(
+	session: string,
+	path: string,
+	breakpoints: BreakpointSpec[],
+): Promise<DapBreakpoint[]> {
+	return invoke<DapBreakpoint[]>("dap_set_breakpoints_ex", { session, path, breakpoints });
+}

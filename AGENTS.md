@@ -22,3 +22,4 @@ Rust and C/C++ IDE. Tauri 2 + React 19 shell; clangd, rust-analyzer and lldb-dap
 - **`evaluate` is broken for Rust** (falls back to Objective-C++, errors) — no watch-expression pane until a workaround is measured.
 - **Data breakpoint `dataId` is `<hex>/<size>` with no `0x`**, `hitBreakpointIds` is null, and the stop reports the line after the store.
 - **`realpath` the project directory before `launch`** — `/var/…` versus `/private/var/…` leaves every breakpoint unverified.
+- **`cargo fmt` in `src-tauri` rewrites `lsp.rs`** — that file is not rustfmt-clean, so a crate-wide format adds an out-of-unit diff. Format the one file instead: `rustfmt --edition 2024 src/dap.rs`.
