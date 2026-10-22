@@ -51,6 +51,7 @@ import { type FileBuffer, isDirty } from "@/project/buffer";
 import { describeError } from "@/project/errors";
 import { type SaveOutcome, saveBuffer, saveErrorMessage, saveMessage } from "@/project/save";
 import RecentProjects from "@/projects/RecentProjects";
+import QuickOpen from "@/quickopen/QuickOpen";
 import { applyFileEdits } from "@/refactor/apply";
 import RunForm from "@/run/RunForm";
 import RunLog from "@/run/RunLog";
@@ -158,6 +159,7 @@ export default function App() {
 	);
 	const [cursor, setCursor] = useState<{ line: number; character: number } | null>(null);
 	const [searchOpen, setSearchOpen] = useState(false);
+	const [quickOpenOpen, setQuickOpenOpen] = useState(false);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
 	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 	const [recentCommands, setRecentCommands] = useState<string[]>([]);
@@ -803,6 +805,25 @@ export default function App() {
 		return () => window.removeEventListener("keydown", handleKeyDown, true);
 	}, []);
 
+	/** Cmd+P opens quick open by file name. */
+	useEffect(() => {
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (!event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+				return;
+			}
+			if (event.key.toLowerCase() !== "p") {
+				return;
+			}
+			if (root === null) {
+				return;
+			}
+			event.preventDefault();
+			setQuickOpenOpen(true);
+		};
+		window.addEventListener("keydown", handleKeyDown, true);
+		return () => window.removeEventListener("keydown", handleKeyDown, true);
+	}, [root]);
+
 	/** Cmd+F10 runs to the caret line. */
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
@@ -888,6 +909,17 @@ export default function App() {
 	const handleOpenMatch = useCallback(
 		(path: string) => {
 			setSearchOpen(false);
+			if (path === activePath) {
+				return;
+			}
+			void openPath(path, fileName(path));
+		},
+		[activePath, openPath],
+	);
+
+	const handleOpenQuick = useCallback(
+		(path: string) => {
+			setQuickOpenOpen(false);
 			if (path === activePath) {
 				return;
 			}
@@ -1456,6 +1488,14 @@ export default function App() {
 					) : null}
 					{searchOpen && root !== null ? (
 						<SearchPalette root={root} onOpen={handleOpenMatch} onClose={closeSearch} />
+					) : null}
+					{quickOpenOpen && root !== null ? (
+						<QuickOpen
+							root={root}
+							openPaths={new Set(buffers.map((buffer) => buffer.path))}
+							onOpen={handleOpenQuick}
+							onClose={() => setQuickOpenOpen(false)}
+						/>
 					) : null}
 					{shortcutsOpen ? (
 						<ShortcutSheet
