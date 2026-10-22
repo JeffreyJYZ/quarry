@@ -777,6 +777,25 @@ export default function App() {
 		return () => window.removeEventListener("keydown", handleKeyDown, true);
 	}, []);
 
+	/** Cmd+F10 runs to the caret line. */
+	useEffect(() => {
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (!event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+				return;
+			}
+			if (event.key !== "F10") {
+				return;
+			}
+			if (activePathRef.current === null || cursor === null) {
+				return;
+			}
+			event.preventDefault();
+			debug.runToCursor(activePathRef.current, cursor.line + 1);
+		};
+		window.addEventListener("keydown", handleKeyDown, true);
+		return () => window.removeEventListener("keydown", handleKeyDown, true);
+	}, [cursor, debug]);
+
 	/** Shift+Alt+H opens call hierarchy panel. */
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
@@ -1409,7 +1428,9 @@ export default function App() {
 					/>
 				</main>
 
-				{debugOpen && root !== null ? <DebugPanel debug={debug} /> : null}
+				{debugOpen && root !== null ? (
+					<DebugPanel debug={debug} activePath={activePath} cursor={cursor} />
+				) : null}
 			</div>
 
 			{refsOpen ? (

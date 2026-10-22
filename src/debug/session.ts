@@ -90,6 +90,7 @@ export type BreakpointEntry = {
 	enabled: boolean;
 	verified: boolean | null;
 	message: string | null;
+	temporary: boolean;
 };
 
 export type BreakpointRow = {
@@ -102,6 +103,7 @@ export type BreakpointRow = {
 	hitCondition: string | null;
 	logMessage: string | null;
 	enabled: boolean;
+	temporary: boolean;
 };
 
 /** `path:line`, the identity of one set breakpoint across both the panel and the editor gutter. */
@@ -196,6 +198,8 @@ export type DebugController = {
 	/** Adds the selected frame's line once; the panel's button. */
 	addBreakpoint: () => void;
 	removeBreakpoint: (path: string, line: number) => void;
+	/** Run to cursor: temporary breakpoint on path:line, then continue. */
+	runToCursor: (path: string, line: number) => void;
 };
 
 /**
@@ -390,60 +394,80 @@ export function useDebugSession(root: string | null): DebugController {
 		}
 	}, []);
 
-	const handleStop = useCallback(
-		async (event: DapStoppedEvent) => {
-			if (sessionRef.current === null || event.session !== sessionRef.current) {
+	// biome-ignore lint/correctness/useExhaustiveDependencies: commitMap and syncFile are defined later in this hook
+	const handleStop = useCallback(async (event: DapStoppedEvent) => {
+		if (sessionRef.current === null || event.session !== sessionRef.current) {
+			return;
+		}
+		const session = event.session;
+		/* Remove any temporary (run-to-cursor) breakpoints on the first stop. */
+		const tempPaths = new Set<string>();
+		const nextMap = new Map(breakpointMapRef.current);
+		for (const [path, lines] of nextMap) {
+			const nextLines = new Map(lines);
+			let changed = false;
+			for (const [line, entry] of nextLines) {
+				if (entry.temporary) {
+					nextLines.delete(line);
+					changed = true;
+				}
+			}
+			if (changed) {
+				if (nextLines.size === 0) nextMap.delete(path);
+				else nextMap.set(path, nextLines);
+				tempPaths.add(path);
+			}
+		}
+		if (tempPaths.size > 0) {
+			commitMap(nextMap);
+			for (const path of tempPaths) void syncFile(path);
+		}
+		setLaunching(false);
+		setRestarting(false);
+		setRestarted(false);
+		setError(null);
+		const generation = ++generationRef.current;
+		setStopView({
+			reason: event.reason,
+			description: event.description,
+			threadId: event.threadId,
+			frames: [],
+			frameId: null,
+			scopes: [],
+		});
+		setChildren(new Map());
+		setExpanded(new Set());
+		setSelectedVariable(null);
+		try {
+			const threads = await dapThreads(session);
+			if (generation !== generationRef.current) {
 				return;
 			}
-			const session = event.session;
-			setLaunching(false);
-			setRestarting(false);
-			setRestarted(false);
-			setError(null);
-			const generation = ++generationRef.current;
-			setStopView({
-				reason: event.reason,
-				description: event.description,
-				threadId: event.threadId,
-				frames: [],
-				frameId: null,
-				scopes: [],
-			});
-			setChildren(new Map());
-			setExpanded(new Set());
-			setSelectedVariable(null);
-			try {
-				const threads = await dapThreads(session);
-				if (generation !== generationRef.current) {
-					return;
-				}
-				const threadId = event.threadId ?? threads[0]?.id ?? null;
-				if (threadId === null) {
-					setError("Stopped with no thread to inspect");
-					return;
-				}
-				const frames = await dapStackTrace(session, threadId);
-				if (generation !== generationRef.current) {
-					return;
-				}
-				const top = frames[0] ?? null;
-				setStopView((current) =>
-					current === null
-						? current
-						: { ...current, threadId, frames, frameId: top === null ? null : top.id },
-				);
-				if (top === null) {
-					return;
-				}
-				await loadFrame(session, top.id);
-			} catch (reason) {
-				if (generation === generationRef.current) {
-					setError(`Stack: ${describeError(reason)}`);
-				}
+			const threadId = event.threadId ?? threads[0]?.id ?? null;
+			if (threadId === null) {
+				setError("Stopped with no thread to inspect");
+				return;
 			}
-		},
-		[loadFrame],
-	);
+			const frames = await dapStackTrace(session, threadId);
+			if (generation !== generationRef.current) {
+				return;
+			}
+			const top = frames[0] ?? null;
+			setStopView((current) =>
+				current === null
+					? current
+					: { ...current, threadId, frames, frameId: top === null ? null : top.id },
+			);
+			if (top === null) {
+				return;
+			}
+			await loadFrame(session, top.id);
+		} catch (reason) {
+			if (generation === generationRef.current) {
+				setError(`Stack: ${describeError(reason)}`);
+			}
+		}
+	}, []);
 
 	const selectFrame = useCallback(
 		(frameId: number) => {
@@ -722,6 +746,7 @@ export function useDebugSession(root: string | null): DebugController {
 					enabled: true,
 					verified: null,
 					message: null,
+					temporary: false,
 				});
 				next.set(path, nextLines);
 				commitMap(next);
@@ -755,6 +780,7 @@ export function useDebugSession(root: string | null): DebugController {
 			enabled: true,
 			verified: null,
 			message: null,
+			temporary: false,
 		});
 		next.set(path, nextLines);
 		commitMap(next);
@@ -772,6 +798,52 @@ export function useDebugSession(root: string | null): DebugController {
 			else next.set(path, nextLines);
 			commitMap(next);
 			void syncFile(path);
+		},
+		[commitMap, syncFile],
+	);
+
+	const runToCursor = useCallback(
+		async (path: string, line: number) => {
+			const session = sessionRef.current;
+			if (session === null || path === "" || !Number.isInteger(line) || line < 1) {
+				return;
+			}
+			const lines = breakpointMapRef.current.get(path);
+			if (lines?.has(line)) {
+				const s = sessionRef.current;
+				if (s !== null) {
+					try {
+						await dapContinueOn(s, stopRef.current?.threadId ?? undefined);
+						setStopView(null);
+						setError(null);
+					} catch (reason) {
+						setError(`Continue: ${describeError(reason)}`);
+					}
+				}
+				return;
+			}
+			setError(null);
+			const next = new Map(breakpointMapRef.current);
+			const nextLines = new Map(lines ?? []);
+			nextLines.set(line, {
+				condition: null,
+				hitCondition: null,
+				logMessage: null,
+				enabled: true,
+				verified: null,
+				message: null,
+				temporary: true,
+			});
+			next.set(path, nextLines);
+			commitMap(next);
+			await syncFile(path);
+			try {
+				await dapContinueOn(session, stopRef.current?.threadId ?? undefined);
+				setStopView(null);
+				setError(null);
+			} catch (reason) {
+				setError(`Continue: ${describeError(reason)}`);
+			}
 		},
 		[commitMap, syncFile],
 	);
@@ -1039,22 +1111,41 @@ export function useDebugSession(root: string | null): DebugController {
 		setRestarting(false);
 	}, [restarting]);
 
-	const handleTerminated = useCallback((session: string) => {
-		if (sessionRef.current !== null && session !== sessionRef.current) {
-			return;
-		}
-		generationRef.current += 1;
-		sessionRef.current = null;
-		setSessionId(null);
-		setLaunching(false);
-		setRestarting(false);
-		setStopView(null);
-		setChildren(new Map());
-		setExpanded(new Set());
-		setSelectedVariable(null);
-		watchRef.current = [];
-		setWatchPoints([]);
-	}, []);
+	const handleTerminated = useCallback(
+		(session: string) => {
+			if (sessionRef.current !== null && session !== sessionRef.current) {
+				return;
+			}
+			const nextMap = new Map(breakpointMapRef.current);
+			for (const [path, lines] of nextMap) {
+				const nextLines = new Map(lines);
+				let changed = false;
+				for (const [line, entry] of nextLines) {
+					if (entry.temporary) {
+						nextLines.delete(line);
+						changed = true;
+					}
+				}
+				if (changed) {
+					if (nextLines.size === 0) nextMap.delete(path);
+					else nextMap.set(path, nextLines);
+				}
+			}
+			commitMap(nextMap);
+			generationRef.current += 1;
+			sessionRef.current = null;
+			setSessionId(null);
+			setLaunching(false);
+			setRestarting(false);
+			setStopView(null);
+			setChildren(new Map());
+			setExpanded(new Set());
+			setSelectedVariable(null);
+			watchRef.current = [];
+			setWatchPoints([]);
+		},
+		[commitMap],
+	);
 
 	const stopHandler = useRef(handleStop);
 	stopHandler.current = handleStop;
@@ -1125,6 +1216,7 @@ export function useDebugSession(root: string | null): DebugController {
 					hitCondition: entry.hitCondition,
 					logMessage: entry.logMessage,
 					enabled: entry.enabled,
+					temporary: entry.temporary,
 				});
 			}
 		}
@@ -1191,5 +1283,6 @@ export function useDebugSession(root: string | null): DebugController {
 		toggleBreakpoint,
 		addBreakpoint,
 		removeBreakpoint,
+		runToCursor,
 	};
 }
