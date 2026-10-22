@@ -198,15 +198,6 @@ pub fn exited_payload(id: &str, code: Option<i32>) -> Value {
 pub fn lossy_chunk(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).into_owned()
 }
-pub fn chunk_to_string(bytes: &[u8]) -> String {
-    lossy_chunk(bytes)
-}
-pub fn utf8_lossy(bytes: &[u8]) -> String {
-    lossy_chunk(bytes)
-}
-pub fn bytes_to_string(bytes: &[u8]) -> String {
-    lossy_chunk(bytes)
-}
 
 fn pump(
     reader: Box<dyn Read + Send>,

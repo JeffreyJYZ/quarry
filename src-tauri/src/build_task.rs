@@ -592,18 +592,6 @@ pub fn plain_clang_argv<P: AsRef<Path>>(root: &str, name: &str, sources: &[P]) -
 
 /// Alias names kept for test discoverability.
 #[allow(dead_code)]
-fn clang_argv<P: AsRef<Path>>(root: &str, name: &str, sources: &[P]) -> Vec<String> {
-    plain_clang_argv(root, name, sources)
-}
-#[allow(dead_code)]
-fn clang_build_argv<P: AsRef<Path>>(root: &str, name: &str, sources: &[P]) -> Vec<String> {
-    plain_clang_argv(root, name, sources)
-}
-#[allow(dead_code)]
-pub fn collect_sources(root: &Path) -> Result<Vec<std::path::PathBuf>, String> {
-    collect_plain_clang_sources(root)
-}
-#[allow(dead_code)]
 fn compiler_for_sources(sources: &[std::path::PathBuf]) -> &'static str {
     if sources
         .iter()
