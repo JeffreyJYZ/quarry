@@ -88,9 +88,11 @@ in [`docs/plans/README.md`](docs/plans/README.md).
 bun install
 bun run tauri dev     # desktop app
 bun run dev           # browser-only UI
-bun run check         # tsc --noEmit + biome check
-bun run fmt           # biome check --write
-bun run build         # tsc --noEmit + vite build
+bun check             # type check (bun builtin, all cores)
+bun fmt               # biome format --write .
+bun lint              # biome lint --write .
+bun run verify        # type check + biome check, the commit gate
+bun run build         # type check + vite build
 ```
 
 Rust tests run from the Tauri crate: `cd src-tauri && cargo test`.
