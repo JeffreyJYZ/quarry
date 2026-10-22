@@ -419,3 +419,18 @@ pub struct CodeAction {
     pub kind: Option<String>,
     pub edits: Vec<FileEdit>,
 }
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SignatureInformation {
+    pub label: String,
+    pub documentation: Option<String>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SignatureHelp {
+    pub signatures: Vec<SignatureInformation>,
+    pub active_signature: u32,
+    pub active_parameter: u32,
+}

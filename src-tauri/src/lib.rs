@@ -50,6 +50,7 @@ pub fn run() {
             lsp::lsp_symbols,
             lsp::lsp_rename,
             lsp::lsp_code_actions,
+            lsp::lsp_signature_help,
             build_task::build_project,
             format::format_document,
             format::formatter_for,

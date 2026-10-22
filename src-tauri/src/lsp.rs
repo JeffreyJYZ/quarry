@@ -17,7 +17,8 @@ use crate::protocol_pipe::{FrameError, ProcessPipe};
 use crate::resolve;
 use crate::types::{
     CodeAction, CompletionItem, CompletionList, Diagnostic, DiagnosticsEvent, FileEdit, HoverInfo,
-    Location, LspStatus, Position, ProjectKind, Range, Symbol, TextEdit,
+    Location, LspStatus, Position, ProjectKind, Range, SignatureHelp, SignatureInformation, Symbol,
+    TextEdit,
 };
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -949,6 +950,67 @@ mod tests {
     }
 
     #[test]
+    fn signature_help_parses_two_signatures_with_indices() {
+        let result = json!({
+            "signatures": [
+                { "label": "foo(a: i32)", "documentation": "first" },
+                { "label": "foo(a: i32, b: i32)", "documentation": { "kind": "markdown", "value": "second" } },
+            ],
+            "activeSignature": 1,
+            "activeParameter": 0,
+        });
+        let help = parse_signature_help(&result).expect("help");
+        assert_eq!(help.signatures.len(), 2);
+        assert_eq!(help.signatures[0].label, "foo(a: i32)");
+        assert_eq!(help.signatures[0].documentation.as_deref(), Some("first"));
+        assert_eq!(help.signatures[1].documentation.as_deref(), Some("second"));
+        assert_eq!(help.active_signature, 1);
+        assert_eq!(help.active_parameter, 0);
+    }
+
+    #[test]
+    fn signature_help_defaults_indices_when_missing() {
+        let result = json!({
+            "signatures": [{ "label": "bar()" }],
+        });
+        let help = parse_signature_help(&result).expect("help");
+        assert_eq!(help.signatures.len(), 1);
+        assert_eq!(help.active_signature, 0);
+        assert_eq!(help.active_parameter, 0);
+    }
+
+    #[test]
+    fn signature_help_flattens_documentation_object() {
+        let result = json!({
+            "signatures": [{ "label": "baz()", "documentation": { "language": "rust", "value": "let x = 1;" } }],
+        });
+        let help = parse_signature_help(&result).expect("help");
+        assert_eq!(
+            help.signatures[0].documentation.as_deref(),
+            Some("let x = 1;")
+        );
+    }
+
+    #[test]
+    fn signature_help_null_result_is_none() {
+        assert!(parse_signature_help(&Value::Null).is_none());
+    }
+
+    #[test]
+    fn signature_help_skips_malformed_entries() {
+        let result = json!({
+            "signatures": [
+                { "documentation": "no label" },
+                { "label": "ok()" },
+                42,
+            ],
+        });
+        let help = parse_signature_help(&result).expect("help");
+        assert_eq!(help.signatures.len(), 1);
+        assert_eq!(help.signatures[0].label, "ok()");
+    }
+
+    #[test]
     fn client_capabilities_advertise_the_navigation_requests() {
         let capabilities = client_capabilities();
         assert_eq!(
@@ -1595,4 +1657,62 @@ mod rename_extra_tests {
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].edits.len(), 1);
     }
+}
+
+#[tauri::command]
+pub async fn lsp_signature_help(
+    state: State<'_, LspState>,
+    root: String,
+    path: String,
+    line: u32,
+    character: u32,
+) -> Result<Option<SignatureHelp>, String> {
+    let session = session_for(&state, &root)?;
+    let result = send_request(
+        &session,
+        "textDocument/signatureHelp",
+        position_params(&path_to_uri(&path), line, character),
+    )
+    .await?;
+    Ok(parse_signature_help(&result))
+}
+
+/// Read a signature help answer into the IDE's shape.
+///
+/// A null result reads as `None`. Malformed signature entries are skipped. Both
+/// active indices default to 0 when the server omits them. `documentation` may
+/// be a plain string or a `{ kind, value }` / `{ language, value }` object and
+/// is flattened the same way hover contents are.
+pub fn parse_signature_help(result: &Value) -> Option<SignatureHelp> {
+    if result.is_null() {
+        return None;
+    }
+    let signatures_value = result.get("signatures").and_then(Value::as_array)?;
+    let mut signatures = Vec::new();
+    for entry in signatures_value {
+        let Some(label) = entry.get("label").and_then(Value::as_str) else {
+            continue;
+        };
+        let documentation = entry
+            .get("documentation")
+            .map(hover_contents)
+            .filter(|text| !text.is_empty());
+        signatures.push(SignatureInformation {
+            label: label.to_string(),
+            documentation,
+        });
+    }
+    Some(SignatureHelp {
+        signatures,
+        active_signature: result
+            .get("activeSignature")
+            .and_then(Value::as_u64)
+            .and_then(|n| u32::try_from(n).ok())
+            .unwrap_or(0),
+        active_parameter: result
+            .get("activeParameter")
+            .and_then(Value::as_u64)
+            .and_then(|n| u32::try_from(n).ok())
+            .unwrap_or(0),
+    })
 }
