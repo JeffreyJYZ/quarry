@@ -1,16 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-	type GitStatus,
-	type GitStatusEntry,
-	gitStage,
-	gitStatus,
-	gitUnstage,
-} from "@/project/api";
+import { type GitStatus, type GitStatusEntry, gitStage, gitUnstage } from "@/project/api";
 import { describeError } from "@/project/errors";
 
 export type SourceControlProps = {
 	root: string;
 	refreshToken: number;
+	status: GitStatus | null;
+	onRefresh: () => Promise<void>;
 	onOpenFile: (path: string) => void;
 	onDiff: (path: string) => void;
 };
@@ -47,10 +43,12 @@ function nameOf(path: string): string {
 export default function SourceControl({
 	root,
 	refreshToken,
+	status: statusProp,
+	onRefresh,
 	onOpenFile,
 	onDiff,
 }: SourceControlProps) {
-	const [status, setStatus] = useState<GitStatus | null>(null);
+	const status = statusProp;
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [busy, setBusy] = useState<Set<string>>(() => new Set<string>());
@@ -59,16 +57,14 @@ export default function SourceControl({
 	const refresh = useCallback(async () => {
 		setLoading(true);
 		try {
-			const next = await gitStatus(root);
-			setStatus(next);
+			await onRefresh();
 			setError(null);
 		} catch (err) {
 			setError(describeError(err));
-			setStatus(null);
 		} finally {
 			setLoading(false);
 		}
-	}, [root]);
+	}, [onRefresh]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: refreshToken is an explicit refresh trigger
 	useEffect(() => {

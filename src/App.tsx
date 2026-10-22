@@ -353,25 +353,41 @@ export default function App() {
 
 	const root = project?.root ?? null;
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: gitRefresh is an explicit refresh trigger
-	useEffect(() => {
-		let cancelled = false;
+	const gitInFlight = useRef<Promise<void> | null>(null);
+	const gitFollowup = useRef(false);
+	const refreshGit = useCallback(async () => {
 		if (root === null) {
 			setGitStatusState(null);
 			return;
 		}
-		void (async () => {
-			try {
+		if (gitInFlight.current !== null) {
+			gitFollowup.current = true;
+			return gitInFlight.current;
+		}
+		const run = async () => {
+			do {
+				gitFollowup.current = false;
 				const next = await gitStatus(root);
-				if (!cancelled) setGitStatusState(next);
-			} catch {
-				if (!cancelled) setGitStatusState(null);
-			}
-		})();
-		return () => {
-			cancelled = true;
+				setGitStatusState(next);
+			} while (gitFollowup.current);
 		};
-	}, [root, gitRefresh]);
+		const promise = run()
+			.catch((error) => {
+				throw error;
+			})
+			.finally(() => {
+				gitInFlight.current = null;
+			});
+		gitInFlight.current = promise;
+		return promise;
+	}, [root]);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: gitRefresh is an explicit refresh trigger
+	useEffect(() => {
+		void refreshGit().catch(() => {
+			/* failures surface through callers that await refreshGit */
+		});
+	}, [root, gitRefresh, refreshGit]);
 
 	useEffect(() => {
 		const handleFocus = () => {
@@ -1160,6 +1176,8 @@ export default function App() {
 					<SourceControl
 						root={root}
 						refreshToken={gitRefresh}
+						status={gitStatusState}
+						onRefresh={refreshGit}
 						onOpenFile={(path) => void openPath(path, fileName(path))}
 						onDiff={setGitDiffPath}
 					/>
