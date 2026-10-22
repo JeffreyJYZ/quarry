@@ -49,7 +49,9 @@ import { type FileBuffer, isDirty } from "@/project/buffer";
 import { describeError } from "@/project/errors";
 import { type SaveOutcome, saveBuffer, saveErrorMessage, saveMessage } from "@/project/save";
 import { applyFileEdits } from "@/refactor/apply";
+import RunForm from "@/run/RunForm";
 import RunLog from "@/run/RunLog";
+import { splitArgs } from "@/run/splitArgs";
 import SearchPalette from "@/search/SearchPalette";
 import ShortcutSheet from "@/shortcuts/ShortcutSheet";
 import Terminal from "@/terminal/Terminal";
@@ -127,6 +129,10 @@ export default function App() {
 		null,
 	);
 	const runIdRef = useRef<string | null>(null);
+	const [runProgramState, setRunProgramState] = useState("");
+	const [runArgsState, setRunArgsState] = useState("");
+	const [runCwdState, setRunCwdState] = useState("");
+	const runFormMemory = useRef<Map<string, { args: string; cwd: string }>>(new Map());
 	useEffect(() => {
 		runIdRef.current = runId;
 	}, [runId]);
@@ -358,6 +364,34 @@ export default function App() {
 	}, []);
 
 	const root = project?.root ?? null;
+
+	useEffect(() => {
+		if (root === null) {
+			return;
+		}
+		const saved = runFormMemory.current.get(root);
+		void defaultLaunchConfig(root, false)
+			.then((config) => {
+				setRunProgramState(config.program);
+				if (saved === undefined) {
+					setRunArgsState(config.args.join(" "));
+					setRunCwdState(config.cwd);
+				} else {
+					setRunArgsState(saved.args);
+					setRunCwdState(saved.cwd);
+				}
+			})
+			.catch(() => {
+				/* ignore */
+			});
+	}, [root]);
+
+	useEffect(() => {
+		if (root === null) {
+			return;
+		}
+		runFormMemory.current.set(root, { args: runArgsState, cwd: runCwdState });
+	}, [root, runArgsState, runCwdState]);
 
 	const gitInFlight = useRef<Promise<void> | null>(null);
 	const gitFollowup = useRef(false);
@@ -918,19 +952,22 @@ export default function App() {
 	}, []);
 
 	const handleRun = useCallback(async () => {
-		if (root === null || runId !== null) {
+		if (root === null || runId !== null || runProgramState === "") {
+			return;
+		}
+		if (!runCwdState.startsWith("/")) {
+			setNotice("cwd must be absolute");
 			return;
 		}
 		setRunLines([]);
 		setRunExited(null);
 		try {
-			const config = await defaultLaunchConfig(root, false);
-			const id = await runProgram(config.program, config.args, config.cwd);
+			const id = await runProgram(runProgramState, splitArgs(runArgsState), runCwdState);
 			setRunId(id);
 		} catch (error) {
 			setNotice(describeError(error));
 		}
-	}, [root, runId]);
+	}, [root, runId, runProgramState, runArgsState, runCwdState]);
 
 	const handleStop = useCallback(async () => {
 		const id = runId;
@@ -1223,6 +1260,7 @@ export default function App() {
 									root={project.root}
 									activePath={activePath}
 									onNavigate={handleNavigate}
+									cursor={cursor}
 								/>
 							</>
 						) : (
@@ -1316,6 +1354,24 @@ export default function App() {
 								onSelect: handleSelectProblem,
 							}}
 							tests={tests}
+						/>
+					) : null}
+					{root !== null ? (
+						<RunForm
+							program={runProgramState}
+							args={runArgsState}
+							cwd={runCwdState}
+							argv={[runProgramState, ...splitArgs(runArgsState)].join(" ")}
+							cwdError={
+								runCwdState !== "" && !runCwdState.startsWith("/")
+									? "cwd must be absolute"
+									: null
+							}
+							running={runId !== null}
+							onArgsChange={setRunArgsState}
+							onCwdChange={setRunCwdState}
+							onRun={() => void handleRun()}
+							onStop={() => void handleStop()}
 						/>
 					) : null}
 					{runId !== null || runLines.length > 0 || runExited !== null ? (
