@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import BreakpointItem from "@/debug/BreakpointItem";
 import DisasmPane from "@/debug/memory/DisasmPane";
 import MemoryPane from "@/debug/memory/MemoryPane";
+import ProcessPicker from "@/debug/ProcessPicker";
 import type { DebugController, VariableRow } from "@/debug/session";
 import { fileName } from "@/problems/model";
 import type { DapVariable } from "@/project/api";
@@ -267,15 +268,7 @@ export default function DebugPanel({ debug }: { debug: DebugController }) {
 					</button>
 				</div>
 				<div className="debug-row debug-row-wrap">
-					<input
-						className="debug-pid"
-						type="number"
-						inputMode="numeric"
-						placeholder="pid"
-						value={debug.pidInput}
-						disabled={session !== null}
-						onChange={(event) => debug.setPidInput(event.target.value)}
-					/>
+					<ProcessPicker debug={debug} />
 					<button
 						type="button"
 						className="button"
