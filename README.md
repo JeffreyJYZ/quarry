@@ -36,7 +36,7 @@ read off `src-tauri/src/lib.rs` and `src/`:
   clang build (`run_plain_clang_build` in `src-tauri/src/build_task.rs`), so C/C++ builds do not
   require cmake.
 - **Run**: `run_program` / `stop_program` stream `run://output` lines and one `run://exited`, with a
-  run panel in `src/run/` (program, args, cwd, env, argv preview, run/stop).
+  run panel in `src/run/` (program, args, cwd, env vars with validation, argv preview, run/stop).
 - **Terminal**: an embedded terminal built on `portable-pty` (`pty::pty_open` / `pty_write` /
   `pty_resize` / `pty_close`) with `src/terminal/Terminal.tsx`, supporting multiple sessions in tabs
   (`Cmd+T` / `Cmd+W`, close button per tab), opening in the active file's directory when one is
@@ -52,6 +52,12 @@ read off `src-tauri/src/lib.rs` and `src/`:
 - **Search**: `rg`-backed palette with results grouped by file, keyboard navigation, and a visible cap
   when the result set is truncated. Case-sensitive, regex and whole-word toggles are in
   `src/search/SearchPalette.tsx`.
+- **Quick open**: `Cmd+P` file picker over `files::list_files`, ranked in `src/quickopen/QuickOpen.tsx`
+  and `src/quickopen/rank.ts`, with a recent-files list.
+- **Recent projects**: dropdown of previously opened roots backed by `settings::remember_root` and
+  `src/projects/RecentProjects.tsx`.
+- **Problems quick fixes**: each Problems entry carries a `Fix` button that opens code actions from
+  `lsp_code_actions` in `src/problems/ProblemsPanel.tsx`.
 - **Tests**: `list_tests` and `run_test` feed a Tests dock with pass/fail status.
 - **Source control**: a Git view with status, per-file diff, an open-in-editor flow, a commit box
   (`git_commit`), branch listing and switching (`git_branches`, `git_checkout`, dropdown in
