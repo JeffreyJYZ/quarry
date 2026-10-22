@@ -9,6 +9,7 @@ Run from the repository root unless noted.
 - `bun run build` — runs `bun run typecheck` then `vite build`. Proves the frontend bundles cleanly to `dist/`.
 - `cargo test` (run in `src-tauri/`) — proves the Rust unit tests, including the build-task and diagnostic parsing tests.
 - `cargo check --all-targets` (run in `src-tauri/`) — proves the whole Rust crate compiles for every target, including tests and benches.
+- `cargo clippy --all-targets -- -D warnings` (run in `src-tauri/`) — proves the Rust crate passes clippy with warnings denied. Clean on the current tree with no `#[allow(clippy::…)]` added.
 
 Also run before committing: `cargo fmt --check` must be clean. Note `src-tauri/src/lsp.rs` is not rustfmt-clean, so format only the file being edited, for example `rustfmt --edition 2024 src/dap.rs`, rather than a crate-wide `cargo fmt`.
 

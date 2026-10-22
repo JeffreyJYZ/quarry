@@ -125,13 +125,13 @@ bun run gate          # verify + tests, the commit gate
 bun run build         # type check + vite build
 ```
 
-Rust tests run from the Tauri crate: `cd src-tauri && cargo test`.
+Rust tests run from the Tauri crate: `cd src-tauri && cargo test`. Rust checks run there too: `cd src-tauri && cargo check --all-targets` and `cd src-tauri && cargo clippy --all-targets -- -D warnings`.
 
 The formatter for TypeScript, CSS and Markdown is Biome; `bun run verify` is the commit gate.
 
 ## Tests
 
-Rust tests live in `src-tauri` and run with `cd src-tauri && cargo test`. Frontend unit tests are `bun test` over pure helpers: ranking in `src/quickopen/rank.ts`, argument splitting in `src/run/splitArgs.ts`, hex helpers in `src/debug/memory/hex.ts`, buffer handling in `src/project/buffer.ts`, blame helpers in `src/editor/blame.ts`, and the search model in `src/search/model.ts`. The smoke scripts under `scripts/` are the only place real language servers and debuggers are exercised. The commit gate is `bun run gate` (`bun run verify` plus `bun test`).
+Rust tests live in `src-tauri` and run with `cd src-tauri && cargo test`. Frontend unit tests are `bun test` over pure helpers: ranking in `src/quickopen/rank.ts`, argument splitting in `src/run/splitArgs.ts`, hex helpers in `src/debug/memory/hex.ts`, buffer handling in `src/project/buffer.ts`, blame helpers in `src/editor/blame.ts`, and the search model in `src/search/model.ts`. The smoke scripts under `scripts/` are the only place real language servers and debuggers are exercised. The commit gate is `bun run gate` (`bun run verify` plus `bun test`). Rust changes also require `cargo check --all-targets` and `cargo clippy --all-targets -- -D warnings` to pass; clippy is clean on the current tree with no `#[allow(clippy::…)]` added.
 
 ## Smoke scripts
 
