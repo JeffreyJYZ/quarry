@@ -153,9 +153,9 @@ async function main() {
 			params: { textDocument: { uri: sourceUri, languageId: "rust", version: 1, text } },
 		});
 
-		// position on `main` identifier: line 4 (1-based) => 0-based 3, char 3
+		// position on `run` identifier inside the call: line 4 (0-based), char 18
 		const line = 4,
-			character = 4;
+			character = 18;
 
 		// poll hover until non-null
 		let hoverResp: any = null;
@@ -278,6 +278,112 @@ async function main() {
 		// So no unhandled expected; but print definition example raw for verification
 		if (defExample) {
 			summary.push(`definition example: ${JSON.stringify(defExample).slice(0, 600)}`);
+		}
+
+		// signature help: position inside a call expression in main.rs (run())
+		const shLine = 4,
+			shChar = 20;
+		const shId = nextId();
+		client.send({
+			jsonrpc: "2.0",
+			id: shId,
+			method: "textDocument/signatureHelp",
+			params: {
+				textDocument: { uri: sourceUri },
+				position: { line: shLine, character: shChar },
+			},
+		});
+		const shResp = await client.waitForResponse(shId, REQ_TIMEOUT);
+		let shLabel = "none";
+		let shOk = false;
+		if (shResp && !shResp.error && shResp.result != null) {
+			const r = shResp.result;
+			const sigs = Array.isArray(r?.signatures) ? r.signatures : [];
+			const active = typeof r?.activeSignature === "number" ? r.activeSignature : 0;
+			if (sigs.length > 0) {
+				const pick = sigs[active] ?? sigs[0];
+				shLabel = pick?.label ?? "none";
+				shOk = true;
+			}
+		}
+		if (shResp?.error) {
+			fatal = true;
+			summary.push(`signatureHelp: FAIL ERR ${JSON.stringify(shResp.error)}`);
+		} else {
+			summary.push(`signatureHelp: ${shOk ? "OK" : "none"} label=${shLabel}`);
+		}
+
+		// rename at the `main` identifier
+		const rnId = nextId();
+		client.send({
+			jsonrpc: "2.0",
+			id: rnId,
+			method: "textDocument/rename",
+			params: {
+				textDocument: { uri: sourceUri },
+				position: { line, character },
+				newName: "quarry_probe_rename",
+			},
+		});
+		const rnResp = await client.waitForResponse(rnId, REQ_TIMEOUT);
+		let rnShape = "none";
+		let rnFiles = 0;
+		let rnEdits = 0;
+		let rnOk = false;
+		if (rnResp && !rnResp.error && rnResp.result != null) {
+			const r = rnResp.result;
+			if (r?.changes && typeof r.changes === "object") rnShape = "changes";
+			else if (Array.isArray(r?.documentChanges)) rnShape = "documentChanges";
+			if (rnShape === "changes") {
+				rnFiles = Object.keys(r.changes).length;
+				for (const k of Object.keys(r.changes)) {
+					rnEdits += Array.isArray(r.changes[k]) ? r.changes[k].length : 0;
+				}
+			} else if (rnShape === "documentChanges") {
+				rnFiles = r.documentChanges.length;
+				for (const dc of r.documentChanges) {
+					rnEdits += Array.isArray(dc?.edits) ? dc.edits.length : 0;
+				}
+			}
+			rnOk = rnShape !== "none";
+		}
+		if (rnResp?.error || !rnOk) {
+			fatal = true;
+			summary.push(
+				`rename: FAIL ${rnResp?.error ? JSON.stringify(rnResp.error) : "no shape"}`,
+			);
+		} else {
+			summary.push(`rename: shape=${rnShape} files=${rnFiles} edits=${rnEdits}`);
+		}
+
+		// code actions single-position range at identifier
+		const caId = nextId();
+		client.send({
+			jsonrpc: "2.0",
+			id: caId,
+			method: "textDocument/codeAction",
+			params: {
+				textDocument: { uri: sourceUri },
+				range: {
+					start: { line, character },
+					end: { line, character },
+				},
+				context: { diagnostics: [] },
+			},
+		});
+		const caResp = await client.waitForResponse(caId, REQ_TIMEOUT);
+		let caCount = 0;
+		let caTitles: string[] = [];
+		if (caResp && !caResp.error && Array.isArray(caResp.result)) {
+			caCount = caResp.result.length;
+			caTitles = caResp.result
+				.slice(0, 3)
+				.map((x: any) => x?.title ?? "")
+				.filter((t: string) => t.length > 0);
+		}
+		summary.push(`codeAction: count=${caCount} titles=${JSON.stringify(caTitles)}`);
+		if (caResp?.error) {
+			// not fatal per spec (count zero is data), but request failure? spec: exit non-zero only failed handshake or failed sig/rename. codeAction failure not specified; treat as non-fatal data.
 		}
 	} finally {
 		client.kill();
