@@ -1542,7 +1542,12 @@ export default function App() {
 				</main>
 
 				{debugOpen && root !== null ? (
-					<DebugPanel debug={debug} activePath={activePath} cursor={cursor} />
+					<DebugPanel
+						debug={debug}
+						activePath={activePath}
+						cursor={cursor}
+						onNavigate={handleNavigate}
+					/>
 				) : null}
 			</div>
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import BreakpointItem from "@/debug/BreakpointItem";
 import DisasmPane from "@/debug/memory/DisasmPane";
 import MemoryPane from "@/debug/memory/MemoryPane";
@@ -190,13 +190,25 @@ export default function DebugPanel({
 	debug,
 	activePath = null,
 	cursor = null,
+	onNavigate,
 }: {
 	debug: DebugController;
 	activePath?: string | null;
 	cursor?: { line: number; character: number } | null;
+	onNavigate?: (path: string, line: number, character: number) => void;
 }) {
 	const view = debug.stopView;
 	const top = view === null ? null : (view.frames[0] ?? null);
+	const [navigated, setNavigated] = useState<{ source: string; line: number } | null>(null);
+	const framesRef = useRef(view?.frames);
+	// Clear the navigation marker whenever a new stop arrives (frames array changes), so a stale
+	// frame never stays marked; selecting a frame keeps its array identity and the marker survives.
+	useEffect(() => {
+		if (framesRef.current !== view?.frames) {
+			framesRef.current = view?.frames;
+			setNavigated(null);
+		}
+	}, [view]);
 	const activeFrame =
 		view === null ? null : (view.frames.find((frame) => frame.id === view.frameId) ?? top);
 	const memoryAddress =
@@ -395,24 +407,59 @@ export default function DebugPanel({
 					) : view.frames.length === 0 ? (
 						<p className="debug-note">No frames</p>
 					) : (
-						view.frames.map((frame) => (
-							<button
-								key={frame.id}
-								type="button"
-								className={
-									frame.id === view.frameId ? "debug-frame active" : "debug-frame"
-								}
-								title={frame.source ?? undefined}
-								onClick={() => debug.selectFrame(frame.id)}
-							>
-								<span className="debug-frame-name">{frame.name}</span>
-								<span className="debug-frame-pos">
-									{frame.source === null
-										? "—"
-										: `${fileName(frame.source)}:${frame.line}`}
-								</span>
-							</button>
-						))
+						view.frames.map((frame) => {
+							const navigable = frame.source !== null && frame.line > 0;
+							const marked =
+								navigated !== null &&
+								frame.source === navigated.source &&
+								frame.line === navigated.line;
+							const className = [
+								"debug-frame",
+								frame.id === view.frameId ? "active" : "",
+								marked && frame.id !== view.frameId ? "navigated" : "",
+							]
+								.filter(Boolean)
+								.join(" ");
+							const content = (
+								<>
+									<span className="debug-frame-name">{frame.name}</span>
+									<span className="debug-frame-pos">
+										{frame.source === null
+											? "—"
+											: `${fileName(frame.source)}:${frame.line}`}
+									</span>
+								</>
+							);
+							if (!navigable || frame.source === null) {
+								return (
+									<span
+										key={frame.id}
+										className={className}
+										title={frame.source ?? undefined}
+										style={marked ? { opacity: 0.55 } : undefined}
+									>
+										{content}
+									</span>
+								);
+							}
+							const source = frame.source;
+							return (
+								<button
+									key={frame.id}
+									type="button"
+									className={className}
+									title={source}
+									style={marked ? { opacity: 0.55 } : undefined}
+									onClick={() => {
+										debug.selectFrame(frame.id);
+										setNavigated({ source, line: frame.line });
+										onNavigate?.(source, frame.line - 1, 0);
+									}}
+								>
+									{content}
+								</button>
+							);
+						})
 					)}
 				</div>
 			</section>
