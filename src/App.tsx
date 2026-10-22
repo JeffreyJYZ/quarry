@@ -8,6 +8,8 @@ import Welcome from "@/components/Welcome";
 import DebugPanel from "@/debug/DebugPanel";
 import { type BreakpointRow, useDebugSession } from "@/debug/session";
 import Editor from "@/editor/Editor";
+import DiffView from "@/git/DiffView";
+import SourceControl from "@/git/SourceControl";
 import {
 	combineDiagnostics,
 	countSeverities,
@@ -73,6 +75,9 @@ export default function App() {
 	const [refsOpen, setRefsOpen] = useState(false);
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [debugOpen, setDebugOpen] = useState(false);
+	const [gitOpen, setGitOpen] = useState(false);
+	const [gitRefresh, setGitRefresh] = useState(0);
+	const [gitDiffPath, setGitDiffPath] = useState<string | null>(null);
 	/** Paths with a write in flight; the tab row dims its mark while the promise resolves. */
 	const [saving, setSaving] = useState<ReadonlySet<string>>(() => new Set<string>());
 	/** Path whose dirty close is waiting on the inline Save/Discard choice. */
@@ -170,6 +175,17 @@ export default function App() {
 	}, [project, buffers, activePath]);
 
 	const root = project?.root ?? null;
+
+	useEffect(() => {
+		const handleFocus = () => {
+			if (root !== null) {
+				setGitRefresh((current) => current + 1);
+			}
+		};
+		window.addEventListener("focus", handleFocus);
+		return () => window.removeEventListener("focus", handleFocus);
+	}, [root]);
+
 	const tests = useTests(root);
 	const active = buffers.find((buffer) => buffer.path === activePath) ?? null;
 
@@ -342,6 +358,8 @@ export default function App() {
 			setProject(next);
 			setBuffers([]);
 			setActivePath(null);
+			setGitRefresh((current) => current + 1);
+			setGitDiffPath(null);
 			setConfirmClose(null);
 			setSaveStatus(null);
 			setServerDiagnostics(new Map());
@@ -586,6 +604,15 @@ export default function App() {
 					type="button"
 					className="button"
 					disabled={root === null}
+					aria-pressed={gitOpen}
+					onClick={() => setGitOpen((current) => !current)}
+				>
+					Git
+				</button>
+				<button
+					type="button"
+					className="button"
+					disabled={root === null}
 					aria-pressed={debugOpen && root !== null}
 					onClick={() => setDebugOpen((current) => !current)}
 				>
@@ -620,21 +647,30 @@ export default function App() {
 			) : null}
 
 			<div className={debugOpen && root !== null ? "body debug-open" : "body"}>
-				<aside className="rail">
-					<div className="rail-head">
-						<span className="label">explorer</span>
-					</div>
-					{project ? (
-						<FileTree
-							key={project.root}
-							root={project.root}
-							activePath={activePath}
-							onOpenFile={handleOpenFile}
-						/>
-					) : (
-						<p className="empty">No folder open. Use Open project to choose one.</p>
-					)}
-				</aside>
+				{gitOpen && root !== null ? (
+					<SourceControl
+						root={root}
+						refreshToken={gitRefresh}
+						onOpenFile={(path) => void openPath(path, fileName(path))}
+						onDiff={setGitDiffPath}
+					/>
+				) : (
+					<aside className="rail">
+						<div className="rail-head">
+							<span className="label">explorer</span>
+						</div>
+						{project ? (
+							<FileTree
+								key={project.root}
+								root={project.root}
+								activePath={activePath}
+								onOpenFile={handleOpenFile}
+							/>
+						) : (
+							<p className="empty">No folder open. Use Open project to choose one.</p>
+						)}
+					</aside>
+				)}
 
 				<main className="canvas">
 					{active ? (
@@ -703,6 +739,9 @@ export default function App() {
 					onNavigate={handleNavigate}
 					onClose={() => setRefsOpen(false)}
 				/>
+			) : null}
+			{gitDiffPath !== null && root !== null ? (
+				<DiffView root={root} path={gitDiffPath} onClose={() => setGitDiffPath(null)} />
 			) : null}
 			<StatusBar
 				version={appVersion}
