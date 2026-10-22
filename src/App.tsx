@@ -425,8 +425,14 @@ export default function App() {
 	);
 
 	const handleSelectProblem = useCallback(
-		(path: string) => {
+		(path: string, line?: number, character?: number) => {
+			if (line === undefined || character === undefined) {
+				void openPath(path, fileName(path));
+				return;
+			}
 			void openPath(path, fileName(path));
+			setRevealTarget({ line, character });
+			setRevealToken((current) => current + 1);
 		},
 		[openPath],
 	);

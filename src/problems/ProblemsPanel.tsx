@@ -8,7 +8,7 @@ export type ProblemsPanelProps = {
 	warnings: number;
 	open: boolean;
 	onToggle: () => void;
-	onSelect: (path: string) => void;
+	onSelect: (path: string, line?: number, character?: number) => void;
 	activePath: string | null;
 };
 
@@ -97,7 +97,9 @@ export default function ProblemsPanel({
 													type="button"
 													className="problems-row"
 													title={diagnostic.message}
-													onClick={() => onSelect(file.path)}
+													onClick={() =>
+														onSelect(file.path, line, character)
+													}
 												>
 													<span
 														className={`problem-dot ${SEVERITY_CLASS[diagnostic.severity]}`}
