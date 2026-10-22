@@ -101,3 +101,12 @@
 	white-space: pre-wrap;
 	word-break: break-word;
 }
+
+.cm-inlay-hint {
+	color: var(--muted);
+	opacity: 0.6;
+	font-size: 0.85em;
+	font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+	pointer-events: none;
+	user-select: none;
+}

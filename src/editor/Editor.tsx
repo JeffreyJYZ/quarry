@@ -16,6 +16,7 @@ import { forwardRef, type JSX, useEffect, useImperativeHandle, useRef, useState 
 import "@/editor/editor.css";
 import { breakpointGutter, normalizeLines, setBreakpoints } from "@/editor/breakpoints";
 import { lintSignature, toLintDiagnostics } from "@/editor/diagnostics";
+import { inlayHintsField, setInlayHints } from "@/editor/inlayHints";
 import { languageForPath } from "@/editor/languages";
 import {
 	emptySearchState,
@@ -25,7 +26,7 @@ import {
 	setSearchMatches,
 } from "@/editor/search";
 import { quarryHighlightStyle, quarryTheme } from "@/editor/theme";
-import type { CodeAction, Diagnostic, FileEdit, SignatureHelp } from "@/project/api";
+import type { CodeAction, Diagnostic, FileEdit, InlayHint, SignatureHelp } from "@/project/api";
 import {
 	formatDocument,
 	formatterFor,
@@ -34,6 +35,7 @@ import {
 	lspCompletion,
 	lspDefinition,
 	lspHover,
+	lspInlayHints,
 	lspReferences,
 	lspRename,
 	lspSignatureHelp,
@@ -250,6 +252,12 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 	const sigSeqRef = useRef(0);
 	const sigTimerRef = useRef<number | null>(null);
 	const sigHideTimerRef = useRef<number | null>(null);
+	const [hintsVisible, setHintsVisible] = useState(true);
+	const hintsVisibleRef = useRef(hintsVisible);
+	hintsVisibleRef.current = hintsVisible;
+	const inlaySeqRef = useRef(0);
+	const inlayTimerRef = useRef<number | null>(null);
+	const inlayHintsRef = useRef<InlayHint[]>([]);
 
 	const recompute = () => {
 		const view = viewRef.current;
@@ -450,6 +458,35 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		}, 150);
 	};
 
+	const applyInlay = (hints: InlayHint[] | null) => {
+		const view = viewRef.current;
+		if (view === null) return;
+		view.dispatch({ effects: setInlayHints.of(hintsVisibleRef.current ? hints : []) });
+	};
+
+	const runInlay = async () => {
+		const view = viewRef.current;
+		const currentRoot = rootRef.current;
+		const currentPath = latestRef.current.path;
+		if (view === null || currentRoot === null || currentPath === null) {
+			applyInlay(null);
+			return;
+		}
+		const mySeq = ++inlaySeqRef.current;
+		let result: InlayHint[] = [];
+		try {
+			result = await lspInlayHints(currentRoot, currentPath);
+		} catch {
+			result = [];
+			if (mySeq !== inlaySeqRef.current) return;
+			applyInlay(null);
+			return;
+		}
+		if (mySeq !== inlaySeqRef.current) return;
+		inlayHintsRef.current = result;
+		applyInlay(result);
+	};
+
 	openSearchRef.current = openSearch;
 	closeSearchRef.current = closeSearch;
 	stepRef.current = stepMatch;
@@ -520,6 +557,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 					breakpointGutter,
 					searchField,
 					searchDecorations,
+					inlayHintsField,
 					lineNumbers(),
 					lintGutter(),
 					highlightActiveLineGutter(),
@@ -684,6 +722,22 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 							},
 						},
 						{
+							key: "Mod-Alt-i",
+							run: () => {
+								setHintsVisible((v) => {
+									const next = !v;
+									hintsVisibleRef.current = next;
+									if (next) {
+										applyInlay(inlayHintsRef.current);
+									} else {
+										applyInlay([]);
+									}
+									return next;
+								});
+								return true;
+							},
+						},
+						{
 							key: "Escape",
 							run: () => {
 								if (renameOpen) {
@@ -723,6 +777,12 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 								}
 							}
 							if (typed) scheduleSig();
+							if (inlayTimerRef.current !== null)
+								window.clearTimeout(inlayTimerRef.current);
+							inlayTimerRef.current = window.setTimeout(() => {
+								inlayTimerRef.current = null;
+								void runInlay();
+							}, 600);
 						}
 						if (update.selectionSet) {
 							scheduleSig();
@@ -873,6 +933,22 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		const language = languageRef.current;
 		if (view === null || language === null) return;
 		view.dispatch({ effects: language.reconfigure(languageForPath(path)) });
+	}, [path]);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: reads refs
+	useEffect(() => {
+		inlayHintsRef.current = [];
+		if (inlayTimerRef.current !== null) {
+			window.clearTimeout(inlayTimerRef.current);
+			inlayTimerRef.current = null;
+		}
+		inlaySeqRef.current += 1;
+		if (path === null) {
+			applyInlay(null);
+			return;
+		}
+		void runInlay();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [path]);
 
 	useEffect(() => {
