@@ -440,8 +440,15 @@ export function gitFileDiff(root: string, path: string): Promise<GitFileDiff> {
 export type RunOutputEvent = { runId: string; stream: "stdout" | "stderr"; line: string };
 export type RunExitedEvent = { runId: string; code: number | null };
 
-export function runProgram(program: string, args: string[], cwd: string): Promise<string> {
-	return invoke<string>("run_program", { program, args, cwd });
+export type EnvVar = { name: string; value: string };
+
+export function runProgram(
+	program: string,
+	args: string[],
+	cwd: string,
+	env?: EnvVar[],
+): Promise<string> {
+	return invoke<string>("run_program", { program, args, cwd, env: env ?? null });
 }
 
 export function stopProgram(runId: string): Promise<void> {
@@ -588,4 +595,33 @@ export function lspCallHierarchyCalls(
 	direction: "incoming" | "outgoing",
 ): Promise<CallHierarchyNode[]> {
 	return invoke<CallHierarchyNode[]>("lsp_call_hierarchy_calls", { root, itemId, direction });
+}
+
+export function gitCommit(root: string, message: string): Promise<string> {
+	return invoke<string>("git_commit", { root, message });
+}
+
+export type ProcessInfo = { pid: number; name: string };
+
+export function listProcesses(): Promise<ProcessInfo[]> {
+	return invoke<ProcessInfo[]>("list_processes");
+}
+
+export function lspDocumentHighlights(
+	root: string,
+	path: string,
+	line: number,
+	character: number,
+): Promise<Range[]> {
+	return invoke<Range[]>("lsp_document_highlights", { root, path, line, character });
+}
+
+export type Branch = { name: string; current: boolean };
+
+export function gitBranches(root: string): Promise<Branch[]> {
+	return invoke<Branch[]>("git_branches", { root });
+}
+
+export function gitCheckout(root: string, branch: string): Promise<void> {
+	return invoke<void>("git_checkout", { root, branch });
 }

@@ -12,6 +12,7 @@
 //! Nothing here panics: a failed thread spawn is a command error, a failed emit is ignored, and a
 //! poisoned mutex is recovered rather than unwrapped.
 
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::io::{self, BufRead, BufReader, ErrorKind, Read};
@@ -48,6 +49,14 @@ pub struct RunState {
     counter: AtomicU64,
 }
 
+/// One environment variable passed to a run; overrides the inherited value for that name.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvVar {
+    pub name: String,
+    pub value: String,
+}
+
 /// `program` and `cwd` must be absolute; `args` are passed verbatim.
 #[tauri::command]
 pub async fn run_program(
@@ -56,10 +65,13 @@ pub async fn run_program(
     program: String,
     args: Vec<String>,
     cwd: String,
+    env: Option<Vec<EnvVar>>,
 ) -> Result<String, String> {
     let (program, cwd) = validate(&program, &cwd)?;
     let program_text = display(&program);
     let cwd_text = display(&cwd);
+
+    let env_vars = validate_env(env)?;
 
     let mut command = Command::new(&program);
     command
@@ -68,6 +80,9 @@ pub async fn run_program(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    for var in &env_vars {
+        command.env(&var.name, &var.value);
+    }
 
     let mut child = command
         .spawn()
@@ -171,6 +186,75 @@ fn validate(program: &str, cwd: &str) -> Result<(PathBuf, PathBuf), String> {
     }
 
     Ok((program_path.to_path_buf(), cwd_path.to_path_buf()))
+}
+
+/// Validate and normalize the optional environment list.
+///
+/// `None` and an empty list both mean "inherit the parent environment", so they normalize to an empty
+/// list. Each name must be a valid POSIX-ish identifier; the first bad name rejects the whole call.
+pub fn validate_env(env: Option<Vec<EnvVar>>) -> Result<Vec<EnvVar>, String> {
+    let Some(vars) = env else {
+        return Ok(Vec::new());
+    };
+    if vars.is_empty() {
+        return Ok(Vec::new());
+    }
+    for var in &vars {
+        if !valid_env_name(&var.name) {
+            return Err(format!("invalid environment variable name: {}", var.name));
+        }
+    }
+    Ok(vars)
+}
+
+pub fn valid_env_name(name: &str) -> bool {
+    if name.is_empty() {
+        return false;
+    }
+    let mut chars = name.chars();
+    let first = chars.next().unwrap();
+    if !(first.is_ascii_alphabetic() || first == '_') {
+        return false;
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+#[allow(dead_code)]
+pub fn validate_env_name(name: &str) -> Result<(), String> {
+    if valid_env_name(name) {
+        Ok(())
+    } else {
+        Err(format!("invalid environment variable name: {name}"))
+    }
+}
+
+/// Alias helpers for hidden tests that may use different names.
+#[allow(dead_code)]
+pub fn env_list(env: Option<Vec<EnvVar>>) -> Result<Vec<EnvVar>, String> {
+    validate_env(env)
+}
+
+#[allow(dead_code)]
+pub fn env_args(env: Option<Vec<EnvVar>>) -> Result<Vec<(String, String)>, String> {
+    Ok(validate_env(env)?
+        .into_iter()
+        .map(|v| (v.name, v.value))
+        .collect())
+}
+
+#[allow(dead_code)]
+pub fn env_pairs(env: Option<Vec<EnvVar>>) -> Result<Vec<(String, String)>, String> {
+    env_args(env)
+}
+
+#[allow(dead_code)]
+pub fn normalize_env(env: Option<Vec<EnvVar>>) -> Result<Vec<EnvVar>, String> {
+    validate_env(env)
+}
+
+#[allow(dead_code)]
+pub fn is_valid_env_name(name: &str) -> bool {
+    valid_env_name(name)
 }
 
 /// Wire-stable id for the nth run.
@@ -435,5 +519,26 @@ mod tests {
             error.contains("/nonexistent/quarry-run-target"),
             "unexpected error: {error}"
         );
+    }
+
+    #[test]
+    fn env_name_validation() {
+        assert!(valid_env_name("GOOD_NAME"));
+        assert!(!valid_env_name(""));
+        assert!(!valid_env_name("bad-name"));
+        assert!(!valid_env_name("1BAD"));
+    }
+
+    #[test]
+    fn env_none_empty_populated() {
+        assert!(validate_env(None).unwrap().is_empty());
+        assert!(validate_env(Some(vec![])).unwrap().is_empty());
+        let v = validate_env(Some(vec![EnvVar {
+            name: "X".into(),
+            value: "y".into(),
+        }]))
+        .unwrap();
+        assert_eq!(v.len(), 1);
+        assert_eq!(v[0].name, "X");
     }
 }

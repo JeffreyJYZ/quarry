@@ -509,6 +509,133 @@ async function main() {
 			summary.push("callHierarchy incoming: skipped (no prepare item)");
 			summary.push("callHierarchy outgoing: skipped (no prepare item)");
 		}
+
+		// documentHighlight at the `run` identifier
+		const dhId = nextId();
+		client.send({
+			jsonrpc: "2.0",
+			id: dhId,
+			method: "textDocument/documentHighlight",
+			params: { textDocument: { uri: sourceUri }, position: { line, character } },
+		});
+		const dhResp = await client.waitForResponse(dhId, REQ_TIMEOUT);
+		let dhCount = 0;
+		let dhHasRange = false;
+		let dhShapeOk = false;
+		if (dhResp && !dhResp.error) {
+			const r = dhResp.result;
+			if (r === null) {
+				dhShapeOk = true;
+			} else if (Array.isArray(r)) {
+				dhCount = r.length;
+				dhShapeOk = true;
+				if (r.length > 0) {
+					const e = r[0];
+					const start = e?.range?.start;
+					const end = e?.range?.end;
+					dhHasRange =
+						typeof start?.line === "number" &&
+						typeof start?.character === "number" &&
+						typeof end?.line === "number" &&
+						typeof end?.character === "number";
+				}
+			} else {
+				dhShapeOk = false;
+			}
+		}
+		if (!dhResp || dhResp.error) {
+			fatal = true;
+			summary.push(
+				`documentHighlight: FAIL ${dhResp?.error ? JSON.stringify(dhResp.error) : "no response"}`,
+			);
+		} else {
+			summary.push(
+				`documentHighlight: count=${dhCount} firstHasRange=${dhHasRange} shape_ok=${dhShapeOk}`,
+			);
+		}
+
+		// inlayHint for the whole open document
+		const ihId = nextId();
+		client.send({
+			jsonrpc: "2.0",
+			id: ihId,
+			method: "textDocument/inlayHint",
+			params: {
+				textDocument: { uri: sourceUri },
+				range: { start: { line: 0, character: 0 }, end: { line: 5, character: 0 } },
+			},
+		});
+		const ihResp = await client.waitForResponse(ihId, REQ_TIMEOUT);
+		let ihCount = 0;
+		let ihLabelKind = "none";
+		let ihShapeOk = false;
+		if (ihResp && !ihResp.error) {
+			const r = ihResp.result;
+			if (r === null) {
+				ihShapeOk = true;
+			} else if (Array.isArray(r)) {
+				ihCount = r.length;
+				ihShapeOk = true;
+				if (r.length > 0) {
+					const label = r[0]?.label;
+					if (typeof label === "string") ihLabelKind = "string";
+					else if (Array.isArray(label)) ihLabelKind = "parts";
+					else ihLabelKind = "other";
+				}
+			} else {
+				ihShapeOk = false;
+			}
+		}
+		if (!ihResp || ihResp.error) {
+			fatal = true;
+			summary.push(
+				`inlayHint: FAIL ${ihResp?.error ? JSON.stringify(ihResp.error) : "no response"}`,
+			);
+		} else {
+			summary.push(
+				`inlayHint: count=${ihCount} firstLabel=${ihLabelKind} shape_ok=${ihShapeOk}`,
+			);
+		}
+
+		// signatureHelp at a position inside a call
+		const sh2Id = nextId();
+		client.send({
+			jsonrpc: "2.0",
+			id: sh2Id,
+			method: "textDocument/signatureHelp",
+			params: { textDocument: { uri: sourceUri }, position: { line: 4, character: 20 } },
+		});
+		const sh2Resp = await client.waitForResponse(sh2Id, REQ_TIMEOUT);
+		let sh2Label = "none";
+		let sh2Ok = false;
+		let sh2ShapeOk = false;
+		if (sh2Resp && !sh2Resp.error) {
+			const r = sh2Resp.result;
+			if (r === null) {
+				sh2ShapeOk = true;
+			} else if (r && Array.isArray(r.signatures)) {
+				sh2ShapeOk = true;
+				const sigs = r.signatures;
+				const active = typeof r.activeSignature === "number" ? r.activeSignature : 0;
+				if (sigs.length > 0) {
+					const pick = sigs[active] ?? sigs[0];
+					sh2Label = pick?.label ?? "none";
+					sh2Ok = true;
+				}
+			} else {
+				sh2ShapeOk = false;
+			}
+		}
+		if (!sh2Resp || sh2Resp.error) {
+			fatal = true;
+			summary.push(
+				`signatureHelp: FAIL ${sh2Resp?.error ? JSON.stringify(sh2Resp.error) : "no response"}`,
+			);
+		} else {
+			summary.push(
+				`signatureHelp: ${sh2Ok ? "OK" : "none"} label=${sh2Label} shape_ok=${sh2ShapeOk}`,
+			);
+		}
 	} finally {
 		client.kill();
 	}
