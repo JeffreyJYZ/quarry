@@ -1,0 +1,24 @@
+.editor-host {
+	height: 100%;
+	min-height: 0;
+	min-width: 0;
+	overflow: hidden;
+	font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+}
+
+.editor-host .cm-editor {
+	height: 100%;
+}
+
+.editor-host .cm-editor .cm-scroller {
+	height: 100%;
+	overflow: auto;
+	line-height: 1.5;
+}
+
+/* Keep line numbers pinned when a long line scrolls horizontally. */
+.editor-host .cm-editor .cm-gutters {
+	position: sticky;
+	left: 0;
+	z-index: 2;
+}
