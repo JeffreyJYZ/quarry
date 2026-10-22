@@ -1,6 +1,9 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import { diagnosticKey } from "@/lsp/diagnostics";
 import { directoryOf, type ProblemFile } from "@/problems/model";
 import type { Diagnostic } from "@/project/api";
+import { type CodeAction, lspCodeActions } from "@/project/api";
+import { applyFileEdits } from "@/refactor/apply";
 
 export type ProblemsPanelProps = {
 	files: ProblemFile[];
@@ -10,6 +13,13 @@ export type ProblemsPanelProps = {
 	onToggle: () => void;
 	onSelect: (path: string, line?: number, character?: number) => void;
 	activePath: string | null;
+	root: string | null;
+	buffers: import("@/project/buffer").FileBuffer[];
+	setBuffers: (
+		updater: (
+			current: import("@/project/buffer").FileBuffer[],
+		) => import("@/project/buffer").FileBuffer[],
+	) => void;
 };
 
 const SEVERITY_CLASS: Record<Diagnostic["severity"], string> = {
@@ -26,10 +36,10 @@ const SEVERITY_LABEL: Record<Diagnostic["severity"], string> = {
 	4: "hint",
 };
 
-/**
- * Bottom dock listing every problem, grouped by file. It only renders what the store holds; the
- * editor and the app own the diagnostics themselves.
- */
+function cacheKey(path: string, line: number, character: number): string {
+	return `${path}:${line}:${character}`;
+}
+
 export default function ProblemsPanel({
 	files,
 	errors,
@@ -38,17 +48,134 @@ export default function ProblemsPanel({
 	onToggle,
 	onSelect,
 	activePath,
+	root,
+	buffers,
+	setBuffers,
 }: ProblemsPanelProps) {
 	const total = files.reduce((sum, file) => sum + file.diagnostics.length, 0);
 	const other = total - errors - warnings;
 
+	const cache = useRef<Map<string, CodeAction[]>>(new Map());
+	const [menuKey, setMenuKey] = useState<string | null>(null);
+	const [menuActions, setMenuActions] = useState<CodeAction[]>([]);
+	const [menuLoading, setMenuLoading] = useState(false);
+	const [menuError, setMenuError] = useState<string | null>(null);
+	const [menuIndex, setMenuIndex] = useState(0);
+	const [applied, setApplied] = useState<string | null>(null);
+	const appliedTimer = useRef<number | null>(null);
+
+	useEffect(
+		() => () => {
+			if (appliedTimer.current !== null) window.clearTimeout(appliedTimer.current);
+		},
+		[],
+	);
+
+	const showApplied = useCallback((title: string) => {
+		setApplied(title);
+		if (appliedTimer.current !== null) window.clearTimeout(appliedTimer.current);
+		appliedTimer.current = window.setTimeout(() => {
+			appliedTimer.current = null;
+			setApplied(null);
+		}, 4000);
+	}, []);
+
+	const fetchActions = useCallback(
+		async (path: string, line: number, character: number) => {
+			const key = cacheKey(path, line, character);
+			const cached = cache.current.get(key);
+			if (cached !== undefined) {
+				return cached;
+			}
+			if (root === null) {
+				return [];
+			}
+			const actions = await lspCodeActions(root, path, line, character);
+			cache.current.set(key, actions);
+			return actions;
+		},
+		[root],
+	);
+
+	const openMenu = useCallback(
+		async (path: string, line: number, character: number) => {
+			const key = cacheKey(path, line, character);
+			setMenuKey(key);
+			setMenuActions([]);
+			setMenuError(null);
+			setMenuLoading(true);
+			setMenuIndex(0);
+			try {
+				const actions = await fetchActions(path, line, character);
+				setMenuActions(actions);
+				if (actions.length === 0) {
+					setMenuKey(null);
+				}
+			} catch (error) {
+				setMenuError(error instanceof Error ? error.message : String(error));
+				setMenuKey(null);
+			} finally {
+				setMenuLoading(false);
+			}
+		},
+		[fetchActions],
+	);
+
+	const closeMenu = useCallback(() => {
+		setMenuKey(null);
+		setMenuActions([]);
+		setMenuError(null);
+		setMenuLoading(false);
+	}, []);
+
+	const applyAction = useCallback(
+		async (action: CodeAction) => {
+			if (action.edits.length === 0) {
+				closeMenu();
+				return;
+			}
+			closeMenu();
+			try {
+				await applyFileEdits(action.edits, buffers, setBuffers);
+				showApplied(action.title);
+			} catch (error) {
+				setMenuError(error instanceof Error ? error.message : String(error));
+			}
+		},
+		[buffers, setBuffers, closeMenu, showApplied],
+	);
+
+	if (!open) {
+		return (
+			<section className="problems collapsed" aria-label="Problems">
+				<button
+					type="button"
+					className="problems-head"
+					onClick={onToggle}
+					aria-expanded={false}
+				>
+					<span className="problems-caret" aria-hidden="true" />
+					<span className="problems-title">Problems</span>
+					<span className="problems-counts">
+						<span className="count error">{errors} errors</span>
+						<span className="sep">·</span>
+						<span className="count warning">{warnings} warnings</span>
+						{other > 0 ? (
+							<>
+								<span className="sep">·</span>
+								<span className="count">{other} info</span>
+							</>
+						) : null}
+					</span>
+				</button>
+			</section>
+		);
+	}
+
 	return (
-		<section className={open ? "problems" : "problems collapsed"} aria-label="Problems">
-			<button type="button" className="problems-head" onClick={onToggle} aria-expanded={open}>
-				<span
-					className={open ? "problems-caret open" : "problems-caret"}
-					aria-hidden="true"
-				/>
+		<section className="problems" aria-label="Problems">
+			<button type="button" className="problems-head" onClick={onToggle} aria-expanded={true}>
+				<span className="problems-caret open" aria-hidden="true" />
 				<span className="problems-title">Problems</span>
 				<span className="problems-counts">
 					<span className="count error">{errors} errors</span>
@@ -62,69 +189,112 @@ export default function ProblemsPanel({
 					) : null}
 				</span>
 			</button>
-			{open ? (
-				<div className="problems-body">
-					{files.length === 0 ? (
-						<p className="problems-empty">No problems</p>
-					) : (
-						files.map((file) => (
-							<div
-								key={file.path}
-								className={
-									file.path === activePath
-										? "problems-file active"
-										: "problems-file"
-								}
-							>
-								<div className="problems-file-head" title={file.path}>
-									<span className="problems-file-name">{file.name}</span>
-									<span className="problems-file-dir">
-										{directoryOf(file.path)}
-									</span>
-									<span className="problems-file-count">
-										{file.diagnostics.length}
-									</span>
-								</div>
-								<ul className="problems-list">
-									{file.diagnostics.map((diagnostic) => {
-										const { line, character } = diagnostic.range.start;
-										return (
-											<li
-												key={diagnosticKey(diagnostic)}
-												className="problems-item"
-											>
-												<button
-													type="button"
-													className="problems-row"
-													title={diagnostic.message}
-													onClick={() =>
-														onSelect(file.path, line, character)
-													}
-												>
-													<span
-														className={`problem-dot ${SEVERITY_CLASS[diagnostic.severity]}`}
-														aria-hidden="true"
-													/>
-													<span className="problem-pos">
-														{line + 1}:{character + 1}
-													</span>
-													<span className="problem-message">
-														{diagnostic.message}
-													</span>
-													<span className="problem-source">
-														{diagnostic.source ??
-															SEVERITY_LABEL[diagnostic.severity]}
-													</span>
-												</button>
-											</li>
-										);
-									})}
-								</ul>
+			{applied !== null ? <div className="problems-applied">Applied: {applied}</div> : null}
+			{menuError !== null ? <div className="problems-error">{menuError}</div> : null}
+			<div className="problems-body">
+				{files.length === 0 ? (
+					<p className="problems-empty">No problems</p>
+				) : (
+					files.map((file) => (
+						<div
+							key={file.path}
+							className={
+								file.path === activePath ? "problems-file active" : "problems-file"
+							}
+						>
+							<div className="problems-file-head" title={file.path}>
+								<span className="problems-file-name">{file.name}</span>
+								<span className="problems-file-dir">{directoryOf(file.path)}</span>
+								<span className="problems-file-count">
+									{file.diagnostics.length}
+								</span>
 							</div>
-						))
-					)}
-				</div>
-			) : null}
+							<ul className="problems-list">
+								{file.diagnostics.map((diagnostic) => {
+									const { line, character } = diagnostic.range.start;
+									const key = cacheKey(file.path, line, character);
+									const menuOpen = menuKey === key;
+									return (
+										<li
+											key={diagnosticKey(diagnostic)}
+											className="problems-item"
+										>
+											<button
+												type="button"
+												className="problems-row"
+												title={diagnostic.message}
+												onClick={() => onSelect(file.path, line, character)}
+												onKeyDown={(event) => {
+													if (event.altKey && event.key === "Enter") {
+														event.preventDefault();
+														void openMenu(file.path, line, character);
+													}
+													if (event.key === "Escape") {
+														closeMenu();
+													}
+												}}
+											>
+												<span
+													className={`problem-dot ${SEVERITY_CLASS[diagnostic.severity]}`}
+													aria-hidden="true"
+												/>
+												<span className="problem-pos">
+													{line + 1}:{character + 1}
+												</span>
+												<span className="problem-message">
+													{diagnostic.message}
+												</span>
+												<span className="problem-source">
+													{diagnostic.source ??
+														SEVERITY_LABEL[diagnostic.severity]}
+												</span>
+											</button>
+											<button
+												type="button"
+												className="problem-fix"
+												onClick={() =>
+													void openMenu(file.path, line, character)
+												}
+											>
+												Fix
+											</button>
+											{menuOpen ? (
+												<div className="problem-menu">
+													{menuLoading ? (
+														<div className="problem-menu-loading">
+															Loading…
+														</div>
+													) : (
+														menuActions.map((action, index) => (
+															<button
+																type="button"
+																key={action.title}
+																className={
+																	index === menuIndex
+																		? "problem-menu-item active"
+																		: "problem-menu-item"
+																}
+																onMouseEnter={() =>
+																	setMenuIndex(index)
+																}
+																onClick={() =>
+																	void applyAction(action)
+																}
+															>
+																{action.title}
+															</button>
+														))
+													)}
+												</div>
+											) : null}
+										</li>
+									);
+								})}
+							</ul>
+						</div>
+					))
+				)}
+			</div>
 		</section>
 	);
 }

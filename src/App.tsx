@@ -1392,6 +1392,9 @@ export default function App() {
 								warnings: counts.warnings,
 								activePath,
 								onSelect: handleSelectProblem,
+								root,
+								buffers,
+								setBuffers,
 							}}
 							tests={tests}
 						/>

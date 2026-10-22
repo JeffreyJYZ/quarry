@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ProblemFile } from "@/problems/model";
 import ProblemsPanel from "@/problems/ProblemsPanel";
 import type { TestItem } from "@/project/api";
+import type { FileBuffer } from "@/project/buffer";
 import TestsPanel from "@/tests/TestsPanel";
 import type { TestsController } from "@/tests/useTests";
 
@@ -20,7 +21,10 @@ export type TestsDockProps = {
 		errors: number;
 		warnings: number;
 		activePath: string | null;
-		onSelect: (path: string) => void;
+		onSelect: (path: string, line?: number, character?: number) => void;
+		root: string | null;
+		buffers: FileBuffer[];
+		setBuffers: (updater: (current: FileBuffer[]) => FileBuffer[]) => void;
 	};
 	tests: TestsController;
 };
@@ -228,6 +232,9 @@ export default function TestsDock({
 							onToggle={onToggleExpanded}
 							onSelect={problems.onSelect}
 							activePath={problems.activePath}
+							root={problems.root}
+							buffers={problems.buffers}
+							setBuffers={problems.setBuffers}
 						/>
 					)}
 				</div>
