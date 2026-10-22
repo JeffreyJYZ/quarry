@@ -598,3 +598,108 @@ mod tests {
         assert_eq!(unquote_path("\"tab\\there.rs\""), "tab\there.rs");
     }
 }
+
+/// Stage paths (relative to `root` or absolute inside it). Never a shell, never outside the root.
+#[tauri::command]
+pub async fn git_stage(root: String, paths: Vec<String>) -> Result<(), String> {
+    let validated = validate_paths(&root, &paths)?;
+    tauri::async_runtime::spawn_blocking(move || stage(&root, &validated))
+        .await
+        .map_err(|error| format!("git stage failed: {error}"))?
+}
+
+#[tauri::command]
+pub async fn git_unstage(root: String, paths: Vec<String>) -> Result<(), String> {
+    let validated = validate_paths(&root, &paths)?;
+    tauri::async_runtime::spawn_blocking(move || unstage(&root, &validated))
+        .await
+        .map_err(|error| format!("git unstage failed: {error}"))?
+}
+
+fn stage(root: &str, paths: &[String]) -> Result<(), String> {
+    run_mutation(root, paths, &["add", "--"], "git stage")
+}
+
+fn unstage(root: &str, paths: &[String]) -> Result<(), String> {
+    run_mutation(root, paths, &["restore", "--staged", "--"], "git unstage")
+}
+
+fn run_mutation(
+    root: &str,
+    paths: &[String],
+    head: &[&str],
+    operation: &str,
+) -> Result<(), String> {
+    let program = git_program()?;
+    let mut command = Command::new(&program);
+    command.args(head).args(paths).current_dir(root);
+    let output = command
+        .output()
+        .map_err(|error| format!("cannot run {program} in {root}: {error}"))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if is_not_a_repository(&stderr) {
+            return Err(format!("not a git repository: {root}"));
+        }
+        return Err(operation_error(operation, &stderr));
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub fn validate_path(root: &str, path: &str) -> Result<String, String> {
+    if path.is_empty() {
+        return Err("path must not be empty".to_string());
+    }
+    let canonical_root = fs::canonicalize(root).unwrap_or_else(|_| std::path::PathBuf::from(root));
+    let given = std::path::Path::new(path);
+    for component in given.components() {
+        if let std::path::Component::ParentDir = component {
+            return Err(format!("path escapes the repository root: {path}"));
+        }
+    }
+    if given.is_absolute() {
+        if !given.starts_with(&canonical_root) && !given.starts_with(root) {
+            return Err(format!("path is outside the repository root: {path}"));
+        }
+    }
+    Ok(path.to_string())
+}
+
+#[allow(dead_code)]
+pub fn validate_paths(root: &str, paths: &[String]) -> Result<Vec<String>, String> {
+    if paths.is_empty() {
+        return Err("no paths given".to_string());
+    }
+    let mut validated = Vec::with_capacity(paths.len());
+    for path in paths {
+        validated.push(validate_path(root, path)?);
+    }
+    Ok(validated)
+}
+
+#[allow(dead_code)]
+pub fn stage_args(paths: &[String]) -> Vec<String> {
+    build_stage_argv(paths)
+}
+#[allow(dead_code)]
+pub fn build_stage_argv(paths: &[String]) -> Vec<String> {
+    let mut argv = vec!["add".to_string(), "--".to_string()];
+    argv.extend(paths.iter().cloned());
+    argv
+}
+#[allow(dead_code)]
+pub fn unstage_args(paths: &[String]) -> Vec<String> {
+    build_unstage_argv(paths)
+}
+#[allow(dead_code)]
+pub fn build_unstage_argv(paths: &[String]) -> Vec<String> {
+    let mut argv = vec![
+        "restore".to_string(),
+        "--staged".to_string(),
+        "--".to_string(),
+    ];
+    argv.extend(paths.iter().cloned());
+    argv
+}

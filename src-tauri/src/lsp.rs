@@ -16,9 +16,9 @@ use crate::project::open_project;
 use crate::protocol_pipe::{FrameError, ProcessPipe};
 use crate::resolve;
 use crate::types::{
-    CodeAction, CompletionItem, CompletionList, Diagnostic, DiagnosticsEvent, FileEdit, HoverInfo,
-    InlayHint, Location, LspStatus, Position, ProjectKind, Range, SignatureHelp,
-    SignatureInformation, Symbol, TextEdit,
+    CallHierarchyNode, CodeAction, CompletionItem, CompletionList, Diagnostic, DiagnosticsEvent,
+    FileEdit, HoverInfo, InlayHint, Location, LspStatus, Position, ProjectKind, Range,
+    SignatureHelp, SignatureInformation, Symbol, TextEdit,
 };
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -1786,4 +1786,28 @@ fn flatten_inlay_label(value: &Value) -> Option<String> {
         }
         _ => None,
     }
+}
+
+#[tauri::command]
+pub async fn lsp_call_hierarchy_prepare(
+    _state: State<'_, LspState>,
+    _root: String,
+    _path: String,
+    _line: u32,
+    _character: u32,
+) -> Result<Vec<CallHierarchyNode>, String> {
+    // STUB: replaces this.
+    Err("call hierarchy is not implemented yet".to_string())
+}
+
+/// `direction` is `incoming` or `outgoing`.
+#[tauri::command]
+pub async fn lsp_call_hierarchy_calls(
+    _state: State<'_, LspState>,
+    _root: String,
+    _item_id: u32,
+    _direction: String,
+) -> Result<Vec<CallHierarchyNode>, String> {
+    // STUB: replaces this.
+    Err("call hierarchy is not implemented yet".to_string())
 }

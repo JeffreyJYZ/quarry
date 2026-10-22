@@ -445,3 +445,16 @@ pub struct InlayHint {
     /// 1 type, 2 parameter.
     pub kind: Option<u32>,
 }
+
+/// One entry in a call hierarchy list.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct CallHierarchyNode {
+    pub name: String,
+    pub kind: u32,
+    pub path: String,
+    pub line: u32,
+    pub character: u32,
+    /// Opaque handle used to expand this node; stable for the session.
+    pub item_id: u32,
+}
