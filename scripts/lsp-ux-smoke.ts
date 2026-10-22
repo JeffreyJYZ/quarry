@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+// biome-ignore-all lint/suspicious/noExplicitAny: LSP payloads are untyped JSON
 import { type ChildProcess, spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -245,7 +246,7 @@ async function main() {
 			defExample = Array.isArray(r) ? r[0] : r;
 		}
 		summary.push(
-			`definition: shape=${defShape} count=${defCount} ${defResp?.error ? "ERR " + JSON.stringify(defResp.error) : ""}`,
+			`definition: shape=${defShape} count=${defCount} ${defResp?.error ? `ERR ${JSON.stringify(defResp.error)}` : ""}`,
 		);
 
 		// references
@@ -265,7 +266,7 @@ async function main() {
 		if (refResp && !refResp.error && Array.isArray(refResp.result))
 			refCount = refResp.result.length;
 		summary.push(
-			`references: count=${refCount} ${refResp?.error ? "ERR " + JSON.stringify(refResp.error) : ""}`,
+			`references: count=${refCount} ${refResp?.error ? `ERR ${JSON.stringify(refResp.error)}` : ""}`,
 		);
 
 		// print one example raw for definition if needed? only if unhandled shape

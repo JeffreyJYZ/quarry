@@ -791,9 +791,112 @@ button.tree-note {
 	background: var(--hover);
 }
 
-.problems-head:focus-visible {
+.problems-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 0 0 auto;
+	width: 100%;
+	height: 26px;
+	padding: 0 12px;
+	border: 0;
+	border-bottom: 1px solid var(--line);
+	background: none;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+}
+
+.problems-head-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	flex: 0 0 auto;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	letter-spacing: inherit;
+	text-transform: inherit;
+	cursor: pointer;
+}
+
+.problems-head-toggle:focus-visible {
 	outline: 1px solid var(--accent);
 	outline-offset: -1px;
+}
+
+.problems-filter {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	margin-left: 8px;
+}
+
+.problems-filter-option {
+	padding: 1px 6px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: transparent;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	cursor: pointer;
+}
+
+.problems-filter-option.active {
+	color: var(--text);
+	background: var(--hover);
+	border-color: #2a313a;
+}
+
+.problems-filter-option:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: 1px;
+}
+
+.problems-file-toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.problems-file-toggle:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: -1px;
+}
+
+.problems-file-copy {
+	flex: 0 0 auto;
+	padding: 1px 6px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: transparent;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 9.5px;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	cursor: pointer;
+}
+
+.problems-file-copy:hover {
+	color: var(--text);
+	border-color: var(--muted);
 }
 
 .problems-caret {
