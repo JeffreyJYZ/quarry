@@ -4,9 +4,10 @@ mod format;
 mod git;
 mod launch;
 mod lsp;
+mod processes;
 mod project;
-mod pty;
 mod protocol_pipe;
+mod pty;
 mod resolve;
 mod run_config;
 mod run_task;
@@ -92,6 +93,7 @@ pub fn run() {
             git::git_stage,
             git::git_unstage,
             git::git_commit,
+            processes::list_processes,
             pty::pty_open,
             pty::pty_write,
             pty::pty_resize,
