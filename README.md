@@ -36,11 +36,12 @@ read off `src-tauri/src/lib.rs` and `src/`:
   clang build (`run_plain_clang_build` in `src-tauri/src/build_task.rs`), so C/C++ builds do not
   require cmake.
 - **Run**: `run_program` / `stop_program` stream `run://output` lines and one `run://exited`, with a
-  run panel in `src/run/` (program, args, cwd, argv preview, run/stop).
+  run panel in `src/run/` (program, args, cwd, env, argv preview, run/stop).
 - **Terminal**: an embedded terminal built on `portable-pty` (`pty::pty_open` / `pty_write` /
   `pty_resize` / `pty_close`) with `src/terminal/Terminal.tsx`, supporting multiple sessions in tabs
-  (`Cmd+T` / `Cmd+W`, close button per tab). Not yet exercised in a real desktop window by this
-  agent; the backend and component are present.
+  (`Cmd+T` / `Cmd+W`, close button per tab), opening in the active file's directory when one is
+  open. Not yet exercised in a real desktop window by this agent; the backend and component are
+  present.
 - **Debug**: `lldb-dap` sessions launched from a `.quarry/launch.json` preset, composed for an
   unconfigured Cargo project (which also passes the Rust formatter `initCommands`), or attached to a
   running process by pid via `processes::list_processes` and `src/debug/ProcessPicker.tsx`. Line
@@ -54,7 +55,8 @@ read off `src-tauri/src/lib.rs` and `src/`:
 - **Tests**: `list_tests` and `run_test` feed a Tests dock with pass/fail status.
 - **Source control**: a Git view with status, per-file diff, an open-in-editor flow, a commit box
   (`git_commit`), branch listing and switching (`git_branches`, `git_checkout`, dropdown in
-  `src/git/SourceControl.tsx`), plus `git_status` and `git_file_diff` commands.
+  `src/git/SourceControl.tsx`), a History tab listing recent commits (`git_log`), and a unified
+  diff for a selected commit (`git_commit_diff`), plus `git_status` and `git_file_diff` commands.
 - **Breadcrumb**: a strip showing the file path and the symbol chain containing the caret, built from
   `lsp_symbols` in `src/breadcrumb/Breadcrumb.tsx`.
 
