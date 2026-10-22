@@ -7,7 +7,7 @@ import TabStrip from "@/components/TabStrip";
 import Welcome from "@/components/Welcome";
 import DebugPanel from "@/debug/DebugPanel";
 import { type BreakpointRow, useDebugSession } from "@/debug/session";
-import Editor from "@/editor/Editor";
+import Editor, { type EditorHandle } from "@/editor/Editor";
 import DiffView from "@/git/DiffView";
 import SourceControl from "@/git/SourceControl";
 import {
@@ -62,6 +62,7 @@ const SHORTCUT_GROUPS = [
 			{ keys: ["Cmd", "F"], action: "Find in file" },
 			{ keys: ["Cmd", "Alt", "F"], action: "Find in project" },
 			{ keys: ["Cmd", "G"], action: "Next match" },
+			{ keys: ["Cmd", "Alt", "L"], action: "Format active file" },
 		],
 	},
 	{
@@ -97,6 +98,7 @@ export default function App() {
 	const [buildDiagnostics, setBuildDiagnostics] = useState<DiagnosticMap>(() => new Map());
 	const [buildSummary, setBuildSummary] = useState<string | null>(null);
 	const [building, setBuilding] = useState(false);
+	const [formatting, setFormatting] = useState(false);
 	/** `null` means "follow the default": open when there is an error, collapsed otherwise. */
 	const [panelOpen, setPanelOpen] = useState<boolean | null>(null);
 	const [dockTab, setDockTab] = useState<DockTab>("problems");
@@ -121,6 +123,7 @@ export default function App() {
 	/** Mirrors of the live state so the global key handler and the save loop never read a stale run. */
 	const buffersRef = useRef<FileBuffer[]>([]);
 	const activePathRef = useRef<string | null>(null);
+	const editorRef = useRef<EditorHandle | null>(null);
 	const saveTimer = useRef<number | null>(null);
 	const restoredRef = useRef(false);
 
@@ -317,6 +320,18 @@ export default function App() {
 		[savePaths],
 	);
 
+	const formatActive = useCallback(async () => {
+		if (root === null || activePath === null || formatting) {
+			return;
+		}
+		setFormatting(true);
+		try {
+			await editorRef.current?.format();
+		} finally {
+			setFormatting(false);
+		}
+	}, [root, activePath, formatting]);
+
 	const reportNotice = useCallback((message: string) => setNotice(message), []);
 	const lsp = useLspServer(root, reportNotice);
 	const debug = useDebugSession(root);
@@ -427,6 +442,11 @@ export default function App() {
 				}
 				return;
 			}
+			if (key === "l" && event.altKey && root !== null && activePath !== null) {
+				event.preventDefault();
+				void formatActive();
+				return;
+			}
 			if (event.altKey || event.shiftKey || key !== "f" || root === null) {
 				return;
 			}
@@ -439,7 +459,7 @@ export default function App() {
 		};
 		window.addEventListener("keydown", handleKeyDown, true);
 		return () => window.removeEventListener("keydown", handleKeyDown, true);
-	}, [root, saveActive, saveAll]);
+	}, [root, saveActive, saveAll, formatActive, activePath]);
 
 	/** Cmd+K toggles the shortcut sheet; `?` opens it when focus is outside the editor and any input. */
 	useEffect(() => {
@@ -675,6 +695,14 @@ export default function App() {
 				<button
 					type="button"
 					className="button"
+					disabled={root === null || activePath === null || formatting}
+					onClick={() => void formatActive()}
+				>
+					{formatting ? "Formatting…" : "Format"}
+				</button>
+				<button
+					type="button"
+					className="button"
 					disabled={root === null}
 					aria-pressed={gitOpen}
 					onClick={() => setGitOpen((current) => !current)}
@@ -760,10 +788,12 @@ export default function App() {
 							/>
 							<div className="editor-pane">
 								<Editor
+									ref={editorRef}
 									path={active.path}
 									value={active.text}
 									onChange={handleChange}
 									root={root}
+									onNotice={setNotice}
 									diagnostics={diagnostics.get(active.path)}
 									breakpointLines={breakpointLines}
 									unverifiedLines={unverifiedLines}

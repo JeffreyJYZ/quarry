@@ -12,7 +12,7 @@ import {
 	keymap,
 	lineNumbers,
 } from "@codemirror/view";
-import { type JSX, useEffect, useRef, useState } from "react";
+import { forwardRef, type JSX, useEffect, useImperativeHandle, useRef, useState } from "react";
 import "@/editor/editor.css";
 import { breakpointGutter, normalizeLines, setBreakpoints } from "@/editor/breakpoints";
 import { lintSignature, toLintDiagnostics } from "@/editor/diagnostics";
@@ -27,12 +27,15 @@ import {
 import { quarryHighlightStyle, quarryTheme } from "@/editor/theme";
 import type { Diagnostic } from "@/project/api";
 import {
+	formatDocument,
+	formatterFor,
 	type Location,
 	lspCompletion,
 	lspDefinition,
 	lspHover,
 	lspReferences,
 } from "@/project/api";
+import { describeError } from "@/project/errors";
 
 export type EditorProps = {
 	/** Absolute path of the open file, or null for an empty buffer. */
@@ -55,6 +58,8 @@ export type EditorProps = {
 	onReferences?: (locations: Location[]) => void;
 	/** Move the caret to a zero-based position and scroll it into view. */
 	reveal?: { line: number; character: number; token: number } | null;
+	/** Report a one-line status to the host (no formatter / formatter failure). */
+	onNotice?: (message: string | null) => void;
 };
 
 const NO_LINES: number[] = [];
@@ -128,19 +133,25 @@ function toLspPosition(view: EditorView, pos: number): { line: number; character
  * document only when it actually differs, so local edits keep their selection and scroll position.
  * Breakpoints arrive as props and reach the gutter through a state field, never a rebuilt view.
  */
-export default function Editor({
-	path,
-	value,
-	onChange,
-	diagnostics,
-	breakpointLines = NO_LINES,
-	unverifiedLines = NO_LINES,
-	onToggleBreakpoint,
-	root = null,
-	onNavigate,
-	onReferences,
-	reveal = null,
-}: EditorProps): JSX.Element {
+export type EditorHandle = { format: () => Promise<void> };
+
+const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
+	{
+		path,
+		value,
+		onChange,
+		diagnostics,
+		breakpointLines = NO_LINES,
+		unverifiedLines = NO_LINES,
+		onToggleBreakpoint,
+		root = null,
+		onNavigate,
+		onReferences,
+		reveal = null,
+		onNotice,
+	}: EditorProps,
+	ref,
+): JSX.Element {
 	const hostRef = useRef<HTMLDivElement | null>(null);
 	const viewRef = useRef<EditorView | null>(null);
 	const [searchOpen, setSearchOpen] = useState(false);
@@ -192,6 +203,8 @@ export default function Editor({
 	navigateRef.current = onNavigate ?? null;
 	const referencesRef = useRef<((locations: Location[]) => void) | null>(onReferences ?? null);
 	referencesRef.current = onReferences ?? null;
+	const onNoticeRef = useRef<((message: string | null) => void) | null>(onNotice ?? null);
+	onNoticeRef.current = onNotice ?? null;
 	const revealTokenRef = useRef<number | null>(null);
 
 	const recompute = () => {
@@ -310,6 +323,51 @@ export default function Editor({
 	closeSearchRef.current = closeSearch;
 	stepRef.current = stepMatch;
 	recomputeRef.current = recompute;
+
+	useImperativeHandle(ref, () => ({
+		format: async () => {
+			const view = viewRef.current;
+			const currentRoot = rootRef.current;
+			const currentPath = latestRef.current.path;
+			if (view === null || currentRoot === null || currentPath === null) return;
+			const notify = onNoticeRef.current;
+			let formatter = "";
+			try {
+				formatter = await formatterFor(currentPath);
+			} catch (error) {
+				notify?.(describeError(error));
+				return;
+			}
+			if (formatter === "") {
+				const ext = currentPath.includes(".")
+					? currentPath.slice(currentPath.lastIndexOf(".") + 1)
+					: "";
+				notify?.(`No formatter for ${ext}`);
+				return;
+			}
+			const text = view.state.doc.toString();
+			const head = view.state.selection.main.head;
+			const lineObj = view.state.doc.lineAt(head);
+			const originalLine = lineObj.number;
+			const originalCol = head - lineObj.from;
+			try {
+				const formatted = await formatDocument(currentRoot, currentPath, text);
+				latestRef.current.onChange(formatted);
+				window.setTimeout(() => {
+					const v = viewRef.current;
+					if (v === null) return;
+					const doc = v.state.doc;
+					const targetLine = Math.min(originalLine, doc.lines);
+					const newLine = doc.line(targetLine);
+					const col = Math.min(originalCol, newLine.length);
+					const pos = newLine.from + col;
+					v.dispatch({ selection: { anchor: pos } });
+				}, 0);
+			} catch (error) {
+				notify?.(describeError(error));
+			}
+		},
+	}));
 
 	useEffect(() => {
 		const host = hostRef.current;
@@ -750,4 +808,6 @@ export default function Editor({
 			) : null}
 		</div>
 	);
-}
+});
+
+export default Editor;
