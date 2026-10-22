@@ -4,6 +4,7 @@ mod lsp;
 mod project;
 mod protocol_pipe;
 mod run_config;
+mod run_task;
 mod search;
 mod toolchain;
 mod types;
@@ -21,6 +22,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(lsp::LspState::default())
         .manage(dap::DapState::default())
+        .manage(run_task::RunState::default())
         .invoke_handler(tauri::generate_handler![
             version,
             toolchain::toolchains,
@@ -50,7 +52,9 @@ pub fn run() {
             dap::dap_stop,
             run_config::read_launch_config,
             run_config::write_launch_config,
-            run_config::resolve_launch_config
+            run_config::resolve_launch_config,
+            run_task::run_program,
+            run_task::stop_program
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
