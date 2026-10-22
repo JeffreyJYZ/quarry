@@ -25,7 +25,7 @@ import {
 	setSearchMatches,
 } from "@/editor/search";
 import { quarryHighlightStyle, quarryTheme } from "@/editor/theme";
-import type { CodeAction, Diagnostic, FileEdit } from "@/project/api";
+import type { CodeAction, Diagnostic, FileEdit, SignatureHelp } from "@/project/api";
 import {
 	formatDocument,
 	formatterFor,
@@ -36,6 +36,7 @@ import {
 	lspHover,
 	lspReferences,
 	lspRename,
+	lspSignatureHelp,
 } from "@/project/api";
 import { describeError } from "@/project/errors";
 
@@ -129,6 +130,25 @@ function kindToType(kind: number | null): string {
 	}
 }
 
+function splitTopLevel(text: string): string[] {
+	const parts: string[] = [];
+	let depth = 0;
+	let current = "";
+	for (const ch of text) {
+		if (ch === "(" || ch === "<" || ch === "[" || ch === "{") depth += 1;
+		else if (ch === ")" || ch === ">" || ch === "]" || ch === "}")
+			depth = Math.max(0, depth - 1);
+		if (ch === "," && depth === 0) {
+			parts.push(current);
+			current = "";
+		} else {
+			current += ch;
+		}
+	}
+	parts.push(current);
+	return parts;
+}
+
 function toLspPosition(view: EditorView, pos: number): { line: number; character: number } {
 	const lineObj = view.state.doc.lineAt(pos);
 	return { line: lineObj.number - 1, character: pos - lineObj.from };
@@ -175,6 +195,8 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 	const [renameValue, setRenameValue] = useState("");
 	const [codeActions, setCodeActions] = useState<CodeAction[]>([]);
 	const [codeMenuOpen, setCodeMenuOpen] = useState(false);
+	const [sigHelp, setSigHelp] = useState<SignatureHelp | null>(null);
+	const [sigCoords, setSigCoords] = useState<{ top: number; left: number } | null>(null);
 	const searchOpenRef = useRef(searchOpen);
 	searchOpenRef.current = searchOpen;
 	const queryRef = useRef(query);
@@ -225,6 +247,9 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 	onApplyEditsRef.current = onApplyEdits ?? null;
 	const lastCursorRef = useRef<{ line: number; character: number } | null>(null);
 	const revealTokenRef = useRef<number | null>(null);
+	const sigSeqRef = useRef(0);
+	const sigTimerRef = useRef<number | null>(null);
+	const sigHideTimerRef = useRef<number | null>(null);
 
 	const recompute = () => {
 		const view = viewRef.current;
@@ -370,6 +395,59 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		if (action.edits.length > 0) {
 			onApplyEditsRef.current?.(action.edits);
 		}
+	};
+
+	const hideSig = () => {
+		setSigHelp(null);
+		setSigCoords(null);
+		if (sigHideTimerRef.current !== null) {
+			window.clearTimeout(sigHideTimerRef.current);
+			sigHideTimerRef.current = null;
+		}
+	};
+
+	const runSig = async () => {
+		const view = viewRef.current;
+		const currentRoot = rootRef.current;
+		const currentPath = latestRef.current.path;
+		if (view === null || currentRoot === null || currentPath === null) {
+			hideSig();
+			return;
+		}
+		const pos = view.state.selection.main.head;
+		const { line, character } = toLspPosition(view, pos);
+		const mySeq = ++sigSeqRef.current;
+		let result: SignatureHelp | null = null;
+		try {
+			result = await lspSignatureHelp(currentRoot, currentPath, line, character);
+		} catch {
+			result = null;
+		}
+		if (mySeq !== sigSeqRef.current) return;
+		if (result === null || result.signatures.length === 0) {
+			hideSig();
+			return;
+		}
+		setSigHelp(result);
+		const host = hostRef.current;
+		const coords = view.coordsAtPos(pos);
+		if (coords !== null && host !== null) {
+			const rect = host.getBoundingClientRect();
+			setSigCoords({ top: coords.bottom - rect.top, left: coords.left - rect.left });
+		}
+		if (sigHideTimerRef.current !== null) window.clearTimeout(sigHideTimerRef.current);
+		sigHideTimerRef.current = window.setTimeout(() => {
+			setSigHelp(null);
+			setSigCoords(null);
+		}, 10000);
+	};
+
+	const scheduleSig = () => {
+		if (sigTimerRef.current !== null) window.clearTimeout(sigTimerRef.current);
+		sigTimerRef.current = window.setTimeout(() => {
+			sigTimerRef.current = null;
+			void runSig();
+		}, 150);
 	};
 
 	openSearchRef.current = openSearch;
@@ -599,6 +677,13 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 							},
 						},
 						{
+							key: "Mod-Shift-Space",
+							run: () => {
+								void runSig();
+								return true;
+							},
+						},
+						{
 							key: "Escape",
 							run: () => {
 								if (renameOpen) {
@@ -609,6 +694,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 									setCodeMenuOpen(false);
 									return true;
 								}
+								hideSig();
 								if (!searchOpenRef.current) return false;
 								closeSearchRef.current();
 								return true;
@@ -624,6 +710,11 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 					}),
 					EditorView.updateListener.of((update) => {
 						if (update.docChanged) {
+							let typed = false;
+							update.changes.iterChanges((_from, _to, inserted) => {
+								const text = inserted.toString();
+								if (text === "(" || text === ",") typed = true;
+							});
 							const next = update.state.doc.toString();
 							if (next !== latestRef.current.value) {
 								latestRef.current.onChange(next);
@@ -631,8 +722,10 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 									window.setTimeout(() => recomputeRef.current(), 0);
 								}
 							}
+							if (typed) scheduleSig();
 						}
 						if (update.selectionSet) {
+							scheduleSig();
 							const pos = update.state.selection.main.head;
 							const { line, character } = toLspPosition(update.view, pos);
 							const last = lastCursorRef.current;
@@ -647,6 +740,10 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 						}
 					}),
 					EditorView.domEventHandlers({
+						blur: () => {
+							hideSig();
+							return false;
+						},
 						mousedown: (event, view) => {
 							if (!(event.metaKey || event.ctrlKey)) return false;
 							const currentRoot = rootRef.current;
@@ -968,6 +1065,42 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 					))}
 				</ul>
 			) : null}
+			{sigHelp !== null && sigCoords !== null
+				? (() => {
+						const activeSig = sigHelp.activeSignature ?? 0;
+						const sig = sigHelp.signatures[activeSig] ?? sigHelp.signatures[0];
+						const label = sig.label;
+						const activeParam = sigHelp.activeParameter ?? 0;
+						const parts = splitTopLevel(label);
+						const doc = (sig.documentation ?? "").slice(0, 200);
+						return (
+							<div
+								className="cm-sig-help"
+								style={{ top: sigCoords.top + 4, left: sigCoords.left }}
+							>
+								<div className="cm-sig-label">
+									{parts.length > 1 &&
+									activeParam >= 0 &&
+									activeParam < parts.length
+										? parts.map((part, i) => (
+												<span key={part}>
+													{i > 0 ? ", " : ""}
+													{i === activeParam ? (
+														<span className="cm-sig-active">
+															{part}
+														</span>
+													) : (
+														part
+													)}
+												</span>
+											))
+										: label}
+								</div>
+								{doc ? <div className="cm-sig-doc">{doc}</div> : null}
+							</div>
+						);
+					})()
+				: null}
 		</div>
 	);
 });

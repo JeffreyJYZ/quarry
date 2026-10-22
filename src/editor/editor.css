@@ -71,3 +71,33 @@
 	min-width: 60px;
 	text-align: center;
 }
+
+.cm-sig-help {
+	position: absolute;
+	z-index: 20;
+	max-width: 520px;
+	padding: 6px 8px;
+	border: 1px solid var(--line);
+	background: var(--panel);
+	font-family: var(--mono);
+	font-size: 12px;
+	color: var(--text);
+}
+
+.cm-sig-label {
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.cm-sig-active {
+	color: var(--accent);
+	font-weight: 600;
+}
+
+.cm-sig-doc {
+	margin-top: 4px;
+	color: var(--muted);
+	font-size: 11px;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
