@@ -23,15 +23,20 @@ import { fileName, plural, problemFiles } from "@/problems/model";
 import {
 	buildProject,
 	type Diagnostic,
+	defaultLaunchConfig,
 	type FileEntry,
 	type GitStatus,
 	gitStatus,
 	type Location,
+	onRunExited,
+	onRunOutput,
 	openProject,
 	type ProjectInfo,
 	readSettings,
 	readTextFile,
+	runProgram,
 	type Settings,
+	stopProgram,
 	type ToolchainReport,
 	toolchains,
 	version,
@@ -40,6 +45,7 @@ import {
 import { type FileBuffer, isDirty } from "@/project/buffer";
 import { describeError } from "@/project/errors";
 import { type SaveOutcome, saveBuffer, saveErrorMessage, saveMessage } from "@/project/save";
+import RunLog from "@/run/RunLog";
 import SearchPalette from "@/search/SearchPalette";
 import ShortcutSheet from "@/shortcuts/ShortcutSheet";
 import TestsDock, { type DockTab } from "@/tests/TestsDock";
@@ -101,6 +107,15 @@ export default function App() {
 	const [buildDiagnostics, setBuildDiagnostics] = useState<DiagnosticMap>(() => new Map());
 	const [buildSummary, setBuildSummary] = useState<string | null>(null);
 	const [building, setBuilding] = useState(false);
+	const [runId, setRunId] = useState<string | null>(null);
+	const [runLines, setRunLines] = useState<{ stream: "stdout" | "stderr"; line: string }[]>([]);
+	const [runExited, setRunExited] = useState<{ code: number | null; killed?: boolean } | null>(
+		null,
+	);
+	const runIdRef = useRef<string | null>(null);
+	useEffect(() => {
+		runIdRef.current = runId;
+	}, [runId]);
 	const [formatting, setFormatting] = useState(false);
 	/** `null` means "follow the default": open when there is an error, collapsed otherwise. */
 	const [panelOpen, setPanelOpen] = useState<boolean | null>(null);
@@ -122,6 +137,46 @@ export default function App() {
 	/** Path whose dirty close is waiting on the inline Save/Discard choice. */
 	const [confirmClose, setConfirmClose] = useState<string | null>(null);
 	const [saveStatus, setSaveStatus] = useState<SaveStatus | null>(null);
+
+	useEffect(() => {
+		let unOutput: (() => void) | undefined;
+		let unExited: (() => void) | undefined;
+		let cancelled = false;
+		void (async () => {
+			try {
+				unOutput = await onRunOutput((event) => {
+					if (event.runId !== runIdRef.current) {
+						return;
+					}
+					setRunLines((current) => {
+						const next = [...current, { stream: event.stream, line: event.line }];
+						if (next.length > 2000) {
+							return next.slice(next.length - 2000);
+						}
+						return next;
+					});
+				});
+				unExited = await onRunExited((event) => {
+					if (event.runId !== runIdRef.current) {
+						return;
+					}
+					setRunExited({ code: event.code });
+					setRunId(null);
+				});
+			} catch {
+				/* ignore */
+			}
+			if (cancelled) {
+				unOutput?.();
+				unExited?.();
+			}
+		})();
+		return () => {
+			cancelled = true;
+			unOutput?.();
+			unExited?.();
+		};
+	}, []);
 	const reading = useRef<Set<string>>(new Set());
 	/** Mirrors of the live state so the global key handler and the save loop never read a stale run. */
 	const buffersRef = useRef<FileBuffer[]>([]);
@@ -670,6 +725,35 @@ export default function App() {
 		setActivePath(path);
 	}, []);
 
+	const handleRun = useCallback(async () => {
+		if (root === null || runId !== null) {
+			return;
+		}
+		setRunLines([]);
+		setRunExited(null);
+		try {
+			const config = await defaultLaunchConfig(root, false);
+			const id = await runProgram(config.program, config.args, config.cwd);
+			setRunId(id);
+		} catch (error) {
+			setNotice(describeError(error));
+		}
+	}, [root, runId]);
+
+	const handleStop = useCallback(async () => {
+		const id = runId;
+		if (id === null) {
+			return;
+		}
+		try {
+			await stopProgram(id);
+		} catch (error) {
+			setNotice(describeError(error));
+		}
+		setRunExited((current) => (current === null ? { code: null, killed: true } : current));
+		setRunId(null);
+	}, [runId]);
+
 	const handleBuild = useCallback(async () => {
 		if (root === null || building) {
 			return;
@@ -714,6 +798,20 @@ export default function App() {
 					onClick={handleBuild}
 				>
 					{building ? "Building…" : "Build"}
+				</button>
+				<button
+					type="button"
+					className="button"
+					disabled={root === null}
+					onClick={() => {
+						if (runId !== null) {
+							void handleStop();
+						} else {
+							void handleRun();
+						}
+					}}
+				>
+					{runId !== null ? "Stop" : "Run"}
 				</button>
 				<button
 					type="button"
@@ -848,6 +946,16 @@ export default function App() {
 								onSelect: handleSelectProblem,
 							}}
 							tests={tests}
+						/>
+					) : null}
+					{runId !== null || runLines.length > 0 || runExited !== null ? (
+						<RunLog
+							lines={runLines}
+							exited={runExited}
+							onClear={() => {
+								setRunLines([]);
+								setRunExited(null);
+							}}
 						/>
 					) : null}
 					{searchOpen && root !== null ? (
