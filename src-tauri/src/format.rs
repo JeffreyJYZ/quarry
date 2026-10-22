@@ -20,7 +20,6 @@ pub const MAX_INPUT_BYTES: usize = 4 * 1024 * 1024;
 
 const RUSTFMT: &str = "rustfmt";
 const CLANG_FORMAT: &str = "clang-format";
-const RUST_EDITION: &str = "2021";
 /// A formatter's stderr line can be a whole diagnostic block, so it is cut for the status bar.
 pub const STDERR_LIMIT: usize = 300;
 
@@ -84,13 +83,104 @@ fn require_size(len: usize) -> Result<(), String> {
     Ok(())
 }
 
+/// Resolve the Rust edition for the project containing `path`.
+fn rust_edition_for_path(path: &str) -> &'static str {
+    let start = std::path::Path::new(path);
+    let mut dir = if start.is_dir() {
+        start
+    } else {
+        start.parent().unwrap_or(start)
+    };
+    loop {
+        let manifest = dir.join("Cargo.toml");
+        if manifest.is_file() {
+            if let Ok(content) = std::fs::read_to_string(&manifest) {
+                return parse_rust_edition(&content);
+            }
+        }
+        match dir.parent() {
+            Some(parent) if parent != dir => dir = parent,
+            _ => break,
+        }
+    }
+    "2021"
+}
+
+fn parse_rust_edition(content: &str) -> &'static str {
+    let mut section = "";
+    let mut package_edition: Option<&str> = None;
+    let mut workspace_edition: Option<&str> = None;
+    for raw_line in content.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            section = line.trim_start_matches('[').trim_end_matches(']');
+            continue;
+        }
+        if let Some((key, value)) = line.split_once('=') {
+            if key.trim() != "edition" {
+                continue;
+            }
+            let parsed = parse_edition_value(value.trim());
+            if let Some(ed) = parsed {
+                match section {
+                    "package" => {
+                        if package_edition.is_none() {
+                            package_edition = Some(ed);
+                        }
+                    }
+                    "workspace.package" => {
+                        if workspace_edition.is_none() {
+                            workspace_edition = Some(ed);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    let chosen = package_edition.or(workspace_edition);
+    match chosen {
+        Some("2015") => "2015",
+        Some("2018") => "2018",
+        Some("2021") => "2021",
+        Some("2024") => "2024",
+        _ => "2021",
+    }
+}
+
+fn parse_edition_value(raw: &str) -> Option<&str> {
+    let raw = raw.trim();
+    if raw.starts_with('"') {
+        let rest = &raw[1..];
+        let end = rest.find('"')?;
+        Some(&rest[..end])
+    } else if raw.starts_with('\'') {
+        let rest = &raw[1..];
+        let end = rest.find('\'')?;
+        Some(&rest[..end])
+    } else {
+        let end = raw
+            .find(|c: char| c.is_whitespace() || c == '#')
+            .unwrap_or(raw.len());
+        Some(&raw[..end])
+    }
+}
+
 /// The exact argument list for a formatter. No shell is involved: each argument is passed separately.
 fn argv(formatter: Formatter, path: &str) -> Vec<String> {
     match formatter {
-        Formatter::Rustfmt => ["--edition", RUST_EDITION, "--emit", "stdout"]
-            .iter()
-            .map(|argument| (*argument).to_string())
-            .collect(),
+        Formatter::Rustfmt => {
+            let edition = rust_edition_for_path(path);
+            vec![
+                "--edition".to_string(),
+                edition.to_string(),
+                "--emit".to_string(),
+                "stdout".to_string(),
+            ]
+        }
         Formatter::ClangFormat => vec![format!("-assume-filename={path}")],
         Formatter::None => Vec::new(),
     }

@@ -1,15 +1,18 @@
 //! Build runner and compiler diagnostics.
 //!
-//! Runs `cargo build --message-format=json` in the project's build root, turns the machine-readable
-//! stream into `Diagnostic`s and returns a `BuildReport`. Cargo only in this slice — CMake and
-//! `compile_commands.json` projects return an honest error instead of guessing a build command.
+//! Cargo projects build with `cargo build --message-format=json`; the machine-readable stream
+//! becomes `Diagnostic`s. CMake projects configure with `cmake -S … -B …` when their build root
+//! holds no generator file, then build with `cmake --build`; their diagnostics are parsed from
+//! the compiler's plain-text output. A `compile_commands.json` project has no known build system,
+//! so it names the kind and points at `.quarry/launch.json` instead of guessing a command.
 //!
-//! A failing build is a result, not a command error: only a spawn failure or an unsupported project
-//! kind is `Err`. The build never runs the program and never writes into the source tree.
+//! A failing build is a result, not a command error: only a missing tool or a spawn failure is
+//! `Err`. The build never runs the program and never writes into the source tree.
 
 use crate::project;
 use crate::types::{BuildReport, Diagnostic, Position, ProjectKind, Range};
 use serde_json::Value;
+use std::collections::HashSet;
 use std::path::Path;
 use std::process::Command;
 use std::time::Instant;
@@ -24,6 +27,18 @@ const SOURCE: &str = "cargo";
 const SUMMARY_LIMIT: usize = 200;
 const DEFAULT_SUMMARY: &str = "cargo build succeeded";
 
+/// Program that builds CMake projects; the tool must be installed on the machine.
+const CMAKE_PROGRAM: &str = "cmake";
+/// Diagnostics from a CMake build carry this source, so the panel can label them.
+const CMAKE_SOURCE: &str = "cmake";
+/// CMake names its configurations like this.
+const CMAKE_CONFIG_DEBUG: &str = "Debug";
+const CMAKE_CONFIG_RELEASE: &str = "Release";
+/// A generator file in the build root means the project is configured already.
+const CMAKE_GENERATOR_FILES: [&str; 2] = ["build.ninja", "Makefile"];
+/// Status-bar summary for a CMake build that printed nothing at all.
+const DEFAULT_CPP_SUMMARY: &str = "cmake build finished";
+
 /// `profile` is `debug` or `release`; anything else is an error naming the accepted values.
 #[tauri::command]
 pub async fn build_project(root: String, profile: String) -> Result<BuildReport, String> {
@@ -36,8 +51,15 @@ pub async fn build_project(root: String, profile: String) -> Result<BuildReport,
 /// Detection and the build both touch the filesystem, so both run off the async runtime.
 fn build(root: &str, release: bool) -> Result<BuildReport, String> {
     let info = project::inspect(root)?;
-    require_cargo(info.kind)?;
-    run_build(&info.build_root, release)
+    match info.kind {
+        ProjectKind::Cargo => {
+            require_cargo(info.kind)?;
+            run_build(&info.build_root, release)
+        }
+        ProjectKind::Cmake => run_cmake_build(&info.root, &info.build_root, release),
+        ProjectKind::CompileCommands => Err(compile_commands_not_wired()),
+        ProjectKind::Unknown => Err(no_build_system()),
+    }
 }
 
 /// Maps the wire profile onto cargo's `--release` flag.
@@ -51,23 +73,38 @@ fn release_for(profile: &str) -> Result<bool, String> {
     }
 }
 
-/// Only Cargo builds are wired in this slice; the C/C++ kinds must say so rather than guess.
+/// The cargo branch accepts Cargo projects only.
+///
+/// The C/C++ kinds have their own branches, so reaching this gate with one of them means a
+/// mis-dispatch; the gate still refuses them rather than guessing a command.
 fn require_cargo(kind: ProjectKind) -> Result<(), String> {
     match kind {
         ProjectKind::Cargo => Ok(()),
         ProjectKind::Cmake => Err(cpp_not_wired("CMakeLists.txt")),
         ProjectKind::CompileCommands => Err(cpp_not_wired("compile_commands.json")),
-        ProjectKind::Unknown => Err(
-            "no build system detected in this project: only Cargo projects build in this slice"
-                .to_string(),
-        ),
+        ProjectKind::Unknown => Err(no_build_system()),
     }
 }
 
 fn cpp_not_wired(marker: &str) -> String {
     format!(
-        "C/C++ builds are not wired yet (detected {marker}): only Cargo projects build in this slice"
+        "C/C++ builds are not wired yet (detected {marker}) in the cargo branch: \
+         the cargo branch builds Cargo projects only"
     )
+}
+
+/// A `compile_commands.json` project names no build system, so the message names the kind and
+/// points at the `build` hint in the launch config.
+fn compile_commands_not_wired() -> String {
+    format!(
+        "compile-commands project (compile_commands.json): no build system is known, so quarry \
+         cannot build it. Add a `build` command to .quarry/launch.json to say how to build it"
+    )
+}
+
+/// Nothing in the directory tree marks a build system.
+fn no_build_system() -> String {
+    "no build system detected in this project: nothing to build".to_string()
 }
 
 /// Runs the build and reports. Called on a blocking thread so the async runtime stays free.
@@ -296,6 +333,243 @@ fn truncate(text: &str, limit: usize) -> String {
     text.chars().take(limit).collect()
 }
 
+/// Builds a CMake project: configure the build root when it holds no generator file, then build.
+///
+/// A failing configure or build is a result, not an error: only a missing `cmake` or a failed
+/// spawn is `Err`.
+fn run_cmake_build(
+    source_root: &str,
+    build_root: &str,
+    release: bool,
+) -> Result<BuildReport, String> {
+    let started = Instant::now();
+    let mut text = String::new();
+    let mut success = true;
+
+    if !cmake_configured(Path::new(build_root)) {
+        let outcome = run_cmake(&cmake_configure_argv(source_root, build_root), build_root)?;
+        text.push_str(&outcome.text);
+        success = outcome.success;
+    }
+
+    if success {
+        let outcome = run_cmake(&cmake_build_argv(build_root, release), build_root)?;
+        text.push_str(&outcome.text);
+        success = outcome.success;
+    }
+
+    let duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+    Ok(BuildReport {
+        success,
+        diagnostics: parse_text_diagnostics(&text, Path::new(build_root)),
+        duration_ms,
+        summary: summarize_text(&text),
+    })
+}
+
+/// True when the build root already holds a generator file, so configuring again is pointless.
+fn cmake_configured(build_root: &Path) -> bool {
+    CMAKE_GENERATOR_FILES
+        .iter()
+        .any(|name| build_root.join(name).is_file())
+}
+
+/// `cmake -S <source> -B <build root> -DCMAKE_EXPORT_COMPILE_COMMANDS=ON`.
+fn cmake_configure_argv(source_root: &str, build_root: &str) -> Vec<String> {
+    vec![
+        CMAKE_PROGRAM.to_string(),
+        "-S".to_string(),
+        source_root.to_string(),
+        "-B".to_string(),
+        build_root.to_string(),
+        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON".to_string(),
+    ]
+}
+
+/// `cmake --build <build root> --config <Debug|Release>`.
+fn cmake_build_argv(build_root: &str, release: bool) -> Vec<String> {
+    vec![
+        CMAKE_PROGRAM.to_string(),
+        "--build".to_string(),
+        build_root.to_string(),
+        "--config".to_string(),
+        cmake_config(release).to_string(),
+    ]
+}
+
+/// The CMake configuration name for a profile.
+fn cmake_config(release: bool) -> &'static str {
+    if release {
+        CMAKE_CONFIG_RELEASE
+    } else {
+        CMAKE_CONFIG_DEBUG
+    }
+}
+
+/// Output of one cmake invocation: the exit verdict and the merged output text.
+struct CmakeOutcome {
+    success: bool,
+    text: String,
+}
+
+/// Runs cmake with an argv whose first element is the program name.
+fn run_cmake(argv: &[String], build_root: &str) -> Result<CmakeOutcome, String> {
+    let mut command = Command::new(CMAKE_PROGRAM);
+    command.args(&argv[1..]).current_dir(build_root);
+
+    let output = command
+        .output()
+        .map_err(|error| cmake_spawn_error(&error))?;
+    let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
+    text.push('\n');
+    text.push_str(&String::from_utf8_lossy(&output.stderr));
+
+    Ok(CmakeOutcome {
+        success: output.status.success(),
+        text,
+    })
+}
+
+/// A missing cmake is a setup problem, so the message says what has to be installed.
+fn cmake_spawn_error(error: &std::io::Error) -> String {
+    if error.kind() == std::io::ErrorKind::NotFound {
+        return missing_cmake_error();
+    }
+    format!("cannot run {CMAKE_PROGRAM}: {error}")
+}
+
+/// The message for a machine without cmake installed.
+fn missing_cmake_error() -> String {
+    format!("{CMAKE_PROGRAM} is not on PATH: C/C++ support needs CMake installed")
+}
+
+/// The severities a C/C++ compiler prints, matched as `path:line:column: severity: message`.
+const TEXT_SEVERITIES: [(&str, u8); 5] = [
+    (": fatal error:", 1),
+    (": error:", 1),
+    (": warning:", 2),
+    (": note:", 3),
+    (": remark:", 3),
+];
+
+/// Parses every compiler diagnostic in the text, dropping duplicates and keeping the order.
+///
+/// CMake builds speak plain text, not JSON, so this is the only source of diagnostics there.
+fn parse_text_diagnostics(text: &str, build_root: &Path) -> Vec<Diagnostic> {
+    let mut seen: HashSet<(String, u32, u32, String)> = HashSet::new();
+    let mut diagnostics = Vec::new();
+
+    for line in text.lines() {
+        let Some(diagnostic) = parse_text_diagnostic(line, build_root) else {
+            continue;
+        };
+        let key = (
+            diagnostic.path.clone(),
+            diagnostic.range.start.line,
+            diagnostic.range.start.character,
+            diagnostic.message.clone(),
+        );
+        if seen.insert(key) {
+            diagnostics.push(diagnostic);
+        }
+    }
+
+    diagnostics
+}
+
+/// One compiler line: `path:line:column: severity: message`.
+fn parse_text_diagnostic(line: &str, build_root: &Path) -> Option<Diagnostic> {
+    let (head, message, severity) = split_severity(line)?;
+    let message = message.trim();
+    if message.is_empty() {
+        return None;
+    }
+
+    let (path, line_number, column) = split_position(head)?;
+    let start = Position {
+        line: offset(u64::from(line_number)),
+        character: offset(u64::from(column)),
+    };
+
+    Some(Diagnostic {
+        path: absolute_text_path(&path, build_root),
+        range: Range {
+            start,
+            end: Position {
+                line: start.line,
+                character: start.character.saturating_add(1),
+            },
+        },
+        severity,
+        message: message.to_string(),
+        source: Some(CMAKE_SOURCE.to_string()),
+    })
+}
+
+/// Splits a line into its position head and the `severity: message` tail.
+///
+/// The earliest severity marker wins, so a message that mentions `error:` further right does not
+/// move the split. A line without a marker carries no severity and is skipped: that covers
+/// clang's `In file included from` headers and its bare `path:line:` continuation lines.
+fn split_severity(line: &str) -> Option<(&str, &str, u8)> {
+    let mut found: Option<(usize, u8)> = None;
+    for (marker, severity) in TEXT_SEVERITIES {
+        if let Some(index) = line.find(marker) {
+            if found.is_none_or(|(at, _)| index < at) {
+                found = Some((index, severity));
+            }
+        }
+    }
+
+    let (index, severity) = found?;
+    let head = &line[..index];
+    let tail = line[index + 1..].trim_start();
+    let (_, message) = tail.split_once(':')?;
+    Some((head, message, severity))
+}
+
+/// Splits `path:line:column` into its parts; the column is optional and defaults to 1.
+fn split_position(head: &str) -> Option<(String, u32, u32)> {
+    let head = head.trim();
+    let (rest, last) = head.rsplit_once(':')?;
+    let last_number = last.trim().parse::<u32>().ok();
+
+    let (path, line, column) = match (last_number, rest.rsplit_once(':')) {
+        (Some(column), Some((path, line))) => (path, line, column),
+        (Some(_), None) => (rest, last, 1),
+        (None, Some((path, line))) => (path, line, 1),
+        (None, None) => return None,
+    };
+
+    let line = line.trim().parse::<u32>().ok()?;
+    let path = path.trim();
+    if path.is_empty() || path.chars().all(|character| character.is_ascii_digit()) {
+        return None;
+    }
+    Some((path.to_string(), line, column))
+}
+
+/// The compiler prints paths relative to the build root; the UI keys diagnostics by absolute path.
+fn absolute_text_path(path: &str, build_root: &Path) -> String {
+    let candidate = Path::new(path);
+    let resolved = if candidate.is_absolute() {
+        candidate.to_path_buf()
+    } else {
+        build_root.join(candidate)
+    };
+    resolved.to_string_lossy().into_owned()
+}
+
+/// Last non-empty line of the build output, truncated for the status bar.
+fn summarize_text(text: &str) -> String {
+    let last = text
+        .lines()
+        .rev()
+        .find(|line| !line.trim().is_empty())
+        .map(|line| line.trim());
+    truncate(last.unwrap_or(DEFAULT_CPP_SUMMARY), SUMMARY_LIMIT)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -502,5 +776,207 @@ mod tests {
             );
         }
         assert!(require_cargo(ProjectKind::Unknown).is_err());
+    }
+
+    /// A compiler error line becomes one diagnostic with a zero-based, one-character range.
+    #[test]
+    fn text_error_line_becomes_a_diagnostic() {
+        let text = "src/main.cpp:12:5: error: expected ';'";
+
+        let diagnostics = parse_text_diagnostics(text, build_root());
+
+        assert_eq!(diagnostics.len(), 1);
+        let diagnostic = &diagnostics[0];
+        assert_eq!(diagnostic.path, format!("{BUILD_ROOT}/src/main.cpp"));
+        assert_eq!(
+            diagnostic.range,
+            Range {
+                start: Position {
+                    line: 11,
+                    character: 4
+                },
+                end: Position {
+                    line: 11,
+                    character: 5
+                },
+            }
+        );
+        assert_eq!(diagnostic.severity, 1);
+        assert_eq!(diagnostic.message, "expected ';'");
+        assert_eq!(diagnostic.source.as_deref(), Some("cmake"));
+    }
+
+    #[test]
+    fn text_warning_line_becomes_a_warning_diagnostic() {
+        let text = "src/main.cpp:3:9: warning: unused variable 'x'";
+
+        let diagnostics = parse_text_diagnostics(text, build_root());
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].severity, 2);
+        assert_eq!(diagnostics[0].message, "unused variable 'x'");
+        assert_eq!(diagnostics[0].range.start.line, 2);
+        assert_eq!(diagnostics[0].range.start.character, 8);
+    }
+
+    #[test]
+    fn text_note_and_remark_lines_become_information_diagnostics() {
+        let text = concat!(
+            "src/main.cpp:7:3: note: declared here\n",
+            "src/main.cpp:8:3: remark: see the manual\n",
+        );
+
+        let diagnostics = parse_text_diagnostics(text, build_root());
+
+        assert_eq!(diagnostics.len(), 2);
+        assert_eq!(diagnostics[0].severity, 3);
+        assert_eq!(diagnostics[0].message, "declared here");
+        assert_eq!(diagnostics[1].severity, 3);
+        assert_eq!(diagnostics[1].message, "see the manual");
+    }
+
+    /// Include headers and continuation lines carry no severity, so they are not diagnostics.
+    #[test]
+    fn include_and_continuation_lines_are_ignored() {
+        let text = concat!(
+            "In file included from src/main.cpp:1:\n",
+            "                 from include/thing.h:3:\n",
+            "include/thing.h:5:1: warning: unused include\n",
+        );
+
+        let diagnostics = parse_text_diagnostics(text, build_root());
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].path, format!("{BUILD_ROOT}/include/thing.h"));
+        assert_eq!(diagnostics[0].severity, 2);
+    }
+
+    #[test]
+    fn relative_text_paths_are_joined_to_the_build_root() {
+        let text = "src/deep/nested/file.cpp:1:1: error: boom";
+
+        let diagnostics = parse_text_diagnostics(text, build_root());
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].path,
+            format!("{BUILD_ROOT}/src/deep/nested/file.cpp")
+        );
+    }
+
+    #[test]
+    fn absolute_text_paths_are_kept() {
+        let text = "/elsewhere/file.cpp:1:1: error: boom";
+
+        let diagnostics = parse_text_diagnostics(text, build_root());
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].path, "/elsewhere/file.cpp");
+    }
+
+    #[test]
+    fn identical_text_diagnostics_are_deduplicated() {
+        let text = concat!(
+            "src/main.cpp:12:5: error: expected ';'\n",
+            "src/main.cpp:12:5: error: expected ';'\n",
+            "src/main.cpp:13:5: error: expected ';'\n",
+        );
+
+        let diagnostics = parse_text_diagnostics(text, build_root());
+
+        assert_eq!(diagnostics.len(), 2);
+        assert_eq!(diagnostics[0].range.start.line, 11);
+        assert_eq!(diagnostics[1].range.start.line, 12);
+    }
+
+    #[test]
+    fn malformed_text_lines_are_skipped() {
+        let text = concat!(
+            "this is not a diagnostic\n",
+            "src/main.cpp:12:5: error: real error\n",
+            "no colon at all\n",
+        );
+
+        let diagnostics = parse_text_diagnostics(text, build_root());
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].message, "real error");
+    }
+
+    #[test]
+    fn cmake_argv_carries_the_profile_and_the_configure_step() {
+        let configure = cmake_configure_argv("/projects/demo", "/projects/demo/build");
+        assert_eq!(
+            configure.iter().map(String::as_str).collect::<Vec<_>>(),
+            vec![
+                "cmake",
+                "-S",
+                "/projects/demo",
+                "-B",
+                "/projects/demo/build",
+                "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            ]
+        );
+
+        let debug = cmake_build_argv("/projects/demo/build", false);
+        assert_eq!(
+            debug.iter().map(String::as_str).collect::<Vec<_>>(),
+            vec![
+                "cmake",
+                "--build",
+                "/projects/demo/build",
+                "--config",
+                "Debug"
+            ]
+        );
+
+        let release = cmake_build_argv("/projects/demo/build", true);
+        assert_eq!(
+            release.iter().map(String::as_str).collect::<Vec<_>>(),
+            vec![
+                "cmake",
+                "--build",
+                "/projects/demo/build",
+                "--config",
+                "Release"
+            ]
+        );
+    }
+
+    #[test]
+    fn missing_cmake_names_the_tool_and_says_it_must_be_installed() {
+        let error = missing_cmake_error();
+
+        assert!(error.contains("cmake"), "unexpected error: {error}");
+        assert!(
+            error.contains("CMake installed"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn compile_commands_projects_point_at_the_launch_config() {
+        let error = compile_commands_not_wired();
+
+        assert!(
+            error.contains("compile_commands.json"),
+            "unexpected error: {error}"
+        );
+        assert!(
+            error.contains(".quarry/launch.json"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn text_summary_is_the_last_non_empty_line_truncated() {
+        assert_eq!(
+            summarize_text("compiling\n[100%] built target demo\n\n"),
+            "[100%] built target demo"
+        );
+        assert_eq!(summarize_text("  \n\n"), DEFAULT_CPP_SUMMARY);
+
+        let long = "e".repeat(SUMMARY_LIMIT + 50);
+        assert_eq!(summarize_text(&long).chars().count(), SUMMARY_LIMIT);
     }
 }

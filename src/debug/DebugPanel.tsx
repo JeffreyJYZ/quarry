@@ -4,6 +4,17 @@ import type { DebugController, VariableRow } from "@/debug/session";
 import { fileName } from "@/problems/model";
 import type { DapVariable } from "@/project/api";
 
+/** How many characters of a program path the panel keeps when it truncates from the left. */
+const PROGRAM_CHARS = 36;
+
+/** The path tail is what identifies the binary, so the head is what goes when space runs out. */
+function truncateLeft(path: string): string {
+	if (path.length <= PROGRAM_CHARS) {
+		return path;
+	}
+	return `…${path.slice(path.length - (PROGRAM_CHARS - 1))}`;
+}
+
 type VariableListProps = {
 	variables: DapVariable[];
 	containerRef: number;
@@ -119,25 +130,37 @@ export default function DebugPanel({ debug }: { debug: DebugController }) {
 					{debug.error}
 				</p>
 			)}
+			{debug.buildNeeded === null ? null : (
+				<div className="debug-row">
+					<button
+						type="button"
+						className="button"
+						disabled={debug.building}
+						onClick={debug.buildNow}
+					>
+						{debug.building ? "Building…" : "Build now"}
+					</button>
+				</div>
+			)}
 
 			<section className="debug-section">
 				<div className="debug-section-head">
 					<span className="label">launch</span>
-					<span className="debug-count">{debug.presets.length}</span>
+					<span className="debug-count">{debug.presetEntries.length}</span>
 				</div>
 				<div className="debug-row">
 					<select
 						className="debug-select"
 						value={debug.preset}
-						disabled={debug.presets.length === 0 || session !== null}
+						disabled={debug.presetEntries.length === 0 || session !== null}
 						onChange={(event) => debug.setPreset(event.target.value)}
 					>
-						{debug.presets.length === 0 ? (
+						{debug.presetEntries.length === 0 ? (
 							<option value="">no presets</option>
 						) : (
-							debug.presets.map((entry) => (
-								<option key={entry.name} value={entry.name}>
-									{entry.name}
+							debug.presetEntries.map((entry) => (
+								<option key={entry.value} value={entry.value}>
+									{entry.label}
 								</option>
 							))
 						)}
@@ -149,13 +172,27 @@ export default function DebugPanel({ debug }: { debug: DebugController }) {
 							debug.status === "launching" ||
 							session !== null ||
 							debug.preset === "" ||
-							debug.presets.length === 0
+							debug.presetEntries.length === 0
 						}
 						onClick={debug.launch}
 					>
 						Launch
 					</button>
 				</div>
+				{debug.presets.length === 0 ? (
+					<p className="debug-note">No presets in .quarry/launch.json</p>
+				) : null}
+				{debug.resolved === null ? null : (
+					<p className="debug-note" title={debug.resolved.program}>
+						{truncateLeft(debug.resolved.program)}
+					</p>
+				)}
+				{debug.resolved === null || debug.resolved.initCommands.length === 0 ? null : (
+					<p className="debug-note">
+						{debug.resolved.initCommands.length} init command
+						{debug.resolved.initCommands.length === 1 ? "" : "s"} loaded
+					</p>
+				)}
 				{debug.configError === null ? null : (
 					<p className="debug-note" title={debug.configError}>
 						{debug.configError}

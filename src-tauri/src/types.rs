@@ -284,3 +284,36 @@ pub struct TestReport {
     pub output: String,
     pub duration_ms: u64,
 }
+
+/// A source location returned by navigation requests.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Location {
+    pub path: String,
+    pub range: Range,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct HoverInfo {
+    /// Markdown or plain text, already flattened to a single string.
+    pub contents: String,
+    pub range: Option<Range>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct CompletionItem {
+    pub label: String,
+    pub detail: Option<String>,
+    /// LSP CompletionItemKind, 1–25.
+    pub kind: Option<u32>,
+    pub insert_text: Option<String>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct CompletionList {
+    pub items: Vec<CompletionItem>,
+    pub is_incomplete: bool,
+}

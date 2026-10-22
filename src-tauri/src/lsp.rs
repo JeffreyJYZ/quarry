@@ -3,16 +3,21 @@
 //! Unit U6 owns the body of this file. Contract: spawn the server for the project kind with
 //! `protocol_pipe`, perform the `initialize` / `initialized` handshake, synchronise documents with
 //! full-document `didOpen` / `didChange` / `didClose`, and forward `textDocument/publishDiagnostics`
-//! as the `lsp://diagnostics` event (payload `DiagnosticsEvent`). No completion, hover or navigation
-//! in this slice. Never write into the source tree, never bundle a server.
+//! as the `lsp://diagnostics` event (payload `DiagnosticsEvent`). Unit U26 adds request/response
+//! navigation: hover, go to definition, find references and completion, correlated by a request id
+//! and a pending map. Never write into the source tree, never bundle a server.
 //!
 //! Locking rule: the session map and a single session are never held across a blocking read. The
-//! handshake reads frames before any lock exists, and the pump thread only locks a session for the
-//! short write that answers a server request.
+//! handshake reads frames before any lock exists, the pump thread only locks a session for the
+//! short write that answers a server request or hands a response to its waiter, and a request
+//! waiter blocks on its own channel without any lock held.
 
 use crate::project::open_project;
 use crate::protocol_pipe::{FrameError, ProcessPipe};
-use crate::types::{Diagnostic, DiagnosticsEvent, LspStatus, Position, ProjectKind, Range};
+use crate::types::{
+    CompletionItem, CompletionList, Diagnostic, DiagnosticsEvent, HoverInfo, Location, LspStatus,
+    Position, ProjectKind, Range,
+};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::env;
@@ -24,14 +29,22 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, State};
+use tokio::sync::oneshot;
 
 /// How long `initialize` may take before the session is declared dead.
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(20);
 
-/// Request ids this module sends. Only `initialize` and `shutdown` are requests; document sync is a
-/// notification, so two fixed ids are enough and there is no counter to get wrong.
+/// How long any other request may take before it is given up on.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// Request ids this module sends. `initialize` and `shutdown` are the two fixed ones; document sync
+/// is a notification, so they need no counter.
 const INITIALIZE_ID: i64 = 1;
 const SHUTDOWN_ID: i64 = 2;
+
+/// First id handed out to a request that expects an answer. The counter starts clear of the two
+/// fixed ids above, so a response can never be confused with the handshake.
+const FIRST_REQUEST_ID: i64 = 100;
 
 /// Held by Tauri as managed state; one entry per project root.
 #[derive(Default)]
@@ -46,6 +59,51 @@ pub struct Session {
     /// Open document path to the version last sent, so `didChange` speaks the same version the
     /// server last heard.
     documents: HashMap<String, u32>,
+    /// The next request id to hand out. Monotonic, so a late answer can never be mistaken for a
+    /// newer request's answer.
+    next_request_id: i64,
+    /// Requests that are waiting for an answer, keyed by the id they were sent with.
+    pending: HashMap<i64, Pending>,
+}
+
+/// One request that is waiting for its answer.
+struct Pending {
+    /// The method that was asked for, so an error can name it.
+    method: String,
+    /// The channel the answer travels on. Dropping the session drops this, which tells the
+    /// waiting side that no answer is coming.
+    sender: oneshot::Sender<Result<Value, String>>,
+}
+
+impl Session {
+    /// Send one request and hand back its id and the channel its answer will arrive on.
+    ///
+    /// The pending entry is registered before the frame goes out, so a fast server cannot answer
+    /// before there is somewhere to put the answer.
+    fn begin_request(
+        &mut self,
+        method: &str,
+        params: Value,
+    ) -> Result<(i64, oneshot::Receiver<Result<Value, String>>), String> {
+        let id = self.next_request_id;
+        self.next_request_id += 1;
+        let (sender, receiver) = oneshot::channel();
+        self.pending.insert(
+            id,
+            Pending {
+                method: method.to_string(),
+                sender,
+            },
+        );
+
+        let message = request(id, method, params);
+        if let Err(error) = self.pipe.send(&message) {
+            self.pending.remove(&id);
+            return Err(format!("{}: cannot send {method}: {error}", self.server));
+        }
+
+        Ok((id, receiver))
+    }
 }
 
 impl Session {
@@ -115,6 +173,8 @@ pub async fn start_lsp(
         server: server.to_string(),
         pipe,
         documents: HashMap::new(),
+        next_request_id: FIRST_REQUEST_ID,
+        pending: HashMap::new(),
     }));
 
     let pump_session = Arc::clone(&session);
@@ -259,7 +319,7 @@ fn handshake(
     let params = json!({
         "processId": std::process::id(),
         "rootUri": root_uri,
-        "capabilities": {},
+        "capabilities": client_capabilities(),
         "workspaceFolders": [{ "uri": root_uri, "name": name }],
     });
     pipe.send(&request(INITIALIZE_ID, "initialize", params))
@@ -321,8 +381,13 @@ fn pump(
             break;
         };
 
+        // A response to one of our own requests: resolve it before handling any notification.
+        if message.get("method").is_none() {
+            resolve_response(&session, &message);
+            continue;
+        }
+
         let Some(method) = message.get("method").and_then(Value::as_str) else {
-            // A response to one of our own requests; nothing in this slice waits on one.
             continue;
         };
 
@@ -340,6 +405,30 @@ fn pump(
             }
         }
     }
+}
+
+/// Hand a server's answer to the request that is waiting for it.
+fn resolve_response(session: &Arc<Mutex<Session>>, message: &Value) {
+    let Some(id) = message.get("id").and_then(Value::as_i64) else {
+        return;
+    };
+
+    let outcome = {
+        let mut guard = lock(session);
+        let Some(pending) = guard.pending.remove(&id) else {
+            return;
+        };
+        let outcome = match message.get("error") {
+            Some(error) => Err(format!(
+                "{} rejected {}: {error}",
+                guard.server, pending.method
+            )),
+            None => Ok(message.get("result").cloned().unwrap_or(Value::Null)),
+        };
+        (pending.sender, outcome)
+    };
+
+    let _ = outcome.0.send(outcome.1);
 }
 
 /// Answer a server-to-client request. `workspace/configuration` gets one `null` per requested item,
@@ -649,4 +738,433 @@ mod tests {
         assert_eq!(diagnostic.message, "cannot find value");
         assert_eq!(diagnostic.source.as_deref(), Some("rust-analyzer"));
     }
+
+    #[test]
+    fn hover_contents_flatten_every_shape() {
+        assert_eq!(hover_contents(&json!("plain")), "plain");
+
+        assert_eq!(
+            hover_contents(&json!({ "kind": "markdown", "value": "**bold**" })),
+            "**bold**"
+        );
+
+        assert_eq!(
+            hover_contents(&json!({ "language": "rust", "value": "let x = 1;" })),
+            "let x = 1;"
+        );
+
+        assert_eq!(
+            hover_contents(&json!([
+                { "language": "rust", "value": "let x = 1;" },
+                "and a note",
+            ])),
+            "let x = 1;\n\nand a note"
+        );
+    }
+
+    #[test]
+    fn hover_answer_becomes_hover_info() {
+        let result = json!({
+            "contents": { "kind": "markdown", "value": "```rust\nlet x = 1;\n```" },
+            "range": {
+                "start": { "line": 2, "character": 4 },
+                "end": { "line": 2, "character": 5 },
+            },
+        });
+
+        let hover = parse_hover(&result).expect("hover");
+        assert_eq!(hover.contents, "```rust\nlet x = 1;\n```");
+        let range = hover.range.expect("range");
+        assert_eq!(range.start.line, 2);
+        assert_eq!(range.start.character, 4);
+        assert_eq!(range.end.character, 5);
+
+        assert!(parse_hover(&Value::Null).is_none());
+    }
+
+    #[test]
+    fn definition_answer_maps_locations_and_links() {
+        let single = json!({
+            "uri": path_to_uri("/p/src/main.rs"),
+            "range": {
+                "start": { "line": 1, "character": 2 },
+                "end": { "line": 1, "character": 8 },
+            },
+        });
+        let locations = parse_locations(&single);
+        assert_eq!(locations.len(), 1);
+        assert_eq!(locations[0].path, "/p/src/main.rs");
+        assert_eq!(locations[0].range.start.line, 1);
+        assert_eq!(locations[0].range.end.character, 8);
+
+        let list = json!([single.clone()]);
+        assert_eq!(parse_locations(&list).len(), 1);
+
+        let links = json!([{
+            "targetUri": path_to_uri("/p/src/other.rs"),
+            "targetRange": {
+                "start": { "line": 3, "character": 0 },
+                "end": { "line": 9, "character": 1 },
+            },
+            "targetSelectionRange": {
+                "start": { "line": 3, "character": 4 },
+                "end": { "line": 3, "character": 9 },
+            },
+        }]);
+        let locations = parse_locations(&links);
+        assert_eq!(locations.len(), 1);
+        assert_eq!(locations[0].path, "/p/src/other.rs");
+        assert_eq!(locations[0].range.start.character, 4);
+        assert_eq!(locations[0].range.end.character, 9);
+    }
+
+    #[test]
+    fn a_location_that_is_not_a_file_is_skipped() {
+        let result = json!([
+            { "uri": "untitled:Untitled-1", "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 1 } } },
+            { "uri": path_to_uri("/p/src/main.rs"), "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 1 } } },
+        ]);
+        let locations = parse_locations(&result);
+        assert_eq!(locations.len(), 1);
+        assert_eq!(locations[0].path, "/p/src/main.rs");
+    }
+
+    #[test]
+    fn completion_answer_reads_both_shapes() {
+        let list = json!({
+            "isIncomplete": true,
+            "items": [
+                { "label": "print", "detail": "fn()", "kind": 3, "insertText": "print!()" },
+                { "label": "println" },
+            ],
+        });
+        let completion = parse_completion(&list);
+        assert!(completion.is_incomplete);
+        assert_eq!(completion.items.len(), 2);
+        assert_eq!(completion.items[0].label, "print");
+        assert_eq!(completion.items[0].detail.as_deref(), Some("fn()"));
+        assert_eq!(completion.items[0].kind, Some(3));
+        assert_eq!(completion.items[0].insert_text.as_deref(), Some("print!()"));
+        assert_eq!(completion.items[1].insert_text.as_deref(), Some("println"));
+
+        let bare = json!([{ "label": "vec" }]);
+        let completion = parse_completion(&bare);
+        assert!(!completion.is_incomplete);
+        assert_eq!(completion.items.len(), 1);
+        assert_eq!(completion.items[0].label, "vec");
+    }
+
+    #[test]
+    fn reference_params_ask_for_the_declaration() {
+        let params = references_params("file:///p/src/main.rs", 7, 3);
+        assert_eq!(
+            params["textDocument"]["uri"],
+            json!("file:///p/src/main.rs")
+        );
+        assert_eq!(params["position"], json!({ "line": 7, "character": 3 }));
+        assert_eq!(params["context"], json!({ "includeDeclaration": true }));
+    }
+
+    #[test]
+    fn a_malformed_answer_reads_as_empty() {
+        assert!(parse_locations(&json!("not a location")).is_empty());
+        assert!(parse_locations(&json!({ "uri": 7 })).is_empty());
+        assert!(
+            parse_completion(&json!({ "items": "nope" }))
+                .items
+                .is_empty()
+        );
+        assert!(parse_completion(&json!(42)).items.is_empty());
+        assert!(parse_hover(&json!({ "contents": 7 })).is_none());
+    }
+
+    #[test]
+    fn client_capabilities_advertise_the_navigation_requests() {
+        let capabilities = client_capabilities();
+        assert_eq!(
+            capabilities["textDocument"]["hover"]["contentFormat"],
+            json!(["markdown", "plaintext"])
+        );
+        assert_eq!(
+            capabilities["textDocument"]["completion"]["completionItem"]["snippetSupport"],
+            json!(false)
+        );
+        assert_eq!(
+            capabilities["textDocument"]["definition"]["linkSupport"],
+            json!(true)
+        );
+    }
+}
+
+/// Client capabilities this IDE advertises. Only what the navigation requests need is declared;
+/// everything else keeps the specification's default.
+fn client_capabilities() -> Value {
+    json!({
+        "textDocument": {
+            "hover": { "contentFormat": ["markdown", "plaintext"] },
+            "completion": { "completionItem": { "snippetSupport": false } },
+            "definition": { "linkSupport": true }
+        }
+    })
+}
+
+/// The `textDocument` + `position` pair every navigation request shares.
+fn position_params(uri: &str, line: u32, character: u32) -> Value {
+    json!({
+        "textDocument": { "uri": uri },
+        "position": { "line": line, "character": character },
+    })
+}
+
+/// `textDocument/references` asks for the declaration too.
+fn references_params(uri: &str, line: u32, character: u32) -> Value {
+    json!({
+        "textDocument": { "uri": uri },
+        "position": { "line": line, "character": character },
+        "context": { "includeDeclaration": true },
+    })
+}
+
+/// `textDocument/completion` was triggered by typing, not by an explicit invocation.
+fn completion_params(uri: &str, line: u32, character: u32) -> Value {
+    json!({
+        "textDocument": { "uri": uri },
+        "position": { "line": line, "character": character },
+        "context": { "triggerKind": 1 },
+    })
+}
+
+/// Ask the server one question and wait for the answer.
+///
+/// The session lock is held only for the write; the wait happens with no lock held, so the pump
+/// thread is free to answer while this call is still waiting.
+async fn send_request(
+    session: &Arc<Mutex<Session>>,
+    method: &str,
+    params: Value,
+) -> Result<Value, String> {
+    let (id, receiver) = {
+        let mut guard = lock(session);
+        guard.begin_request(method, params)?
+    };
+
+    match tokio::time::timeout(REQUEST_TIMEOUT, receiver).await {
+        Ok(Ok(outcome)) => outcome,
+        Ok(Err(_)) => Err(format!(
+            "{method}: the language server closed the connection"
+        )),
+        Err(_) => {
+            lock(session).pending.remove(&id);
+            Err(format!(
+                "{method} did not answer within {}s",
+                REQUEST_TIMEOUT.as_secs()
+            ))
+        }
+    }
+}
+
+/// Flatten a hover's contents into one string.
+///
+/// The server may answer with a plain string, a `MarkupContent` object, a `MarkedString` object or
+/// an array of those. Every block keeps its own text; blocks are joined by a blank line.
+fn hover_contents(value: &Value) -> String {
+    match value {
+        Value::String(text) => text.clone(),
+        Value::Object(_) => value
+            .get("value")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        Value::Array(blocks) => blocks
+            .iter()
+            .map(hover_contents)
+            .collect::<Vec<_>>()
+            .join("\n\n"),
+        _ => String::new(),
+    }
+}
+
+/// Read a hover out of the server's answer; `None` when there is nothing to show.
+fn parse_hover(result: &Value) -> Option<HoverInfo> {
+    if result.is_null() {
+        return None;
+    }
+    let contents = result.get("contents")?;
+    let text = hover_contents(contents);
+    if text.is_empty() {
+        return None;
+    }
+    Some(HoverInfo {
+        contents: text,
+        range: result.get("range").map(parse_range),
+    })
+}
+
+/// Read a range out of the server's answer; a missing or broken range reads as the origin.
+fn parse_range(value: &Value) -> Range {
+    Range {
+        start: position(value.get("start")),
+        end: position(value.get("end")),
+    }
+}
+
+/// Read the locations out of a definition or references answer.
+///
+/// The answer may be a single `Location`, a list of them, or a list of `LocationLink`s. A link
+/// carries the identifier's own range in `targetSelectionRange`; the whole target in
+/// `targetRange`. The identifier's range wins, because that is where the caret belongs.
+fn parse_locations(result: &Value) -> Vec<Location> {
+    match result {
+        Value::Array(entries) => entries.iter().filter_map(parse_location).collect(),
+        Value::Object(_) => parse_location(result).into_iter().collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn parse_location(value: &Value) -> Option<Location> {
+    let uri = value
+        .get("uri")
+        .and_then(Value::as_str)
+        .or_else(|| value.get("targetUri").and_then(Value::as_str))?;
+    let path = uri_to_path(uri)?;
+    if !path.starts_with('/') {
+        return None;
+    }
+    let range = value
+        .get("range")
+        .or_else(|| value.get("targetSelectionRange"))
+        .or_else(|| value.get("targetRange"))
+        .map(parse_range)
+        .unwrap_or_else(|| Range {
+            start: Position {
+                line: 0,
+                character: 0,
+            },
+            end: Position {
+                line: 0,
+                character: 0,
+            },
+        });
+    Some(Location { path, range })
+}
+
+/// Read the items out of a completion answer.
+///
+/// The answer may be a `CompletionList` or a bare array of items. An item without a label is
+/// dropped: there is nothing to show for it.
+fn parse_completion(result: &Value) -> CompletionList {
+    let (items, is_incomplete) = match result {
+        Value::Array(items) => (items.clone(), false),
+        Value::Object(_) => (
+            result
+                .get("items")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default(),
+            result
+                .get("isIncomplete")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+        ),
+        _ => (Vec::new(), false),
+    };
+
+    CompletionList {
+        items: items.iter().filter_map(parse_completion_item).collect(),
+        is_incomplete,
+    }
+}
+
+fn parse_completion_item(value: &Value) -> Option<CompletionItem> {
+    let label = value.get("label").and_then(Value::as_str)?.to_string();
+    let insert_text = value
+        .get("insertText")
+        .and_then(Value::as_str)
+        .unwrap_or(&label)
+        .to_string();
+    Some(CompletionItem {
+        label,
+        detail: value
+            .get("detail")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        kind: value
+            .get("kind")
+            .and_then(Value::as_u64)
+            .and_then(|kind| u32::try_from(kind).ok()),
+        insert_text: Some(insert_text),
+    })
+}
+
+/// Zero-based position inside a document.
+#[tauri::command]
+pub async fn lsp_hover(
+    state: State<'_, LspState>,
+    root: String,
+    path: String,
+    line: u32,
+    character: u32,
+) -> Result<Option<HoverInfo>, String> {
+    let session = session_for(&state, &root)?;
+    let result = send_request(
+        &session,
+        "textDocument/hover",
+        position_params(&path_to_uri(&path), line, character),
+    )
+    .await?;
+    Ok(parse_hover(&result))
+}
+
+#[tauri::command]
+pub async fn lsp_definition(
+    state: State<'_, LspState>,
+    root: String,
+    path: String,
+    line: u32,
+    character: u32,
+) -> Result<Vec<Location>, String> {
+    let session = session_for(&state, &root)?;
+    let result = send_request(
+        &session,
+        "textDocument/definition",
+        position_params(&path_to_uri(&path), line, character),
+    )
+    .await?;
+    Ok(parse_locations(&result))
+}
+
+#[tauri::command]
+pub async fn lsp_references(
+    state: State<'_, LspState>,
+    root: String,
+    path: String,
+    line: u32,
+    character: u32,
+) -> Result<Vec<Location>, String> {
+    let session = session_for(&state, &root)?;
+    let result = send_request(
+        &session,
+        "textDocument/references",
+        references_params(&path_to_uri(&path), line, character),
+    )
+    .await?;
+    Ok(parse_locations(&result))
+}
+
+#[tauri::command]
+pub async fn lsp_completion(
+    state: State<'_, LspState>,
+    root: String,
+    path: String,
+    line: u32,
+    character: u32,
+) -> Result<CompletionList, String> {
+    let session = session_for(&state, &root)?;
+    let result = send_request(
+        &session,
+        "textDocument/completion",
+        completion_params(&path_to_uri(&path), line, character),
+    )
+    .await?;
+    Ok(parse_completion(&result))
 }

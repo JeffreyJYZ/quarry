@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fileName } from "@/problems/model";
 import {
+	buildProject,
 	type DapFrame,
 	type DapScope,
 	type DapStoppedEvent,
@@ -17,9 +18,13 @@ import {
 	dapStop,
 	dapThreads,
 	dapVariables,
+	defaultLaunchConfig,
+	type LaunchConfig,
 	type LaunchPreset,
 	onDapStopped,
 	onDapTerminated,
+	openProject,
+	type ProjectKind,
 	readLaunchConfig,
 	resolveLaunchConfig,
 } from "@/project/api";
@@ -28,6 +33,26 @@ import { describeError } from "@/project/errors";
 export type DebugStatus = "idle" | "launching" | "running" | "stopped";
 
 export type StepKind = "next" | "stepIn" | "stepOut";
+
+/** Select value of the preset-free Cargo launch; no preset file is expected to define this name. */
+const CARGO_DEFAULT = "cargo:no-preset";
+
+/** The label the Cargo entry carries in the select. */
+const CARGO_LABEL = "Cargo binary (no preset)";
+
+/** The preset-free launch runs like a preset that does not stop on entry. */
+const CARGO_STOP_ON_ENTRY = false;
+
+/** One row of the launch select: the Cargo entry first when the project can resolve one. */
+export type PresetEntry = { value: string; label: string };
+
+/**
+ * Only the backend's missing-binary rejection earns a build offer. A preset that needs one, an
+ * ambiguous workspace or a missing toolchain all say something else and must not trigger a build.
+ */
+function asksForBuild(message: string): boolean {
+	return message.includes("does not exist yet") && message.includes("build");
+}
 
 /** One rendered variable, flattened from the adapter tree so a row can be passed around. */
 export type VariableRow = {
@@ -98,10 +123,18 @@ export type DebugController = {
 	error: string | null;
 	configError: string | null;
 	sessionId: string | null;
+	/** Every row the launch select renders, in order. */
+	presetEntries: PresetEntry[];
 	presets: LaunchPreset[];
 	preset: string;
 	setPreset: (name: string) => void;
 	launch: () => void;
+	/** The configuration the last launch resolved, for the panel's program line. */
+	resolved: LaunchConfig | null;
+	/** The missing-binary message; non-null only while one build is still offered. */
+	buildNeeded: string | null;
+	building: boolean;
+	buildNow: () => void;
 	continueRun: () => void;
 	step: (kind: StepKind) => void;
 	stop: () => void;
@@ -144,6 +177,13 @@ export function useDebugSession(root: string | null): DebugController {
 	const [selectedVariable, setSelectedVariable] = useState<VariableRow | null>(null);
 	const [watchPoints, setWatchPoints] = useState<WatchRow[]>([]);
 	const [breakpoints, setBreakpoints] = useState<BreakpointRow[]>([]);
+	/** Project kind decides whether the preset-free Cargo entry is offered at all. */
+	const [kind, setKind] = useState<ProjectKind | null>(null);
+	/** The configuration the last launch resolved, shown under the select. */
+	const [resolved, setResolved] = useState<LaunchConfig | null>(null);
+	/** The missing-binary message while one build is still on offer; null once used. */
+	const [buildNeeded, setBuildNeeded] = useState<string | null>(null);
+	const [building, setBuilding] = useState(false);
 
 	/** Mirrors for async work; the event listeners read these rather than a render closure. */
 	const sessionRef = useRef<string | null>(null);
@@ -164,7 +204,38 @@ export function useDebugSession(root: string | null): DebugController {
 	childrenRef.current = children;
 	expandedRef.current = expanded;
 
-	const setPreset = useCallback((name: string) => setPresetState(name), []);
+	/* A new selection invalidates the resolved path shown under the select. */
+	const setPreset = useCallback((name: string) => {
+		setResolved(null);
+		setBuildNeeded(null);
+		setPresetState(name);
+	}, []);
+
+	/** The select's rows: a Cargo project's preset-free launch first, then whatever the file defines. */
+	const presetEntries = useMemo(() => {
+		const entries: PresetEntry[] = [];
+		if (kind === "cargo") {
+			entries.push({ value: CARGO_DEFAULT, label: CARGO_LABEL });
+		}
+		for (const entry of presets) {
+			entries.push({ value: entry.name, label: entry.name });
+		}
+		return entries;
+	}, [kind, presets]);
+
+	/**
+	 * Keep the selection on a rendered row. A file's own preset wins when there is one; a Cargo
+	 * project with no presets lands on the preset-free entry.
+	 */
+	useEffect(() => {
+		const values = presetEntries.map((entry) => entry.value);
+		setPresetState((current) => {
+			if (values.includes(current)) {
+				return current;
+			}
+			return presets[0]?.name ?? values[0] ?? "";
+		});
+	}, [presetEntries, presets]);
 
 	/** Reset on every project switch; a live session from the previous root is stopped. */
 	useEffect(() => {
@@ -183,6 +254,10 @@ export function useDebugSession(root: string | null): DebugController {
 		setConfigError(null);
 		setPresets([]);
 		setPresetState("");
+		setKind(null);
+		setResolved(null);
+		setBuildNeeded(null);
+		setBuilding(false);
 		if (previous !== null) {
 			void dapStop(previous).catch(() => undefined);
 		}
@@ -190,19 +265,29 @@ export function useDebugSession(root: string | null): DebugController {
 			return;
 		}
 		let live = true;
-		readLaunchConfig(root).then(
-			(file) => {
-				if (!live) {
-					return;
+		/* Kind and presets are independent reads; the select's rows need both, so each lands alone. */
+		openProject(root).then(
+			(info) => {
+				if (live) {
+					setKind(info.kind);
 				}
-				setPresets(file.configurations);
-				setPresetState(file.configurations[0]?.name ?? "");
 			},
 			(reason) => {
-				if (!live) {
-					return;
+				if (live) {
+					setConfigError((current) => current ?? `Project: ${describeError(reason)}`);
 				}
-				setConfigError(`Launch config: ${describeError(reason)}`);
+			},
+		);
+		readLaunchConfig(root).then(
+			(file) => {
+				if (live) {
+					setPresets(file.configurations);
+				}
+			},
+			(reason) => {
+				if (live) {
+					setConfigError(`Launch config: ${describeError(reason)}`);
+				}
 			},
 		);
 		return () => {
@@ -524,47 +609,104 @@ export function useDebugSession(root: string | null): DebugController {
 		[applyBreakpoints],
 	);
 
-	const launch = useCallback(async () => {
-		const rootNow = rootRef.current;
-		if (rootNow === null) {
-			setError("Open a project first");
-			return;
+	/** The one place a select value becomes a configuration; a preset and the Cargo default differ only here. */
+	const resolveConfig = useCallback(async (root: string, name: string) => {
+		if (name === CARGO_DEFAULT) {
+			return defaultLaunchConfig(root, CARGO_STOP_ON_ENTRY);
 		}
-		const name = presetRef.current;
-		if (name === "") {
-			setError("No launch preset in .quarry/launch.json");
-			return;
-		}
-		if (sessionRef.current !== null) {
-			setError("A debug session is already running");
-			return;
-		}
-		setLaunching(true);
-		setError(null);
-		setStopView(null);
-		let id: string;
-		try {
-			const config = await resolveLaunchConfig(rootNow, name);
-			const session = await dapLaunch(rootNow, config);
-			id = session.id;
-		} catch (reason) {
-			setError(`Launch: ${describeError(reason)}`);
+		return resolveLaunchConfig(root, name);
+	}, []);
+
+	/**
+	 * Launch the selected configuration. A missing binary offers one build; every other rejection
+	 * is a plain error line.
+	 */
+	const launch = useCallback(
+		async (offerBuild = true) => {
+			const rootNow = rootRef.current;
+			if (rootNow === null) {
+				setError("Open a project first");
+				return;
+			}
+			const name = presetRef.current;
+			if (name === "") {
+				setError("No launch preset in .quarry/launch.json");
+				return;
+			}
+			if (sessionRef.current !== null) {
+				setError("A debug session is already running");
+				return;
+			}
+			setLaunching(true);
+			setError(null);
+			setStopView(null);
+			let config: LaunchConfig;
+			try {
+				config = await resolveConfig(rootNow, name);
+			} catch (reason) {
+				const message = describeError(reason);
+				setLaunching(false);
+				if (offerBuild && asksForBuild(message)) {
+					setBuildNeeded(message);
+					setError(message);
+					return;
+				}
+				setError(`Launch: ${message}`);
+				return;
+			}
+			setResolved(config);
+			let id: string;
+			try {
+				const session = await dapLaunch(rootNow, config);
+				id = session.id;
+			} catch (reason) {
+				setError(`Launch: ${describeError(reason)}`);
+				setLaunching(false);
+				return;
+			}
+			sessionRef.current = id;
+			setSessionId(id);
 			setLaunching(false);
+			/* A fresh adapter knows nothing about rows from an earlier session. */
+			if (breakpointsRef.current.length > 0) {
+				await applyBreakpoints(breakpointsRef.current);
+			}
+			try {
+				await dapConfigurationDone(id);
+			} catch (reason) {
+				setError(`Configuration done: ${describeError(reason)}`);
+			}
+		},
+		[applyBreakpoints, resolveConfig],
+	);
+
+	/** Build the project, then retry the launch once; a second failure is a plain error line. */
+	const buildNow = useCallback(async () => {
+		const rootNow = rootRef.current;
+		const message = buildNeeded;
+		if (rootNow === null || building || message === null) {
 			return;
 		}
-		sessionRef.current = id;
-		setSessionId(id);
-		setLaunching(false);
-		/* A fresh adapter knows nothing about rows from an earlier session. */
-		if (breakpointsRef.current.length > 0) {
-			await applyBreakpoints(breakpointsRef.current);
-		}
+		setBuilding(true);
+		setBuildNeeded(null);
+		setError(null);
 		try {
-			await dapConfigurationDone(id);
+			const report = await buildProject(rootNow, "debug");
+			if (!report.success) {
+				setError(`Build: ${report.summary}`);
+				/* The offer stays: only the launch retry is limited to one. */
+				setBuildNeeded(message);
+				return;
+			}
 		} catch (reason) {
-			setError(`Configuration done: ${describeError(reason)}`);
+			setError(`Build: ${describeError(reason)}`);
+			setBuildNeeded(message);
+			return;
+		} finally {
+			setBuilding(false);
 		}
-	}, [applyBreakpoints]);
+		await launch(false);
+	}, [buildNeeded, building, launch]);
 
 	const continueRun = useCallback(async () => {
 		const session = sessionRef.current;
@@ -695,11 +837,18 @@ export function useDebugSession(root: string | null): DebugController {
 		error,
 		configError,
 		sessionId,
+		presetEntries,
 		presets,
 		preset,
 		setPreset,
 		launch: () => {
 			void launch();
+		},
+		resolved,
+		buildNeeded,
+		building,
+		buildNow: () => {
+			void buildNow();
 		},
 		continueRun: () => {
 			void continueRun();
