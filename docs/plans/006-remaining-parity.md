@@ -37,9 +37,12 @@ loop in `001-clion-parity.md` §1.
    detect cmake, then wire `build_project` for non-Cargo kinds. Estimate: 2-4 days, plus the cmake dependency.
 5. **Embedded terminal.** `portable-pty` is named in `001-clion-parity.md` §2 but no `pty` module is registered in
    `lib.rs`. Medium value, mostly mechanical. Estimate: 2 days.
-6. **Watch-expression pane.** Blocked: `evaluate` is broken for Rust in lldb-dap (see `docs/spikes/dap.md`,
-   "evaluate is broken for Rust"). Do not build on `evaluate` until a workaround is measured. Estimate: unknown
-   until the probe in `scripts/dap-eval-probe.ts` produces a passing path.
+6. **Watch-expression pane.** Blocked on `evaluate`, which the probe measured as unusable for Rust: `evaluate`
+   returns nothing usable across `repl`/`watch`/`hover` contexts; `settings set target.language rust` changes
+   nothing; `setExpression` kills the adapter. Escape hatches that do work: `variables` (default or
+   `filter: "named"`) and `readMemory` from a pointer found in `variables`. Scope for now: a watch pane can only
+   offer variables-tree watching and memory views, until a different adapter or toolchain is measured. See
+   `docs/spikes/dap.md`, "evaluate is broken for Rust" and "Evaluate probe (2026-10-22)". Estimate: unknown.
 7. **Remote and attach polish.** Attach by pid exists (`dap::dap_attach`); remote development is an explicit
    non-goal. Polish items: attach UX, thread selection, and reconnect. Estimate: 1-2 days.
 8. **Profiler.** Explicit non-goal per `001-clion-parity.md` §8 and `AGENTS.md`. Do not schedule.
