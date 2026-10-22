@@ -70,6 +70,10 @@ pub struct Session {
     next_request_id: i64,
     /// Requests that are waiting for an answer, keyed by the id they were sent with.
     pending: HashMap<i64, Pending>,
+    /// Monotonic id for stored call-hierarchy items.
+    next_call_hierarchy_id: u32,
+    /// Raw `CallHierarchyItem` JSON keyed by the id handed out to the UI.
+    call_hierarchy_items: HashMap<u32, Value>,
 }
 
 /// One request that is waiting for its answer.
@@ -116,6 +120,7 @@ impl Session {
     /// Say goodbye and kill the child. Safe to call twice: a killed child rejects further frames,
     /// and those errors are deliberately ignored here.
     fn stop(&mut self) {
+        self.call_hierarchy_items.clear();
         let _ = self
             .pipe
             .send(&request(SHUTDOWN_ID, "shutdown", Value::Null));
@@ -205,6 +210,8 @@ async fn start_lsp_session(
         documents: HashMap::new(),
         next_request_id: FIRST_REQUEST_ID,
         pending: HashMap::new(),
+        next_call_hierarchy_id: 1,
+        call_hierarchy_items: HashMap::new(),
     }));
 
     let pump_session = Arc::clone(&session);
@@ -1790,24 +1797,157 @@ fn flatten_inlay_label(value: &Value) -> Option<String> {
 
 #[tauri::command]
 pub async fn lsp_call_hierarchy_prepare(
-    _state: State<'_, LspState>,
-    _root: String,
-    _path: String,
-    _line: u32,
-    _character: u32,
+    state: State<'_, LspState>,
+    root: String,
+    path: String,
+    line: u32,
+    character: u32,
 ) -> Result<Vec<CallHierarchyNode>, String> {
-    // STUB: replaces this.
-    Err("call hierarchy is not implemented yet".to_string())
+    let session = session_for(&state, &root)?;
+    let result = send_request(
+        &session,
+        "textDocument/prepareCallHierarchy",
+        position_params(&path_to_uri(&path), line, character),
+    )
+    .await?;
+
+    let mut guard = lock(&session);
+    let mut out = Vec::new();
+    if let Some(items) = result.as_array() {
+        for item in items {
+            if let Some(mut node) = call_hierarchy_node_from_item(item, 0) {
+                let id = guard.next_call_hierarchy_id;
+                guard.next_call_hierarchy_id += 1;
+                guard.call_hierarchy_items.insert(id, item.clone());
+                node.item_id = id;
+                out.push(node);
+            }
+        }
+    }
+    Ok(out)
 }
 
 /// `direction` is `incoming` or `outgoing`.
 #[tauri::command]
 pub async fn lsp_call_hierarchy_calls(
-    _state: State<'_, LspState>,
-    _root: String,
-    _item_id: u32,
-    _direction: String,
+    state: State<'_, LspState>,
+    root: String,
+    item_id: u32,
+    direction: String,
 ) -> Result<Vec<CallHierarchyNode>, String> {
-    // STUB: replaces this.
-    Err("call hierarchy is not implemented yet".to_string())
+    if direction != "incoming" && direction != "outgoing" {
+        return Err(format!(
+            "direction must be \"incoming\" or \"outgoing\", got {direction}"
+        ));
+    }
+
+    let session = session_for(&state, &root)?;
+    let raw_item = {
+        let guard = lock(&session);
+        guard
+            .call_hierarchy_items
+            .get(&item_id)
+            .cloned()
+            .ok_or_else(|| format!("unknown call hierarchy item id {item_id}"))?
+    };
+
+    let method = if direction == "incoming" {
+        "callHierarchy/incomingCalls"
+    } else {
+        "callHierarchy/outgoingCalls"
+    };
+    let source_key = if direction == "incoming" {
+        "from"
+    } else {
+        "to"
+    };
+
+    let result = send_request(&session, method, json!({ "item": raw_item })).await?;
+
+    let mut guard = lock(&session);
+    let mut out = Vec::new();
+    if let Some(entries) = result.as_array() {
+        for entry in entries {
+            let Some(source) = entry.get(source_key) else {
+                continue;
+            };
+            if let Some(mut node) = call_hierarchy_node_from_item(source, 0) {
+                let id = guard.next_call_hierarchy_id;
+                guard.next_call_hierarchy_id += 1;
+                guard.call_hierarchy_items.insert(id, source.clone());
+                node.item_id = id;
+                out.push(node);
+            }
+        }
+    }
+    Ok(out)
+}
+
+fn call_hierarchy_node_from_item(item: &Value, _item_id: u32) -> Option<CallHierarchyNode> {
+    let name = item.get("name").and_then(Value::as_str)?;
+    if name.is_empty() {
+        return None;
+    }
+    let kind = item
+        .get("kind")
+        .and_then(Value::as_u64)
+        .and_then(|kind| u32::try_from(kind).ok())
+        .unwrap_or(0);
+    let uri = item.get("uri").and_then(Value::as_str)?;
+    let path = uri_to_path(uri)?;
+    if !path.starts_with('/') {
+        return None;
+    }
+    let range_value = item.get("selectionRange").or_else(|| item.get("range"))?;
+    let start = range_value.get("start")?;
+    let line = start
+        .get("line")
+        .and_then(Value::as_u64)
+        .and_then(|value| u32::try_from(value).ok())
+        .unwrap_or(0);
+    let character = start
+        .get("character")
+        .and_then(Value::as_u64)
+        .and_then(|value| u32::try_from(value).ok())
+        .unwrap_or(0);
+    Some(CallHierarchyNode {
+        name: name.to_string(),
+        kind,
+        path,
+        line,
+        character,
+        item_id: 0,
+    })
+}
+
+/// Pure mapping helper for tests: map a `prepareCallHierarchy` result.
+#[allow(dead_code)]
+pub fn parse_call_hierarchy_prepare(result: &Value) -> Vec<CallHierarchyNode> {
+    let mut out = Vec::new();
+    if let Some(items) = result.as_array() {
+        for item in items {
+            if let Some(node) = call_hierarchy_node_from_item(item, 0) {
+                out.push(node);
+            }
+        }
+    } else if result.is_null() {
+    }
+    out
+}
+
+/// Pure mapping helper for tests: map an incoming/outgoing calls result.
+#[allow(dead_code)]
+pub fn parse_call_hierarchy_calls(result: &Value, incoming: bool) -> Vec<CallHierarchyNode> {
+    let source_key = if incoming { "from" } else { "to" };
+    let mut out = Vec::new();
+    if let Some(entries) = result.as_array() {
+        for entry in entries {
+            if let Some(source) = entry.get(source_key) {
+                if let Some(node) = call_hierarchy_node_from_item(source, 0) {
+                    out.push(node);
+                }
+            }
+        }
+    }
+    out
 }
