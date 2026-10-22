@@ -15,27 +15,37 @@ Most of the daily loop runs end to end for a Cargo project. This is what the app
 read off `src-tauri/src/lib.rs` and `src/`:
 - **Project and shell**: open a folder, detect `cargo` / `CMakeLists.txt` / `compile_commands.json`,
   report which toolchains were found on `PATH` or via `xcrun`, browse a lazily expanded file tree, open
-  files in tabs, save, restore the last project and open tabs on startup.
+  files in tabs, save, restore the last project, open tabs and layout (rail, debug panel, git panel,
+  dock tab) on startup via `settings::read_settings`.
 - **Editing**: CodeMirror 6 with Rust and C/C++ highlighting, a breakpoint gutter, diagnostics drawn
   as squiggles plus gutter markers, format on save through `rustfmt` or `clang-format` (with a warning
-  when the formatter is unavailable or fails), and format on demand. Shortcuts: `Cmd+S` save,
-  `Cmd+Alt+S` save all, `Cmd+Alt+L` format, `Cmd+F` in-file search, `Cmd+Alt+F` project search,
-  `F12` / `Shift+F12` / `Cmd+Click` for definition and references, `Cmd+K` for the shortcut sheet.
+  when the formatter is unavailable or fails), and format on demand. Rename (`lsp_rename`) and
+  code actions (`lsp_code_actions`) are wired through the editor, signature help renders as a tooltip,
+  and inlay hints are rendered in the editor (backend `lsp_inlay_hints` plus `src/editor/inlayHints.ts`).
+  Shortcuts: `Cmd+S` save, `Cmd+Alt+S` save all, `Cmd+Alt+L` format, `Cmd+F` in-file search,
+  `Cmd+Alt+F` project search, `F12` / `Shift+F12` / `Cmd+Click` for definition and references,
+  `Cmd+K` for the shortcut sheet.
 - **Insight**: one language server per project root — `rust-analyzer` for Cargo, `clangd` for CMake or
   `compile_commands.json` — with full-document sync. Diagnostics stream into the editor and the Problems
   dock, grouped by file with severity, line and message. Hover, go-to-definition, references and
   completion commands are wired; hover, completion (CompletionList with real labels), definition (LocationLink[]) and references (24) are verified against rust-analyzer 1.99.0 via `bun run scripts/lsp-ux-smoke.ts`.
+  Document outline via `lsp_symbols` and `src/outline/Outline.tsx`.
 - **Build**: `build_project` runs `cargo build --message-format=json` and merges its machine-readable
   diagnostics into the Problems dock.
 - **Run**: `run_program` / `stop_program` stream `run://output` lines and one `run://exited`. Backend
   and event contract only; no run panel in the UI yet.
+- **Terminal**: an embedded terminal built on `portable-pty` (`pty::pty_open` / `pty_write` /
+  `pty_resize` / `pty_close`) with `src/terminal/Terminal.tsx`. Not yet exercised in a real desktop
+  window by this agent; the backend and component are present.
 - **Debug**: `lldb-dap` sessions launched from a `.quarry/launch.json` preset, composed for an
   unconfigured Cargo project (which also passes the Rust formatter `initCommands`), or attached to a
   running process by pid. Line breakpoints with verified and pending states, conditional and hit-count
   breakpoints, threads, frames, scopes, variables, hardware watchpoints, a paged hex memory pane and a
-  disassembly pane.
+  disassembly pane. Variable values can be edited via `dap::dap_set_variable` and memory cells via
+  `dap::dap_write_memory`.
 - **Search**: `rg`-backed palette with results grouped by file, keyboard navigation, and a visible cap
-  when the result set is truncated.
+  when the result set is truncated. Case-sensitive, regex and whole-word toggles are in
+  `src/search/SearchPalette.tsx`.
 - **Tests**: `list_tests` and `run_test` feed a Tests dock with pass/fail status.
 - **Source control**: a Git view with status, per-file diff, and an open-in-editor flow, plus
   `git_status` and `git_file_diff` commands.
