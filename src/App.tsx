@@ -25,10 +25,13 @@ import {
 	type Location,
 	openProject,
 	type ProjectInfo,
+	readSettings,
 	readTextFile,
+	type Settings,
 	type ToolchainReport,
 	toolchains,
 	version,
+	writeSettings,
 } from "@/project/api";
 import { type FileBuffer, isDirty } from "@/project/buffer";
 import { describeError } from "@/project/errors";
@@ -80,6 +83,7 @@ export default function App() {
 	const buffersRef = useRef<FileBuffer[]>([]);
 	const activePathRef = useRef<string | null>(null);
 	const saveTimer = useRef<number | null>(null);
+	const restoredRef = useRef(false);
 
 	useEffect(() => {
 		version().then(setAppVersion, () => setAppVersion(""));
@@ -94,6 +98,76 @@ export default function App() {
 			},
 		);
 	}, []);
+
+	useEffect(() => {
+		let cancelled = false;
+		void (async () => {
+			try {
+				const settings = await readSettings();
+				if (cancelled) return;
+				if (settings.lastRoot !== null) {
+					try {
+						const next = await openProject(settings.lastRoot);
+						if (cancelled) return;
+						setProject(next);
+						setBuffers([]);
+						setActivePath(null);
+						for (const path of settings.openFiles) {
+							if (cancelled) return;
+							const name = fileName(path);
+							try {
+								const text = await readTextFile(path);
+								if (cancelled) return;
+								setBuffers((current) =>
+									current.some((buffer) => buffer.path === path)
+										? current
+										: [...current, { path, name, text, loaded: text }],
+								);
+							} catch {
+								/* skip unreadable file */
+							}
+						}
+						if (
+							settings.activeFile !== null &&
+							settings.openFiles.includes(settings.activeFile)
+						) {
+							setActivePath(settings.activeFile);
+						}
+					} catch {
+						try {
+							await writeSettings({
+								lastRoot: null,
+								openFiles: [],
+								activeFile: null,
+							});
+						} catch {
+							/* ignore */
+						}
+					}
+				}
+			} catch (error) {
+				if (!cancelled) setNotice(describeError(error));
+			} finally {
+				if (!cancelled) restoredRef.current = true;
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	useEffect(() => {
+		if (!restoredRef.current) return;
+		const timer = window.setTimeout(() => {
+			const settings: Settings = {
+				lastRoot: project?.root ?? null,
+				openFiles: buffers.map((buffer) => buffer.path),
+				activeFile: activePath,
+			};
+			void writeSettings(settings).catch((error) => setNotice(describeError(error)));
+		}, 400);
+		return () => window.clearTimeout(timer);
+	}, [project, buffers, activePath]);
 
 	const root = project?.root ?? null;
 	const tests = useTests(root);
