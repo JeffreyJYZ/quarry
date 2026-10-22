@@ -26,15 +26,25 @@ Environment facts that must hold: rust-analyzer component installed; `cmake` and
 
 ## 3. Build and bundle
 
-Run `bun run tauri build`. The `beforeBuildCommand` in `src-tauri/tauri.conf.json` runs `bun run build` first, so the frontend is rebuilt into `dist/` before bundling.
+Verified command (measured): `bun run tauri build --bundles app`. The `beforeBuildCommand` in `src-tauri/tauri.conf.json` runs `bun run build` first, so the frontend is rebuilt into `dist/` before bundling. The `--bundles app` flag restricts the build to the macOS `.app` bundle and skips the `.dmg` (and other targets) to save time.
+
+Measured facts from a real run:
+- command: `bun run tauri build --bundles app`
+- artefact: `src-tauri/target/release/bundle/macos/quarry.app`
+- size: 5.42 MiB
+- wall time: about 2.5 minutes (release Rust compile dominates, about 2m26s)
 
 Product name: `quarry`. Bundle identifier: `land.jyz.quarry`. Bundle targets: `all` (`bundle.active` is true).
 
 Artefacts land under `src-tauri/target/release/bundle/` (platform bundles such as the macOS `.app` and `.dmg`), with the release binary at `src-tauri/target/release/quarry`.
 
+Launch smoke step (manual, run after the build):
+1. `open -a src-tauri/target/release/bundle/macos/quarry.app` (or `open` the `.app` directly).
+2. Confirm the `quarry` process is alive after 5 seconds.
+3. Quit the app cleanly.
 ## 4. Version bumping
 
-The version lives in three places and they must agree before release:
+The version lives in three places and they must agree before release. Checked against the current tree (all agree at `0.1.0`):
 - `package.json`: `"version": "0.1.0"`
 - `src-tauri/Cargo.toml`: `version = "0.1.0"`
 - `src-tauri/tauri.conf.json`: `"version": "0.1.0"`
