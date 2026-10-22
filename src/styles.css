@@ -1962,3 +1962,88 @@ button.tree-note {
 .git-diff-line.error {
 	color: var(--danger);
 }
+
+.shortcut-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 50;
+	display: grid;
+	place-items: center;
+	background: rgba(0, 0, 0, 0.55);
+}
+
+.shortcut-sheet {
+	width: min(520px, calc(100% - 32px));
+	max-height: calc(100% - 48px);
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--line);
+	background: var(--panel);
+	outline: none;
+}
+
+.shortcut-head {
+	flex: 0 0 auto;
+	height: 30px;
+	display: flex;
+	align-items: center;
+	padding: 0 12px;
+	border-bottom: 1px solid var(--line);
+}
+
+.shortcut-body {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: auto;
+	padding: 8px 12px 12px;
+}
+
+.shortcut-group + .shortcut-group {
+	margin-top: 10px;
+	border-top: 1px solid var(--line);
+	padding-top: 8px;
+}
+
+.shortcut-group-title {
+	margin: 0 0 6px;
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--muted);
+	font-weight: 500;
+}
+
+.shortcut-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.shortcut-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 4px 0;
+}
+
+.shortcut-keys {
+	display: inline-flex;
+	gap: 4px;
+	flex: 0 0 auto;
+}
+
+.shortcut-key {
+	font-family: var(--mono);
+	font-size: 11px;
+	padding: 1px 6px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: var(--rail);
+	color: var(--text);
+}
+
+.shortcut-action {
+	font-size: 12px;
+	color: var(--text);
+}

@@ -39,11 +39,44 @@ import { type FileBuffer, isDirty } from "@/project/buffer";
 import { describeError } from "@/project/errors";
 import { type SaveOutcome, saveBuffer, saveErrorMessage, saveMessage } from "@/project/save";
 import SearchPalette from "@/search/SearchPalette";
+import ShortcutSheet from "@/shortcuts/ShortcutSheet";
 import TestsDock, { type DockTab } from "@/tests/TestsDock";
 import { useTests } from "@/tests/useTests";
 import "./styles.css";
 
 const NO_BREAKPOINTS: BreakpointRow[] = [];
+
+const SHORTCUT_GROUPS = [
+	{
+		title: "Project",
+		entries: [
+			{ keys: ["Cmd", "K"], action: "Toggle shortcut sheet" },
+			{ keys: ["?"], action: "Open shortcut sheet (outside editor)" },
+		],
+	},
+	{
+		title: "Editing",
+		entries: [
+			{ keys: ["Cmd", "S"], action: "Save active file" },
+			{ keys: ["Cmd", "Alt", "S"], action: "Save all dirty files" },
+			{ keys: ["Cmd", "F"], action: "Find in file" },
+			{ keys: ["Cmd", "Alt", "F"], action: "Find in project" },
+			{ keys: ["Cmd", "G"], action: "Next match" },
+		],
+	},
+	{
+		title: "Navigation",
+		entries: [
+			{ keys: ["F12"], action: "Go to definition" },
+			{ keys: ["Shift", "F12"], action: "Find references" },
+			{ keys: ["Cmd", "Click"], action: "Go to definition" },
+		],
+	},
+	{
+		title: "Panels",
+		entries: [{ keys: ["Esc"], action: "Close in-file search / sheet" }],
+	},
+];
 
 /** How long the transient save line stays in the status bar. */
 const SAVE_STATUS_MS = 4000;
@@ -74,6 +107,7 @@ export default function App() {
 	const [revealToken, setRevealToken] = useState(0);
 	const [refsOpen, setRefsOpen] = useState(false);
 	const [searchOpen, setSearchOpen] = useState(false);
+	const [shortcutsOpen, setShortcutsOpen] = useState(false);
 	const [debugOpen, setDebugOpen] = useState(false);
 	const [gitOpen, setGitOpen] = useState(false);
 	const [gitRefresh, setGitRefresh] = useState(0);
@@ -367,6 +401,7 @@ export default function App() {
 			setBuildSummary(null);
 			setPanelOpen(null);
 			setSearchOpen(false);
+			setShortcutsOpen(false);
 			setDebugOpen(false);
 		} catch (error) {
 			setNotice(describeError(error));
@@ -405,6 +440,43 @@ export default function App() {
 		window.addEventListener("keydown", handleKeyDown, true);
 		return () => window.removeEventListener("keydown", handleKeyDown, true);
 	}, [root, saveActive, saveAll]);
+
+	/** Cmd+K toggles the shortcut sheet; `?` opens it when focus is outside the editor and any input. */
+	useEffect(() => {
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) {
+				const key = event.key.toLowerCase();
+				if (key === "k") {
+					event.preventDefault();
+					setShortcutsOpen((current) => !current);
+					return;
+				}
+			}
+			if (
+				event.key === "?" &&
+				!event.metaKey &&
+				!event.ctrlKey &&
+				!event.altKey &&
+				!event.shiftKey
+			) {
+				const focused = document.activeElement;
+				if (focused instanceof Element && focused.closest(".cm-editor") !== null) {
+					return;
+				}
+				if (
+					focused instanceof HTMLInputElement ||
+					focused instanceof HTMLTextAreaElement ||
+					(focused instanceof HTMLElement && focused.isContentEditable)
+				) {
+					return;
+				}
+				event.preventDefault();
+				setShortcutsOpen(true);
+			}
+		};
+		window.addEventListener("keydown", handleKeyDown, true);
+		return () => window.removeEventListener("keydown", handleKeyDown, true);
+	}, []);
 
 	const openPath = useCallback(
 		async (path: string, name: string) => {
@@ -727,6 +799,12 @@ export default function App() {
 					) : null}
 					{searchOpen && root !== null ? (
 						<SearchPalette root={root} onOpen={handleOpenMatch} onClose={closeSearch} />
+					) : null}
+					{shortcutsOpen ? (
+						<ShortcutSheet
+							groups={SHORTCUT_GROUPS}
+							onClose={() => setShortcutsOpen(false)}
+						/>
 					) : null}
 				</main>
 
