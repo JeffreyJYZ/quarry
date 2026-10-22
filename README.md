@@ -48,8 +48,8 @@ read off `src-tauri/src/lib.rs` and `src/`:
   breakpoints with verified and pending states, conditional and hit-count breakpoints, run to cursor
   (`Cmd+F10`, `runToCursor` in `src/debug/session.ts` with temporary breakpoint handling), threads,
   frames (clicking a frame opens its source line), scopes, variables, hardware watchpoints, a paged
-  hex memory pane and a disassembly pane. Exception breakpoints: backend commands
-  (`dap::dap_set_exception_breakpoints`, `dap::dap_exception_filters`) ready, panel pending.
+  hex memory pane and a disassembly pane. Exception breakpoints toggle from the adapter's own filter
+  list through `dap::dap_exception_filters` and `dap::dap_set_exception_breakpoints`, and survive a restart.
   Variable values can be edited via `dap::dap_set_variable` and memory cells via `dap::dap_write_memory`.
 - **Search**: `rg`-backed palette with results grouped by file, keyboard navigation, and a visible cap
   when the result set is truncated. Case-sensitive, regex and whole-word toggles are in
@@ -65,7 +65,9 @@ read off `src-tauri/src/lib.rs` and `src/`:
   (`git_commit`), branch listing and switching (`git_branches`, `git_checkout`, dropdown in
   `src/git/SourceControl.tsx`), a History tab listing recent commits (`git_log`), and a unified
   diff for a selected commit (`git_commit_diff`), plus `git_status` and `git_file_diff` commands.
-  `git_blame` backend exists; no gutter blame UI in `src/`.
+  Blame annotations render in the editor through `src/editor/blame.ts` (wired into
+  `src/editor/Editor.tsx`) on top of the `git_blame` backend; there is no toolbar toggle
+  yet.
 - **Breadcrumb**: a strip showing the file path and the symbol chain containing the caret, built from
   `lsp_symbols` in `src/breadcrumb/Breadcrumb.tsx`.
 
@@ -75,10 +77,7 @@ Still missing, and named here so it is not mistaken for done:
   changes nothing, and `setExpression` kills the adapter. A watch pane can only offer variables-tree watching and
   memory views until a different adapter or toolchain is measured (see `docs/spikes/dap.md`, "Evaluate probe
   (2026-10-22)").
-- **No run panel beyond args/cwd and output** — `run_program` / `stop_program` stream `run://output`; the UI in
-- **No exception-breakpoint UI** — `dap::dap_set_exception_breakpoints` and
-  `dap::dap_exception_filters` exist, but `src/debug/DebugPanel.tsx` has no section for them.
-  `src/run/` covers program, args, cwd and argv preview, but there is no richer run configuration UI.
+- **No run panel beyond args, cwd, env and output** — `run_program` / `stop_program` stream `run://output`; `src/run/` covers program, args, cwd, environment variables and an argv preview, but there is no richer run configuration UI.
 - **No remote development, embedded targets, profilers, databases, Docker, AI assistance or plugin API.**
 
 ## What "parity" means here
@@ -121,7 +120,7 @@ bun check             # type check (bun builtin, all cores)
 bun fmt               # biome format --write .
 bun lint              # biome lint --write .
 bun run verify        # type check + biome check, the commit gate
-bun test              # frontend unit tests over pure helpers (rank, splitArgs, hex, buffer)
+bun test              # frontend unit tests over pure helpers (rank, splitArgs, hex, buffer, blame, search model)
 bun run gate          # verify + tests, the commit gate
 bun run build         # type check + vite build
 ```
@@ -132,7 +131,7 @@ The formatter for TypeScript, CSS and Markdown is Biome; `bun run verify` is the
 
 ## Tests
 
-Rust tests live in `src-tauri` and run with `cd src-tauri && cargo test`. Frontend unit tests are `bun test` over pure helpers: `src/quickopen/rank.ts`, `src/run/splitArgs.ts`, `src/debug/memory/hex.ts` and `src/project/buffer.ts`. The smoke scripts under `scripts/` are the only place real language servers and debuggers are exercised. The commit gate is `bun run gate` (`bun run verify` plus `bun test`).
+Rust tests live in `src-tauri` and run with `cd src-tauri && cargo test`. Frontend unit tests are `bun test` over pure helpers: ranking in `src/quickopen/rank.ts`, argument splitting in `src/run/splitArgs.ts`, hex helpers in `src/debug/memory/hex.ts`, buffer handling in `src/project/buffer.ts`, blame helpers in `src/editor/blame.ts`, and the search model in `src/search/model.ts`. The smoke scripts under `scripts/` are the only place real language servers and debuggers are exercised. The commit gate is `bun run gate` (`bun run verify` plus `bun test`).
 
 ## Smoke scripts
 
