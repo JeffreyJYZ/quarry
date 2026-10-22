@@ -20,6 +20,7 @@ import {
 import { useDiagnosticsFeed } from "@/lsp/feed";
 import { useDocumentSync, useLspServer } from "@/lsp/session";
 import Outline from "@/outline/Outline";
+import CommandPalette, { type Command } from "@/palette/CommandPalette";
 import { fileName, plural, problemFiles } from "@/problems/model";
 import {
 	buildProject,
@@ -139,6 +140,8 @@ export default function App() {
 	const [refsOpen, setRefsOpen] = useState(false);
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
+	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+	const [recentCommands, setRecentCommands] = useState<string[]>([]);
 	const [debugOpen, setDebugOpen] = useState(false);
 	const [gitOpen, setGitOpen] = useState(false);
 	const [railCollapsed, setRailCollapsed] = useState(false);
@@ -634,6 +637,22 @@ export default function App() {
 		return () => window.removeEventListener("keydown", handleKeyDown, true);
 	}, [panelExpanded]);
 
+	/** Cmd+Shift+P opens the command palette. */
+	useEffect(() => {
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (!event.metaKey || event.ctrlKey || event.altKey || !event.shiftKey) {
+				return;
+			}
+			if (event.key.toLowerCase() !== "p") {
+				return;
+			}
+			event.preventDefault();
+			setCommandPaletteOpen(true);
+		};
+		window.addEventListener("keydown", handleKeyDown, true);
+		return () => window.removeEventListener("keydown", handleKeyDown, true);
+	}, []);
+
 	const openPath = useCallback(
 		async (path: string, name: string) => {
 			if (buffers.some((buffer) => buffer.path === path)) {
@@ -840,6 +859,117 @@ export default function App() {
 			setBuilding(false);
 		}
 	}, [root, building]);
+
+	const commands: Command[] = [
+		{
+			id: "open-project",
+			label: "Open project",
+			hint: "",
+			run: () => {
+				void handleOpenProject();
+			},
+		},
+		{
+			id: "build",
+			label: "Build",
+			hint: "",
+			disabled: root === null || building,
+			run: () => {
+				void handleBuild();
+			},
+		},
+		{
+			id: "run",
+			label: "Run",
+			hint: "",
+			disabled: root === null || runId !== null,
+			run: () => {
+				void handleRun();
+			},
+		},
+		{
+			id: "stop-run",
+			label: "Stop run",
+			hint: "",
+			disabled: runId === null,
+			run: () => {
+				void handleStop();
+			},
+		},
+		{
+			id: "toggle-debug",
+			label: "Toggle debug panel",
+			hint: "",
+			disabled: root === null,
+			run: () => setDebugOpen((current) => !current),
+		},
+		{
+			id: "toggle-source-control",
+			label: "Toggle source control",
+			hint: "",
+			disabled: root === null,
+			run: () => setGitOpen((current) => !current),
+		},
+		{
+			id: "save",
+			label: "Save",
+			hint: "Cmd+S",
+			disabled: root === null || activePath === null,
+			run: () => {
+				void saveActive();
+			},
+		},
+		{
+			id: "save-all",
+			label: "Save all",
+			hint: "Cmd+Alt+S",
+			disabled: root === null,
+			run: () => {
+				void saveAll();
+			},
+		},
+		{
+			id: "format",
+			label: "Format file",
+			hint: "Cmd+Alt+L",
+			disabled: root === null || activePath === null || formatting,
+			run: () => {
+				void formatActive();
+			},
+		},
+		{
+			id: "find-in-project",
+			label: "Find in project",
+			hint: "Cmd+Alt+F",
+			disabled: root === null,
+			run: () => setSearchOpen(true),
+		},
+		{
+			id: "toggle-rail",
+			label: "Toggle rail",
+			hint: "Cmd+B",
+			run: () => setRailCollapsed((current) => !current),
+		},
+		{
+			id: "toggle-dock",
+			label: "Toggle dock",
+			hint: "Cmd+J",
+			run: () => setPanelOpen(!panelExpanded),
+		},
+		{
+			id: "show-shortcuts",
+			label: "Show shortcuts",
+			hint: "Cmd+K",
+			run: () => setShortcutsOpen(true),
+		},
+		{
+			id: "refresh-git",
+			label: "Refresh git",
+			hint: "",
+			disabled: root === null,
+			run: () => setGitRefresh((current) => current + 1),
+		},
+	];
 
 	const serverLabel =
 		lsp === null
@@ -1054,6 +1184,13 @@ export default function App() {
 							onClose={() => setShortcutsOpen(false)}
 						/>
 					) : null}
+					<CommandPalette
+						open={commandPaletteOpen}
+						commands={commands}
+						recent={recentCommands}
+						onRecent={setRecentCommands}
+						onClose={() => setCommandPaletteOpen(false)}
+					/>
 				</main>
 
 				{debugOpen && root !== null ? <DebugPanel debug={debug} /> : null}
