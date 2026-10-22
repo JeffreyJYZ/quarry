@@ -2387,6 +2387,38 @@ button.tree-note {
 .git-group-action {
 	margin-left: auto;
 }
+.git-discard-btn {
+	flex: 0 0 auto;
+	padding: 1px 6px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: transparent;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 9.5px;
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity 0.1s ease;
+}
+.git-group-head .git-discard-btn {
+	opacity: 1;
+}
+.git-row:hover .git-discard-btn,
+.git-row:focus-within .git-discard-btn {
+	opacity: 1;
+}
+.git-discard-btn:hover:not(:disabled) {
+	color: var(--text);
+	border-color: var(--muted);
+}
+.git-discard-confirm {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 8px 4px 12px;
+	font-size: 11px;
+	color: var(--text);
+}
 .git-row-main {
 	display: flex;
 	align-items: center;

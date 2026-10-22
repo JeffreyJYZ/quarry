@@ -9,6 +9,7 @@ import {
 	gitBranches,
 	gitCheckout,
 	gitCommit,
+	gitDiscard,
 	gitFileDiff,
 	gitLog,
 	gitStage,
@@ -112,6 +113,8 @@ export default function SourceControl({
 	const [blameLoading, setBlameLoading] = useState(false);
 	const [blameError, setBlameError] = useState<string | null>(null);
 	const [collapsed, setCollapsed] = useState<Set<number>>(() => new Set());
+	const [discardPaths, setDiscardPaths] = useState<string[] | null>(null);
+	const [discarding, setDiscarding] = useState(false);
 	const [history, setHistory] = useState<GitCommitEntry[] | null>(null);
 	const [historyLimit, setHistoryLimit] = useState(50);
 	const [historyLoading, setHistoryLoading] = useState(false);
@@ -203,6 +206,37 @@ export default function SourceControl({
 			}
 		},
 		[root, refresh],
+	);
+
+	const discard = useCallback(
+		async (paths: string[]) => {
+			if (paths.length === 0) return;
+			setDiscarding(true);
+			setBusy((current) => {
+				const next = new Set(current);
+				for (const path of paths) next.add(path);
+				return next;
+			});
+			setError(null);
+			try {
+				await gitDiscard(root, paths);
+				if (diffPath !== null && paths.includes(diffPath)) {
+					onDiff(null);
+				}
+				await refresh();
+				setDiscardPaths(null);
+			} catch (err) {
+				setError(describeError(err));
+			} finally {
+				setDiscarding(false);
+				setBusy((current) => {
+					const next = new Set(current);
+					for (const path of paths) next.delete(path);
+					return next;
+				});
+			}
+		},
+		[root, refresh, diffPath, onDiff],
 	);
 
 	const loadHistory = useCallback(
@@ -517,6 +551,8 @@ export default function SourceControl({
 					<span className="git-row-dir">{dirOf(entry.path)}</span>
 				</button>
 				{entry.staged ? (
+					// Staged rows offer no discard affordance: their content lives in the
+					// index, so unstaging first is the honest path.
 					<button
 						type="button"
 						className="git-stage-btn"
@@ -527,15 +563,37 @@ export default function SourceControl({
 						Unstage
 					</button>
 				) : (
-					<button
-						type="button"
-						className="git-stage-btn"
-						disabled={isBusy}
-						onClick={() => void stage([entry.path])}
-						aria-label={`stage ${entry.path}`}
-					>
-						Stage
-					</button>
+					<>
+						<button
+							type="button"
+							className="git-discard-btn"
+							disabled={isBusy || discarding}
+							onClick={() => setDiscardPaths([entry.path])}
+							onKeyDown={(event) => {
+								if (
+									event.metaKey &&
+									!event.ctrlKey &&
+									!event.altKey &&
+									event.key === "Backspace"
+								) {
+									event.preventDefault();
+									setDiscardPaths([entry.path]);
+								}
+							}}
+							aria-label={`discard ${entry.path}`}
+						>
+							Discard
+						</button>
+						<button
+							type="button"
+							className="git-stage-btn"
+							disabled={isBusy}
+							onClick={() => void stage([entry.path])}
+							aria-label={`stage ${entry.path}`}
+						>
+							Stage
+						</button>
+					</>
 				)}
 				<button
 					type="button"
@@ -747,6 +805,19 @@ export default function SourceControl({
 									<span>Changes</span>
 									<button
 										type="button"
+										className="git-discard-btn git-group-action"
+										disabled={
+											changes.some((entry) => busy.has(entry.path)) ||
+											discarding
+										}
+										onClick={() =>
+											setDiscardPaths(changes.map((entry) => entry.path))
+										}
+									>
+										Discard all
+									</button>
+									<button
+										type="button"
 										className="git-stage-btn git-group-action"
 										disabled={changes.some((entry) => busy.has(entry.path))}
 										onClick={() =>
@@ -756,6 +827,45 @@ export default function SourceControl({
 										Stage all
 									</button>
 								</div>
+								{discardPaths !== null ? (
+									<div
+										className="git-discard-confirm"
+										role="alertdialog"
+										tabIndex={-1}
+										onKeyDown={(event) => {
+											if (event.key === "Escape") {
+												event.preventDefault();
+												setDiscardPaths(null);
+											}
+											if (event.key === "Enter") {
+												event.preventDefault();
+												void discard(discardPaths);
+											}
+										}}
+									>
+										<span>
+											Discard {discardPaths.length}{" "}
+											{discardPaths.length === 1 ? "file" : "files"}? This
+											cannot be undone.
+										</span>
+										<button
+											type="button"
+											className="git-discard-btn"
+											disabled={discarding}
+											onClick={() => void discard(discardPaths)}
+										>
+											Discard
+										</button>
+										<button
+											type="button"
+											className="git-stage-btn"
+											disabled={discarding}
+											onClick={() => setDiscardPaths(null)}
+										>
+											Cancel
+										</button>
+									</div>
+								) : null}
 								<ul className="git-list">{changes.map(renderRow)}</ul>
 							</>
 						) : null}
