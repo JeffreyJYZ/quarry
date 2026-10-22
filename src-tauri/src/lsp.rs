@@ -65,6 +65,8 @@ pub struct Session {
     /// Open document path to the version last sent, so `didChange` speaks the same version the
     /// server last heard.
     documents: HashMap<String, u32>,
+    /// Recorded end position of each open document, computed from the text last sent.
+    document_ends: HashMap<String, Position>,
     /// The next request id to hand out. Monotonic, so a late answer can never be mistaken for a
     /// newer request's answer.
     next_request_id: i64,
@@ -121,6 +123,8 @@ impl Session {
     /// and those errors are deliberately ignored here.
     fn stop(&mut self) {
         self.call_hierarchy_items.clear();
+        self.documents.clear();
+        self.document_ends.clear();
         let _ = self
             .pipe
             .send(&request(SHUTDOWN_ID, "shutdown", Value::Null));
@@ -208,6 +212,7 @@ async fn start_lsp_session(
         server: server.to_string(),
         pipe,
         documents: HashMap::new(),
+        document_ends: HashMap::new(),
         next_request_id: FIRST_REQUEST_ID,
         pending: HashMap::new(),
         next_call_hierarchy_id: 1,
@@ -253,6 +258,9 @@ pub async fn lsp_open_document(
 
     let version = 1;
     session.documents.insert(path.clone(), version);
+    session
+        .document_ends
+        .insert(path.clone(), document_end(&text));
 
     let message = notification(
         "textDocument/didOpen",
@@ -280,6 +288,9 @@ pub async fn lsp_change_document(
 
     let version = session.documents.get(&path).copied().unwrap_or(0) + 1;
     session.documents.insert(path.clone(), version);
+    session
+        .document_ends
+        .insert(path.clone(), document_end(&text));
 
     let message = notification(
         "textDocument/didChange",
@@ -301,6 +312,7 @@ pub async fn lsp_close_document(
     let mut session = lock(&session);
 
     session.documents.remove(&path);
+    session.document_ends.remove(&path);
 
     let message = notification(
         "textDocument/didClose",
@@ -949,6 +961,62 @@ mod tests {
         let symbols = parse_symbols(&result);
         assert_eq!(symbols.len(), 1);
         assert_eq!(symbols[0].name, "has_range");
+    }
+
+    #[test]
+    fn document_end_single_line() {
+        assert_eq!(
+            document_end("hello"),
+            Position {
+                line: 0,
+                character: 5
+            }
+        );
+    }
+
+    #[test]
+    fn document_end_trailing_newline() {
+        assert_eq!(
+            document_end("hello\n"),
+            Position {
+                line: 1,
+                character: 0
+            }
+        );
+    }
+
+    #[test]
+    fn document_end_multi_line() {
+        assert_eq!(
+            document_end("a\nbc"),
+            Position {
+                line: 1,
+                character: 2
+            }
+        );
+    }
+
+    #[test]
+    fn document_end_empty() {
+        assert_eq!(
+            document_end(""),
+            Position {
+                line: 0,
+                character: 0
+            }
+        );
+    }
+
+    #[test]
+    fn document_end_utf16() {
+        // '😀' is one code point but two UTF-16 code units.
+        assert_eq!(
+            document_end("a😀"),
+            Position {
+                line: 0,
+                character: 3
+            }
+        );
     }
 
     #[test]
@@ -1725,9 +1793,6 @@ pub fn parse_signature_help(result: &Value) -> Option<SignatureHelp> {
 }
 
 /// Inlay hints for one document.
-///
-/// The session tracks only document versions, not their text, so the request range spans the
-/// whole document via a generously large end position rather than a computed one.
 #[tauri::command]
 pub async fn lsp_inlay_hints(
     state: State<'_, LspState>,
@@ -1735,6 +1800,13 @@ pub async fn lsp_inlay_hints(
     path: String,
 ) -> Result<Vec<InlayHint>, String> {
     let session = session_for(&state, &root)?;
+    let end = {
+        let guard = lock(&session);
+        match guard.document_ends.get(&path).copied() {
+            Some(end) => end,
+            None => return Ok(Vec::new()),
+        }
+    };
     let result = send_request(
         &session,
         "textDocument/inlayHint",
@@ -1742,12 +1814,24 @@ pub async fn lsp_inlay_hints(
             "textDocument": { "uri": path_to_uri(&path) },
             "range": {
                 "start": { "line": 0, "character": 0 },
-                "end": { "line": 1_000_000, "character": 0 },
+                "end": { "line": end.line, "character": end.character },
             },
         }),
     )
     .await?;
     Ok(parse_inlay_hints(&result))
+}
+
+/// Compute the LSP end position of a document from its text.
+///
+/// Line and character counts follow LSP: lines are separated by `\\n`, and
+/// characters are UTF-16 code units.
+pub fn document_end(text: &str) -> Position {
+    let lines: Vec<&str> = text.split('\n').collect();
+    let line = lines.len().saturating_sub(1) as u32;
+    let last = lines.last().copied().unwrap_or("");
+    let character = last.chars().map(|c| c.len_utf16() as u32).sum();
+    Position { line, character }
 }
 
 /// Read inlay hints out of a `textDocument/inlayHint` answer.
