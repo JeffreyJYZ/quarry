@@ -51,15 +51,14 @@ read off `src-tauri/src/lib.rs` and `src/`:
   `git_status` and `git_file_diff` commands.
 
 Still missing, and named here so it is not mistaken for done:
-- **No embedded terminal.**
 - **No `evaluate`, so no watch expressions** — Rust expression evaluation cannot be made to work through
   `lldb-dap` here: `evaluate` returns nothing usable across `repl`/`watch`/`hover`, `settings set target.language rust`
   changes nothing, and `setExpression` kills the adapter. A watch pane can only offer variables-tree watching and
   memory views until a different adapter or toolchain is measured (see `docs/spikes/dap.md`, "Evaluate probe
   (2026-10-22)").
-- **C/C++ builds are not wired.** `build_project` refuses any project kind other than Cargo, and the
-  no-preset launch composition is Cargo-only. A preset that names an already-built binary is the C/C++
-  debug path. C/C++ builds also need `cmake`, which is not installed on this machine.
+- **C/C++ builds.** `build_project` runs a plain clang build (`run_plain_n_build`) for projects without a build
+  system, so C/C++ projects can compile without cmake. Projects that need cmake still cannot build here because
+  `cmake` and `ninja` are not installed on this machine.
 - **No remote development, embedded targets, profilers, databases, Docker, AI assistance or plugin API.**
 
 ## What "parity" means here
