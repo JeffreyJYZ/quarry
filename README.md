@@ -43,16 +43,18 @@ read off `src-tauri/src/lib.rs` and `src/`:
   agent; the backend and component are present.
 - **Debug**: `lldb-dap` sessions launched from a `.quarry/launch.json` preset, composed for an
   unconfigured Cargo project (which also passes the Rust formatter `initCommands`), or attached to a
-  running process by pid. Line breakpoints with verified and pending states, conditional and hit-count
-  breakpoints, threads, frames, scopes, variables, hardware watchpoints, a paged hex memory pane and a
-  disassembly pane. Variable values can be edited via `dap::dap_set_variable` and memory cells via
-  `dap::dap_write_memory`.
+  running process by pid via `processes::list_processes` and `src/debug/ProcessPicker.tsx`. Line
+  breakpoints with verified and pending states, conditional and hit-count breakpoints, run to cursor
+  (`Cmd+F10`, `runToCursor` in `src/debug/session.ts` with temporary breakpoint handling), threads,
+  frames, scopes, variables, hardware watchpoints, a paged hex memory pane and a disassembly pane.
+  Variable values can be edited via `dap::dap_set_variable` and memory cells via `dap::dap_write_memory`.
 - **Search**: `rg`-backed palette with results grouped by file, keyboard navigation, and a visible cap
   when the result set is truncated. Case-sensitive, regex and whole-word toggles are in
   `src/search/SearchPalette.tsx`.
 - **Tests**: `list_tests` and `run_test` feed a Tests dock with pass/fail status.
-- **Source control**: a Git view with status, per-file diff, an open-in-editor flow, and a commit box
-  (`git_commit`), plus `git_status` and `git_file_diff` commands.
+- **Source control**: a Git view with status, per-file diff, an open-in-editor flow, a commit box
+  (`git_commit`), branch listing and switching (`git_branches`, `git_checkout`, dropdown in
+  `src/git/SourceControl.tsx`), plus `git_status` and `git_file_diff` commands.
 - **Breadcrumb**: a strip showing the file path and the symbol chain containing the caret, built from
   `lsp_symbols` in `src/breadcrumb/Breadcrumb.tsx`.
 
