@@ -2304,3 +2304,40 @@ button.tree-note {
 .body.rail-collapsed .rail {
 	display: none;
 }
+
+.cm-rename-bar {
+	position: absolute;
+	top: 4px;
+	left: 4px;
+	background: #1e1e1e;
+	border: 1px solid #333;
+	padding: 4px;
+	z-index: 5;
+}
+.rename-input {
+	background: #2a2a2a;
+	color: #ddd;
+	border: 1px solid #444;
+	font-family: monospace;
+}
+.cm-codeactions {
+	position: absolute;
+	top: 4px;
+	left: 4px;
+	background: #1e1e1e;
+	border: 1px solid #333;
+	list-style: none;
+	padding: 4px;
+	margin: 0;
+	z-index: 5;
+}
+.cm-codeactions button {
+	background: transparent;
+	color: #ddd;
+	border: none;
+	cursor: pointer;
+	font-family: monospace;
+	display: block;
+	width: 100%;
+	text-align: left;
+}

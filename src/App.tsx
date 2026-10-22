@@ -46,6 +46,7 @@ import {
 import { type FileBuffer, isDirty } from "@/project/buffer";
 import { describeError } from "@/project/errors";
 import { type SaveOutcome, saveBuffer, saveErrorMessage, saveMessage } from "@/project/save";
+import { applyFileEdits } from "@/refactor/apply";
 import RunLog from "@/run/RunLog";
 import SearchPalette from "@/search/SearchPalette";
 import ShortcutSheet from "@/shortcuts/ShortcutSheet";
@@ -721,6 +722,19 @@ export default function App() {
 		[activePath],
 	);
 
+	const handleApplyEdits = useCallback(async (edits: import("@/project/api").FileEdit[]) => {
+		const result = await applyFileEdits(edits, buffersRef.current, setBuffers);
+		if (result.files > 0) {
+			setNotice(`Renamed ${result.files} files`);
+		}
+		for (const failed of result.failed) {
+			setNotice(`Failed: ${failed}`);
+		}
+		if (result.files === 0 && result.failed.length === 0) {
+			setNotice("Rename unavailable here");
+		}
+	}, []);
+
 	const closeNow = useCallback(
 		(path: string) => {
 			const index = buffers.findIndex((buffer) => buffer.path === path);
@@ -993,6 +1007,7 @@ export default function App() {
 									onToggleBreakpoint={handleToggleBreakpoint}
 									onNavigate={handleNavigate}
 									onReferences={handleReferences}
+									onApplyEdits={handleApplyEdits}
 									reveal={
 										revealTarget === null
 											? null

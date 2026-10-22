@@ -25,15 +25,17 @@ import {
 	setSearchMatches,
 } from "@/editor/search";
 import { quarryHighlightStyle, quarryTheme } from "@/editor/theme";
-import type { Diagnostic } from "@/project/api";
+import type { CodeAction, Diagnostic, FileEdit } from "@/project/api";
 import {
 	formatDocument,
 	formatterFor,
 	type Location,
+	lspCodeActions,
 	lspCompletion,
 	lspDefinition,
 	lspHover,
 	lspReferences,
+	lspRename,
 } from "@/project/api";
 import { describeError } from "@/project/errors";
 
@@ -60,6 +62,10 @@ export type EditorProps = {
 	reveal?: { line: number; character: number; token: number } | null;
 	/** Report a one-line status to the host (no formatter / formatter failure). */
 	onNotice?: (message: string | null) => void;
+	/** Report caret position changes. */
+	onCursor?: (position: { line: number; character: number }) => void;
+	/** Apply a batch of file edits produced by rename or code actions. */
+	onApplyEdits?: (edits: FileEdit[]) => void;
 };
 
 const NO_LINES: number[] = [];
@@ -149,6 +155,8 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		onReferences,
 		reveal = null,
 		onNotice,
+		onCursor,
+		onApplyEdits,
 	}: EditorProps,
 	ref,
 ): JSX.Element {
@@ -163,6 +171,10 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 	const [matches, setMatches] = useState<SearchMatch[]>([]);
 	const [active, setActive] = useState(0);
 	const [error, setError] = useState<string | null>(null);
+	const [renameOpen, setRenameOpen] = useState(false);
+	const [renameValue, setRenameValue] = useState("");
+	const [codeActions, setCodeActions] = useState<CodeAction[]>([]);
+	const [codeMenuOpen, setCodeMenuOpen] = useState(false);
 	const searchOpenRef = useRef(searchOpen);
 	searchOpenRef.current = searchOpen;
 	const queryRef = useRef(query);
@@ -205,6 +217,13 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 	referencesRef.current = onReferences ?? null;
 	const onNoticeRef = useRef<((message: string | null) => void) | null>(onNotice ?? null);
 	onNoticeRef.current = onNotice ?? null;
+	const onCursorRef = useRef<((position: { line: number; character: number }) => void) | null>(
+		onCursor ?? null,
+	);
+	onCursorRef.current = onCursor ?? null;
+	const onApplyEditsRef = useRef<((edits: FileEdit[]) => void) | null>(onApplyEdits ?? null);
+	onApplyEditsRef.current = onApplyEdits ?? null;
+	const lastCursorRef = useRef<{ line: number; character: number } | null>(null);
 	const revealTokenRef = useRef<number | null>(null);
 
 	const recompute = () => {
@@ -319,6 +338,40 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		}));
 		view.dispatch({ changes });
 	};
+	const submitRename = () => {
+		const view = viewRef.current;
+		const currentRoot = rootRef.current;
+		const currentPath = latestRef.current.path;
+		if (view === null || currentRoot === null || currentPath === null) {
+			setRenameOpen(false);
+			return;
+		}
+		const name = renameValue.trim();
+		setRenameOpen(false);
+		if (name === "") return;
+		const { line, character } = toLspPosition(view, view.state.selection.main.head);
+		void (async () => {
+			let result: FileEdit[] = [];
+			try {
+				result = await lspRename(currentRoot, currentPath, line, character, name);
+			} catch {
+				result = [];
+			}
+			if (result.length === 0) {
+				onNoticeRef.current?.("Rename unavailable here");
+				return;
+			}
+			onApplyEditsRef.current?.(result);
+		})();
+	};
+
+	const applyCodeAction = (action: CodeAction) => {
+		setCodeMenuOpen(false);
+		if (action.edits.length > 0) {
+			onApplyEditsRef.current?.(action.edits);
+		}
+	};
+
 	openSearchRef.current = openSearch;
 	closeSearchRef.current = closeSearch;
 	stepRef.current = stepMatch;
@@ -369,6 +422,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		},
 	}));
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: keymap reads state via closure
 	useEffect(() => {
 		const host = hostRef.current;
 		if (host === null) return;
@@ -490,8 +544,71 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 							},
 						},
 						{
+							key: "F2",
+							run: () => {
+								const view = viewRef.current;
+								if (view === null) return false;
+								const pos = view.state.selection.main.head;
+								let ident = "";
+								// find identifier containing pos
+								const line = view.state.doc.lineAt(pos);
+								const rel = pos - line.from;
+								const before =
+									line.text.slice(0, rel).match(/[A-Za-z0-9_]*$/)?.[0] ?? "";
+								const after =
+									line.text.slice(rel).match(/^[A-Za-z0-9_]*/)?.[0] ?? "";
+								ident = before + after;
+								setRenameValue(ident);
+								setRenameOpen(true);
+								return true;
+							},
+						},
+						{
+							key: "Alt-Enter",
+							run: () => {
+								const view = viewRef.current;
+								if (view === null) return false;
+								const currentRoot = rootRef.current;
+								const currentPath = latestRef.current.path;
+								if (currentRoot === null || currentPath === null) return false;
+								const { line, character } = toLspPosition(
+									view,
+									view.state.selection.main.head,
+								);
+								void (async () => {
+									let actions: CodeAction[] = [];
+									try {
+										actions = await lspCodeActions(
+											currentRoot,
+											currentPath,
+											line,
+											character,
+										);
+									} catch {
+										actions = [];
+									}
+									if (actions.length === 0) {
+										setCodeMenuOpen(false);
+										setCodeActions([]);
+										return;
+									}
+									setCodeActions(actions);
+									setCodeMenuOpen(true);
+								})();
+								return true;
+							},
+						},
+						{
 							key: "Escape",
 							run: () => {
+								if (renameOpen) {
+									setRenameOpen(false);
+									return true;
+								}
+								if (codeMenuOpen) {
+									setCodeMenuOpen(false);
+									return true;
+								}
 								if (!searchOpenRef.current) return false;
 								closeSearchRef.current();
 								return true;
@@ -506,12 +623,27 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 						spellcheck: "false",
 					}),
 					EditorView.updateListener.of((update) => {
-						if (!update.docChanged) return;
-						const next = update.state.doc.toString();
-						if (next === latestRef.current.value) return;
-						latestRef.current.onChange(next);
-						if (searchOpenRef.current) {
-							window.setTimeout(() => recomputeRef.current(), 0);
+						if (update.docChanged) {
+							const next = update.state.doc.toString();
+							if (next !== latestRef.current.value) {
+								latestRef.current.onChange(next);
+								if (searchOpenRef.current) {
+									window.setTimeout(() => recomputeRef.current(), 0);
+								}
+							}
+						}
+						if (update.selectionSet) {
+							const pos = update.state.selection.main.head;
+							const { line, character } = toLspPosition(update.view, pos);
+							const last = lastCursorRef.current;
+							if (
+								last === null ||
+								last.line !== line ||
+								last.character !== character
+							) {
+								lastCursorRef.current = { line, character };
+								onCursorRef.current?.({ line, character });
+							}
 						}
 					}),
 					EditorView.domEventHandlers({
@@ -805,6 +937,36 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 						Close
 					</button>
 				</div>
+			) : null}
+			{renameOpen ? (
+				<div className="cm-rename-bar">
+					<input
+						className="rename-input"
+						value={renameValue}
+						onChange={(e) => setRenameValue(e.target.value)}
+						onKeyDown={(e) => {
+							if (e.key === "Enter") {
+								e.preventDefault();
+								submitRename();
+							}
+							if (e.key === "Escape") {
+								e.preventDefault();
+								setRenameOpen(false);
+							}
+						}}
+					/>
+				</div>
+			) : null}
+			{codeMenuOpen && codeActions.length > 0 ? (
+				<ul className="cm-codeactions">
+					{codeActions.map((action) => (
+						<li key={action.title}>
+							<button type="button" onClick={() => applyCodeAction(action)}>
+								{action.title}
+							</button>
+						</li>
+					))}
+				</ul>
 			) : null}
 		</div>
 	);
