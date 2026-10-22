@@ -8,6 +8,7 @@ mod protocol_pipe;
 mod run_config;
 mod run_task;
 mod search;
+mod settings;
 mod test_task;
 mod toolchain;
 mod types;
@@ -38,6 +39,10 @@ pub fn run() {
             lsp::lsp_open_document,
             lsp::lsp_change_document,
             lsp::lsp_close_document,
+            lsp::lsp_hover,
+            lsp::lsp_definition,
+            lsp::lsp_references,
+            lsp::lsp_completion,
             build_task::build_project,
             format::format_document,
             format::formatter_for,
@@ -63,7 +68,9 @@ pub fn run() {
             run_task::stop_program,
             launch::default_launch_config,
             test_task::list_tests,
-            test_task::run_test
+            test_task::run_test,
+            settings::read_settings,
+            settings::write_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

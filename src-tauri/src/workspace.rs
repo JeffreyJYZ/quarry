@@ -23,7 +23,8 @@ pub const NEW_FILE_MODE: u32 = 0o644;
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// macOS metadata, never useful in the tree.
-const IGNORED_NAMES: [&str; 1] = [".DS_Store"];
+/// Noise the explorer never shows: build trees, dependency caches and editor bookkeeping.
+const IGNORED_NAMES: [&str; 5] = [".DS_Store", ".git", "node_modules", "target", "dist"];
 
 #[tauri::command]
 pub fn list_dir(path: String) -> Result<Vec<FileEntry>, String> {

@@ -328,3 +328,63 @@ export function listTests(root: string): Promise<TestItem[]> {
 export function runTest(root: string, name: string): Promise<TestReport> {
 	return invoke<TestReport>("run_test", { root, name });
 }
+
+export type Location = { path: string; range: Range };
+export type HoverInfo = { contents: string; range: Range | null };
+export type CompletionItem = {
+	label: string;
+	detail: string | null;
+	kind: number | null;
+	insertText: string | null;
+};
+export type CompletionList = { items: CompletionItem[]; isIncomplete: boolean };
+
+export function lspHover(
+	root: string,
+	path: string,
+	line: number,
+	character: number,
+): Promise<HoverInfo | null> {
+	return invoke<HoverInfo | null>("lsp_hover", { root, path, line, character });
+}
+
+export function lspDefinition(
+	root: string,
+	path: string,
+	line: number,
+	character: number,
+): Promise<Location[]> {
+	return invoke<Location[]>("lsp_definition", { root, path, line, character });
+}
+
+export function lspReferences(
+	root: string,
+	path: string,
+	line: number,
+	character: number,
+): Promise<Location[]> {
+	return invoke<Location[]>("lsp_references", { root, path, line, character });
+}
+
+export function lspCompletion(
+	root: string,
+	path: string,
+	line: number,
+	character: number,
+): Promise<CompletionList> {
+	return invoke<CompletionList>("lsp_completion", { root, path, line, character });
+}
+
+export type Settings = {
+	lastRoot: string | null;
+	openFiles: string[];
+	activeFile: string | null;
+};
+
+export function readSettings(): Promise<Settings> {
+	return invoke<Settings>("read_settings");
+}
+
+export function writeSettings(settings: Settings): Promise<void> {
+	return invoke<void>("write_settings", { settings });
+}
