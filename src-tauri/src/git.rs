@@ -6,6 +6,7 @@
 //! Every read-only command runs off the async runtime on a blocking thread. A directory that is
 //! not a repository is not an error: the status comes back empty so the UI can hide the panel.
 
+use serde::Serialize;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -787,4 +788,125 @@ fn commit(root: &str, message: &str) -> Result<String, String> {
         }
         _ => Ok(String::new()),
     }
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Branch {
+    pub name: String,
+    pub current: bool,
+}
+
+#[tauri::command]
+pub async fn git_branches(root: String) -> Result<Vec<Branch>, String> {
+    tauri::async_runtime::spawn_blocking(move || branches(&root))
+        .await
+        .map_err(|error| format!("git branch failed: {error}"))?
+}
+
+/// Switch branches. Never forces: git's own refusal on a dirty tree is the answer.
+#[tauri::command]
+pub async fn git_checkout(root: String, branch: String) -> Result<(), String> {
+    validate_branch_name(&branch)?;
+    tauri::async_runtime::spawn_blocking(move || checkout(&root, &branch))
+        .await
+        .map_err(|error| format!("git checkout failed: {error}"))?
+}
+
+fn branches(root: &str) -> Result<Vec<Branch>, String> {
+    let program = git_program()?;
+    let output = run(
+        &program,
+        root,
+        &["branch", "--format=%(refname:short)%09%(HEAD)"],
+    )?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if is_not_a_repository(&stderr) {
+            return Ok(Vec::new());
+        }
+        return Err(operation_error("git branch", &stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut parsed = parse_branches(&stdout);
+    sort_branches(&mut parsed);
+    Ok(parsed)
+}
+
+fn checkout(root: &str, branch: &str) -> Result<(), String> {
+    let program = git_program()?;
+    let output = Command::new(&program)
+        .args(checkout_argv(branch))
+        .current_dir(root)
+        .output()
+        .map_err(|error| format!("cannot run {program} in {root}: {error}"))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if is_not_a_repository(&stderr) {
+            return Err(format!("not a git repository: {root}"));
+        }
+        return Err(operation_error("git checkout", &stderr));
+    }
+    Ok(())
+}
+
+/// Parses the tab-separated output of `git branch --format=...`.
+pub fn parse_branches(stdout: &str) -> Vec<Branch> {
+    let mut branches = Vec::new();
+    for line in stdout.lines() {
+        if line.is_empty() {
+            continue;
+        }
+        let mut parts = line.split('\t');
+        let name = parts.next().unwrap_or("").trim();
+        if name.is_empty() {
+            continue;
+        }
+        let head = parts.next().unwrap_or("");
+        let current = head.trim() == "*";
+        branches.push(Branch {
+            name: name.to_string(),
+            current,
+        });
+    }
+    branches
+}
+
+/// Sorts branches: current first, then alphabetically by name.
+pub fn sort_branches(branches: &mut [Branch]) {
+    branches.sort_by(|left, right| {
+        right
+            .current
+            .cmp(&left.current)
+            .then_with(|| left.name.cmp(&right.name))
+    });
+}
+
+#[allow(dead_code)]
+pub fn validate_branch_name(branch: &str) -> Result<(), String> {
+    if branch.is_empty() {
+        return Err("branch name must not be empty".to_string());
+    }
+    if !branch
+        .chars()
+        .all(|character| character.is_ascii_alphanumeric() || "._/-".contains(character))
+    {
+        return Err("branch name must contain only characters in [A-Za-z0-9._/-]".to_string());
+    }
+    if branch
+        .split('/')
+        .any(|segment| segment.is_empty() || segment == "..")
+    {
+        return Err("branch name must not contain '..' segments".to_string());
+    }
+    Ok(())
+}
+
+/// Builds the argv for `git checkout <branch>`.
+#[allow(dead_code)]
+pub fn checkout_argv(branch: &str) -> Vec<String> {
+    vec!["checkout".to_string(), branch.to_string()]
 }

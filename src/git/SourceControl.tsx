@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+	type Branch,
 	type GitStatus,
 	type GitStatusEntry,
+	gitBranches,
+	gitCheckout,
 	gitCommit,
 	gitStage,
 	gitUnstage,
@@ -66,6 +69,15 @@ export default function SourceControl({
 	const [committing, setCommitting] = useState(false);
 	const committedTimer = useRef<number | null>(null);
 
+	const [branches, setBranches] = useState<Branch[] | null>(null);
+	const [branchOpen, setBranchOpen] = useState(false);
+	const [branchFilter, setBranchFilter] = useState("");
+	const [branchIndex, setBranchIndex] = useState(0);
+	const [branchSwitching, setBranchSwitching] = useState(false);
+	const [branchSwitched, setBranchSwitched] = useState<string | null>(null);
+	const switchedTimer = useRef<number | null>(null);
+	const filterRef = useRef<HTMLInputElement | null>(null);
+
 	const refresh = useCallback(async () => {
 		setLoading(true);
 		try {
@@ -82,6 +94,23 @@ export default function SourceControl({
 	useEffect(() => {
 		void refresh();
 	}, [refreshToken]);
+
+	useEffect(() => {
+		let cancelled = false;
+		void (async () => {
+			try {
+				const list = await gitBranches(root);
+				if (cancelled) return;
+				setBranches(list);
+			} catch {
+				if (cancelled) return;
+				setBranches([]);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [root]);
 
 	const stage = useCallback(
 		async (paths: string[]) => {
@@ -162,8 +191,19 @@ export default function SourceControl({
 			if (committedTimer.current !== null) {
 				window.clearTimeout(committedTimer.current);
 			}
+			if (switchedTimer.current !== null) {
+				window.clearTimeout(switchedTimer.current);
+			}
 		};
 	}, []);
+
+	useEffect(() => {
+		if (branchOpen) {
+			setBranchFilter("");
+			setBranchIndex(0);
+			window.setTimeout(() => filterRef.current?.focus(), 0);
+		}
+	}, [branchOpen]);
 
 	useEffect(() => {
 		const handler = (event: KeyboardEvent) => {
@@ -182,6 +222,33 @@ export default function SourceControl({
 		window.addEventListener("keydown", handler, true);
 		return () => window.removeEventListener("keydown", handler, true);
 	}, [selected, status, stage, unstage]);
+
+	const switchBranch = useCallback(
+		async (branch: string) => {
+			if (branchSwitching) return;
+			setBranchSwitching(true);
+			setError(null);
+			try {
+				await gitCheckout(root, branch);
+				await onRefresh();
+				setBranches(await gitBranches(root).catch(() => branches ?? []));
+				setBranchOpen(false);
+				setBranchSwitched(`Switched to ${branch}`);
+				if (switchedTimer.current !== null) {
+					window.clearTimeout(switchedTimer.current);
+				}
+				switchedTimer.current = window.setTimeout(() => {
+					switchedTimer.current = null;
+					setBranchSwitched(null);
+				}, 4000);
+			} catch (err) {
+				setError(describeError(err));
+			} finally {
+				setBranchSwitching(false);
+			}
+		},
+		[root, onRefresh, branchSwitching, branches],
+	);
 
 	if (status === null && error === null && loading) {
 		return (
@@ -211,6 +278,11 @@ export default function SourceControl({
 
 	const staged = status.entries.filter((entry) => entry.staged);
 	const changes = status.entries.filter((entry) => !entry.staged);
+
+	const filteredBranches = (branches ?? []).filter((branch) =>
+		branch.name.toLowerCase().includes(branchFilter.toLowerCase()),
+	);
+	const isRepo = (branches ?? []).length > 0;
 
 	const renderRow = (entry: GitStatusEntry) => {
 		const isBusy = busy.has(entry.path);
@@ -269,10 +341,84 @@ export default function SourceControl({
 
 	return (
 		<aside className="rail">
-			<div className="rail-head">
+			<div className="rail-head" style={{ position: "relative" }}>
 				<span className="label">Source control</span>
-				<span className="git-branch">{status.branch}</span>
+				{isRepo ? (
+					<button
+						type="button"
+						className="git-branch git-branch-btn"
+						onClick={() => setBranchOpen((current) => !current)}
+					>
+						{status.branch}
+					</button>
+				) : (
+					<span className="git-branch">{status.branch}</span>
+				)}
+				{branchOpen && isRepo ? (
+					<div className="git-branch-menu">
+						<input
+							ref={filterRef}
+							className="git-branch-filter"
+							value={branchFilter}
+							onChange={(event) => {
+								setBranchFilter(event.target.value);
+								setBranchIndex(0);
+							}}
+							onKeyDown={(event) => {
+								if (event.key === "Escape") {
+									event.preventDefault();
+									setBranchOpen(false);
+									return;
+								}
+								if (event.key === "ArrowDown") {
+									event.preventDefault();
+									setBranchIndex((current) =>
+										Math.min(
+											current + 1,
+											Math.max(0, filteredBranches.length - 1),
+										),
+									);
+									return;
+								}
+								if (event.key === "ArrowUp") {
+									event.preventDefault();
+									setBranchIndex((current) => Math.max(current - 1, 0));
+									return;
+								}
+								if (event.key === "Enter") {
+									event.preventDefault();
+									const target = filteredBranches[branchIndex];
+									if (target !== undefined && !branchSwitching) {
+										void switchBranch(target.name);
+									}
+								}
+							}}
+							placeholder="Filter branches"
+						/>
+						<ul
+							className={`git-branch-list${branchSwitching ? " git-branch-list-busy" : ""}`}
+						>
+							{filteredBranches.map((branch, index) => (
+								<li key={branch.name}>
+									<button
+										type="button"
+										className={`git-branch-option${index === branchIndex ? " git-branch-option-active" : ""}`}
+										disabled={branchSwitching}
+										onClick={() => void switchBranch(branch.name)}
+									>
+										<span className="git-branch-mark">
+											{branch.current ? "●" : " "}
+										</span>
+										{branch.name}
+									</button>
+								</li>
+							))}
+						</ul>
+						{error !== null ? <p className="git-branch-error">{error}</p> : null}
+					</div>
+				) : null}
 			</div>
+			{branchSwitched !== null ? <p className="git-committed">{branchSwitched}</p> : null}
 			<div className="git-commit-box">
 				<textarea
 					className="git-commit-input"

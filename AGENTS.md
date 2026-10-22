@@ -25,3 +25,4 @@ Rust and C/C++ IDE. Tauri 2 + React 19 shell; clangd, rust-analyzer and lldb-dap
 - **Data breakpoint `dataId` is `<hex>/<size>` with no `0x`**, `hitBreakpointIds` is null, and the stop reports the line after the store.
 - **`realpath` the project directory before `launch`** — `/var/…` versus `/private/var/…` leaves every breakpoint unverified.
 - **`cargo fmt` in `src-tauri` rewrites `lsp.rs`** — that file is not rustfmt-clean, so a crate-wide format adds an out-of-unit diff. Format the one file instead: `rustfmt --edition 2024 src/dap.rs`.
+- **Verification ladder**: `bun check` + `bunx biome check .` + `bun run build` for any frontend change; add `cargo test` + `cargo check --all-targets` for Rust; add `scripts/lsp-*.ts` for language-server work and `scripts/dap-*.ts` for debugger work. The DAP evaluate probe is expected to report failures — that is its result, not a regression.

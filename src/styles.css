@@ -2955,3 +2955,66 @@ button.tree-note {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+
+.git-branch-btn {
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: 0;
+}
+.git-branch-menu {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	z-index: 20;
+	min-width: 200px;
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	padding: 6px;
+	box-shadow: 0 10px 24px rgb(0 0 0 / 45%);
+}
+.git-branch-filter {
+	width: 100%;
+	box-sizing: border-box;
+	font-family: var(--mono);
+	font-size: 12px;
+	padding: 4px 6px;
+}
+.git-branch-list {
+	list-style: none;
+	margin: 4px 0 0;
+	padding: 0;
+	max-height: 200px;
+	overflow: auto;
+}
+.git-branch-list-busy {
+	opacity: 0.5;
+	pointer-events: none;
+}
+.git-branch-option {
+	display: flex;
+	gap: 6px;
+	width: 100%;
+	text-align: left;
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: 3px 4px;
+	font-family: var(--mono);
+	font-size: 12px;
+}
+.git-branch-option:disabled {
+	cursor: not-allowed;
+}
+.git-branch-option-active {
+	background: var(--line);
+}
+.git-branch-mark {
+	width: 10px;
+}
+.git-branch-error {
+	color: var(--error, #f66);
+	font-size: 11px;
+	margin: 4px 0 0;
+}
