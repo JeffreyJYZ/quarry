@@ -19,6 +19,9 @@ const palette = {
 	activeLine: "rgba(255, 255, 255, 0.03)",
 } as const;
 
+/** Breakpoint dot hue; one colour for set and unverified, the latter hollow. */
+const breakpoint = { dot: "#e06c75" } as const;
+
 /** Lint colours, tuned to stay legible on the `#0b0d10` canvas. */
 const lint = {
 	error: "#e06c75",
@@ -77,6 +80,31 @@ const lintStyles = {
 	".cm-diagnostic-info": { borderLeftColor: lint.info },
 	".cm-diagnostic-hint": { borderLeftColor: lint.hint },
 	".cm-diagnosticSource": { color: "var(--muted)", opacity: 1 },
+} as const;
+
+const breakpointStyles = {
+	".cm-breakpoint-gutter": {
+		width: "1.1em",
+		cursor: "pointer",
+		"& .cm-gutterElement": {
+			display: "flex",
+			alignItems: "center",
+			justifyContent: "center",
+			padding: "0",
+		},
+	},
+	".cm-breakpoint-dot": {
+		width: "8px",
+		height: "8px",
+		boxSizing: "border-box",
+		borderRadius: "50%",
+		backgroundColor: breakpoint.dot,
+	},
+	".cm-breakpoint-dot.unverified": {
+		backgroundColor: "transparent",
+		border: `1px solid ${breakpoint.dot}`,
+		opacity: 0.65,
+	},
 } as const;
 
 export const quarryTheme: Extension = EditorView.theme(
@@ -146,6 +174,7 @@ export const quarryTheme: Extension = EditorView.theme(
 			color: "var(--text)",
 		},
 		...lintStyles,
+		...breakpointStyles,
 	},
 	{ dark: true },
 );

@@ -1,9 +1,11 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FileTree from "@/components/FileTree";
 import StatusBar from "@/components/StatusBar";
 import TabStrip from "@/components/TabStrip";
 import Welcome from "@/components/Welcome";
+import DebugPanel from "@/debug/DebugPanel";
+import { type BreakpointRow, useDebugSession } from "@/debug/session";
 import Editor from "@/editor/Editor";
 import {
 	combineDiagnostics,
@@ -32,18 +34,7 @@ import { describeError } from "@/project/errors";
 import SearchPalette from "@/search/SearchPalette";
 import "./styles.css";
 
-/**
- * The editor gains an optional `diagnostics` member in its own unit, so the app passes it through a
- * widened view: the prop is wired now and the editor renders it whenever it lands.
- */
-type EditorSurface = ComponentType<{
-	path: string | null;
-	value: string;
-	onChange: (value: string) => void;
-	diagnostics?: Diagnostic[];
-}>;
-
-const EditorWithDiagnostics = Editor as unknown as EditorSurface;
+const NO_BREAKPOINTS: BreakpointRow[] = [];
 
 export default function App() {
 	const [appVersion, setAppVersion] = useState("");
@@ -61,6 +52,7 @@ export default function App() {
 	/** `null` means "follow the default": open when there is an error, collapsed otherwise. */
 	const [panelOpen, setPanelOpen] = useState<boolean | null>(null);
 	const [searchOpen, setSearchOpen] = useState(false);
+	const [debugOpen, setDebugOpen] = useState(false);
 	const reading = useRef<Set<string>>(new Set());
 
 	useEffect(() => {
@@ -82,6 +74,33 @@ export default function App() {
 
 	const reportNotice = useCallback((message: string) => setNotice(message), []);
 	const lsp = useLspServer(root, reportNotice);
+	const debug = useDebugSession(root);
+
+	/* Breakpoints live in the debug session, keyed by absolute path, so a tab switch or a gutter
+	 * click with no live session both render straight from that map. */
+	const activeBreakpoints = useMemo(
+		() =>
+			activePath === null
+				? NO_BREAKPOINTS
+				: (debug.breakpointsByPath.get(activePath) ?? NO_BREAKPOINTS),
+		[activePath, debug.breakpointsByPath],
+	);
+	const breakpointLines = useMemo(
+		() => activeBreakpoints.map((row) => row.line),
+		[activeBreakpoints],
+	);
+	const unverifiedLines = useMemo(
+		() => activeBreakpoints.filter((row) => row.verified === false).map((row) => row.line),
+		[activeBreakpoints],
+	);
+	const toggleBreakpoint = debug.toggleBreakpoint;
+	const handleToggleBreakpoint = useCallback(
+		(line: number) => {
+			if (activePath === null) return;
+			toggleBreakpoint(activePath, line);
+		},
+		[activePath, toggleBreakpoint],
+	);
 
 	const handlePublish = useCallback((path: string, diagnostics: Diagnostic[]) => {
 		setServerDiagnostics((current) => withServerDiagnostics(current, path, diagnostics));
@@ -133,6 +152,7 @@ export default function App() {
 			setBuildSummary(null);
 			setPanelOpen(null);
 			setSearchOpen(false);
+			setDebugOpen(false);
 		} catch (error) {
 			setNotice(describeError(error));
 		} finally {
@@ -288,6 +308,15 @@ export default function App() {
 				>
 					{building ? "Building…" : "Build"}
 				</button>
+				<button
+					type="button"
+					className="button"
+					disabled={root === null}
+					aria-pressed={debugOpen && root !== null}
+					onClick={() => setDebugOpen((current) => !current)}
+				>
+					Debug
+				</button>
 				<span className="crumbs" title={project ? project.root : undefined}>
 					{project ? project.root : "no project open"}
 				</span>
@@ -304,7 +333,7 @@ export default function App() {
 				</div>
 			) : null}
 
-			<div className="body">
+			<div className={debugOpen && root !== null ? "body debug-open" : "body"}>
 				<aside className="rail">
 					<div className="rail-head">
 						<span className="label">explorer</span>
@@ -331,11 +360,14 @@ export default function App() {
 								onClose={handleClose}
 							/>
 							<div className="editor-pane">
-								<EditorWithDiagnostics
+								<Editor
 									path={active.path}
 									value={active.text}
 									onChange={handleChange}
 									diagnostics={diagnostics.get(active.path)}
+									breakpointLines={breakpointLines}
+									unverifiedLines={unverifiedLines}
+									onToggleBreakpoint={handleToggleBreakpoint}
 								/>
 							</div>
 						</>
@@ -357,6 +389,8 @@ export default function App() {
 						<SearchPalette root={root} onOpen={handleOpenMatch} onClose={closeSearch} />
 					) : null}
 				</main>
+
+				{debugOpen && root !== null ? <DebugPanel debug={debug} /> : null}
 			</div>
 
 			<StatusBar

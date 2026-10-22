@@ -263,3 +263,24 @@ pub struct LaunchFile {
     #[serde(default)]
     pub configurations: Vec<LaunchPreset>,
 }
+
+/// One discovered test in a project.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct TestItem {
+    /// Fully qualified test name, e.g. `protocol_pipe::tests::roundtrip`.
+    pub name: String,
+    /// Test binary the name belongs to.
+    pub binary: String,
+}
+
+/// Result of running a single test.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct TestReport {
+    pub name: String,
+    pub passed: bool,
+    /// Captured stdout and stderr of the run, trimmed.
+    pub output: String,
+    pub duration_ms: u64,
+}

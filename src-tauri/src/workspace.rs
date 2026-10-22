@@ -141,3 +141,10 @@ mod tests {
         }
     }
 }
+
+/// Write one UTF-8 file atomically: write a sibling temporary file, then rename over the target.
+#[tauri::command]
+pub fn write_text_file(_path: String, _text: String) -> Result<(), String> {
+    // STUB: U22 replaces this.
+    Err("writing files is not implemented yet".to_string())
+}

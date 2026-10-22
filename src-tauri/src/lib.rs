@@ -8,6 +8,7 @@ mod protocol_pipe;
 mod run_config;
 mod run_task;
 mod search;
+mod test_task;
 mod toolchain;
 mod types;
 mod workspace;
@@ -31,6 +32,7 @@ pub fn run() {
             project::open_project,
             workspace::list_dir,
             workspace::read_text_file,
+            workspace::write_text_file,
             lsp::start_lsp,
             lsp::stop_lsp,
             lsp::lsp_open_document,
@@ -59,7 +61,9 @@ pub fn run() {
             run_config::resolve_launch_config,
             run_task::run_program,
             run_task::stop_program,
-            launch::default_launch_config
+            launch::default_launch_config,
+            test_task::list_tests,
+            test_task::run_test
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

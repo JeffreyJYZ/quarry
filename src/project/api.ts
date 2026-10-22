@@ -135,3 +135,196 @@ export async function onDiagnostics(
 	});
 	return unlisten;
 }
+
+export type LaunchConfig = {
+	program: string;
+	args: string[];
+	cwd: string;
+	stopOnEntry: boolean;
+	initCommands: string[];
+};
+
+export type LaunchPreset = {
+	name: string;
+	program: string | null;
+	args: string[];
+	cwd: string | null;
+	build: string | null;
+	stopOnEntry: boolean;
+	initCommands: string[];
+};
+
+export type LaunchFile = { configurations: LaunchPreset[] };
+
+export type DapSession = { id: string; program: string };
+export type DapThread = { id: number; name: string };
+export type DapFrame = {
+	id: number;
+	name: string;
+	source: string | null;
+	line: number;
+	column: number;
+	instructionPointer: string | null;
+};
+export type DapScope = { name: string; variablesReference: number; expensive: boolean };
+export type DapVariable = {
+	name: string;
+	value: string;
+	typeName: string | null;
+	variablesReference: number;
+	memoryReference: string | null;
+};
+export type DapBreakpoint = {
+	id: number | null;
+	verified: boolean;
+	line: number | null;
+	message: string | null;
+	source: string | null;
+};
+export type MemoryDump = { address: string; bytes: number[] };
+export type DisassembledInstruction = {
+	address: string;
+	instruction: string;
+	symbol: string | null;
+};
+export type DataBreakpointInfo = {
+	dataId: string | null;
+	description: string;
+	accessTypes: string[];
+};
+export type DapStoppedEvent = {
+	session: string;
+	reason: string;
+	description: string | null;
+	threadId: number | null;
+	line: number | null;
+	source: string | null;
+};
+
+export function readLaunchConfig(root: string): Promise<LaunchFile> {
+	return invoke<LaunchFile>("read_launch_config", { root });
+}
+
+export function writeLaunchConfig(root: string, file: LaunchFile): Promise<string> {
+	return invoke<string>("write_launch_config", { root, file });
+}
+
+export function resolveLaunchConfig(root: string, name: string): Promise<LaunchConfig> {
+	return invoke<LaunchConfig>("resolve_launch_config", { root, name });
+}
+
+export function dapLaunch(root: string, config: LaunchConfig): Promise<DapSession> {
+	return invoke<DapSession>("dap_launch", { root, config });
+}
+
+export function dapConfigurationDone(session: string): Promise<void> {
+	return invoke<void>("dap_configuration_done", { session });
+}
+
+export function dapSetBreakpoints(
+	session: string,
+	path: string,
+	lines: number[],
+): Promise<DapBreakpoint[]> {
+	return invoke<DapBreakpoint[]>("dap_set_breakpoints", { session, path, lines });
+}
+
+export function dapContinue(session: string): Promise<void> {
+	return invoke<void>("dap_continue", { session });
+}
+
+export function dapStep(session: string, kind: "next" | "stepIn" | "stepOut"): Promise<void> {
+	return invoke<void>("dap_step", { session, kind });
+}
+
+export function dapThreads(session: string): Promise<DapThread[]> {
+	return invoke<DapThread[]>("dap_threads", { session });
+}
+
+export function dapStackTrace(session: string, threadId: number): Promise<DapFrame[]> {
+	return invoke<DapFrame[]>("dap_stack_trace", { session, threadId });
+}
+
+export function dapScopes(session: string, frameId: number): Promise<DapScope[]> {
+	return invoke<DapScope[]>("dap_scopes", { session, frameId });
+}
+
+export function dapVariables(session: string, variablesReference: number): Promise<DapVariable[]> {
+	return invoke<DapVariable[]>("dap_variables", { session, variablesReference });
+}
+
+export function dapReadMemory(
+	session: string,
+	address: string,
+	count: number,
+): Promise<MemoryDump> {
+	return invoke<MemoryDump>("dap_read_memory", { session, address, count });
+}
+
+export function dapDisassemble(
+	session: string,
+	address: string,
+	count: number,
+): Promise<DisassembledInstruction[]> {
+	return invoke<DisassembledInstruction[]>("dap_disassemble", { session, address, count });
+}
+
+export function dapDataBreakpointInfo(
+	session: string,
+	variablesReference: number,
+	name: string,
+): Promise<DataBreakpointInfo> {
+	return invoke<DataBreakpointInfo>("dap_data_breakpoint_info", {
+		session,
+		variablesReference,
+		name,
+	});
+}
+
+export function dapSetDataBreakpoints(
+	session: string,
+	dataIds: string[],
+): Promise<DapBreakpoint[]> {
+	return invoke<DapBreakpoint[]>("dap_set_data_breakpoints", { session, dataIds });
+}
+
+export function dapStop(session: string): Promise<void> {
+	return invoke<void>("dap_stop", { session });
+}
+
+export function onDapStopped(handler: (event: DapStoppedEvent) => void): Promise<() => void> {
+	return listen<DapStoppedEvent>("dap://stopped", (event) => handler(event.payload));
+}
+
+export function onDapTerminated(handler: (session: string) => void): Promise<() => void> {
+	return listen<{ session: string }>("dap://terminated", (event) =>
+		handler(event.payload.session),
+	);
+}
+
+export type TestItem = { name: string; binary: string };
+export type TestReport = { name: string; passed: boolean; output: string; durationMs: number };
+
+export function writeTextFile(path: string, text: string): Promise<void> {
+	return invoke<void>("write_text_file", { path, text });
+}
+
+export function formatDocument(root: string, path: string, text: string): Promise<string> {
+	return invoke<string>("format_document", { root, path, text });
+}
+
+export function formatterFor(path: string): Promise<string> {
+	return invoke<string>("formatter_for", { path });
+}
+
+export function defaultLaunchConfig(root: string, stopOnEntry: boolean): Promise<LaunchConfig> {
+	return invoke<LaunchConfig>("default_launch_config", { root, stopOnEntry });
+}
+
+export function listTests(root: string): Promise<TestItem[]> {
+	return invoke<TestItem[]>("list_tests", { root });
+}
+
+export function runTest(root: string, name: string): Promise<TestReport> {
+	return invoke<TestReport>("run_test", { root, name });
+}
