@@ -30,6 +30,7 @@ import {
 	defaultLaunchConfig,
 	type FileEntry,
 	type GitStatus,
+	gitBlame,
 	gitStatus,
 	type Location,
 	onRunExited,
@@ -70,6 +71,7 @@ const SHORTCUT_GROUPS = [
 		title: "Project",
 		entries: [
 			{ keys: ["Cmd", "K"], action: "Toggle shortcut sheet" },
+			{ keys: ["Cmd", "Shift", "P"], action: "Open command palette" },
 			{ keys: ["?"], action: "Open shortcut sheet (outside editor)" },
 		],
 	},
@@ -87,10 +89,16 @@ const SHORTCUT_GROUPS = [
 	{
 		title: "Navigation",
 		entries: [
+			{ keys: ["Cmd", "P"], action: "Quick open by file name" },
+			{ keys: ["Cmd", "Shift", "E"], action: "Reveal active file in explorer" },
 			{ keys: ["F12"], action: "Go to definition" },
 			{ keys: ["Shift", "F12"], action: "Find references" },
 			{ keys: ["Cmd", "Click"], action: "Go to definition" },
 		],
+	},
+	{
+		title: "Debug",
+		entries: [{ keys: ["Cmd", "F10"], action: "Run to cursor" }],
 	},
 	{
 		title: "Panels",
@@ -169,6 +177,10 @@ export default function App() {
 	const [fileRevealToken, setFileRevealToken] = useState(0);
 	const [gitRefresh, setGitRefresh] = useState(0);
 	const [blameSaveToken, setBlameSaveToken] = useState(0);
+	const [blameOn, setBlameOn] = useState(false);
+	const [blameByPath, setBlameByPath] = useState<Map<string, { line: number; label: string }[]>>(
+		new Map(),
+	);
 	const [gitDiffPath, setGitDiffPath] = useState<string | null>(null);
 	const [gitCommitDiffHash, setGitCommitDiffHash] = useState<string | null>(null);
 	const [terminalOpen, setTerminalOpen] = useState(false);
@@ -455,6 +467,28 @@ export default function App() {
 	}, [root]);
 
 	const tests = useTests(root);
+
+	/* Editor blame annotations: fetched only while the toggle is on, cached per path. */
+	useEffect(() => {
+		if (!blameOn || root === null || activePath === null) return;
+		if (blameByPath.has(activePath)) return;
+		let cancelled = false;
+		gitBlame(root, activePath)
+			.then((rows) => {
+				if (cancelled) return;
+				const annotations = rows.map((row) => ({
+					line: row.line,
+					label: `${row.hash} · ${row.author}`,
+				}));
+				setBlameByPath((current) => new Map(current).set(activePath, annotations));
+			})
+			.catch(() => {
+				if (!cancelled) setBlameOn(false);
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [blameOn, root, activePath, blameByPath]);
 	const active = buffers.find((buffer) => buffer.path === activePath) ?? null;
 
 	useEffect(() => {
@@ -515,6 +549,12 @@ export default function App() {
 						current.map((entry) => (entry.path === path ? written : entry)),
 					);
 					saved += 1;
+					setBlameByPath((current) => {
+						if (!current.has(path)) return current;
+						const next = new Map(current);
+						next.delete(path);
+						return next;
+					});
 					if (outcome.warning !== null) {
 						warned = true;
 					}
@@ -1203,6 +1243,43 @@ export default function App() {
 			run: () => setPanelOpen(!panelExpanded),
 		},
 		{
+			id: "toggle-terminal",
+			label: "Toggle terminal",
+			hint: "",
+			disabled: root === null,
+			run: () => {
+				setTerminalOpen((current) => {
+					if (!current) setPanelOpen(true);
+					return !current;
+				});
+			},
+		},
+		{
+			id: "reveal-active-file",
+			label: "Reveal active file in explorer",
+			hint: "Cmd+Shift+E",
+			disabled: root === null || activePath === null,
+			run: () => setFileRevealToken((current) => current + 1),
+		},
+		{
+			id: "quick-open",
+			label: "Quick open",
+			hint: "Cmd+P",
+			disabled: root === null,
+			run: () => setQuickOpenOpen(true),
+		},
+		{
+			id: "run-to-cursor",
+			label: "Run to cursor",
+			hint: "Cmd+F10",
+			disabled: activePath === null || cursor === null,
+			run: () => {
+				if (activePathRef.current !== null && cursor !== null) {
+					debug.runToCursor(activePathRef.current, cursor.line + 1);
+				}
+			},
+		},
+		{
 			id: "show-shortcuts",
 			label: "Show shortcuts",
 			hint: "Cmd+K",
@@ -1303,6 +1380,15 @@ export default function App() {
 					}}
 				>
 					Tests
+				</button>
+				<button
+					type="button"
+					className="button"
+					disabled={root === null || activePath === null}
+					aria-pressed={blameOn}
+					onClick={() => setBlameOn((current) => !current)}
+				>
+					Blame
 				</button>
 				<button
 					type="button"
@@ -1432,6 +1518,7 @@ export default function App() {
 									onReferences={handleReferences}
 									onCursor={setCursor}
 									onApplyEdits={handleApplyEdits}
+									blame={blameOn ? (blameByPath.get(active.path) ?? null) : null}
 									reveal={
 										revealTarget === null
 											? null
