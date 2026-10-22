@@ -30,6 +30,8 @@ import {
 } from "@codemirror/view";
 import { forwardRef, type JSX, useEffect, useImperativeHandle, useRef, useState } from "react";
 import "@/editor/editor.css";
+import { blameField, setBlame } from "@/editor/blame";
+
 import { breakpointGutter, normalizeLines, setBreakpoints } from "@/editor/breakpoints";
 import { lintSignature, toLintDiagnostics } from "@/editor/diagnostics";
 import { inlayHintsField, setInlayHints } from "@/editor/inlayHints";
@@ -85,6 +87,8 @@ export type EditorProps = {
 	onNotice?: (message: string | null) => void;
 	/** Report caret position changes. */
 	onCursor?: (position: { line: number; character: number }) => void;
+	/** Per-line blame annotations; null/undefined clears them. */
+	blame?: { line: number; label: string }[] | null;
 	/** Apply a batch of file edits produced by rename or code actions. */
 	onApplyEdits?: (edits: FileEdit[]) => void;
 };
@@ -197,6 +201,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		onNotice,
 		onCursor,
 		onApplyEdits,
+		blame = null,
 	}: EditorProps,
 	ref,
 ): JSX.Element {
@@ -642,6 +647,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 					searchDecorations,
 					inlayHintsField,
 					occurrencesField,
+					blameField,
 					lineNumbers(),
 					lintGutter(),
 					highlightActiveLineGutter(),
@@ -1164,6 +1170,12 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		publishedRef.current = { view, signature };
 		view.dispatch(setDiagnostics(view.state, mapped));
 	}, [diagnostics]);
+
+	useEffect(() => {
+		const view = viewRef.current;
+		if (view === null) return;
+		view.dispatch({ effects: setBlame.of(blame ?? null) });
+	}, [blame]);
 
 	// Reveal-only transaction: moves the caret, scrolls it into view and focuses. Keyed on the
 	// token so a repeated target still re-dispatches, while a same-token value does nothing.
