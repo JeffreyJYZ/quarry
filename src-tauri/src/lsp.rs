@@ -17,8 +17,8 @@ use crate::protocol_pipe::{FrameError, ProcessPipe};
 use crate::resolve;
 use crate::types::{
     CodeAction, CompletionItem, CompletionList, Diagnostic, DiagnosticsEvent, FileEdit, HoverInfo,
-    Location, LspStatus, Position, ProjectKind, Range, SignatureHelp, SignatureInformation, Symbol,
-    TextEdit,
+    InlayHint, Location, LspStatus, Position, ProjectKind, Range, SignatureHelp,
+    SignatureInformation, Symbol, TextEdit,
 };
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -1715,4 +1715,75 @@ pub fn parse_signature_help(result: &Value) -> Option<SignatureHelp> {
             .and_then(|n| u32::try_from(n).ok())
             .unwrap_or(0),
     })
+}
+
+/// Inlay hints for one document.
+///
+/// The session tracks only document versions, not their text, so the request range spans the
+/// whole document via a generously large end position rather than a computed one.
+#[tauri::command]
+pub async fn lsp_inlay_hints(
+    state: State<'_, LspState>,
+    root: String,
+    path: String,
+) -> Result<Vec<InlayHint>, String> {
+    let session = session_for(&state, &root)?;
+    let result = send_request(
+        &session,
+        "textDocument/inlayHint",
+        json!({
+            "textDocument": { "uri": path_to_uri(&path) },
+            "range": {
+                "start": { "line": 0, "character": 0 },
+                "end": { "line": 1_000_000, "character": 0 },
+            },
+        }),
+    )
+    .await?;
+    Ok(parse_inlay_hints(&result))
+}
+
+/// Read inlay hints out of a `textDocument/inlayHint` answer.
+///
+/// The answer may be `null` or an array. Each entry carries a `position` and a `label` that is
+/// either a plain string or an array of `{ value }` parts. Entries whose label cannot be
+/// flattened, or whose position is missing or malformed, are skipped.
+pub fn parse_inlay_hints(result: &Value) -> Vec<InlayHint> {
+    if result.is_null() {
+        return Vec::new();
+    }
+    let Some(entries) = result.as_array() else {
+        return Vec::new();
+    };
+    entries.iter().filter_map(parse_inlay_hint).collect()
+}
+
+fn parse_inlay_hint(value: &Value) -> Option<InlayHint> {
+    let position = value.get("position")?;
+    let line = position.get("line")?.as_u64()?;
+    let character = position.get("character")?.as_u64()?;
+    let label = flatten_inlay_label(value.get("label")?)?;
+    Some(InlayHint {
+        line: u32::try_from(line).ok()?,
+        character: u32::try_from(character).ok()?,
+        label,
+        kind: value
+            .get("kind")
+            .and_then(Value::as_u64)
+            .and_then(|kind| u32::try_from(kind).ok()),
+    })
+}
+
+fn flatten_inlay_label(value: &Value) -> Option<String> {
+    match value {
+        Value::String(text) => Some(text.clone()),
+        Value::Array(parts) => {
+            let mut out = String::new();
+            for part in parts {
+                out.push_str(part.get("value").and_then(Value::as_str)?);
+            }
+            Some(out)
+        }
+        _ => None,
+    }
 }

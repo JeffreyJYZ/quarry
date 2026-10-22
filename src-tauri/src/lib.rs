@@ -51,6 +51,7 @@ pub fn run() {
             lsp::lsp_rename,
             lsp::lsp_code_actions,
             lsp::lsp_signature_help,
+            lsp::lsp_inlay_hints,
             build_task::build_project,
             format::format_document,
             format::formatter_for,

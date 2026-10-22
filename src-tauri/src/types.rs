@@ -434,3 +434,14 @@ pub struct SignatureHelp {
     pub active_signature: u32,
     pub active_parameter: u32,
 }
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct InlayHint {
+    /// Zero-based position the hint is drawn at.
+    pub line: u32,
+    pub character: u32,
+    pub label: String,
+    /// 1 type, 2 parameter.
+    pub kind: Option<u32>,
+}
