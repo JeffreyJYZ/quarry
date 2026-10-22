@@ -1,0 +1,1183 @@
+//! Debug sessions over DAP.
+//!
+//! One `lldb-dap` child per session, request/response correlation by `seq`, events forwarded to the
+//! UI, and the measured facts in `docs/spikes/dap.md` taken as given (no `evaluate`, no gating on
+//! `supportsMemoryReferences`, `dataId` without `0x`, `realpath` the project before launch).
+//!
+//! Locking rule: the session map and a single session are never held across a blocking read. The
+//! `initialize` / `launch` handshake reads frames before any session exists, and the pump thread
+//! only locks a session for the short write that answers a server request.
+
+use crate::protocol_pipe::{FrameError, ProcessPipe};
+use crate::types::{
+    DapBreakpoint, DapFrame, DapScope, DapSession, DapStoppedEvent, DapThread, DapVariable,
+    DataBreakpointInfo, DisassembledInstruction, LaunchConfig, MemoryDump,
+};
+use serde_json::{Value, json};
+use std::collections::HashMap;
+use std::env;
+use std::fs;
+use std::io;
+use std::path::Path;
+use std::process::Command;
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU32, AtomicU64, Ordering};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::thread;
+use std::time::{Duration, Instant};
+use tauri::{AppHandle, Emitter, State};
+
+/// The adapter this crate supports; resolved through `PATH` and then `xcrun`.
+const ADAPTER: &str = "lldb-dap";
+
+/// Every request is bounded: a hung adapter fails the command instead of freezing the UI.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// Fixed ids for the two handshake requests; anything a session sends starts above them.
+const INITIALIZE_SEQ: i64 = 1;
+const LAUNCH_SEQ: i64 = 2;
+const FIRST_REQUEST_SEQ: i64 = 3;
+
+/// Held by Tauri as managed state: one live session per generated id.
+#[derive(Default)]
+pub struct DapState {
+    pub sessions: Mutex<HashMap<String, Arc<Session>>>,
+    /// Only ever incremented, so an id is never reused while a stale session is still draining.
+    counter: AtomicU64,
+}
+
+/// A live adapter process plus the correlation state its pump resolves.
+pub struct Session {
+    id: String,
+    /// `None` once [`Session::shutdown`] has taken the child; `ProcessPipe`'s own `Drop` reaps it.
+    pipe: Mutex<Option<ProcessPipe>>,
+    /// Outstanding requests, keyed by the `seq` they were sent with.
+    pending: Mutex<HashMap<i64, Sender<Result<Value, String>>>>,
+    seq: AtomicI64,
+    /// The thread id of the last `stopped` event, which `continue` and the step commands need.
+    stopped_thread: AtomicU32,
+    alive: AtomicBool,
+}
+
+impl Session {
+    fn new(id: String, pipe: ProcessPipe) -> Self {
+        Session {
+            id,
+            pipe: Mutex::new(Some(pipe)),
+            pending: Mutex::new(HashMap::new()),
+            seq: AtomicI64::new(FIRST_REQUEST_SEQ),
+            stopped_thread: AtomicU32::new(0),
+            alive: AtomicBool::new(true),
+        }
+    }
+
+    fn next_seq(&self) -> i64 {
+        self.seq.fetch_add(1, Ordering::SeqCst)
+    }
+
+    fn write(&self, message: &Value) -> io::Result<()> {
+        let mut pipe = lock(&self.pipe);
+        match pipe.as_mut() {
+            Some(pipe) => pipe.send(message),
+            None => Err(io::Error::new(
+                io::ErrorKind::NotConnected,
+                "the session is closed",
+            )),
+        }
+    }
+
+    /// Send one request and wait for its response, at most [`REQUEST_TIMEOUT`].
+    fn request(&self, command: &str, arguments: Value) -> Result<Value, String> {
+        if !self.alive.load(Ordering::SeqCst) {
+            return Err(format!(
+                "{command}: the debug session {} is closed",
+                self.id
+            ));
+        }
+
+        let seq = self.next_seq();
+        let (sender, receiver) = mpsc::channel();
+        lock(&self.pending).insert(seq, sender);
+
+        let message = json!({
+            "seq": seq,
+            "type": "request",
+            "command": command,
+            "arguments": arguments,
+        });
+        if let Err(error) = self.write(&message) {
+            lock(&self.pending).remove(&seq);
+            return Err(format!("{command}: cannot send to {ADAPTER}: {error}"));
+        }
+
+        match receiver.recv_timeout(REQUEST_TIMEOUT) {
+            Ok(Ok(body)) => Ok(body),
+            Ok(Err(message)) => Err(format!("{command} failed: {message}")),
+            Err(RecvTimeoutError::Timeout) => {
+                lock(&self.pending).remove(&seq);
+                Err(format!(
+                    "{command} timed out after {}s",
+                    REQUEST_TIMEOUT.as_secs()
+                ))
+            }
+            Err(RecvTimeoutError::Disconnected) => {
+                Err(format!("{command}: {ADAPTER} stopped answering"))
+            }
+        }
+    }
+
+    /// Hand a response to the request that is waiting on it. `false` when nothing was waiting.
+    fn resolve(&self, message: &Value) -> bool {
+        let Some(request_seq) = message.get("request_seq").and_then(Value::as_i64) else {
+            return false;
+        };
+        let Some(sender) = lock(&self.pending).remove(&request_seq) else {
+            return false;
+        };
+
+        let _ = sender.send(response_result(message));
+        true
+    }
+
+    /// Release every waiting request with `reason`, so a dead adapter fails commands immediately.
+    fn fail_pending(&self, reason: &str) {
+        let pending = std::mem::take(&mut *lock(&self.pending));
+        for (_, sender) in pending {
+            let _ = sender.send(Err(reason.to_string()));
+        }
+    }
+
+    /// Say goodbye, kill and reap the child, and fail anything still waiting. Idempotent.
+    fn shutdown(&self) {
+        if self.alive.swap(false, Ordering::SeqCst) {
+            let _ = self.write(&json!({
+                "seq": self.next_seq(),
+                "type": "request",
+                "command": "disconnect",
+                "arguments": { "terminateDebuggee": true, "restart": false },
+            }));
+        }
+
+        let pipe = lock(&self.pipe).take();
+        if let Some(mut pipe) = pipe {
+            let _ = pipe.kill();
+        }
+        self.fail_pending("the debug session is closed");
+    }
+}
+
+impl Drop for Session {
+    fn drop(&mut self) {
+        self.shutdown();
+    }
+}
+
+/// Start a debug session and return once the adapter is configured and waiting for breakpoints.
+///
+/// `configurationDone` is deliberately not sent here: the caller sets breakpoints first.
+#[tauri::command]
+pub async fn dap_launch(
+    app: AppHandle,
+    state: State<'_, DapState>,
+    root: String,
+    config: LaunchConfig,
+) -> Result<DapSession, String> {
+    let adapter = resolve_adapter()?;
+    // LLDB canonicalises the DWARF source path, so a `/var/…` cwd leaves every breakpoint
+    // unverified. Resolve the directory before the child inherits it.
+    let cwd = real_directory(&config.cwd)?;
+
+    let mut command = Command::new(&adapter);
+    command.current_dir(&cwd);
+    let mut pipe = ProcessPipe::spawn(&mut command)
+        .map_err(|error| format!("cannot start {ADAPTER} ({adapter}) for {root}: {error}"))?;
+
+    if let Err(error) = handshake(&mut pipe, &adapter, &config, &cwd) {
+        let _ = pipe.kill();
+        return Err(error);
+    }
+
+    let frames = pipe.take_frames();
+    let id = format!("dap-{}", state.counter.fetch_add(1, Ordering::SeqCst) + 1);
+    let session = Arc::new(Session::new(id.clone(), pipe));
+
+    let pump = Pump {
+        app,
+        session: Arc::clone(&session),
+        frames,
+        deferred: Vec::new(),
+        depth: 0,
+    };
+    thread::Builder::new()
+        .name("quarry-dap-pump".to_string())
+        .spawn(move || pump.run())
+        .map_err(|error| {
+            session.shutdown();
+            lock(&state.sessions).remove(&id);
+            format!("cannot start the {ADAPTER} reader thread: {error}")
+        })?;
+
+    lock(&state.sessions).insert(id.clone(), session);
+
+    Ok(DapSession {
+        id,
+        program: config.program,
+    })
+}
+
+#[tauri::command]
+pub async fn dap_configuration_done(
+    state: State<'_, DapState>,
+    session: String,
+) -> Result<(), String> {
+    session_for(&state, &session)?
+        .request("configurationDone", json!({}))
+        .map(|_| ())
+}
+
+#[tauri::command]
+pub async fn dap_set_breakpoints(
+    state: State<'_, DapState>,
+    session: String,
+    path: String,
+    lines: Vec<u32>,
+) -> Result<Vec<DapBreakpoint>, String> {
+    let breakpoints: Vec<Value> = lines.iter().map(|line| json!({ "line": line })).collect();
+    let body = session_for(&state, &session)?.request(
+        "setBreakpoints",
+        json!({
+            "source": { "path": path },
+            "breakpoints": breakpoints,
+            "sourceModified": false,
+        }),
+    )?;
+
+    Ok(breakpoints_from(&body))
+}
+
+#[tauri::command]
+pub async fn dap_continue(state: State<'_, DapState>, session: String) -> Result<(), String> {
+    let session = session_for(&state, &session)?;
+    let thread_id = session.stopped_thread.load(Ordering::SeqCst);
+
+    session
+        .request("continue", json!({ "threadId": thread_id }))
+        .map(|_| ())
+}
+
+/// `kind` is `next`, `stepIn` or `stepOut`.
+#[tauri::command]
+pub async fn dap_step(
+    state: State<'_, DapState>,
+    session: String,
+    kind: String,
+) -> Result<(), String> {
+    let command = step_command(&kind)?;
+    let session = session_for(&state, &session)?;
+    let thread_id = session.stopped_thread.load(Ordering::SeqCst);
+
+    session
+        .request(command, json!({ "threadId": thread_id }))
+        .map(|_| ())
+}
+
+#[tauri::command]
+pub async fn dap_threads(
+    state: State<'_, DapState>,
+    session: String,
+) -> Result<Vec<DapThread>, String> {
+    let body = session_for(&state, &session)?.request("threads", json!({}))?;
+
+    Ok(threads_from(&body))
+}
+
+#[tauri::command]
+pub async fn dap_stack_trace(
+    state: State<'_, DapState>,
+    session: String,
+    thread_id: u32,
+) -> Result<Vec<DapFrame>, String> {
+    let body = session_for(&state, &session)?.request(
+        "stackTrace",
+        json!({ "threadId": thread_id, "startFrame": 0, "levels": 100 }),
+    )?;
+
+    Ok(frames_from(&body))
+}
+
+#[tauri::command]
+pub async fn dap_scopes(
+    state: State<'_, DapState>,
+    session: String,
+    frame_id: u32,
+) -> Result<Vec<DapScope>, String> {
+    let body = session_for(&state, &session)?.request("scopes", json!({ "frameId": frame_id }))?;
+
+    Ok(scopes_from(&body))
+}
+
+#[tauri::command]
+pub async fn dap_variables(
+    state: State<'_, DapState>,
+    session: String,
+    variables_reference: u32,
+) -> Result<Vec<DapVariable>, String> {
+    let body = session_for(&state, &session)?.request(
+        "variables",
+        json!({ "variablesReference": variables_reference }),
+    )?;
+
+    Ok(variables_from(&body))
+}
+
+#[tauri::command]
+pub async fn dap_read_memory(
+    state: State<'_, DapState>,
+    session: String,
+    address: String,
+    count: u32,
+) -> Result<MemoryDump, String> {
+    let body = session_for(&state, &session)?.request(
+        "readMemory",
+        json!({ "memoryReference": address, "count": count, "offset": 0 }),
+    )?;
+
+    let data = body.get("data").and_then(Value::as_str).unwrap_or_default();
+    let bytes = base64_decode(data).map_err(|error| format!("readMemory at {address}: {error}"))?;
+
+    Ok(MemoryDump { address, bytes })
+}
+
+#[tauri::command]
+pub async fn dap_disassemble(
+    state: State<'_, DapState>,
+    session: String,
+    address: String,
+    count: u32,
+) -> Result<Vec<DisassembledInstruction>, String> {
+    let body = session_for(&state, &session)?.request(
+        "disassemble",
+        json!({
+            "memoryReference": address,
+            "offset": 0,
+            "instructionOffset": 0,
+            "instructionCount": count,
+            "resolveSymbols": true,
+        }),
+    )?;
+
+    Ok(instructions_from(&body))
+}
+
+#[tauri::command]
+pub async fn dap_data_breakpoint_info(
+    state: State<'_, DapState>,
+    session: String,
+    variables_reference: u32,
+    name: String,
+) -> Result<DataBreakpointInfo, String> {
+    let body = session_for(&state, &session)?.request(
+        "dataBreakpointInfo",
+        json!({ "variablesReference": variables_reference, "name": name }),
+    )?;
+
+    Ok(data_breakpoint_info_from(&body))
+}
+
+#[tauri::command]
+pub async fn dap_set_data_breakpoints(
+    state: State<'_, DapState>,
+    session: String,
+    data_ids: Vec<String>,
+) -> Result<Vec<DapBreakpoint>, String> {
+    let breakpoints: Vec<Value> = data_ids
+        .iter()
+        .map(|data_id| json!({ "dataId": data_id, "accessType": "write" }))
+        .collect();
+    let body = session_for(&state, &session)?
+        .request("setDataBreakpoints", json!({ "breakpoints": breakpoints }))?;
+
+    Ok(breakpoints_from(&body))
+}
+
+#[tauri::command]
+pub async fn dap_stop(state: State<'_, DapState>, session: String) -> Result<(), String> {
+    let session = lock(&state.sessions).remove(&session);
+    if let Some(session) = session {
+        session.shutdown();
+    }
+
+    Ok(())
+}
+
+/// Read frames off the adapter and keep both sides unblocked.
+struct Pump {
+    app: AppHandle,
+    session: Arc<Session>,
+    frames: Receiver<Result<Value, FrameError>>,
+    /// Messages seen while a stop was being enriched; replayed in order afterwards.
+    deferred: Vec<Value>,
+    /// Set while the pump issues a request of its own, which must never nest another one.
+    depth: u8,
+}
+
+impl Pump {
+    fn run(mut self) {
+        while let Some(message) = self.next() {
+            self.handle(message);
+        }
+
+        self.session.fail_pending(&format!("{ADAPTER} stopped"));
+        self.session.alive.store(false, Ordering::SeqCst);
+    }
+
+    fn next(&mut self) -> Option<Value> {
+        if !self.deferred.is_empty() {
+            return Some(self.deferred.remove(0));
+        }
+
+        match self.frames.recv() {
+            Ok(Ok(value)) => Some(value),
+            // A framing error is the end of the stream, exactly like a closed channel.
+            Ok(Err(_)) | Err(_) => None,
+        }
+    }
+
+    fn handle(&mut self, message: Value) {
+        match message.get("type").and_then(Value::as_str) {
+            Some("response") => {
+                self.session.resolve(&message);
+            }
+            Some("event") => self.event(&message),
+            Some("request") => {
+                // Adapter-initiated request (`runInTerminal`, `startDebugging`, …). Nothing here
+                // can serve one, so acknowledge with a null body instead of deadlocking.
+                let response = server_response(self.session.next_seq(), &message);
+                let _ = self.session.write(&response);
+            }
+            _ => {}
+        }
+    }
+
+    fn event(&mut self, message: &Value) {
+        let Some(name) = message.get("event").and_then(Value::as_str) else {
+            return;
+        };
+        let body = message.get("body").cloned().unwrap_or(Value::Null);
+
+        match name {
+            "stopped" => {
+                if let Some(thread_id) = body.get("threadId").and_then(Value::as_u64) {
+                    self.session
+                        .stopped_thread
+                        .store(thread_id as u32, Ordering::SeqCst);
+                }
+                // DAP's `stopped` body carries no location, so the UI needs the top frame.
+                let (source, line) = self.top_frame(&body);
+                emit_stopped(
+                    &self.app,
+                    stopped_event(&self.session.id, &body, source, line),
+                );
+            }
+            "terminated" | "exited" => emit_terminated(&self.app, &self.session.id),
+            // `output`, `initialized`, `breakpoint` and the rest need nothing beyond a log.
+            _ => {}
+        }
+    }
+
+    /// Where the stop happened: the top frame's source path and line, if the adapter gives them.
+    fn top_frame(&mut self, body: &Value) -> (Option<String>, Option<u32>) {
+        let Some(thread_id) = body.get("threadId").and_then(Value::as_u64) else {
+            return (None, None);
+        };
+
+        let Some(response) = self.request(
+            "stackTrace",
+            json!({ "threadId": thread_id, "startFrame": 0, "levels": 1 }),
+        ) else {
+            return (None, None);
+        };
+
+        let top = response
+            .get("stackFrames")
+            .and_then(Value::as_array)
+            .and_then(|frames| frames.first());
+        let Some(top) = top else {
+            return (None, None);
+        };
+
+        (
+            top.get("source")
+                .and_then(|source| source.get("path"))
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            top.get("line")
+                .and_then(Value::as_u64)
+                .map(|line| line as u32),
+        )
+    }
+
+    /// A request the pump makes itself, reading its own response off the stream.
+    ///
+    /// Any other message that arrives meanwhile is deferred, because the pump is the only reader.
+    fn request(&mut self, command: &str, arguments: Value) -> Option<Value> {
+        if self.depth > 0 {
+            return None;
+        }
+
+        self.depth += 1;
+        let result = self.request_inner(command, arguments);
+        self.depth -= 1;
+        result
+    }
+
+    fn request_inner(&mut self, command: &str, arguments: Value) -> Option<Value> {
+        let seq = self.session.next_seq();
+        let message = json!({
+            "seq": seq,
+            "type": "request",
+            "command": command,
+            "arguments": arguments,
+        });
+        self.session.write(&message).ok()?;
+
+        let deadline = Instant::now() + REQUEST_TIMEOUT;
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return None;
+            }
+
+            match self.frames.recv_timeout(remaining) {
+                Ok(Ok(value)) => {
+                    let is_ours = value.get("type").and_then(Value::as_str) == Some("response")
+                        && value.get("request_seq").and_then(Value::as_i64) == Some(seq);
+                    if is_ours {
+                        return match response_result(&value) {
+                            Ok(body) => Some(body),
+                            Err(_) => None,
+                        };
+                    }
+                    self.deferred.push(value);
+                }
+                Ok(Err(_)) | Err(_) => return None,
+            }
+        }
+    }
+}
+
+/// `initialize`, `launch`, then wait for `initialized`. `configurationDone` is the caller's job.
+fn handshake(
+    pipe: &mut ProcessPipe,
+    adapter: &str,
+    config: &LaunchConfig,
+    cwd: &str,
+) -> Result<(), String> {
+    let mut reverse_seq = FIRST_REQUEST_SEQ;
+
+    pipe.send(&json!({
+        "seq": INITIALIZE_SEQ,
+        "type": "request",
+        "command": "initialize",
+        "arguments": {
+            "clientID": "quarry",
+            "clientName": "quarry",
+            "adapterID": "lldb",
+            "linesStartAt1": true,
+            "columnsStartAt1": true,
+            "pathFormat": "path",
+            "supportsVariableType": true,
+            "supportsVariablePaging": true,
+            "supportsMemoryReferences": true,
+            "supportsRunInTerminalRequest": false,
+        },
+    }))
+    .map_err(|error| format!("cannot send initialize to {adapter}: {error}"))?;
+
+    pump_until(pipe, adapter, "initialize", &mut reverse_seq, |message| {
+        if message.get("request_seq").and_then(Value::as_i64) != Some(INITIALIZE_SEQ) {
+            return Ok(false);
+        }
+        response_result(message)
+            .map_err(|error| format!("{adapter} rejected initialize: {error}"))?;
+        Ok(true)
+    })?;
+
+    pipe.send(&json!({
+        "seq": LAUNCH_SEQ,
+        "type": "request",
+        "command": "launch",
+        "arguments": {
+            "program": &config.program,
+            "args": &config.args,
+            "cwd": cwd,
+            "stopOnEntry": config.stop_on_entry,
+            "initCommands": &config.init_commands,
+        },
+    }))
+    .map_err(|error| format!("cannot send launch to {adapter}: {error}"))?;
+
+    let mut launched = false;
+    let mut initialized = false;
+    pump_until(pipe, adapter, "launch", &mut reverse_seq, |message| {
+        match message.get("type").and_then(Value::as_str) {
+            Some("response")
+                if message.get("request_seq").and_then(Value::as_i64) == Some(LAUNCH_SEQ) =>
+            {
+                response_result(message)
+                    .map_err(|error| format!("{adapter} rejected launch: {error}"))?;
+                launched = true;
+            }
+            Some("event")
+                if message.get("event").and_then(Value::as_str) == Some("initialized") =>
+            {
+                initialized = true;
+            }
+            _ => {}
+        }
+
+        Ok(launched && initialized)
+    })
+}
+
+/// Read frames until `check` says the handshake step is done, answering server requests on the way.
+fn pump_until<F>(
+    pipe: &mut ProcessPipe,
+    adapter: &str,
+    what: &str,
+    reverse_seq: &mut i64,
+    mut check: F,
+) -> Result<(), String>
+where
+    F: FnMut(&Value) -> Result<bool, String>,
+{
+    let deadline = Instant::now() + REQUEST_TIMEOUT;
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err(format!(
+                "{adapter} did not answer {what} within {}s",
+                REQUEST_TIMEOUT.as_secs()
+            ));
+        }
+
+        match pipe.frames.recv_timeout(remaining) {
+            Ok(Ok(message)) => {
+                if message.get("type").and_then(Value::as_str) == Some("request") {
+                    let response = server_response(*reverse_seq, &message);
+                    *reverse_seq += 1;
+                    let _ = pipe.send(&response);
+                    continue;
+                }
+                if check(&message)? {
+                    return Ok(());
+                }
+            }
+            Ok(Err(error)) => {
+                return Err(format!(
+                    "{adapter} stopped before it could answer {what}: {error}"
+                ));
+            }
+            Err(RecvTimeoutError::Timeout) => {
+                return Err(format!(
+                    "{adapter} did not answer {what} within {}s",
+                    REQUEST_TIMEOUT.as_secs()
+                ));
+            }
+            Err(RecvTimeoutError::Disconnected) => {
+                return Err(format!("{adapter} exited before it could answer {what}"));
+            }
+        }
+    }
+}
+
+/// The only place a poisoned lock is recovered: a panicking pump thread must not turn every later
+/// command into an error.
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poison| poison.into_inner())
+}
+
+fn session_for(state: &DapState, id: &str) -> Result<Arc<Session>, String> {
+    lock(&state.sessions)
+        .get(id)
+        .cloned()
+        .ok_or_else(|| format!("no debug session {id}"))
+}
+
+/// A response's body, or the adapter's own message when it failed.
+fn response_result(message: &Value) -> Result<Value, String> {
+    if message
+        .get("success")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        return Ok(message.get("body").cloned().unwrap_or(Value::Null));
+    }
+
+    Err(message
+        .get("message")
+        .and_then(Value::as_str)
+        .unwrap_or("no message")
+        .to_string())
+}
+
+/// A response to an adapter-initiated request: acknowledged with a null body.
+fn server_response(seq: i64, request: &Value) -> Value {
+    json!({
+        "seq": seq,
+        "type": "response",
+        "request_seq": request.get("seq").cloned().unwrap_or(Value::Null),
+        "success": true,
+        "command": request.get("command").cloned().unwrap_or(Value::Null),
+        "body": Value::Null,
+    })
+}
+
+fn emit_stopped(app: &AppHandle, payload: DapStoppedEvent) {
+    let _ = app.emit("dap://stopped", payload);
+}
+
+fn emit_terminated(app: &AppHandle, session: &str) {
+    let _ = app.emit("dap://terminated", json!({ "session": session }));
+}
+
+/// The `stopped` body plus the location the pump looked up for it.
+fn stopped_event(
+    session: &str,
+    body: &Value,
+    source: Option<String>,
+    line: Option<u32>,
+) -> DapStoppedEvent {
+    DapStoppedEvent {
+        session: session.to_string(),
+        reason: body
+            .get("reason")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown")
+            .to_string(),
+        description: body
+            .get("description")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        thread_id: body
+            .get("threadId")
+            .and_then(Value::as_u64)
+            .map(|id| id as u32),
+        line,
+        source,
+    }
+}
+
+/// The DAP command for a step kind, rejecting anything the UI might invent.
+fn step_command(kind: &str) -> Result<&'static str, String> {
+    match kind {
+        "next" => Ok("next"),
+        "stepIn" => Ok("stepIn"),
+        "stepOut" => Ok("stepOut"),
+        other => Err(format!(
+            "unknown step kind {other:?}: expected next, stepIn or stepOut"
+        )),
+    }
+}
+
+fn entries(body: &Value, key: &str) -> Vec<Value> {
+    body.get(key)
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+}
+
+fn breakpoints_from(body: &Value) -> Vec<DapBreakpoint> {
+    entries(body, "breakpoints")
+        .iter()
+        .map(|entry| DapBreakpoint {
+            id: entry.get("id").and_then(Value::as_u64).map(|id| id as u32),
+            verified: entry
+                .get("verified")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+            line: entry
+                .get("line")
+                .and_then(Value::as_u64)
+                .map(|line| line as u32),
+            message: entry
+                .get("message")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            source: entry
+                .get("source")
+                .and_then(|source| source.get("path"))
+                .and_then(Value::as_str)
+                .map(str::to_string),
+        })
+        .collect()
+}
+
+fn threads_from(body: &Value) -> Vec<DapThread> {
+    entries(body, "threads")
+        .iter()
+        .map(|entry| DapThread {
+            id: entry.get("id").and_then(Value::as_u64).unwrap_or(0) as u32,
+            name: entry
+                .get("name")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
+        })
+        .collect()
+}
+
+fn frames_from(body: &Value) -> Vec<DapFrame> {
+    entries(body, "stackFrames")
+        .iter()
+        .map(|entry| DapFrame {
+            id: entry.get("id").and_then(Value::as_u64).unwrap_or(0) as u32,
+            name: entry
+                .get("name")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
+            source: entry
+                .get("source")
+                .and_then(|source| source.get("path"))
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            line: entry.get("line").and_then(Value::as_u64).unwrap_or(0) as u32,
+            column: entry.get("column").and_then(Value::as_u64).unwrap_or(0) as u32,
+            instruction_pointer: entry
+                .get("instructionPointerReference")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+        })
+        .collect()
+}
+
+fn scopes_from(body: &Value) -> Vec<DapScope> {
+    entries(body, "scopes")
+        .iter()
+        .map(|entry| DapScope {
+            name: entry
+                .get("name")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
+            variables_reference: entry
+                .get("variablesReference")
+                .and_then(Value::as_u64)
+                .unwrap_or(0) as u32,
+            expensive: entry
+                .get("expensive")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+        })
+        .collect()
+}
+
+fn variables_from(body: &Value) -> Vec<DapVariable> {
+    entries(body, "variables")
+        .iter()
+        .map(|entry| DapVariable {
+            name: entry
+                .get("name")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
+            value: entry
+                .get("value")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
+            type_name: entry
+                .get("type")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            variables_reference: entry
+                .get("variablesReference")
+                .and_then(Value::as_u64)
+                .unwrap_or(0) as u32,
+            memory_reference: entry
+                .get("memoryReference")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+        })
+        .collect()
+}
+
+fn instructions_from(body: &Value) -> Vec<DisassembledInstruction> {
+    entries(body, "instructions")
+        .iter()
+        .map(|entry| DisassembledInstruction {
+            address: entry
+                .get("address")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
+            instruction: entry
+                .get("instruction")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
+            symbol: entry
+                .get("symbol")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+        })
+        .collect()
+}
+
+fn data_breakpoint_info_from(body: &Value) -> DataBreakpointInfo {
+    DataBreakpointInfo {
+        data_id: body
+            .get("dataId")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        description: body
+            .get("description")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        access_types: body
+            .get("accessTypes")
+            .and_then(Value::as_array)
+            .map(|types| {
+                types
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect()
+            })
+            .unwrap_or_default(),
+    }
+}
+
+/// Standard base64 with `=` padding, decoded without a crate.
+///
+/// Whitespace is skipped, padding is only accepted at the tail, and a stray character is an error,
+/// because a wrong decode would silently corrupt the hex view.
+fn base64_decode(text: &str) -> Result<Vec<u8>, String> {
+    let bytes = text.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len() / 4 * 3);
+    let mut buffer = 0u32;
+    let mut bits = 0u32;
+
+    for (index, byte) in bytes.iter().enumerate() {
+        let sextet = match byte {
+            b'A'..=b'Z' => byte - b'A',
+            b'a'..=b'z' => byte - b'a' + 26,
+            b'0'..=b'9' => byte - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            b'=' => {
+                if bytes[index..].iter().any(|byte| *byte != b'=') {
+                    return Err(format!("padding at byte {index} is not at the tail"));
+                }
+                break;
+            }
+            b' ' | b'\t' | b'\r' | b'\n' => continue,
+            other => {
+                return Err(format!(
+                    "invalid base64 character {:?} at byte {index}",
+                    *other as char
+                ));
+            }
+        };
+
+        buffer = (buffer << 6) | u32::from(sextet);
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            decoded.push((buffer >> bits) as u8);
+            buffer &= (1 << bits) - 1;
+        }
+    }
+
+    Ok(decoded)
+}
+
+/// `PATH` first, then `xcrun`: a GUI-launched app inherits launchd's `PATH`, so the Apple-shipped
+/// `lldb-dap` is only reachable through `xcrun`.
+fn resolve_adapter() -> Result<String, String> {
+    if let Some(found) = find_on_path(ADAPTER) {
+        return Ok(found);
+    }
+    if let Some(found) = find_with_xcrun(ADAPTER) {
+        return Ok(found);
+    }
+
+    Err(format!(
+        "{ADAPTER} not found on PATH or through xcrun; install the Xcode command line tools with \
+         `xcode-select --install`"
+    ))
+}
+
+/// The directory's real path, with every symlink resolved.
+fn real_directory(path: &str) -> Result<String, String> {
+    let resolved = fs::canonicalize(path)
+        .map_err(|error| format!("cannot resolve the launch directory {path}: {error}"))?;
+
+    Ok(resolved.to_string_lossy().into_owned())
+}
+
+fn find_on_path(name: &str) -> Option<String> {
+    let path = env::var_os("PATH")?;
+
+    env::split_paths(&path).find_map(|directory| {
+        if directory.as_os_str().is_empty() {
+            return None;
+        }
+
+        let candidate = directory.join(name);
+        is_executable(&candidate).then(|| candidate.to_string_lossy().into_owned())
+    })
+}
+
+#[cfg(unix)]
+fn is_executable(path: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+
+    // `metadata` follows symlinks, so a shim that links to the real binary counts as a hit.
+    fs::metadata(path)
+        .map(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
+        .unwrap_or(false)
+}
+
+#[cfg(not(unix))]
+fn is_executable(path: &Path) -> bool {
+    fs::metadata(path)
+        .map(|meta| meta.is_file())
+        .unwrap_or(false)
+}
+
+fn find_with_xcrun(name: &str) -> Option<String> {
+    let output = Command::new("xcrun").args(["--find", name]).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let found = stdout.lines().next()?.trim();
+    if found.is_empty() || !Path::new(found).exists() {
+        return None;
+    }
+
+    Some(found.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn base64_decodes_with_padding() {
+        assert_eq!(base64_decode("cXVhcnJ5").expect("decode"), b"quarry");
+        assert_eq!(base64_decode("").expect("decode"), Vec::<u8>::new());
+        assert_eq!(
+            base64_decode("3q2+7wARIjM=").expect("decode"),
+            vec![0xde, 0xad, 0xbe, 0xef, 0x00, 0x11, 0x22, 0x33]
+        );
+        assert_eq!(base64_decode("AA==").expect("decode"), vec![0x00]);
+        assert_eq!(base64_decode("AAE=").expect("decode"), vec![0x00, 0x01]);
+    }
+
+    #[test]
+    fn base64_decodes_without_padding() {
+        // The adapter pads, but a reader that refuses an unpadded tail is a latent defect.
+        assert_eq!(
+            base64_decode("3q2+7wARIjM").expect("decode"),
+            vec![0xde, 0xad, 0xbe, 0xef, 0x00, 0x11, 0x22, 0x33]
+        );
+        assert_eq!(base64_decode("AAE").expect("decode"), vec![0x00, 0x01]);
+        assert_eq!(base64_decode("AA").expect("decode"), vec![0x00]);
+    }
+
+    #[test]
+    fn base64_rejects_a_stray_character() {
+        let error = base64_decode("3q2*7w==").expect_err("stray character");
+        assert!(error.contains("invalid base64"), "message: {error}");
+    }
+
+    #[test]
+    fn stopped_event_maps_the_body_and_a_known_location() {
+        let body = json!({
+            "reason": "breakpoint",
+            "threadId": 7,
+            "description": "watchpoint 1",
+        });
+
+        let event = stopped_event("dap-1", &body, Some("/p/src/main.rs".to_string()), Some(12));
+        assert_eq!(event.session, "dap-1");
+        assert_eq!(event.reason, "breakpoint");
+        assert_eq!(event.description.as_deref(), Some("watchpoint 1"));
+        assert_eq!(event.thread_id, Some(7));
+        assert_eq!(event.source.as_deref(), Some("/p/src/main.rs"));
+        assert_eq!(event.line, Some(12));
+    }
+
+    #[test]
+    fn stopped_event_tolerates_a_missing_location_and_body() {
+        let event = stopped_event("dap-2", &json!({}), None, None);
+        assert_eq!(event.session, "dap-2");
+        assert_eq!(event.reason, "unknown");
+        assert_eq!(event.description, None);
+        assert_eq!(event.thread_id, None);
+        assert_eq!(event.source, None);
+        assert_eq!(event.line, None);
+    }
+
+    #[test]
+    fn breakpoint_response_maps_ids_verified_flags_lines_and_source() {
+        let body = json!({
+            "breakpoints": [
+                {
+                    "id": 3,
+                    "verified": true,
+                    "line": 12,
+                    "source": { "path": "/p/src/main.rs" },
+                },
+                { "verified": false, "line": 40, "message": "pending" },
+            ],
+        });
+
+        let mapped = breakpoints_from(&body);
+        assert_eq!(mapped.len(), 2);
+
+        assert_eq!(mapped[0].id, Some(3));
+        assert!(mapped[0].verified);
+        assert_eq!(mapped[0].line, Some(12));
+        assert_eq!(mapped[0].source.as_deref(), Some("/p/src/main.rs"));
+        assert_eq!(mapped[0].message, None);
+
+        assert_eq!(mapped[1].id, None);
+        assert!(!mapped[1].verified);
+        assert_eq!(mapped[1].line, Some(40));
+        assert_eq!(mapped[1].message.as_deref(), Some("pending"));
+
+        assert!(breakpoints_from(&json!({})).is_empty());
+    }
+
+    #[test]
+    fn step_kinds_are_whitelisted() {
+        for kind in ["next", "stepIn", "stepOut"] {
+            let command = step_command(kind).expect("accepted step kind");
+            assert_eq!(command, kind);
+        }
+
+        let error = step_command("stepOver").expect_err("unknown step kind");
+        assert!(error.contains("stepOver"), "message: {error}");
+        assert!(error.contains("next"), "message: {error}");
+        assert!(step_command("").is_err());
+    }
+
+    #[test]
+    fn data_breakpoint_info_keeps_the_dataid_shape() {
+        let info = data_breakpoint_info_from(&json!({
+            "dataId": "16FDFDCBC/4",
+            "description": "4 bytes at 16FDFDCBC n",
+            "accessTypes": ["read", "write", "readWrite"],
+        }));
+
+        assert_eq!(info.data_id.as_deref(), Some("16FDFDCBC/4"));
+        assert_eq!(info.description, "4 bytes at 16FDFDCBC n");
+        assert_eq!(info.access_types, vec!["read", "write", "readWrite"]);
+    }
+}

@@ -202,6 +202,16 @@ impl ProcessPipe {
         write_frame(&mut self.stdin, value)
     }
 
+    /// Move the frame receiver out; sending stays available.
+    ///
+    /// The caller takes ownership of the stream from the child, which is what a protocol pump needs
+    /// when it reads frames on its own thread. The pipe keeps a fresh, empty channel in the field's
+    /// place, so the struct stays whole and `send` / `kill` behave exactly as before.
+    pub fn take_frames(&mut self) -> Receiver<Result<serde_json::Value, FrameError>> {
+        let (_sender, replacement) = mpsc::channel();
+        std::mem::replace(&mut self.frames, replacement)
+    }
+
     /// Terminate the child and reap it so no zombie is left behind.
     pub fn kill(&mut self) -> io::Result<()> {
         if self.finished {

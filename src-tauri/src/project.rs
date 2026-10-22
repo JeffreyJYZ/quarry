@@ -14,9 +14,10 @@ const COMPILE_COMMANDS: &str = "compile_commands.json";
 const BUILD_DIR: &str = "build";
 const LAUNCH_CONFIG: &str = ".quarry/launch.json";
 
-#[tauri::command]
-pub fn open_project(root: String) -> Result<ProjectInfo, String> {
-    let canonical = Path::new(&root)
+/// Inspects a project root: canonicalises it, walks up for a build marker, and reports kind, name,
+/// build root and launch config. Never spawns a build.
+pub fn inspect(root: &str) -> Result<ProjectInfo, String> {
+    let canonical = Path::new(root)
         .canonicalize()
         .map_err(|error| format!("cannot open project root {root}: {error}"))?;
     if !canonical.is_dir() {
@@ -40,6 +41,11 @@ pub fn open_project(root: String) -> Result<ProjectInfo, String> {
         build_root: display(&build_root),
         launch_config: launch_config_path(&canonical),
     })
+}
+
+#[tauri::command]
+pub fn open_project(root: String) -> Result<ProjectInfo, String> {
+    inspect(&root)
 }
 
 struct Detected {
