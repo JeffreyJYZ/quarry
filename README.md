@@ -69,8 +69,9 @@ read off `src-tauri/src/lib.rs` and `src/`:
   diff for a selected commit (`git_commit_diff`), plus `git_status` and `git_file_diff` commands.
   Discard changes run through `git_discard` with a confirmation prompt in
   `src/git/SourceControl.tsx`. Blame annotations render in the editor through
-  `src/editor/blame.ts` (wired into `src/editor/Editor.tsx`) on top of the `git_blame` backend;
-  there is no toolbar toggle yet.
+  `src/editor/blame.ts` (wired into `src/editor/Editor.tsx`) on top of the `git_blame` backend,
+  toggled by the title-bar `Blame` button (`blameOn` in `src/App.tsx`); the Source Control
+  `Blame` tab groups the same data by commit.
 - **Breadcrumb**: a strip showing the file path and the symbol chain containing the caret, built from
   `lsp_symbols` in `src/breadcrumb/Breadcrumb.tsx`.
 
