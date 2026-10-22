@@ -19,6 +19,7 @@ import {
 } from "@/lsp/diagnostics";
 import { useDiagnosticsFeed } from "@/lsp/feed";
 import { useDocumentSync, useLspServer } from "@/lsp/session";
+import Outline from "@/outline/Outline";
 import { fileName, plural, problemFiles } from "@/problems/model";
 import {
 	buildProject,
@@ -945,12 +946,19 @@ export default function App() {
 							<span className="label">explorer</span>
 						</div>
 						{project ? (
-							<FileTree
-								key={project.root}
-								root={project.root}
-								activePath={activePath}
-								onOpenFile={handleOpenFile}
-							/>
+							<>
+								<FileTree
+									key={project.root}
+									root={project.root}
+									activePath={activePath}
+									onOpenFile={handleOpenFile}
+								/>
+								<Outline
+									root={project.root}
+									activePath={activePath}
+									onNavigate={handleNavigate}
+								/>
+							</>
 						) : (
 							<p className="empty">No folder open. Use Open project to choose one.</p>
 						)}
