@@ -24,7 +24,7 @@ read off `src-tauri/src/lib.rs` and `src/`:
 - **Insight**: one language server per project root — `rust-analyzer` for Cargo, `clangd` for CMake or
   `compile_commands.json` — with full-document sync. Diagnostics stream into the editor and the Problems
   dock, grouped by file with severity, line and message. Hover, go-to-definition, references and
-  completion commands are wired; completion is present but unverified against a live server.
+  completion commands are wired; hover, completion (CompletionList with real labels), definition (LocationLink[]) and references (24) are verified against rust-analyzer 1.99.0 via `bun run scripts/lsp-ux-smoke.ts`.
 - **Build**: `build_project` runs `cargo build --message-format=json` and merges its machine-readable
   diagnostics into the Problems dock.
 - **Run**: `run_program` / `stop_program` stream `run://output` lines and one `run://exited`. Backend
@@ -41,14 +41,12 @@ read off `src-tauri/src/lib.rs` and `src/`:
   `git_status` and `git_file_diff` commands.
 
 Still missing, and named here so it is not mistaken for done:
-- **Completion is present but unverified against a live server.** Hover, definition and references share
-  the same path and are exercised by it.
+- **No embedded terminal.**
 - **No `evaluate`, so no watch expressions** — Rust expression evaluation is broken in `lldb-dap` (see
   the spike).
 - **C/C++ builds are not wired.** `build_project` refuses any project kind other than Cargo, and the
   no-preset launch composition is Cargo-only. A preset that names an already-built binary is the C/C++
   debug path. C/C++ builds also need `cmake`, which is not installed on this machine.
-- **No embedded terminal.**
 - **No remote development, embedded targets, profilers, databases, Docker, AI assistance or plugin API.**
 
 ## What "parity" means here
@@ -93,6 +91,14 @@ bun run build         # tsc --noEmit + vite build
 ```
 
 Rust tests run from the Tauri crate: `cd src-tauri && cargo test`.
+
+## Smoke scripts
+
+- `scripts/lsp-smoke.ts` — initialize handshake against a language server.
+- `scripts/lsp-ux-smoke.ts` — navigation response shapes (hover, completion, definition, references).
+- `scripts/dap-spike.ts` — debugger capabilities, memory, breakpoints and formatters.
+- `scripts/dap-eval-probe.ts` — Rust evaluate attempts.
+- `scripts/cxx-smoke.ts` — clang diagnostic shape and the missing-cmake path.
 
 ## License
 
