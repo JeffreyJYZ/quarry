@@ -85,6 +85,15 @@ const SHORTCUT_GROUPS = [
 		title: "Panels",
 		entries: [{ keys: ["Esc"], action: "Close in-file search / sheet" }],
 	},
+	{
+		title: "View",
+		entries: [
+			{ keys: ["Cmd", "B"], action: "Toggle left rail" },
+			{ keys: ["Cmd", "J"], action: "Toggle bottom dock" },
+			{ keys: ["Cmd", "Shift", "D"], action: "Toggle debug panel" },
+			{ keys: ["Cmd", "Shift", "G"], action: "Toggle source control" },
+		],
+	},
 ];
 
 /** How long the transient save line stays in the status bar. */
@@ -130,6 +139,7 @@ export default function App() {
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
 	const [debugOpen, setDebugOpen] = useState(false);
 	const [gitOpen, setGitOpen] = useState(false);
+	const [railCollapsed, setRailCollapsed] = useState(false);
 	const [gitRefresh, setGitRefresh] = useState(0);
 	const [gitDiffPath, setGitDiffPath] = useState<string | null>(null);
 	/** Paths with a write in flight; the tab row dims its mark while the promise resolves. */
@@ -576,6 +586,52 @@ export default function App() {
 		return () => window.removeEventListener("keydown", handleKeyDown, true);
 	}, []);
 
+	/** Layout toggles: Cmd+B rail, Cmd+J dock, Cmd+Shift+D debug, Cmd+Shift+G git. */
+	useEffect(() => {
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (!event.metaKey || event.ctrlKey || event.altKey) {
+				return;
+			}
+			const focused = document.activeElement;
+			if (focused instanceof Element && focused.closest(".cm-editor") !== null) {
+				return;
+			}
+			if (
+				focused instanceof HTMLInputElement ||
+				focused instanceof HTMLTextAreaElement ||
+				(focused instanceof HTMLElement && focused.isContentEditable)
+			) {
+				return;
+			}
+			const key = event.key.toLowerCase();
+			if (!event.shiftKey) {
+				if (key === "b") {
+					event.preventDefault();
+					setRailCollapsed((current) => !current);
+					return;
+				}
+				if (key === "j") {
+					event.preventDefault();
+					setPanelOpen(!panelExpanded);
+					return;
+				}
+				return;
+			}
+			if (key === "d") {
+				event.preventDefault();
+				setDebugOpen((current) => !current);
+				return;
+			}
+			if (key === "g") {
+				event.preventDefault();
+				setGitOpen((current) => !current);
+				return;
+			}
+		};
+		window.addEventListener("keydown", handleKeyDown, true);
+		return () => window.removeEventListener("keydown", handleKeyDown, true);
+	}, [panelExpanded]);
+
 	const openPath = useCallback(
 		async (path: string, name: string) => {
 			if (buffers.some((buffer) => buffer.path === path)) {
@@ -867,7 +923,15 @@ export default function App() {
 				</div>
 			) : null}
 
-			<div className={debugOpen && root !== null ? "body debug-open" : "body"}>
+			<div
+				className={[
+					"body",
+					debugOpen && root !== null ? "debug-open" : "",
+					railCollapsed ? "rail-collapsed" : "",
+				]
+					.filter(Boolean)
+					.join(" ")}
+			>
 				{gitOpen && root !== null ? (
 					<SourceControl
 						root={root}
