@@ -1256,6 +1256,7 @@ export default function App() {
 						onRefresh={refreshGit}
 						onOpenFile={(path) => void openPath(path, fileName(path))}
 						onDiff={setGitDiffPath}
+						diffPath={gitDiffPath}
 					/>
 				) : (
 					<aside className="rail">

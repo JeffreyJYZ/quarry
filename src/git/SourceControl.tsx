@@ -6,6 +6,7 @@ import {
 	gitBranches,
 	gitCheckout,
 	gitCommit,
+	gitFileDiff,
 	gitStage,
 	gitUnstage,
 } from "@/project/api";
@@ -17,7 +18,8 @@ export type SourceControlProps = {
 	status: GitStatus | null;
 	onRefresh: () => Promise<void>;
 	onOpenFile: (path: string) => void;
-	onDiff: (path: string) => void;
+	onDiff: (path: string | null) => void;
+	diffPath: string | null;
 };
 
 const STATUS_LETTER: Record<GitStatusEntry["status"], string> = {
@@ -56,6 +58,7 @@ export default function SourceControl({
 	onRefresh,
 	onOpenFile,
 	onDiff,
+	diffPath,
 }: SourceControlProps) {
 	const status = statusProp;
 	const stagedCount = status?.entries.filter((entry) => entry.staged).length ?? 0;
@@ -75,6 +78,7 @@ export default function SourceControl({
 	const [branchIndex, setBranchIndex] = useState(0);
 	const [branchSwitching, setBranchSwitching] = useState(false);
 	const [branchSwitched, setBranchSwitched] = useState<string | null>(null);
+	const [missingDiff, setMissingDiff] = useState<string | null>(null);
 	const switchedTimer = useRef<number | null>(null);
 	const filterRef = useRef<HTMLInputElement | null>(null);
 
@@ -179,12 +183,13 @@ export default function SourceControl({
 				setCommitted(null);
 			}, 4000);
 			await refresh();
+			onDiff(null);
 		} catch (err) {
 			setCommitError(describeError(err));
 		} finally {
 			setCommitting(false);
 		}
-	}, [message, stagedCount, committing, root, refresh]);
+	}, [message, stagedCount, committing, root, refresh, onDiff]);
 
 	useEffect(() => {
 		return () => {
@@ -233,6 +238,16 @@ export default function SourceControl({
 				await onRefresh();
 				setBranches(await gitBranches(root).catch(() => branches ?? []));
 				setBranchOpen(false);
+				if (diffPath !== null) {
+					try {
+						await gitFileDiff(root, diffPath);
+						onDiff(null);
+						window.setTimeout(() => onDiff(diffPath), 0);
+					} catch {
+						onDiff(null);
+						setMissingDiff("File not on this branch");
+					}
+				}
 				setBranchSwitched(`Switched to ${branch}`);
 				if (switchedTimer.current !== null) {
 					window.clearTimeout(switchedTimer.current);
@@ -247,7 +262,7 @@ export default function SourceControl({
 				setBranchSwitching(false);
 			}
 		},
-		[root, onRefresh, branchSwitching, branches],
+		[root, onRefresh, branchSwitching, branches, diffPath, onDiff],
 	);
 
 	if (status === null && error === null && loading) {
@@ -330,7 +345,10 @@ export default function SourceControl({
 				<button
 					type="button"
 					className="git-diff-btn"
-					onClick={() => onDiff(entry.path)}
+					onClick={() => {
+						setMissingDiff(null);
+						onDiff(entry.path);
+					}}
 					aria-label={`diff ${entry.path}`}
 				>
 					diff
@@ -419,6 +437,7 @@ export default function SourceControl({
 				) : null}
 			</div>
 			{branchSwitched !== null ? <p className="git-committed">{branchSwitched}</p> : null}
+			{missingDiff !== null ? <p className="git-committed">{missingDiff}</p> : null}
 			<div className="git-commit-box">
 				<textarea
 					className="git-commit-input"
