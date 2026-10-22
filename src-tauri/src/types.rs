@@ -458,3 +458,12 @@ pub struct CallHierarchyNode {
     /// Opaque handle used to expand this node; stable for the session.
     pub item_id: u32,
 }
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ExceptionFilter {
+    /// Adapter filter id, e.g. `uncaught`.
+    pub filter: String,
+    pub label: String,
+    pub default: bool,
+}

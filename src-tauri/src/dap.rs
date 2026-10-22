@@ -12,7 +12,8 @@ use crate::protocol_pipe::{FrameError, ProcessPipe};
 use crate::resolve;
 use crate::types::{
     BreakpointSpec, DapBreakpoint, DapFrame, DapScope, DapSession, DapStoppedEvent, DapThread,
-    DapVariable, DataBreakpointInfo, DisassembledInstruction, LaunchConfig, MemoryDump,
+    DapVariable, DataBreakpointInfo, DisassembledInstruction, ExceptionFilter, LaunchConfig,
+    MemoryDump,
 };
 use serde_json::{Map, Value, json};
 use std::collections::HashMap;
@@ -61,6 +62,10 @@ pub struct Session {
     /// The launch parameters this session was created with, so a restart can relaunch identically.
     /// `None` for sessions created by `dap_attach`.
     pub launch_config: Option<LaunchConfig>,
+    /// The last exception-breakpoint filters sent, so `dap_restart` can re-apply them.
+    pub exception_filters: Mutex<Vec<String>>,
+    /// The adapter's exception-breakpoint filters, captured during `initialize`.
+    pub exception_breakpoint_filters: Mutex<Vec<ExceptionFilter>>,
 }
 
 impl Session {
@@ -73,6 +78,8 @@ impl Session {
             stopped_thread: AtomicU32::new(0),
             alive: AtomicBool::new(true),
             launch_config: None,
+            exception_filters: Mutex::new(Vec::new()),
+            exception_breakpoint_filters: Mutex::new(Vec::new()),
         }
     }
 
@@ -171,6 +178,12 @@ impl Session {
     }
 }
 
+impl std::fmt::Debug for Session {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Session").field("id", &self.id).finish()
+    }
+}
+
 impl Drop for Session {
     fn drop(&mut self) {
         self.shutdown();
@@ -198,13 +211,22 @@ pub async fn dap_launch(
     let mut pipe = ProcessPipe::spawn(&mut command)
         .map_err(|error| format!("cannot start {ADAPTER} ({adapter}) for {root}: {error}"))?;
 
-    if let Err(error) = handshake_launch(&mut pipe, &adapter, &config, &cwd) {
-        let _ = pipe.kill();
-        return Err(error);
-    }
+    let captured_filters = match handshake_launch(&mut pipe, &adapter, &config, &cwd) {
+        Ok(filters) => filters,
+        Err(error) => {
+            let _ = pipe.kill();
+            return Err(error);
+        }
+    };
 
     let config_for_session = config.clone();
-    let id = register_session(app, &state, pipe, Some(config_for_session))?;
+    let id = register_session(
+        app,
+        &state,
+        pipe,
+        Some(config_for_session),
+        captured_filters,
+    )?;
 
     Ok(DapSession {
         id,
@@ -232,15 +254,15 @@ pub async fn dap_attach(
         format!("cannot start {ADAPTER} ({adapter}) to attach to {pid}: {error}")
     })?;
 
-    let process_name = match handshake_attach(&mut pipe, &adapter, pid) {
-        Ok(name) => name,
+    let (process_name, captured_filters) = match handshake_attach(&mut pipe, &adapter, pid) {
+        Ok((name, filters)) => (name, filters),
         Err(error) => {
             let _ = pipe.kill();
             return Err(error);
         }
     };
 
-    let id = register_session(app, &state, pipe, None)?;
+    let id = register_session(app, &state, pipe, None, captured_filters)?;
 
     Ok(DapSession {
         id,
@@ -254,11 +276,13 @@ fn register_session(
     state: &DapState,
     mut pipe: ProcessPipe,
     launch_config: Option<LaunchConfig>,
+    exception_breakpoint_filters: Vec<ExceptionFilter>,
 ) -> Result<String, String> {
     let frames = pipe.take_frames();
     let id = format!("dap-{}", state.counter.fetch_add(1, Ordering::SeqCst) + 1);
     let mut session = Session::new(id.clone(), pipe);
     session.launch_config = launch_config;
+    *lock(&session.exception_breakpoint_filters) = exception_breakpoint_filters;
     let session = Arc::new(session);
 
     let pump = Pump {
@@ -552,6 +576,9 @@ pub async fn dap_restart(
         .clone()
         .ok_or_else(|| format!("no debug session {session}"))?;
 
+    // Preserve the last exception-breakpoint filters so they can be re-applied below.
+    let filters = lock(&old.exception_filters).clone();
+
     old.shutdown();
 
     let adapter = resolve_adapter()?;
@@ -563,12 +590,25 @@ pub async fn dap_restart(
     let mut pipe = ProcessPipe::spawn(&mut command)
         .map_err(|error| format!("cannot start {ADAPTER} ({adapter}) for {session}: {error}"))?;
 
-    if let Err(error) = handshake_launch(&mut pipe, &adapter, &config, &cwd) {
-        let _ = pipe.kill();
-        return Err(error);
-    }
+    let adapter_filters = match handshake_launch(&mut pipe, &adapter, &config, &cwd) {
+        Ok(adapter_filters) => adapter_filters,
+        Err(error) => {
+            let _ = pipe.kill();
+            return Err(error);
+        }
+    };
 
-    let id = register_session(app, &state, pipe, Some(config.clone()))?;
+    let id = register_session(app, &state, pipe, Some(config.clone()), adapter_filters)?;
+
+    // Re-apply the exception-breakpoint filters the old session had. A failure here is
+    // intentionally swallowed: the new session is still returned, with no error to the UI.
+    if let Some(session) = lock(&state.sessions).get(&id).cloned() {
+        *lock(&session.exception_filters) = filters.clone();
+        let _ = session.request(
+            "setExceptionBreakpoints",
+            exception_breakpoints_arguments(&filters),
+        );
+    }
 
     Ok(DapSession {
         id,
@@ -738,9 +778,9 @@ fn handshake_launch(
     adapter: &str,
     config: &LaunchConfig,
     cwd: &str,
-) -> Result<(), String> {
+) -> Result<Vec<ExceptionFilter>, String> {
     let mut reverse_seq = FIRST_REQUEST_SEQ;
-    initialize(pipe, adapter, &mut reverse_seq)?;
+    let filters = initialize(pipe, adapter, &mut reverse_seq)?;
 
     pipe.send(&json!({
         "seq": SESSION_SEQ,
@@ -776,7 +816,8 @@ fn handshake_launch(
         }
 
         Ok(launched && initialized)
-    })
+    })?;
+    Ok(filters)
 }
 
 /// `initialize`, then `attach` to a running process.
@@ -788,9 +829,9 @@ fn handshake_attach(
     pipe: &mut ProcessPipe,
     adapter: &str,
     pid: u32,
-) -> Result<Option<String>, String> {
+) -> Result<(Option<String>, Vec<ExceptionFilter>), String> {
     let mut reverse_seq = FIRST_REQUEST_SEQ;
-    initialize(pipe, adapter, &mut reverse_seq)?;
+    let filters = initialize(pipe, adapter, &mut reverse_seq)?;
 
     pipe.send(&json!({
         "seq": SESSION_SEQ,
@@ -820,11 +861,15 @@ fn handshake_attach(
         Ok(attached)
     })?;
 
-    Ok(process_name)
+    Ok((process_name, filters))
 }
 
 /// The `initialize` request; the adapter answers with its capabilities.
-fn initialize(pipe: &mut ProcessPipe, adapter: &str, reverse_seq: &mut i64) -> Result<(), String> {
+fn initialize(
+    pipe: &mut ProcessPipe,
+    adapter: &str,
+    reverse_seq: &mut i64,
+) -> Result<Vec<ExceptionFilter>, String> {
     pipe.send(&json!({
         "seq": INITIALIZE_SEQ,
         "type": "request",
@@ -844,14 +889,17 @@ fn initialize(pipe: &mut ProcessPipe, adapter: &str, reverse_seq: &mut i64) -> R
     }))
     .map_err(|error| format!("cannot send initialize to {adapter}: {error}"))?;
 
+    let mut filters = Vec::new();
     pump_until(pipe, adapter, "initialize", reverse_seq, |message| {
         if message.get("request_seq").and_then(Value::as_i64) != Some(INITIALIZE_SEQ) {
             return Ok(false);
         }
-        response_result(message)
+        let body = response_result(message)
             .map_err(|error| format!("{adapter} rejected initialize: {error}"))?;
+        filters = exception_filters_from(&body);
         Ok(true)
-    })
+    })?;
+    Ok(filters)
 }
 
 /// The `attach` arguments: the pid under both spellings, and no stop on entry.
@@ -1455,6 +1503,53 @@ mod tests {
     }
 
     #[test]
+    fn exception_filters_parse_two_with_defaults_and_missing_label() {
+        let body = json!({
+            "exceptionBreakpointFilters": [
+                { "filter": "uncaught", "label": "Uncaught Exceptions", "default": true },
+                { "filter": "caught" },
+            ],
+        });
+        let parsed = exception_filters_from(&body);
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].filter, "uncaught");
+        assert_eq!(parsed[0].label, "Uncaught Exceptions");
+        assert!(parsed[0].default);
+        assert_eq!(parsed[1].filter, "caught");
+        assert_eq!(parsed[1].label, "caught");
+        assert!(!parsed[1].default);
+    }
+
+    #[test]
+    fn exception_filters_empty_array_yields_empty() {
+        let body = json!({ "exceptionBreakpointFilters": [] });
+        assert!(exception_filters_from(&body).is_empty());
+        assert!(exception_filters_from(&json!({})).is_empty());
+    }
+
+    #[test]
+    fn exception_filters_skip_malformed_entries() {
+        let body = json!({
+            "exceptionBreakpointFilters": [
+                { "label": "no filter" },
+                42,
+                { "filter": "all", "label": "All", "default": "yes" },
+            ],
+        });
+        let parsed = exception_filters_from(&body);
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].filter, "all");
+        assert!(!parsed[0].default);
+    }
+
+    #[test]
+    fn unknown_session_error_names_it() {
+        let state = DapState::default();
+        let error = session_for(&state, "dap-99").expect_err("unknown session");
+        assert!(error.contains("dap-99"), "message: {error}");
+    }
+
+    #[test]
     fn attach_arguments_name_the_pid_and_do_not_stop_on_entry() {
         let arguments = attach_arguments(4242);
 
@@ -1514,6 +1609,33 @@ mod tests {
         assert!(set_variable_result(&json!({ "value": "42" })).is_ok());
         let error = set_variable_result(&json!({ "type": "int" })).expect_err("no value");
         assert!(error.contains("no value"), "message: {error}");
+    }
+
+    #[test]
+    fn exception_breakpoint_arguments_carry_two_filters() {
+        let arguments =
+            exception_breakpoints_arguments(&["uncaught".to_string(), "thrown".to_string()]);
+        assert_eq!(arguments["filters"], json!(["uncaught", "thrown"]));
+    }
+
+    #[test]
+    fn exception_breakpoint_arguments_allow_an_empty_list() {
+        let arguments = exception_breakpoints_arguments(&[]);
+        assert_eq!(arguments["filters"], json!([]));
+    }
+
+    #[test]
+    fn exception_filters_round_trip_through_the_session() {
+        let mut command = Command::new("/bin/cat");
+        let pipe = ProcessPipe::spawn(&mut command).expect("spawn /bin/cat");
+        let session = Session::new("dap-rt".to_string(), pipe);
+
+        assert!(lock(&session.exception_filters).is_empty());
+        *lock(&session.exception_filters) = vec!["uncaught".to_string()];
+        assert_eq!(
+            lock(&session.exception_filters).clone(),
+            vec!["uncaught".to_string()]
+        );
     }
 
     #[test]
@@ -1600,4 +1722,65 @@ pub async fn dap_set_variable(
 
     let body = session_for(&state, &session)?.request("setVariable", arguments)?;
     set_variable_result(&body)
+}
+
+/// Enable exception-style breakpoints. Filters come from the adapter's own `exceptionBreakpointFilters`.
+///
+/// An empty list is valid and clears them. The last filters are kept on the session so `dap_restart`
+/// can re-apply them after relaunch.
+#[tauri::command]
+pub async fn dap_set_exception_breakpoints(
+    state: State<'_, DapState>,
+    session: String,
+    filters: Vec<String>,
+) -> Result<(), String> {
+    let session = session_for(&state, &session)?;
+    let arguments = exception_breakpoints_arguments(&filters);
+    session.request("setExceptionBreakpoints", arguments)?;
+    *lock(&session.exception_filters) = filters;
+    Ok(())
+}
+
+/// Build the DAP arguments for `setExceptionBreakpoints`.
+fn exception_breakpoints_arguments(filters: &[String]) -> Value {
+    json!({ "filters": filters })
+}
+
+/// The adapter's own exception-breakpoint filters, captured from `initialize`.
+#[tauri::command]
+pub async fn dap_exception_filters(
+    state: State<'_, DapState>,
+    session: String,
+) -> Result<Vec<ExceptionFilter>, String> {
+    let session = session_for(&state, &session)?;
+    Ok(lock(&session.exception_breakpoint_filters).clone())
+}
+
+/// Parse `exceptionBreakpointFilters` from an `initialize` response body.
+fn exception_filters_from(body: &Value) -> Vec<ExceptionFilter> {
+    body.get("exceptionBreakpointFilters")
+        .and_then(Value::as_array)
+        .map(|entries| {
+            entries
+                .iter()
+                .filter_map(|entry| {
+                    let filter = entry.get("filter").and_then(Value::as_str)?;
+                    let label = entry
+                        .get("label")
+                        .and_then(Value::as_str)
+                        .unwrap_or(filter)
+                        .to_string();
+                    let default = entry
+                        .get("default")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false);
+                    Some(ExceptionFilter {
+                        filter: filter.to_string(),
+                        label,
+                        default,
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }

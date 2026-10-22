@@ -654,3 +654,19 @@ export function gitCommitDiff(root: string, hash: string): Promise<CommitDiff> {
 export function listFiles(root: string): Promise<string[]> {
 	return invoke<string[]>("list_files", { root });
 }
+
+export type BlameLine = { line: number; hash: string; author: string; subject: string };
+
+export function gitBlame(root: string, path: string): Promise<BlameLine[]> {
+	return invoke<BlameLine[]>("git_blame", { root, path });
+}
+
+export type ExceptionFilter = { filter: string; label: string; default: boolean };
+
+export function dapExceptionFilters(session: string): Promise<ExceptionFilter[]> {
+	return invoke<ExceptionFilter[]>("dap_exception_filters", { session });
+}
+
+export function dapSetExceptionBreakpoints(session: string, filters: string[]): Promise<void> {
+	return invoke<void>("dap_set_exception_breakpoints", { session, filters });
+}
