@@ -11,7 +11,9 @@
 		"typecheck": "bun check",
 		"lint": "biome lint --write .",
 		"fmt": "biome format --write .",
-		"verify": "bun run typecheck && biome check ."
+		"verify": "bun run typecheck && biome check .",
+		"test": "bun test",
+		"gate": "bun run verify && bun test"
 	},
 	"dependencies": {
 		"@codemirror/autocomplete": "^6.20.1",

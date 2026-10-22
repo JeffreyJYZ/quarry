@@ -166,6 +166,7 @@ export default function App() {
 	const [debugOpen, setDebugOpen] = useState(false);
 	const [gitOpen, setGitOpen] = useState(false);
 	const [railCollapsed, setRailCollapsed] = useState(false);
+	const [fileRevealToken, setFileRevealToken] = useState(0);
 	const [gitRefresh, setGitRefresh] = useState(0);
 	const [gitDiffPath, setGitDiffPath] = useState<string | null>(null);
 	const [gitCommitDiffHash, setGitCommitDiffHash] = useState<string | null>(null);
@@ -805,6 +806,25 @@ export default function App() {
 		return () => window.removeEventListener("keydown", handleKeyDown, true);
 	}, []);
 
+	/** Cmd+Shift+E reveals the active file in the explorer. */
+	useEffect(() => {
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (!event.metaKey || event.ctrlKey || event.altKey || !event.shiftKey) {
+				return;
+			}
+			if (event.key.toLowerCase() !== "e") {
+				return;
+			}
+			if (root === null || activePath === null) {
+				return;
+			}
+			event.preventDefault();
+			setFileRevealToken((current) => current + 1);
+		};
+		window.addEventListener("keydown", handleKeyDown, true);
+		return () => window.removeEventListener("keydown", handleKeyDown, true);
+	}, [root, activePath]);
+
 	/** Cmd+P opens quick open by file name. */
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
@@ -1332,6 +1352,14 @@ export default function App() {
 					<aside className="rail">
 						<div className="rail-head">
 							<span className="label">explorer</span>
+							<button
+								type="button"
+								className="button"
+								disabled={root === null || activePath === null}
+								onClick={() => setFileRevealToken((current) => current + 1)}
+							>
+								Reveal
+							</button>
 						</div>
 						{project ? (
 							<>
@@ -1340,6 +1368,7 @@ export default function App() {
 									root={project.root}
 									activePath={activePath}
 									onOpenFile={handleOpenFile}
+									revealToken={fileRevealToken}
 									changes={Object.fromEntries(
 										(gitStatusState?.entries ?? []).map((entry) => [
 											entry.path,

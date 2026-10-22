@@ -12,6 +12,7 @@ export type FileTreeProps = {
 	activePath: string | null;
 	onOpenFile: (entry: FileEntry) => void;
 	changes?: Record<string, GitStatusEntry["status"]>;
+	revealToken?: number;
 };
 
 type TreeLevelProps = {
@@ -20,6 +21,7 @@ type TreeLevelProps = {
 	dirs: Record<string, DirState>;
 	expanded: Set<string>;
 	activePath: string | null;
+	highlightedPath: string | null;
 	onToggle: (path: string) => void;
 	onRetry: (path: string) => void;
 	onOpenFile: (entry: FileEntry) => void;
@@ -37,6 +39,7 @@ function TreeLevel({
 	dirs,
 	expanded,
 	activePath,
+	highlightedPath,
 	onToggle,
 	onRetry,
 	onOpenFile,
@@ -134,10 +137,13 @@ function TreeLevel({
 						) : (
 							<button
 								type="button"
+								data-path={entry.path}
 								className={
 									entry.path === activePath
 										? "tree-row file active"
-										: "tree-row file"
+										: entry.path === highlightedPath
+											? "tree-row file revealed"
+											: "tree-row file"
 								}
 								style={indent(depth)}
 								title={entry.path}
@@ -155,6 +161,7 @@ function TreeLevel({
 								dirs={dirs}
 								expanded={expanded}
 								activePath={activePath}
+								highlightedPath={highlightedPath}
 								onToggle={onToggle}
 								onRetry={onRetry}
 								onOpenFile={onOpenFile}
@@ -168,37 +175,54 @@ function TreeLevel({
 	);
 }
 
-export default function FileTree({ root, activePath, onOpenFile, changes }: FileTreeProps) {
+export default function FileTree({
+	root,
+	activePath,
+	onOpenFile,
+	changes,
+	revealToken,
+}: FileTreeProps) {
 	const changeMap = changes ?? {};
 	const [dirs, setDirs] = useState<Record<string, DirState>>({});
 	const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+	const [highlightedPath, setHighlightedPath] = useState<string | null>(null);
 	const pending = useRef<Set<string>>(new Set());
 	const settled = useRef<Set<string>>(new Set());
+	const promises = useRef<Map<string, Promise<void>>>(new Map());
+	const highlightTimer = useRef<number | null>(null);
 
-	const load = useCallback((path: string) => {
-		if (pending.current.has(path) || settled.current.has(path)) {
-			return;
+	const load = useCallback((path: string): Promise<void> => {
+		const existing = promises.current.get(path);
+		if (existing !== undefined) {
+			return existing;
+		}
+		if (settled.current.has(path)) {
+			return Promise.resolve();
 		}
 		pending.current.add(path);
 		setDirs((current) => ({ ...current, [path]: { status: "loading" } }));
-		listDir(path).then(
-			(entries) => {
+		const promise = listDir(path)
+			.then((entries) => {
 				pending.current.delete(path);
 				settled.current.add(path);
 				setDirs((current) => ({ ...current, [path]: { status: "ready", entries } }));
-			},
-			(error: unknown) => {
+			})
+			.catch((error: unknown) => {
 				pending.current.delete(path);
 				setDirs((current) => ({
 					...current,
 					[path]: { status: "error", message: describeError(error) },
 				}));
-			},
-		);
+				throw error;
+			});
+		promises.current.set(path, promise);
+		return promise;
 	}, []);
 
 	useEffect(() => {
-		load(root);
+		void load(root).catch(() => {
+			/* root load failure surfaces through the tree */
+		});
 	}, [load, root]);
 
 	const toggle = useCallback(
@@ -214,11 +238,89 @@ export default function FileTree({ root, activePath, onOpenFile, changes }: File
 				return next;
 			});
 			if (!isOpen) {
-				load(path);
+				void load(path).catch(() => {
+					/* surfaces through the tree */
+				});
 			}
+			setHighlightedPath(null);
 		},
 		[expanded, load],
 	);
+
+	const openFile = useCallback(
+		(entry: FileEntry) => {
+			setHighlightedPath(null);
+			onOpenFile(entry);
+		},
+		[onOpenFile],
+	);
+
+	const reveal = useCallback(
+		async (target: string | null) => {
+			if (target === null) {
+				return;
+			}
+			if (!target.startsWith(`${root}/`)) {
+				return;
+			}
+			const parts = target
+				.slice(root.length + 1)
+				.split("/")
+				.filter((part) => part.length > 0);
+			let current = root;
+			const ancestors: string[] = [];
+			for (const part of parts.slice(0, -1)) {
+				current = `${current}/${part}`;
+				if (current !== root) {
+					ancestors.push(current);
+				}
+			}
+			try {
+				for (const dir of ancestors) {
+					await load(dir);
+				}
+			} catch {
+				return;
+			}
+			setExpanded((prev) => {
+				const next = new Set(prev);
+				for (const dir of ancestors) {
+					next.add(dir);
+				}
+				return next;
+			});
+			setHighlightedPath(target);
+			if (highlightTimer.current !== null) {
+				window.clearTimeout(highlightTimer.current);
+			}
+			highlightTimer.current = window.setTimeout(() => {
+				setHighlightedPath(null);
+				highlightTimer.current = null;
+			}, 1500);
+			window.setTimeout(() => {
+				const row = document.querySelector(`[data-path="${CSS.escape(target)}"]`);
+				if (row instanceof HTMLElement) {
+					row.scrollIntoView({ block: "nearest" });
+				}
+			}, 0);
+		},
+		[root, load],
+	);
+
+	useEffect(() => {
+		if (revealToken === undefined) {
+			return;
+		}
+		void reveal(activePath);
+	}, [revealToken, reveal, activePath]);
+
+	useEffect(() => {
+		return () => {
+			if (highlightTimer.current !== null) {
+				window.clearTimeout(highlightTimer.current);
+			}
+		};
+	}, []);
 
 	return (
 		<div className="tree-scroll">
@@ -228,9 +330,10 @@ export default function FileTree({ root, activePath, onOpenFile, changes }: File
 				dirs={dirs}
 				expanded={expanded}
 				activePath={activePath}
+				highlightedPath={highlightedPath}
 				onToggle={toggle}
 				onRetry={load}
-				onOpenFile={onOpenFile}
+				onOpenFile={openFile}
 				changes={changeMap}
 			/>
 		</div>

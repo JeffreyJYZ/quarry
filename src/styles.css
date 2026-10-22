@@ -336,6 +336,10 @@ body {
 	color: var(--text);
 }
 
+.tree-row.revealed {
+	background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
 .tree-row:focus-visible {
 	outline: 1px solid var(--accent);
 	outline-offset: -1px;
