@@ -22,21 +22,25 @@ read off `src-tauri/src/lib.rs` and `src/`:
   when the formatter is unavailable or fails), and format on demand. Rename (`lsp_rename`) and
   code actions (`lsp_code_actions`) are wired through the editor, signature help renders as a tooltip,
   and inlay hints are rendered in the editor (backend `lsp_inlay_hints` plus `src/editor/inlayHints.ts`).
-  Shortcuts: `Cmd+S` save, `Cmd+Alt+S` save all, `Cmd+Alt+L` format, `Cmd+F` in-file search,
-  `Cmd+Alt+F` project search, `F12` / `Shift+F12` / `Cmd+Click` for definition and references,
-  `Cmd+K` for the shortcut sheet.
+  Occurrences of the symbol under the caret are highlighted via `lsp_document_highlights` and
+  `src/editor/occurrences.ts`. Shortcuts: `Cmd+S` save, `Cmd+Alt+S` save all, `Cmd+Alt+L` format,
+  `Cmd+F` in-file search, `Cmd+Alt+F` project search, `F12` / `Shift+F12` / `Cmd+Click` for definition
+  and references, `Cmd+K` for the shortcut sheet.
 - **Insight**: one language server per project root — `rust-analyzer` for Cargo, `clangd` for CMake or
   `compile_commands.json` — with full-document sync. Diagnostics stream into the editor and the Problems
   dock, grouped by file with severity, line and message. Hover, go-to-definition, references and
   completion commands are wired; hover, completion (CompletionList with real labels), definition (LocationLink[]) and references (24) are verified against rust-analyzer 1.99.0 via `bun run scripts/lsp-ux-smoke.ts`.
   Document outline via `lsp_symbols` and `src/outline/Outline.tsx`.
 - **Build**: `build_project` runs `cargo build --message-format=json` and merges its machine-readable
-  diagnostics into the Problems dock.
-- **Run**: `run_program` / `stop_program` stream `run://output` lines and one `run://exited`. Backend
-  and event contract only; no run panel in the UI yet.
+  diagnostics into the Problems dock. C/C++ projects without a build system compile through a plain
+  clang build (`run_plain_clang_build` in `src-tauri/src/build_task.rs`), so C/C++ builds do not
+  require cmake.
+- **Run**: `run_program` / `stop_program` stream `run://output` lines and one `run://exited`, with a
+  run panel in `src/run/` (program, args, cwd, argv preview, run/stop).
 - **Terminal**: an embedded terminal built on `portable-pty` (`pty::pty_open` / `pty_write` /
-  `pty_resize` / `pty_close`) with `src/terminal/Terminal.tsx`. Not yet exercised in a real desktop
-  window by this agent; the backend and component are present.
+  `pty_resize` / `pty_close`) with `src/terminal/Terminal.tsx`, supporting multiple sessions in tabs
+  (`Cmd+T` / `Cmd+W`, close button per tab). Not yet exercised in a real desktop window by this
+  agent; the backend and component are present.
 - **Debug**: `lldb-dap` sessions launched from a `.quarry/launch.json` preset, composed for an
   unconfigured Cargo project (which also passes the Rust formatter `initCommands`), or attached to a
   running process by pid. Line breakpoints with verified and pending states, conditional and hit-count
@@ -47,8 +51,10 @@ read off `src-tauri/src/lib.rs` and `src/`:
   when the result set is truncated. Case-sensitive, regex and whole-word toggles are in
   `src/search/SearchPalette.tsx`.
 - **Tests**: `list_tests` and `run_test` feed a Tests dock with pass/fail status.
-- **Source control**: a Git view with status, per-file diff, and an open-in-editor flow, plus
-  `git_status` and `git_file_diff` commands.
+- **Source control**: a Git view with status, per-file diff, an open-in-editor flow, and a commit box
+  (`git_commit`), plus `git_status` and `git_file_diff` commands.
+- **Breadcrumb**: a strip showing the file path and the symbol chain containing the caret, built from
+  `lsp_symbols` in `src/breadcrumb/Breadcrumb.tsx`.
 
 Still missing, and named here so it is not mistaken for done:
 - **No `evaluate`, so no watch expressions** — Rust expression evaluation cannot be made to work through
@@ -56,9 +62,8 @@ Still missing, and named here so it is not mistaken for done:
   changes nothing, and `setExpression` kills the adapter. A watch pane can only offer variables-tree watching and
   memory views until a different adapter or toolchain is measured (see `docs/spikes/dap.md`, "Evaluate probe
   (2026-10-22)").
-- **C/C++ builds.** `build_project` runs a plain clang build (`run_plain_n_build`) for projects without a build
-  system, so C/C++ projects can compile without cmake. Projects that need cmake still cannot build here because
-  `cmake` and `ninja` are not installed on this machine.
+- **No run panel beyond args/cwd and output** — `run_program` / `stop_program` stream `run://output`; the UI in
+  `src/run/` covers program, args, cwd and argv preview, but there is no richer run configuration UI.
 - **No remote development, embedded targets, profilers, databases, Docker, AI assistance or plugin API.**
 
 ## What "parity" means here
