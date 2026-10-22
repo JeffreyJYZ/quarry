@@ -133,7 +133,10 @@ export default function App() {
 	const [runProgramState, setRunProgramState] = useState("");
 	const [runArgsState, setRunArgsState] = useState("");
 	const [runCwdState, setRunCwdState] = useState("");
-	const runFormMemory = useRef<Map<string, { args: string; cwd: string }>>(new Map());
+	const [runEnvState, setRunEnvState] = useState<import("@/project/api").EnvVar[]>([]);
+	const runFormMemory = useRef<
+		Map<string, { args: string; cwd: string; env: import("@/project/api").EnvVar[] }>
+	>(new Map());
 	useEffect(() => {
 		runIdRef.current = runId;
 	}, [runId]);
@@ -377,9 +380,11 @@ export default function App() {
 				if (saved === undefined) {
 					setRunArgsState(config.args.join(" "));
 					setRunCwdState(config.cwd);
+					setRunEnvState([]);
 				} else {
 					setRunArgsState(saved.args);
 					setRunCwdState(saved.cwd);
+					setRunEnvState(saved.env ?? []);
 				}
 			})
 			.catch(() => {
@@ -391,8 +396,8 @@ export default function App() {
 		if (root === null) {
 			return;
 		}
-		runFormMemory.current.set(root, { args: runArgsState, cwd: runCwdState });
-	}, [root, runArgsState, runCwdState]);
+		runFormMemory.current.set(root, { args: runArgsState, cwd: runCwdState, env: runEnvState });
+	}, [root, runArgsState, runCwdState, runEnvState]);
 
 	const gitInFlight = useRef<Promise<void> | null>(null);
 	const gitFollowup = useRef(false);
@@ -982,12 +987,17 @@ export default function App() {
 		setRunLines([]);
 		setRunExited(null);
 		try {
-			const id = await runProgram(runProgramState, splitArgs(runArgsState), runCwdState);
+			const id = await runProgram(
+				runProgramState,
+				splitArgs(runArgsState),
+				runCwdState,
+				runEnvState.length === 0 ? undefined : runEnvState,
+			);
 			setRunId(id);
 		} catch (error) {
 			setNotice(describeError(error));
 		}
-	}, [root, runId, runProgramState, runArgsState, runCwdState]);
+	}, [root, runId, runProgramState, runArgsState, runCwdState, runEnvState]);
 
 	const handleStop = useCallback(async () => {
 		const id = runId;
@@ -1338,7 +1348,7 @@ export default function App() {
 						<Welcome project={project} />
 					)}
 					{project && terminalOpen ? (
-						<Terminal key={project.root} root={project.root} />
+						<Terminal root={project.root} activePath={activePath} />
 					) : project &&
 						callsOpen &&
 						root !== null &&
@@ -1395,8 +1405,10 @@ export default function App() {
 									: null
 							}
 							running={runId !== null}
+							env={runEnvState}
 							onArgsChange={setRunArgsState}
 							onCwdChange={setRunCwdState}
+							onEnvChange={setRunEnvState}
 							onRun={() => void handleRun()}
 							onStop={() => void handleStop()}
 						/>

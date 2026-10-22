@@ -2827,7 +2827,7 @@ button.tree-note {
 	user-select: text;
 }
 
-.terminal-shell {
+.terminal-cwd {
 	flex: 1 1 auto;
 	min-width: 0;
 	font-family: var(--mono);
@@ -2836,6 +2836,8 @@ button.tree-note {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	direction: rtl;
+	text-align: left;
 }
 
 .terminal-size {
