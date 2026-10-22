@@ -10,10 +10,10 @@
 
 use crate::protocol_pipe::{FrameError, ProcessPipe};
 use crate::types::{
-    DapBreakpoint, DapFrame, DapScope, DapSession, DapStoppedEvent, DapThread, DapVariable,
-    DataBreakpointInfo, DisassembledInstruction, LaunchConfig, MemoryDump,
+    BreakpointSpec, DapBreakpoint, DapFrame, DapScope, DapSession, DapStoppedEvent, DapThread,
+    DapVariable, DataBreakpointInfo, DisassembledInstruction, LaunchConfig, MemoryDump,
 };
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -35,7 +35,8 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Fixed ids for the two handshake requests; anything a session sends starts above them.
 const INITIALIZE_SEQ: i64 = 1;
-const LAUNCH_SEQ: i64 = 2;
+/// The second request of a handshake: `launch` or `attach`, never both in one session.
+const SESSION_SEQ: i64 = 2;
 const FIRST_REQUEST_SEQ: i64 = 3;
 
 /// Held by Tauri as managed state: one live session per generated id.

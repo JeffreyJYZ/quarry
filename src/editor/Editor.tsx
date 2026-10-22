@@ -1,3 +1,4 @@
+import { autocompletion } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { indentUnit, syntaxHighlighting } from "@codemirror/language";
 import { lintGutter, setDiagnostics } from "@codemirror/lint";
@@ -7,6 +8,7 @@ import {
 	EditorView,
 	highlightActiveLine,
 	highlightActiveLineGutter,
+	hoverTooltip,
 	keymap,
 	lineNumbers,
 } from "@codemirror/view";
@@ -17,6 +19,13 @@ import { lintSignature, toLintDiagnostics } from "@/editor/diagnostics";
 import { languageForPath } from "@/editor/languages";
 import { quarryHighlightStyle, quarryTheme } from "@/editor/theme";
 import type { Diagnostic } from "@/project/api";
+import {
+	type Location,
+	lspCompletion,
+	lspDefinition,
+	lspHover,
+	lspReferences,
+} from "@/project/api";
 
 export type EditorProps = {
 	/** Absolute path of the open file, or null for an empty buffer. */
@@ -31,6 +40,12 @@ export type EditorProps = {
 	unverifiedLines?: number[];
 	/** Clicking the breakpoint gutter reports a 1-based line; the caller owns the set. */
 	onToggleBreakpoint?: (line: number) => void;
+	/** Open project root; null disables all LSP requests. */
+	root?: string | null;
+	/** Navigate to a definition location. */
+	onNavigate?: (path: string, line: number, character: number) => void;
+	/** Receive reference locations. */
+	onReferences?: (locations: Location[]) => void;
 };
 
 const NO_LINES: number[] = [];
@@ -51,6 +66,54 @@ function sameSet(left: ReadonlySet<number>, right: ReadonlySet<number>): boolean
 	return true;
 }
 
+function kindToType(kind: number | null): string {
+	switch (kind) {
+		case 2:
+			return "method";
+		case 3:
+			return "function";
+		case 4:
+			return "constructor";
+		case 5:
+			return "field";
+		case 6:
+			return "variable";
+		case 7:
+			return "class";
+		case 8:
+			return "interface";
+		case 9:
+			return "namespace";
+		case 10:
+			return "property";
+		case 13:
+			return "enum";
+		case 14:
+			return "keyword";
+		case 15:
+			return "snippet";
+		case 20:
+			return "enumMember";
+		case 21:
+			return "constant";
+		case 22:
+			return "struct";
+		case 23:
+			return "event";
+		case 24:
+			return "operator";
+		case 25:
+			return "type";
+		default:
+			return "text";
+	}
+}
+
+function toLspPosition(view: EditorView, pos: number): { line: number; character: number } {
+	const lineObj = view.state.doc.lineAt(pos);
+	return { line: lineObj.number - 1, character: pos - lineObj.from };
+}
+
 /**
  * CodeMirror 6 surface. One `EditorView` per mount; `value` stays caller-owned and is pushed into the
  * document only when it actually differs, so local edits keep their selection and scroll position.
@@ -64,6 +127,9 @@ export default function Editor({
 	breakpointLines = NO_LINES,
 	unverifiedLines = NO_LINES,
 	onToggleBreakpoint,
+	root = null,
+	onNavigate,
+	onReferences,
 }: EditorProps): JSX.Element {
 	const hostRef = useRef<HTMLDivElement | null>(null);
 	const viewRef = useRef<EditorView | null>(null);
@@ -81,6 +147,14 @@ export default function Editor({
 	latestRef.current = { path, value, onChange };
 	const toggleRef = useRef<((line: number) => void) | null>(onToggleBreakpoint ?? null);
 	toggleRef.current = onToggleBreakpoint ?? null;
+	const rootRef = useRef<string | null>(root);
+	rootRef.current = root;
+	const navigateRef = useRef<((path: string, line: number, character: number) => void) | null>(
+		onNavigate ?? null,
+	);
+	navigateRef.current = onNavigate ?? null;
+	const referencesRef = useRef<((locations: Location[]) => void) | null>(onReferences ?? null);
+	referencesRef.current = onReferences ?? null;
 
 	useEffect(() => {
 		const host = hostRef.current;
@@ -88,6 +162,10 @@ export default function Editor({
 
 		const language = new Compartment();
 		languageRef.current = language;
+
+		let completionSeq = 0;
+		let hoverSeq = 0;
+		let navSeq = 0;
 
 		const view = new EditorView({
 			parent: host,
@@ -103,7 +181,78 @@ export default function Editor({
 					history(),
 					indentUnit.of("    "),
 					EditorState.tabSize.of(4),
-					keymap.of([...defaultKeymap, ...historyKeymap]),
+					keymap.of([
+						...defaultKeymap,
+						...historyKeymap,
+						{
+							key: "F12",
+							run: () => {
+								const currentView = viewRef.current;
+								if (currentView === null) return false;
+								const currentRoot = rootRef.current;
+								const currentPath = latestRef.current.path;
+								if (currentRoot === null || currentPath === null) return false;
+								const callback = navigateRef.current;
+								if (callback === null) return false;
+								const pos = currentView.state.selection.main.head;
+								const { line, character } = toLspPosition(currentView, pos);
+								const mySeq = ++navSeq;
+								void (async () => {
+									let locations: Location[] = [];
+									try {
+										locations = await lspDefinition(
+											currentRoot,
+											currentPath,
+											line,
+											character,
+										);
+									} catch {
+										locations = [];
+									}
+									if (mySeq !== navSeq) return;
+									if (locations.length === 0) return;
+									const first = locations[0];
+									callback(
+										first.path,
+										first.range.start.line,
+										first.range.start.character,
+									);
+								})();
+								return true;
+							},
+						},
+						{
+							key: "Shift-F12",
+							run: () => {
+								const currentView = viewRef.current;
+								if (currentView === null) return false;
+								const currentRoot = rootRef.current;
+								const currentPath = latestRef.current.path;
+								if (currentRoot === null || currentPath === null) return false;
+								const callback = referencesRef.current;
+								if (callback === null) return false;
+								const pos = currentView.state.selection.main.head;
+								const { line, character } = toLspPosition(currentView, pos);
+								const mySeq = ++navSeq;
+								void (async () => {
+									let locations: Location[] = [];
+									try {
+										locations = await lspReferences(
+											currentRoot,
+											currentPath,
+											line,
+											character,
+										);
+									} catch {
+										locations = [];
+									}
+									if (mySeq !== navSeq) return;
+									callback(locations);
+								})();
+								return true;
+							},
+						},
+					]),
 					language.of(languageForPath(latestRef.current.path)),
 					quarryTheme,
 					syntaxHighlighting(quarryHighlightStyle),
@@ -116,6 +265,117 @@ export default function Editor({
 						const next = update.state.doc.toString();
 						if (next === latestRef.current.value) return;
 						latestRef.current.onChange(next);
+					}),
+					EditorView.domEventHandlers({
+						mousedown: (event, view) => {
+							if (!(event.metaKey || event.ctrlKey)) return false;
+							const currentRoot = rootRef.current;
+							const currentPath = latestRef.current.path;
+							const callback = navigateRef.current;
+							if (currentRoot === null || currentPath === null || callback === null)
+								return false;
+							const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+							if (pos === null) return false;
+							const { line, character } = toLspPosition(view, pos);
+							const mySeq = ++navSeq;
+							void (async () => {
+								let locations: Location[] = [];
+								try {
+									locations = await lspDefinition(
+										currentRoot,
+										currentPath,
+										line,
+										character,
+									);
+								} catch {
+									locations = [];
+								}
+								if (mySeq !== navSeq) return;
+								if (locations.length === 0) return;
+								const first = locations[0];
+								callback(
+									first.path,
+									first.range.start.line,
+									first.range.start.character,
+								);
+							})();
+							return false;
+						},
+					}),
+					autocompletion({
+						override: [
+							async (context) => {
+								const currentRoot = rootRef.current;
+								const currentPath = latestRef.current.path;
+								if (currentRoot === null || currentPath === null) return null;
+								const mySeq = ++completionSeq;
+								const completionView = context.view;
+								if (completionView === undefined) return null;
+								const { line, character } = toLspPosition(
+									completionView,
+									context.pos,
+								);
+								let result: Awaited<ReturnType<typeof lspCompletion>>;
+								try {
+									result = await lspCompletion(
+										currentRoot,
+										currentPath,
+										line,
+										character,
+									);
+								} catch {
+									return null;
+								}
+								if (mySeq !== completionSeq) return null;
+								if (result === null) return null;
+								const word = context.matchBefore(/\w*/);
+								const from = word === null ? context.pos : word.from;
+								const options = result.items.map((item) => ({
+									label: item.label,
+									detail: item.detail ?? undefined,
+									type: kindToType(item.kind),
+									apply: item.insertText ?? item.label,
+								}));
+								return { from, options };
+							},
+						],
+					}),
+					hoverTooltip(async (view, pos) => {
+						const currentRoot = rootRef.current;
+						const currentPath = latestRef.current.path;
+						if (currentRoot === null || currentPath === null) return null;
+						const mySeq = ++hoverSeq;
+						const { line, character } = toLspPosition(view, pos);
+						let info: Awaited<ReturnType<typeof lspHover>>;
+						try {
+							info = await lspHover(currentRoot, currentPath, line, character);
+						} catch {
+							return null;
+						}
+						if (mySeq !== hoverSeq) return null;
+						if (info === null) return null;
+						let tooltipPos = pos;
+						let tooltipEnd: number | undefined;
+						if (info.range !== null) {
+							const startLine = view.state.doc.line(info.range.start.line + 1);
+							const endLine = view.state.doc.line(info.range.end.line + 1);
+							tooltipPos = startLine.from + info.range.start.character;
+							tooltipEnd = endLine.from + info.range.end.character;
+						}
+						const text = info.contents;
+						return {
+							pos: tooltipPos,
+							end: tooltipEnd,
+							create: () => {
+								const dom = document.createElement("div");
+								dom.textContent = text;
+								dom.style.fontSize = "12px";
+								dom.style.fontFamily =
+									'ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace';
+								dom.style.whiteSpace = "pre-wrap";
+								return { dom };
+							},
+						};
 					}),
 				],
 			}),

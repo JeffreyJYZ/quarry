@@ -12,6 +12,7 @@
 		"fmt": "biome check --write ."
 	},
 	"dependencies": {
+		"@codemirror/autocomplete": "^6.20.4",
 		"@codemirror/commands": "^6.11.1",
 		"@codemirror/lang-cpp": "^6.0.3",
 		"@codemirror/lang-rust": "^6.0.2",

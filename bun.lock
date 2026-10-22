@@ -5,6 +5,7 @@
     "": {
       "name": "quarry",
       "dependencies": {
+        "@codemirror/autocomplete": "^6.20.4",
         "@codemirror/commands": "^6.11.1",
         "@codemirror/lang-cpp": "^6.0.3",
         "@codemirror/lang-rust": "^6.0.2",
@@ -52,6 +53,8 @@
     "@biomejs/cli-win32-arm64": ["@biomejs/cli-win32-arm64@2.6.2", "", { "os": "win32", "cpu": "arm64" }, "sha512-/PEOo6evlgrQOfKhMNtC/4Gk8ai3hySXXEtjUzCqZe/4iAbMdqelpp7qvZEDyLxlZS+BjOMQFpq2gXI/BPaAqw=="],
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.6.2", "", { "os": "win32", "cpu": "x64" }, "sha512-FVlWD+mDDz8nN5LWKRWUhhb7wKIK0VE3oXQvQBX7Fwwj00CvqMVhMyiz1iz8O5aZGmnkhFlKSwJPrUvMh5prQw=="],
+
+    "@codemirror/autocomplete": ["@codemirror/autocomplete@6.20.4", "", { "dependencies": { "@codemirror/language": "^6.0.0", "@codemirror/state": "^6.0.0", "@codemirror/view": "^6.17.0", "@lezer/common": "^1.0.0" } }, "sha512-yF8RhOf2SXlg00+qtupzLhrglcas61boqaONiNcbPIebHCpJocpqTBA6dyrtUrQO47hqyTdeob/3XnYilT7TaQ=="],
 
     "@codemirror/commands": ["@codemirror/commands@6.11.1", "", { "dependencies": { "@codemirror/language": "^6.0.0", "@codemirror/state": "^6.7.0", "@codemirror/view": "^6.27.0", "@lezer/common": "^1.1.0" } }, "sha512-O/4hG3SC1YwcmQ0d2UVNDs+AsaNWd1iHVxbTeEBuqH+6bExAiPK3iS/BvpY6rZGURALv4ZD3sIgcCmRvw3ehBg=="],
 

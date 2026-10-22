@@ -17,7 +17,6 @@ import {
 import { useDiagnosticsFeed } from "@/lsp/feed";
 import { useDocumentSync, useLspServer } from "@/lsp/session";
 import { fileName, plural, problemFiles } from "@/problems/model";
-import ProblemsPanel from "@/problems/ProblemsPanel";
 import {
 	buildProject,
 	type Diagnostic,
@@ -33,6 +32,8 @@ import { type FileBuffer, isDirty } from "@/project/buffer";
 import { describeError } from "@/project/errors";
 import { type SaveOutcome, saveBuffer, saveErrorMessage, saveMessage } from "@/project/save";
 import SearchPalette from "@/search/SearchPalette";
+import TestsDock, { type DockTab } from "@/tests/TestsDock";
+import { useTests } from "@/tests/useTests";
 import "./styles.css";
 
 const NO_BREAKPOINTS: BreakpointRow[] = [];
@@ -58,6 +59,7 @@ export default function App() {
 	const [building, setBuilding] = useState(false);
 	/** `null` means "follow the default": open when there is an error, collapsed otherwise. */
 	const [panelOpen, setPanelOpen] = useState<boolean | null>(null);
+	const [dockTab, setDockTab] = useState<DockTab>("problems");
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [debugOpen, setDebugOpen] = useState(false);
 	/** Paths with a write in flight; the tab row dims its mark while the promise resolves. */
@@ -86,6 +88,7 @@ export default function App() {
 	}, []);
 
 	const root = project?.root ?? null;
+	const tests = useTests(root);
 	const active = buffers.find((buffer) => buffer.path === activePath) ?? null;
 
 	useEffect(() => {
@@ -484,6 +487,18 @@ export default function App() {
 				>
 					Debug
 				</button>
+				<button
+					type="button"
+					className="button"
+					disabled={root === null}
+					aria-pressed={panelExpanded && dockTab === "tests"}
+					onClick={() => {
+						setDockTab("tests");
+						setPanelOpen(true);
+					}}
+				>
+					Tests
+				</button>
 				<span className="crumbs" title={project ? project.root : undefined}>
 					{project ? project.root : "no project open"}
 				</span>
@@ -536,6 +551,7 @@ export default function App() {
 									path={active.path}
 									value={active.text}
 									onChange={handleChange}
+									root={root}
 									diagnostics={diagnostics.get(active.path)}
 									breakpointLines={breakpointLines}
 									unverifiedLines={unverifiedLines}
@@ -547,14 +563,19 @@ export default function App() {
 						<Welcome project={project} />
 					)}
 					{project ? (
-						<ProblemsPanel
-							files={files}
-							errors={counts.errors}
-							warnings={counts.warnings}
-							open={panelExpanded}
-							onToggle={() => setPanelOpen(!panelExpanded)}
-							onSelect={handleSelectProblem}
-							activePath={activePath}
+						<TestsDock
+							tab={dockTab}
+							expanded={panelExpanded}
+							onToggleExpanded={() => setPanelOpen(!panelExpanded)}
+							onSelectTab={setDockTab}
+							problems={{
+								files,
+								errors: counts.errors,
+								warnings: counts.warnings,
+								activePath,
+								onSelect: handleSelectProblem,
+							}}
+							tests={tests}
 						/>
 					) : null}
 					{searchOpen && root !== null ? (

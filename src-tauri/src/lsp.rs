@@ -161,6 +161,7 @@ pub async fn start_lsp(
 
     let mut command = Command::new(&binary);
     command.current_dir(&info.root);
+    command.env("PATH", server_path(&binary));
     let mut pipe = ProcessPipe::spawn(&mut command)
         .map_err(|error| format!("cannot start {server} ({binary}): {error}"))?;
 
@@ -565,8 +566,32 @@ fn language_id(path: &str) -> &'static str {
 
 /// `PATH` first, then `xcrun`, exactly as the toolchain report probes: a GUI-launched app inherits
 /// launchd's `PATH`, so an Apple-shipped `clangd` is only reachable through `xcrun`.
-fn resolve_server(server: &str) -> Result<String, String> {
-    if let Some(found) = find_on_path(server) {
+/// The `PATH` a spawned server runs with.
+///
+/// A GUI-launched app inherits launchd's `PATH`, which lacks the rustup shims; a rustup-installed
+/// `rust-analyzer` then dies at startup because it cannot find `cargo`. Put the server's own directory
+/// and the usual toolchain directories in front of the inherited value.
+fn server_path(binary: &str) -> std::ffi::OsString {
+    let mut dirs: Vec<std::path::PathBuf> = Vec::new();
+    if let Some(parent) = Path::new(binary).parent() {
+        dirs.push(parent.to_path_buf());
+    }
+    for extra in [
+        "/opt/homebrew/opt/rustup/bin",
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+        "/usr/bin",
+        "/bin",
+    ] {
+        dirs.push(std::path::PathBuf::from(extra));
+    }
+    if let Some(inherited) = env::var_os("PATH") {
+        dirs.extend(env::split_paths(&inherited));
+    }
+    env::join_paths(dirs).unwrap_or_default()
+}
+
+fn resolve_server(server: &str) -> Result<String, String> {    if let Some(found) = find_on_path(server) {
         return Ok(found);
     }
     if let Some(found) = find_with_xcrun(server) {

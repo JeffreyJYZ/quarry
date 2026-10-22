@@ -1481,3 +1481,172 @@ button.tree-note {
 		box-shadow: -10px 0 24px rgba(0, 0, 0, 0.45);
 	}
 }
+
+/* Layout guards: header, dock and status bar never shrink; only the editor absorbs height. */
+.titlebar {
+	flex: 0 0 auto;
+}
+
+.titlebar .button {
+	flex: 0 0 auto;
+	white-space: nowrap;
+}
+
+.crumbs {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.notice {
+	flex: 0 0 auto;
+}
+
+.statusbar {
+	flex: 0 0 auto;
+}
+
+.editor-pane {
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+/* Bottom dock: tests and problems share one region, never stacked. */
+.dock {
+	display: flex;
+	flex-direction: column;
+	flex: 0 0 auto;
+	max-height: 45%;
+	border-top: 1px solid var(--line);
+	background: var(--panel);
+}
+
+.dock.collapsed {
+	max-height: none;
+}
+
+.dock-head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	height: 30px;
+	padding: 0 10px;
+	border-bottom: 1px solid var(--line);
+}
+
+.dock.collapsed .dock-head {
+	border-bottom: 0;
+}
+
+.dock-toggle {
+	display: grid;
+	place-items: center;
+	width: 16px;
+	height: 16px;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	cursor: pointer;
+}
+
+.dock-tabs {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.dock-tab {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 6px;
+	padding: 3px 8px;
+	border: 0;
+	border-radius: 3px;
+	background: transparent;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	cursor: pointer;
+}
+
+.dock-tab:hover {
+	background: var(--hover);
+}
+
+.dock-tab.active {
+	color: var(--text);
+	background: var(--hover);
+}
+
+.dock-tab-count {
+	font-size: 10px;
+	letter-spacing: 0;
+	color: var(--muted);
+}
+
+.dock-tab-count.bad {
+	color: var(--danger);
+}
+
+.dock-tools {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-left: auto;
+	min-width: 0;
+}
+
+.dock-filter {
+	width: 180px;
+	padding: 3px 7px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: var(--bg);
+	color: var(--text);
+	font-family: var(--mono);
+	font-size: 11px;
+	outline: none;
+}
+
+.dock-filter:focus {
+	border-color: var(--accent);
+}
+
+.dock-action {
+	padding: 3px 8px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: transparent;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	cursor: pointer;
+}
+
+.dock-action:hover:not(:disabled) {
+	color: var(--text);
+	border-color: var(--muted);
+}
+
+.dock-action:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+.dock-body {
+	min-height: 0;
+	overflow: auto;
+}
+
+/* Narrow windows: drop the project path before anything is squeezed. */
+@media (max-width: 1180px) {
+	.crumbs {
+		display: none;
+	}
+}
