@@ -24,6 +24,8 @@ import {
 	buildProject,
 	type Diagnostic,
 	type FileEntry,
+	type GitStatus,
+	gitStatus,
 	type Location,
 	openProject,
 	type ProjectInfo,
@@ -88,6 +90,7 @@ type SaveStatus = { text: string; failed: boolean };
 export default function App() {
 	const [appVersion, setAppVersion] = useState("");
 	const [project, setProject] = useState<ProjectInfo | null>(null);
+	const [gitStatusState, setGitStatusState] = useState<GitStatus | null>(null);
 	const [report, setReport] = useState<ToolchainReport | null>(null);
 	const [reportFailed, setReportFailed] = useState(false);
 	const [buffers, setBuffers] = useState<FileBuffer[]>([]);
@@ -212,6 +215,26 @@ export default function App() {
 	}, [project, buffers, activePath]);
 
 	const root = project?.root ?? null;
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: gitRefresh is an explicit refresh trigger
+	useEffect(() => {
+		let cancelled = false;
+		if (root === null) {
+			setGitStatusState(null);
+			return;
+		}
+		void (async () => {
+			try {
+				const next = await gitStatus(root);
+				if (!cancelled) setGitStatusState(next);
+			} catch {
+				if (!cancelled) setGitStatusState(null);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [root, gitRefresh]);
 
 	useEffect(() => {
 		const handleFocus = () => {
@@ -856,6 +879,7 @@ export default function App() {
 				project={project}
 				report={report}
 				reportFailed={reportFailed}
+				git={gitStatusState}
 				extra={
 					<>
 						{saveStatus === null ? null : (
