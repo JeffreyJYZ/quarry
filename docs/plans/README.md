@@ -14,6 +14,7 @@ it is evidence rather than direction.
 | [`005-dap-client.md`](005-dap-client.md)                 | Debugger session core: `lldb-dap` launch, breakpoints, threads, frames, scopes, variables, memory, disassembly, data breakpoints.    |
 | [`006-remaining-parity.md`](006-remaining-parity.md)     | Status of the daily loop, remaining gaps ranked by value, definition of done, and risks.                                             |
 | [`007-formatter-decision.md`](007-formatter-decision.md) | Formatter decision: keep Biome over Bun's `bun fmt`.                                                                                 |
+| [`008-release-checklist.md`](008-release-checklist.md)   | Release checklist: pre-flight gates, smoke matrix, build and bundle, version bumping, known gaps, do-not-ship list.                  |
 
 ## Spike
 
