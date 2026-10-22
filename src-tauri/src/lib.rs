@@ -5,6 +5,7 @@ mod git;
 mod launch;
 mod lsp;
 mod project;
+mod pty;
 mod protocol_pipe;
 mod resolve;
 mod run_config;
@@ -29,6 +30,7 @@ pub fn run() {
         .manage(lsp::LspState::default())
         .manage(dap::DapState::default())
         .manage(run_task::RunState::default())
+        .manage(pty::PtyState::default())
         .invoke_handler(tauri::generate_handler![
             version,
             toolchain::toolchains,
@@ -81,7 +83,11 @@ pub fn run() {
             settings::read_settings,
             settings::write_settings,
             git::git_status,
-            git::git_file_diff
+            git::git_file_diff,
+            pty::pty_open,
+            pty::pty_write,
+            pty::pty_resize,
+            pty::pty_close
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

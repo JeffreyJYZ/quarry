@@ -51,6 +51,7 @@ import { applyFileEdits } from "@/refactor/apply";
 import RunLog from "@/run/RunLog";
 import SearchPalette from "@/search/SearchPalette";
 import ShortcutSheet from "@/shortcuts/ShortcutSheet";
+import Terminal from "@/terminal/Terminal";
 import TestsDock, { type DockTab } from "@/tests/TestsDock";
 import { useTests } from "@/tests/useTests";
 import "./styles.css";
@@ -147,6 +148,7 @@ export default function App() {
 	const [railCollapsed, setRailCollapsed] = useState(false);
 	const [gitRefresh, setGitRefresh] = useState(0);
 	const [gitDiffPath, setGitDiffPath] = useState<string | null>(null);
+	const [terminalOpen, setTerminalOpen] = useState(false);
 	/** Paths with a write in flight; the tab row dims its mark while the promise resolves. */
 	const [saving, setSaving] = useState<ReadonlySet<string>>(() => new Set<string>());
 	/** Path whose dirty close is waiting on the inline Save/Discard choice. */
@@ -1117,6 +1119,18 @@ export default function App() {
 				>
 					Tests
 				</button>
+				<button
+					type="button"
+					className="button"
+					disabled={root === null}
+					aria-pressed={terminalOpen}
+					onClick={() => {
+						setTerminalOpen((current) => !current);
+						if (!terminalOpen) setPanelOpen(true);
+					}}
+				>
+					Terminal
+				</button>
 				<span className="crumbs" title={project ? project.root : undefined}>
 					{project ? project.root : "no project open"}
 				</span>
@@ -1214,7 +1228,9 @@ export default function App() {
 					) : (
 						<Welcome project={project} />
 					)}
-					{project ? (
+					{project && terminalOpen ? (
+						<Terminal key={project.root} root={project.root} />
+					) : project ? (
 						<TestsDock
 							tab={dockTab}
 							expanded={panelExpanded}
