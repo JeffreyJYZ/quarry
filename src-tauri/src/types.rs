@@ -384,3 +384,15 @@ pub struct GitFileDiff {
     pub diff: String,
     pub binary: bool,
 }
+
+/// One entry in a document outline.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Symbol {
+    pub name: String,
+    /// LSP SymbolKind, 1–26.
+    pub kind: u32,
+    pub range: Range,
+    /// Nesting depth, 0 for top-level symbols.
+    pub depth: u32,
+}

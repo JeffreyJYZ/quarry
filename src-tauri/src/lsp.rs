@@ -17,7 +17,7 @@ use crate::protocol_pipe::{FrameError, ProcessPipe};
 use crate::resolve;
 use crate::types::{
     CompletionItem, CompletionList, Diagnostic, DiagnosticsEvent, HoverInfo, Location, LspStatus,
-    Position, ProjectKind, Range,
+    Position, ProjectKind, Range, Symbol,
 };
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -885,6 +885,70 @@ mod tests {
     }
 
     #[test]
+    fn document_symbols_flatten_two_levels() {
+        let result = json!([
+            {
+                "name": "Outer",
+                "kind": 5,
+                "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 10, "character": 1 } },
+                "children": [
+                    {
+                        "name": "Inner",
+                        "kind": 12,
+                        "range": { "start": { "line": 2, "character": 4 }, "end": { "line": 2, "character": 9 } }
+                    }
+                ]
+            }
+        ]);
+        let symbols = parse_symbols(&result);
+        assert_eq!(symbols.len(), 2);
+        assert_eq!(symbols[0].name, "Outer");
+        assert_eq!(symbols[0].depth, 0);
+        assert_eq!(symbols[1].name, "Inner");
+        assert_eq!(symbols[1].depth, 1);
+    }
+
+    #[test]
+    fn symbol_information_maps_absolute_range_at_depth_zero() {
+        let result = json!([
+            {
+                "name": "foo",
+                "kind": 12,
+                "location": {
+                    "uri": path_to_uri("/p/src/main.rs"),
+                    "range": { "start": { "line": 3, "character": 4 }, "end": { "line": 3, "character": 7 } }
+                }
+            }
+        ]);
+        let symbols = parse_symbols(&result);
+        assert_eq!(symbols.len(), 1);
+        assert_eq!(symbols[0].name, "foo");
+        assert_eq!(symbols[0].depth, 0);
+        assert_eq!(symbols[0].range.start.line, 3);
+        assert_eq!(symbols[0].range.start.character, 4);
+    }
+
+    #[test]
+    fn symbol_without_range_is_skipped() {
+        let result = json!([
+            { "name": "no_range", "kind": 1 },
+            {
+                "name": "has_range",
+                "kind": 2,
+                "range": { "start": { "line": 1, "character": 2 }, "end": { "line": 1, "character": 6 } }
+            }
+        ]);
+        let symbols = parse_symbols(&result);
+        assert_eq!(symbols.len(), 1);
+        assert_eq!(symbols[0].name, "has_range");
+    }
+
+    #[test]
+    fn null_symbols_result_is_empty() {
+        assert!(parse_symbols(&Value::Null).is_empty());
+    }
+
+    #[test]
     fn client_capabilities_advertise_the_navigation_requests() {
         let capabilities = client_capabilities();
         assert_eq!(
@@ -1215,4 +1279,91 @@ pub async fn lsp_completion(
     )
     .await?;
     Ok(parse_completion(&result))
+}
+
+/// Flattened document outline: nested symbols arrive with `children`, the UI gets a depth.
+#[tauri::command]
+pub async fn lsp_symbols(
+    state: State<'_, LspState>,
+    root: String,
+    path: String,
+) -> Result<Vec<Symbol>, String> {
+    let session = session_for(&state, &root)?;
+    let result = send_request(
+        &session,
+        "textDocument/documentSymbol",
+        json!({ "textDocument": { "uri": path_to_uri(&path) } }),
+    )
+    .await?;
+    Ok(parse_symbols(&result))
+}
+
+/// Read the symbols out of a `textDocument/documentSymbol` answer.
+///
+/// The server may answer with `DocumentSymbol[]` (nested via `children`) or
+/// `SymbolInformation[]` (flat, with `location`). Both are flattened into one list,
+/// with `depth` reflecting the nesting level.
+pub fn parse_symbols(result: &Value) -> Vec<Symbol> {
+    let mut out = Vec::new();
+    match result {
+        Value::Null => {}
+        Value::Array(entries) => {
+            for entry in entries {
+                if entry.get("location").is_some() {
+                    if let Some(symbol) = parse_symbol_information(entry) {
+                        out.push(symbol);
+                    }
+                } else {
+                    collect_document_symbols(entry, 0, &mut out);
+                }
+            }
+        }
+        _ => {}
+    }
+    out
+}
+
+fn parse_symbol_information(value: &Value) -> Option<Symbol> {
+    let name = value.get("name").and_then(Value::as_str)?;
+    if name.is_empty() {
+        return None;
+    }
+    let range_value = value.get("location")?.get("range")?;
+    Some(Symbol {
+        name: name.to_string(),
+        kind: value
+            .get("kind")
+            .and_then(Value::as_u64)
+            .and_then(|kind| u32::try_from(kind).ok())
+            .unwrap_or(0),
+        range: parse_range(range_value),
+        depth: 0,
+    })
+}
+
+fn collect_document_symbols(value: &Value, depth: u32, out: &mut Vec<Symbol>) {
+    let Some(object) = value.as_object() else {
+        return;
+    };
+    let name = object.get("name").and_then(Value::as_str);
+    let range_value = object.get("range");
+    if let (Some(name), Some(range_value)) = (name, range_value) {
+        if !name.is_empty() {
+            out.push(Symbol {
+                name: name.to_string(),
+                kind: object
+                    .get("kind")
+                    .and_then(Value::as_u64)
+                    .and_then(|kind| u32::try_from(kind).ok())
+                    .unwrap_or(0),
+                range: parse_range(range_value),
+                depth,
+            });
+        }
+    }
+    if let Some(children) = object.get("children").and_then(Value::as_array) {
+        for child in children {
+            collect_document_symbols(child, depth + 1, out);
+        }
+    }
 }
