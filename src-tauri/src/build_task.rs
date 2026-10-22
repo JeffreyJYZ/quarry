@@ -97,10 +97,9 @@ fn cpp_not_wired(marker: &str) -> String {
 /// points at the `build` hint in the launch config.
 #[allow(dead_code)] // used only by tests in this module
 fn compile_commands_not_wired() -> String {
-    format!(
-        "compile-commands project (compile_commands.json): no build system is known, so quarry \
-         cannot build it. Add a `build` command to .quarry/launch.json to say how to build it"
-    )
+    "compile-commands project (compile_commands.json): no build system is known, so quarry \
+     cannot build it. Add a `build` command to .quarry/launch.json to say how to build it"
+        .to_string()
 }
 
 /// Nothing in the directory tree marks a build system.
@@ -661,10 +660,10 @@ fn parse_text_diagnostic(line: &str, build_root: &Path) -> Option<Diagnostic> {
 fn split_severity(line: &str) -> Option<(&str, &str, u8)> {
     let mut found: Option<(usize, u8)> = None;
     for (marker, severity) in TEXT_SEVERITIES {
-        if let Some(index) = line.find(marker) {
-            if found.is_none_or(|(at, _)| index < at) {
-                found = Some((index, severity));
-            }
+        if let Some(index) = line.find(marker)
+            && found.is_none_or(|(at, _)| index < at)
+        {
+            found = Some((index, severity));
         }
     }
 

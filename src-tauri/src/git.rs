@@ -269,9 +269,7 @@ fn entry(path: String, x: char, y: char) -> Option<Entry> {
         return None;
     }
     let code = if x != '.' { x } else { y };
-    let Some(status) = status_name(code) else {
-        return None;
-    };
+    let status = status_name(code)?;
     let staged = x != '.' && x != '?';
     Some(Entry {
         path,
@@ -351,12 +349,12 @@ fn absolute_path(root: &str, relative: &str) -> String {
 fn relative_path(root: &str, path: &str) -> String {
     let root_path = Path::new(root);
     let given = Path::new(path);
-    if given.is_absolute() {
-        if let Ok(stripped) = given.strip_prefix(root_path) {
-            let relative = stripped.to_string_lossy().replace('\\', "/");
-            if !relative.is_empty() {
-                return relative;
-            }
+    if given.is_absolute()
+        && let Ok(stripped) = given.strip_prefix(root_path)
+    {
+        let relative = stripped.to_string_lossy().replace('\\', "/");
+        if !relative.is_empty() {
+            return relative;
         }
     }
     path.replace('\\', "/")
@@ -718,10 +716,8 @@ pub fn validate_path(root: &str, path: &str) -> Result<String, String> {
             return Err(format!("path escapes the repository root: {path}"));
         }
     }
-    if given.is_absolute() {
-        if !given.starts_with(&canonical_root) && !given.starts_with(root) {
-            return Err(format!("path is outside the repository root: {path}"));
-        }
+    if given.is_absolute() && !given.starts_with(&canonical_root) && !given.starts_with(root) {
+        return Err(format!("path is outside the repository root: {path}"));
     }
     Ok(path.to_string())
 }

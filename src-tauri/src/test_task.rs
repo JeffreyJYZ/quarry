@@ -218,9 +218,7 @@ where
                 Ok(0) | Err(_) => return,
                 Ok(_) => {
                     let line = String::from_utf8_lossy(&buffer);
-                    let text = line
-                        .trim_end_matches(|c| c == '\n' || c == '\r')
-                        .to_string();
+                    let text = line.trim_end_matches(['\n', '\r']).to_string();
                     let mut lines = sink.lock().unwrap_or_else(|error| error.into_inner());
                     lines.push(Line { text, stderr });
                 }

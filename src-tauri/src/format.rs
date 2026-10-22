@@ -93,10 +93,10 @@ fn rust_edition_for_path(path: &str) -> &'static str {
     };
     loop {
         let manifest = dir.join("Cargo.toml");
-        if manifest.is_file() {
-            if let Ok(content) = std::fs::read_to_string(&manifest) {
-                return parse_rust_edition(&content);
-            }
+        if manifest.is_file()
+            && let Ok(content) = std::fs::read_to_string(&manifest)
+        {
+            return parse_rust_edition(&content);
         }
         match dir.parent() {
             Some(parent) if parent != dir => dir = parent,
@@ -131,10 +131,8 @@ fn parse_rust_edition(content: &str) -> &'static str {
                             package_edition = Some(ed);
                         }
                     }
-                    "workspace.package" => {
-                        if workspace_edition.is_none() {
-                            workspace_edition = Some(ed);
-                        }
+                    "workspace.package" if workspace_edition.is_none() => {
+                        workspace_edition = Some(ed);
                     }
                     _ => {}
                 }
@@ -153,12 +151,10 @@ fn parse_rust_edition(content: &str) -> &'static str {
 
 fn parse_edition_value(raw: &str) -> Option<&str> {
     let raw = raw.trim();
-    if raw.starts_with('"') {
-        let rest = &raw[1..];
+    if let Some(rest) = raw.strip_prefix('"') {
         let end = rest.find('"')?;
         Some(&rest[..end])
-    } else if raw.starts_with('\'') {
-        let rest = &raw[1..];
+    } else if let Some(rest) = raw.strip_prefix('\'') {
         let end = rest.find('\'')?;
         Some(&rest[..end])
     } else {

@@ -759,10 +759,7 @@ impl Pump {
                     let is_ours = value.get("type").and_then(Value::as_str) == Some("response")
                         && value.get("request_seq").and_then(Value::as_i64) == Some(seq);
                     if is_ours {
-                        return match response_result(&value) {
-                            Ok(body) => Some(body),
-                            Err(_) => None,
-                        };
+                        return response_result(&value).ok();
                     }
                     self.deferred.push(value);
                 }

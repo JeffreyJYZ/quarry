@@ -79,10 +79,11 @@ fn require_cargo(kind: ProjectKind) -> Result<(), String> {
         ProjectKind::Cargo => Ok(()),
         ProjectKind::Cmake => Err(preset_needed("CMake")),
         ProjectKind::CompileCommands => Err(preset_needed("compile_commands.json")),
-        ProjectKind::Unknown => Err(format!(
+        ProjectKind::Unknown => Err(
             "no Cargo project detected in this directory, so there is no binary to launch; \
              add a preset in .quarry/launch.json naming the program to debug."
-        )),
+                .to_string(),
+        ),
     }
 }
 
@@ -229,10 +230,9 @@ fn find_bin_target(metadata: &Value, package: &str) -> Result<String, String> {
         .as_array()
         .filter(|packages| !packages.is_empty())
         .ok_or_else(|| {
-            format!(
-                "cargo metadata reported no packages in this project, so there is no binary to \
+            "cargo metadata reported no packages in this project, so there is no binary to \
                  launch; add a preset in .quarry/launch.json naming the program to debug."
-            )
+                .to_string()
         })?;
 
     let selected = packages

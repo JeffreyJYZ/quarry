@@ -402,7 +402,7 @@ fn handshake(pipe: &mut ProcessPipe, root_uri: &str, name: &str) -> Result<(), S
                 ));
             }
             Err(RecvTimeoutError::Disconnected) => {
-                return Err(format!("exited before answering initialize"));
+                return Err("exited before answering initialize".to_string());
             }
         }
     }
@@ -1484,19 +1484,19 @@ fn collect_document_symbols(value: &Value, depth: u32, out: &mut Vec<Symbol>) {
     };
     let name = object.get("name").and_then(Value::as_str);
     let range_value = object.get("range");
-    if let (Some(name), Some(range_value)) = (name, range_value) {
-        if !name.is_empty() {
-            out.push(Symbol {
-                name: name.to_string(),
-                kind: object
-                    .get("kind")
-                    .and_then(Value::as_u64)
-                    .and_then(|kind| u32::try_from(kind).ok())
-                    .unwrap_or(0),
-                range: parse_range(range_value),
-                depth,
-            });
-        }
+    if let (Some(name), Some(range_value)) = (name, range_value)
+        && !name.is_empty()
+    {
+        out.push(Symbol {
+            name: name.to_string(),
+            kind: object
+                .get("kind")
+                .and_then(Value::as_u64)
+                .and_then(|kind| u32::try_from(kind).ok())
+                .unwrap_or(0),
+            range: parse_range(range_value),
+            depth,
+        });
     }
     if let Some(children) = object.get("children").and_then(Value::as_array) {
         for child in children {
@@ -2026,10 +2026,10 @@ pub fn parse_call_hierarchy_calls(result: &Value, incoming: bool) -> Vec<CallHie
     let mut out = Vec::new();
     if let Some(entries) = result.as_array() {
         for entry in entries {
-            if let Some(source) = entry.get(source_key) {
-                if let Some(node) = call_hierarchy_node_from_item(source, 0) {
-                    out.push(node);
-                }
+            if let Some(source) = entry.get(source_key)
+                && let Some(node) = call_hierarchy_node_from_item(source, 0)
+            {
+                out.push(node);
             }
         }
     }

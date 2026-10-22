@@ -222,8 +222,10 @@ mod tests {
 
     #[test]
     fn remember_root_moves_to_front_and_dedupes() {
-        let mut settings = Settings::default();
-        settings.recent_roots = vec!["/private/tmp".to_string(), "/tmp".to_string()];
+        let mut settings = Settings {
+            recent_roots: vec!["/private/tmp".to_string(), "/tmp".to_string()],
+            ..Default::default()
+        };
         let list = super::remember_root_value(&mut settings, "/tmp".to_string()).expect("ok");
         assert_eq!(list, vec!["/tmp".to_string(), "/private/tmp".to_string()]);
         assert_eq!(settings.recent_roots, list);
@@ -232,7 +234,6 @@ mod tests {
     #[test]
     fn remember_root_caps_at_ten() {
         let mut s2 = Settings::default();
-        s2.recent_roots = vec![];
         for _ in 0..12 {
             let _ = super::remember_root_value(&mut s2, "/tmp".to_string());
         }

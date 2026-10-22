@@ -132,12 +132,12 @@ pub async fn stop_program(state: State<'_, RunState>, run_id: String) -> Result<
         return Ok(());
     };
 
-    if let Err(error) = child.kill() {
-        if !matches!(error.kind(), ErrorKind::InvalidInput | ErrorKind::NotFound) {
-            // Hand the child back so the waiter keeps watching it instead of leaking a zombie.
-            lock(&entry).replace(child);
-            return Err(format!("cannot stop {run_id}: {error}"));
-        }
+    if let Err(error) = child.kill()
+        && !matches!(error.kind(), ErrorKind::InvalidInput | ErrorKind::NotFound)
+    {
+        // Hand the child back so the waiter keeps watching it instead of leaking a zombie.
+        lock(&entry).replace(child);
+        return Err(format!("cannot stop {run_id}: {error}"));
     }
 
     child
