@@ -12,6 +12,7 @@ import {
 	dapConfigurationDone,
 	dapDataBreakpointInfo,
 	dapLaunch,
+	dapRestart,
 	dapScopes,
 	dapSetBreakpoints,
 	dapSetBreakpointsEx,
@@ -142,7 +143,12 @@ export type DebugController = {
 	sessionId: string | null;
 	/** How the live session started; null with no session. */
 	sessionKind: string | null;
-	/** Every row the launch select renders, in order. */
+	/** True while a restart is in flight. */
+	restarting: boolean;
+	/** True once after a restart, until the next stop clears it. */
+	restarted: boolean;
+	/** Restart the live session and re-push breakpoints. */
+	restart: () => void /** Every row the launch select renders, in order. */;
 	presetEntries: PresetEntry[];
 	/** The pid the attach box holds. */
 	pidInput: string;
@@ -217,6 +223,8 @@ export function useDebugSession(root: string | null): DebugController {
 	/** The configuration the last launch resolved, shown under the select. */
 	const [resolved, setResolved] = useState<LaunchConfig | null>(null);
 	const [sessionKind, setSessionKind] = useState<string | null>(null);
+	const [restarting, setRestarting] = useState(false);
+	const [restarted, setRestarted] = useState(false);
 	const [attachPid, setAttachPid] = useState<number | null>(null);
 	const [pidInput, setPidInputState] = useState("");
 	/** The missing-binary message while one build is still on offer; null once used. */
@@ -282,6 +290,7 @@ export function useDebugSession(root: string | null): DebugController {
 		sessionRef.current = null;
 		setSessionId(null);
 		setLaunching(false);
+		setRestarting(false);
 		setStopView(null);
 		setChildren(new Map());
 		setExpanded(new Set());
@@ -388,6 +397,8 @@ export function useDebugSession(root: string | null): DebugController {
 			}
 			const session = event.session;
 			setLaunching(false);
+			setRestarting(false);
+			setRestarted(false);
 			setError(null);
 			const generation = ++generationRef.current;
 			setStopView({
@@ -838,6 +849,7 @@ export function useDebugSession(root: string | null): DebugController {
 			sessionRef.current = id;
 			setSessionId(id);
 			setSessionKind("launch");
+			setRestarted(false);
 			setLaunching(false);
 			/* A fresh adapter knows nothing about rows from an earlier session. */
 			await syncAll();
@@ -912,6 +924,7 @@ export function useDebugSession(root: string | null): DebugController {
 		sessionRef.current = id;
 		setSessionId(id);
 		setSessionKind("attach");
+		setRestarted(false);
 		setAttachPid(pid);
 		setLaunching(false);
 		await syncAll();
@@ -965,6 +978,7 @@ export function useDebugSession(root: string | null): DebugController {
 		sessionRef.current = null;
 		setSessionId(null);
 		setLaunching(false);
+		setRestarting(false);
 		setStopView(null);
 		setChildren(new Map());
 		setExpanded(new Set());
@@ -972,6 +986,58 @@ export function useDebugSession(root: string | null): DebugController {
 		watchRef.current = [];
 		setWatchPoints([]);
 	}, []);
+
+	const restart = useCallback(async () => {
+		const session = sessionRef.current;
+		if (session === null || restarting) {
+			return;
+		}
+		setRestarting(true);
+		setError(null);
+		generationRef.current += 1;
+		setStopView(null);
+		setChildren(new Map());
+		setExpanded(new Set());
+		setSelectedVariable(null);
+		let nextId: string;
+		try {
+			const next = await dapRestart(session);
+			nextId = next.id;
+		} catch (reason) {
+			setError(`Restart: ${describeError(reason)}`);
+			setRestarting(false);
+			return;
+		}
+		sessionRef.current = nextId;
+		setSessionId(nextId);
+		setRestarted(true);
+		/* Re-push every breakpoint file. */
+		for (const path of [...breakpointMapRef.current.keys()]) {
+			const lines = breakpointMapRef.current.get(path);
+			if (lines === undefined) continue;
+			const rows = [...lines.entries()]
+				.filter(([, entry]) => entry.enabled)
+				.map(([line, entry]) => ({
+					line,
+					condition: entry.condition,
+					hitCondition: entry.hitCondition,
+					logMessage: entry.logMessage,
+					enabled: true,
+				}));
+			try {
+				await dapSetBreakpointsEx(nextId, path, rows);
+			} catch (reason) {
+				setError(`Breakpoints: ${fileName(path)}: ${describeError(reason)}`);
+			}
+			if (sessionRef.current !== nextId) return;
+		}
+		try {
+			await dapConfigurationDone(nextId);
+		} catch (reason) {
+			setError(`Configuration done: ${describeError(reason)}`);
+		}
+		setRestarting(false);
+	}, [restarting]);
 
 	const handleTerminated = useCallback((session: string) => {
 		if (sessionRef.current !== null && session !== sessionRef.current) {
@@ -981,6 +1047,7 @@ export function useDebugSession(root: string | null): DebugController {
 		sessionRef.current = null;
 		setSessionId(null);
 		setLaunching(false);
+		setRestarting(false);
 		setStopView(null);
 		setChildren(new Map());
 		setExpanded(new Set());
@@ -1073,6 +1140,8 @@ export function useDebugSession(root: string | null): DebugController {
 		configError,
 		sessionId,
 		sessionKind,
+		restarting,
+		restarted,
 		pidInput,
 		setPidInput,
 		attach: () => {
@@ -1099,6 +1168,9 @@ export function useDebugSession(root: string | null): DebugController {
 		},
 		stop: () => {
 			void stop();
+		},
+		restart: () => {
+			void restart();
 		},
 		stopView,
 		selectFrame,

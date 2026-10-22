@@ -201,9 +201,14 @@ export default function DebugPanel({ debug }: { debug: DebugController }) {
 		<aside className="debug" aria-label="Debugger">
 			<div className="debug-head">
 				<span className="label">debug</span>
-				<span className={`debug-status ${debug.status}`}>{debug.status}</span>
+				<span className={`debug-status ${debug.restarting ? "dimmed" : debug.status}`}>
+					{debug.restarting ? "restarting…" : debug.status}
+				</span>
 				{debug.sessionKind === null ? null : (
-					<span className="debug-session">{debug.sessionKind}</span>
+					<span className="debug-session">
+						{debug.sessionKind}
+						{debug.restarted ? " (restarted)" : ""}
+					</span>
 				)}
 			</div>
 
@@ -345,6 +350,14 @@ export default function DebugPanel({ debug }: { debug: DebugController }) {
 						onClick={debug.stop}
 					>
 						Stop
+					</button>
+					<button
+						type="button"
+						className="button"
+						disabled={session === null || debug.restarting}
+						onClick={debug.restart}
+					>
+						{debug.restarting ? "Restarting…" : "Restart"}
 					</button>
 				</div>
 			</section>
