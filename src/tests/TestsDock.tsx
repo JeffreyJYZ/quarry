@@ -2,8 +2,13 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ProblemFile } from "@/problems/model";
 import ProblemsPanel from "@/problems/ProblemsPanel";
-import type { TestItem } from "@/project/api";
 import type { FileBuffer } from "@/project/buffer";
+import {
+	applyTestFilters,
+	type ResultFilter,
+	resultLabel,
+	type SortDir,
+} from "@/tests/filterTests";
 import TestsPanel from "@/tests/TestsPanel";
 import type { TestsController } from "@/tests/useTests";
 
@@ -29,18 +34,6 @@ export type TestsDockProps = {
 	tests: TestsController;
 };
 
-/** Case-insensitive substring filter over the test name and its binary. */
-function filterTests(items: TestItem[], filter: string): TestItem[] {
-	const needle = filter.trim().toLowerCase();
-	if (needle === "") {
-		return items;
-	}
-	return items.filter(
-		(item) =>
-			item.name.toLowerCase().includes(needle) || item.binary.toLowerCase().includes(needle),
-	);
-}
-
 /**
  * The bottom dock. Tests and problems share one region: the header carries both tabs and the
  * body shows the active one, so the editor never grows a second stacked panel.
@@ -54,11 +47,32 @@ export default function TestsDock({
 	tests,
 }: TestsDockProps) {
 	const [filter, setFilter] = useState("");
+	const [binaryFilter, setBinaryFilter] = useState<string | null>(null);
+	const [resultFilter, setResultFilter] = useState<ResultFilter>("all");
+	const [sort, setSort] = useState<SortDir>("az");
 	const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 	const [highlighted, setHighlighted] = useState(-1);
 	const filterRef = useRef<HTMLInputElement | null>(null);
 	const { load } = tests;
-	const filtered = useMemo(() => filterTests(tests.items, filter), [tests.items, filter]);
+
+	const binaries = useMemo(() => {
+		const counts = new Map<string, number>();
+		for (const item of tests.items) {
+			counts.set(item.binary, (counts.get(item.binary) ?? 0) + 1);
+		}
+		return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+	}, [tests.items]);
+
+	const filtered = useMemo(
+		() =>
+			applyTestFilters(tests.items, tests.results, {
+				text: filter,
+				binary: binaryFilter,
+				result: resultFilter,
+				sort,
+			}),
+		[tests.items, tests.results, filter, binaryFilter, resultFilter, sort],
+	);
 
 	/* The test list loads once, the first time the tests tab is opened. */
 	useEffect(() => {
@@ -187,6 +201,53 @@ export default function TestsDock({
 							}}
 							onKeyDown={onKeyDown}
 						/>
+						<select
+							className="dock-filter"
+							aria-label="Filter by binary"
+							disabled={runningAll}
+							value={binaryFilter ?? ""}
+							onChange={(event) => {
+								setBinaryFilter(
+									event.target.value === "" ? null : event.target.value,
+								);
+								setHighlighted(-1);
+							}}
+						>
+							<option value="">All binaries</option>
+							{binaries.map(([binary, count]) => (
+								<option key={binary} value={binary}>
+									{binary} ({count})
+								</option>
+							))}
+						</select>
+						<div className="dock-segmented">
+							{(["all", "failed", "passed", "notrun"] as ResultFilter[]).map(
+								(value) => (
+									<button
+										key={value}
+										type="button"
+										className={
+											resultFilter === value ? "dock-seg active" : "dock-seg"
+										}
+										disabled={runningAll}
+										onClick={() => {
+											setResultFilter(value);
+											setHighlighted(-1);
+										}}
+									>
+										{resultLabel(value)}
+									</button>
+								),
+							)}
+						</div>
+						<button
+							type="button"
+							className="dock-action"
+							disabled={runningAll}
+							onClick={() => setSort((current) => (current === "az" ? "za" : "az"))}
+						>
+							{sort === "az" ? "A→Z" : "Z→A"}
+						</button>
 						{progressLabel === null ? null : (
 							<span className="dock-progress">{progressLabel}</span>
 						)}
@@ -222,6 +283,9 @@ export default function TestsDock({
 							onToggleGroup={toggleGroup}
 							highlighted={highlighted}
 							onRun={tests.runOne}
+							textFilter={filter}
+							binaryFilter={binaryFilter}
+							resultFilter={resultFilter}
 						/>
 					) : (
 						<ProblemsPanel

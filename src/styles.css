@@ -2712,6 +2712,35 @@ button.tree-note {
 	color: var(--accent);
 }
 
+.dock-segmented {
+	display: inline-flex;
+	gap: 2px;
+}
+
+.dock-seg {
+	padding: 3px 6px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: transparent;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	cursor: pointer;
+}
+
+.dock-seg.active {
+	color: var(--text);
+	background: var(--hover);
+	border-color: #2a313a;
+}
+
+.dock-seg:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
 /* command palette: centered, hairline, mono, scrollable list */
 .command-palette {
 	position: absolute;

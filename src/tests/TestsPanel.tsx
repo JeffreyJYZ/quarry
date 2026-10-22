@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { TestItem, TestReport } from "@/project/api";
+import { type ResultFilter, resultLabel } from "@/tests/filterTests";
 
 /** A failure output longer than this is cut; the rest of it stays on the backend. */
 const OUTPUT_LINE_CAP = 200;
@@ -18,6 +19,9 @@ export type TestsPanelProps = {
 	onToggleGroup: (binary: string) => void;
 	highlighted: number;
 	onRun: (name: string) => void;
+	textFilter?: string;
+	binaryFilter?: string | null;
+	resultFilter?: ResultFilter;
 };
 
 type TestGroup = {
@@ -200,6 +204,7 @@ function TestGroups({
 	onToggleGroup,
 	highlighted,
 	onRun,
+	emptyMessage,
 }: {
 	groups: TestGroup[];
 	results: ReadonlyMap<string, TestReport>;
@@ -208,9 +213,10 @@ function TestGroups({
 	onToggleGroup: (binary: string) => void;
 	highlighted: number;
 	onRun: (name: string) => void;
+	emptyMessage: string;
 }) {
 	if (groups.length === 0) {
-		return <p className="problems-empty">No tests found</p>;
+		return <p className="problems-empty">{emptyMessage}</p>;
 	}
 	let index = 0;
 	return (
@@ -274,12 +280,27 @@ export default function TestsPanel({
 	onToggleGroup,
 	highlighted,
 	onRun,
+	textFilter = "",
+	binaryFilter = null,
+	resultFilter = "all",
 }: TestsPanelProps) {
 	const groups = groupByBinary(items);
 	const summaryClass = summary?.includes("stopped at") ? " bad" : "";
+	const total = items.length;
+	const failedCount = items.filter((item) => {
+		const report = results.get(item.name);
+		return report !== undefined && !report.passed;
+	}).length;
+	const notRunCount = items.filter((item) => results.get(item.name) === undefined).length;
+	const emptyMessage = `No tests match "${textFilter}" · "${binaryFilter ?? "All binaries"}" · "${resultLabel(resultFilter)}"`;
 
 	return (
 		<div className="tests">
+			{loading || loadError !== null ? null : (
+				<p className="tests-summary">
+					{total} tests · {failedCount} failed · {notRunCount} not run
+				</p>
+			)}
 			{summary === null ? null : <p className={`tests-summary${summaryClass}`}>{summary}</p>}
 			{loading ? <p className="problems-empty">Loading tests…</p> : null}
 			{loadError === null ? null : <p className="problems-empty error">{loadError}</p>}
@@ -292,6 +313,7 @@ export default function TestsPanel({
 					onToggleGroup={onToggleGroup}
 					highlighted={highlighted}
 					onRun={onRun}
+					emptyMessage={emptyMessage}
 				/>
 			)}
 		</div>
