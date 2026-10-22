@@ -2005,7 +2005,7 @@ fn call_hierarchy_node_from_item(item: &Value, _item_id: u32) -> Option<CallHier
 }
 
 /// Pure mapping helper for tests: map a `prepareCallHierarchy` result.
-#[allow(dead_code)]
+#[allow(dead_code)] // test-fixture helper, not wired into production path
 pub fn parse_call_hierarchy_prepare(result: &Value) -> Vec<CallHierarchyNode> {
     let mut out = Vec::new();
     if let Some(items) = result.as_array() {
@@ -2020,7 +2020,7 @@ pub fn parse_call_hierarchy_prepare(result: &Value) -> Vec<CallHierarchyNode> {
 }
 
 /// Pure mapping helper for tests: map an incoming/outgoing calls result.
-#[allow(dead_code)]
+#[allow(dead_code)] // test-fixture helper, not wired into production path
 pub fn parse_call_hierarchy_calls(result: &Value, incoming: bool) -> Vec<CallHierarchyNode> {
     let source_key = if incoming { "from" } else { "to" };
     let mut out = Vec::new();

@@ -642,3 +642,7 @@ export type CommitDiff = { hash: string; diff: string; binary: boolean };
 export function gitCommitDiff(root: string, hash: string): Promise<CommitDiff> {
 	return invoke<CommitDiff>("git_commit_diff", { root, hash });
 }
+
+export function listFiles(root: string): Promise<string[]> {
+	return invoke<string[]>("list_files", { root });
+}

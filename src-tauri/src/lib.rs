@@ -1,5 +1,6 @@
 mod build_task;
 mod dap;
+mod files;
 mod format;
 mod git;
 mod launch;
@@ -99,6 +100,7 @@ pub fn run() {
             git::git_checkout,
             git::git_log,
             git::git_commit_diff,
+            files::list_files,
             processes::list_processes,
             pty::pty_open,
             pty::pty_write,

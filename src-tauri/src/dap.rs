@@ -537,7 +537,6 @@ pub async fn dap_stop(state: State<'_, DapState>, session: String) -> Result<(),
 /// no `restart` DAP request to send: this is implemented as a best-effort `disconnect`, kill and
 /// removal followed by a full relaunch. Breakpoints are not re-sent by the backend; the frontend
 /// re-pushes them on relaunch.
-#[allow(dead_code)]
 #[tauri::command]
 pub async fn dap_restart(
     app: AppHandle,

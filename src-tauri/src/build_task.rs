@@ -95,7 +95,7 @@ fn cpp_not_wired(marker: &str) -> String {
 
 /// A `compile_commands.json` project names no build system, so the message names the kind and
 /// points at the `build` hint in the launch config.
-#[allow(dead_code)]
+#[allow(dead_code)] // used only by tests in this module
 fn compile_commands_not_wired() -> String {
     format!(
         "compile-commands project (compile_commands.json): no build system is known, so quarry \
@@ -588,19 +588,6 @@ pub fn plain_clang_argv<P: AsRef<Path>>(root: &str, name: &str, sources: &[P]) -
         argv.push(source.as_ref().to_string_lossy().into_owned());
     }
     argv
-}
-
-/// Alias names kept for test discoverability.
-#[allow(dead_code)]
-fn compiler_for_sources(sources: &[std::path::PathBuf]) -> &'static str {
-    if sources
-        .iter()
-        .all(|p| p.extension().map(|e| e == "c").unwrap_or(false))
-    {
-        "clang"
-    } else {
-        "clang++"
-    }
 }
 
 fn summarize_text_with(text: &str, default: &str) -> String {

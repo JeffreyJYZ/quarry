@@ -707,7 +707,6 @@ fn run_mutation(
     Ok(())
 }
 
-#[allow(dead_code)]
 pub fn validate_path(root: &str, path: &str) -> Result<String, String> {
     if path.is_empty() {
         return Err("path must not be empty".to_string());
@@ -727,7 +726,6 @@ pub fn validate_path(root: &str, path: &str) -> Result<String, String> {
     Ok(path.to_string())
 }
 
-#[allow(dead_code)]
 pub fn validate_paths(root: &str, paths: &[String]) -> Result<Vec<String>, String> {
     if paths.is_empty() {
         return Err("no paths given".to_string());
@@ -737,24 +735,6 @@ pub fn validate_paths(root: &str, paths: &[String]) -> Result<Vec<String>, Strin
         validated.push(validate_path(root, path)?);
     }
     Ok(validated)
-}
-
-#[allow(dead_code)]
-pub fn stage_args(paths: &[String]) -> Vec<String> {
-    let mut argv = vec!["add".to_string(), "--".to_string()];
-    argv.extend(paths.iter().cloned());
-    argv
-}
-
-#[allow(dead_code)]
-pub fn unstage_args(paths: &[String]) -> Vec<String> {
-    let mut argv = vec![
-        "restore".to_string(),
-        "--staged".to_string(),
-        "--".to_string(),
-    ];
-    argv.extend(paths.iter().cloned());
-    argv
 }
 
 /// Validates a commit message before it reaches git.
@@ -921,7 +901,6 @@ pub fn sort_branches(branches: &mut [Branch]) {
     });
 }
 
-#[allow(dead_code)]
 pub fn validate_branch_name(branch: &str) -> Result<(), String> {
     if branch.is_empty() {
         return Err("branch name must not be empty".to_string());
@@ -942,7 +921,6 @@ pub fn validate_branch_name(branch: &str) -> Result<(), String> {
 }
 
 /// Builds the argv for `git checkout <branch>`.
-#[allow(dead_code)]
 pub fn checkout_argv(branch: &str) -> Vec<String> {
     vec!["checkout".to_string(), branch.to_string()]
 }
@@ -1029,27 +1007,6 @@ pub fn parse_git_log(stdout: &str) -> Vec<GitCommitEntry> {
 
 fn is_no_commits(stderr: &str) -> bool {
     stderr.contains("does not have any commits")
-}
-
-// Aliases for callers/tests that use the other naming.
-#[allow(dead_code)]
-pub fn parse_log(stdout: &str) -> Vec<GitCommitEntry> {
-    parse_git_log(stdout)
-}
-
-#[allow(dead_code)]
-pub fn git_log_argv(limit: u32) -> Vec<String> {
-    log_argv(limit)
-}
-
-#[allow(dead_code)]
-pub fn clamp_log_limit(limit: Option<u32>) -> Result<u32, String> {
-    resolve_log_limit(limit)
-}
-
-#[allow(dead_code)]
-pub fn normalize_limit(limit: Option<u32>) -> Result<u32, String> {
-    resolve_log_limit(limit)
 }
 
 #[derive(Serialize, Clone, Debug)]

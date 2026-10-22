@@ -219,44 +219,6 @@ pub fn valid_env_name(name: &str) -> bool {
     chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
-#[allow(dead_code)]
-pub fn validate_env_name(name: &str) -> Result<(), String> {
-    if valid_env_name(name) {
-        Ok(())
-    } else {
-        Err(format!("invalid environment variable name: {name}"))
-    }
-}
-
-/// Alias helpers for hidden tests that may use different names.
-#[allow(dead_code)]
-pub fn env_list(env: Option<Vec<EnvVar>>) -> Result<Vec<EnvVar>, String> {
-    validate_env(env)
-}
-
-#[allow(dead_code)]
-pub fn env_args(env: Option<Vec<EnvVar>>) -> Result<Vec<(String, String)>, String> {
-    Ok(validate_env(env)?
-        .into_iter()
-        .map(|v| (v.name, v.value))
-        .collect())
-}
-
-#[allow(dead_code)]
-pub fn env_pairs(env: Option<Vec<EnvVar>>) -> Result<Vec<(String, String)>, String> {
-    env_args(env)
-}
-
-#[allow(dead_code)]
-pub fn normalize_env(env: Option<Vec<EnvVar>>) -> Result<Vec<EnvVar>, String> {
-    validate_env(env)
-}
-
-#[allow(dead_code)]
-pub fn is_valid_env_name(name: &str) -> bool {
-    valid_env_name(name)
-}
-
 /// Wire-stable id for the nth run.
 fn run_id(number: u64) -> String {
     format!("run-{number}")
