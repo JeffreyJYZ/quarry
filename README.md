@@ -60,14 +60,17 @@ read off `src-tauri/src/lib.rs` and `src/`:
   `src/projects/RecentProjects.tsx`.
 - **Problems quick fixes**: each Problems entry carries a `Fix` button that opens code actions from
   `lsp_code_actions` in `src/problems/ProblemsPanel.tsx`.
-- **Tests**: `list_tests` and `run_test` feed a Tests dock with pass/fail status.
+- **Tests**: `list_tests` and `run_test` feed a Tests dock with pass/fail status, filtering by
+  binary and result, sorting, and run-all scoped to the filtered set
+  (`src/tests/filterTests.ts`).
 - **Source control**: a Git view with status, per-file diff, an open-in-editor flow, a commit box
   (`git_commit`), branch listing and switching (`git_branches`, `git_checkout`, dropdown in
   `src/git/SourceControl.tsx`), a History tab listing recent commits (`git_log`), and a unified
   diff for a selected commit (`git_commit_diff`), plus `git_status` and `git_file_diff` commands.
-  Blame annotations render in the editor through `src/editor/blame.ts` (wired into
-  `src/editor/Editor.tsx`) on top of the `git_blame` backend; there is no toolbar toggle
-  yet.
+  Discard changes run through `git_discard` with a confirmation prompt in
+  `src/git/SourceControl.tsx`. Blame annotations render in the editor through
+  `src/editor/blame.ts` (wired into `src/editor/Editor.tsx`) on top of the `git_blame` backend;
+  there is no toolbar toggle yet.
 - **Breadcrumb**: a strip showing the file path and the symbol chain containing the caret, built from
   `lsp_symbols` in `src/breadcrumb/Breadcrumb.tsx`.
 
