@@ -201,6 +201,12 @@ export const quarryTheme: Extension = EditorView.theme(
 		...lintStyles,
 		...breakpointStyles,
 		...foldStyles,
+		".cm-occurrence": {
+			backgroundColor: "rgba(91, 141, 239, 0.14)",
+		},
+		".cm-occurrence-strong": {
+			backgroundColor: "rgba(91, 141, 239, 0.26)",
+		},
 	},
 	{ dark: true },
 );

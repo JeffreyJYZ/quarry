@@ -34,6 +34,7 @@ import { breakpointGutter, normalizeLines, setBreakpoints } from "@/editor/break
 import { lintSignature, toLintDiagnostics } from "@/editor/diagnostics";
 import { inlayHintsField, setInlayHints } from "@/editor/inlayHints";
 import { languageForPath } from "@/editor/languages";
+import { occurrencesField, setOccurrences } from "@/editor/occurrences";
 import {
 	emptySearchState,
 	type SearchMatch,
@@ -50,6 +51,7 @@ import {
 	lspCodeActions,
 	lspCompletion,
 	lspDefinition,
+	lspDocumentHighlights,
 	lspHover,
 	lspInlayHints,
 	lspReferences,
@@ -274,6 +276,9 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 	const inlaySeqRef = useRef(0);
 	const inlayTimerRef = useRef<number | null>(null);
 	const inlayHintsRef = useRef<InlayHint[]>([]);
+	const occSeqRef = useRef(0);
+	const occTimerRef = useRef<number | null>(null);
+	const occPosRef = useRef<number | null>(null);
 
 	const recompute = () => {
 		const view = viewRef.current;
@@ -503,6 +508,68 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		applyInlay(result);
 	};
 
+	const clearOccurrences = () => {
+		const view = viewRef.current;
+		if (view !== null) view.dispatch({ effects: setOccurrences.of(null) });
+	};
+
+	const runOccurrences = async () => {
+		const view = viewRef.current;
+		const currentRoot = rootRef.current;
+		const currentPath = latestRef.current.path;
+		if (view === null || currentRoot === null || currentPath === null) {
+			clearOccurrences();
+			return;
+		}
+		if (!view.hasFocus) {
+			clearOccurrences();
+			return;
+		}
+		const pos = view.state.selection.main.head;
+		occPosRef.current = pos;
+		const mySeq = occSeqRef.current;
+		const { line, character } = toLspPosition(view, pos);
+		let ranges: Awaited<ReturnType<typeof lspDocumentHighlights>> = [];
+		try {
+			ranges = await lspDocumentHighlights(currentRoot, currentPath, line, character);
+		} catch {
+			ranges = [];
+		}
+		if (mySeq !== occSeqRef.current) return;
+		const liveView = viewRef.current;
+		if (liveView === null || liveView.state.selection.main.head !== pos) {
+			clearOccurrences();
+			return;
+		}
+		const items = ranges
+			.map((range) => {
+				const startLine = liveView.state.doc.line(
+					Math.min(Math.max(range.start.line + 1, 1), liveView.state.doc.lines),
+				);
+				const endLine = liveView.state.doc.line(
+					Math.min(Math.max(range.end.line + 1, 1), liveView.state.doc.lines),
+				);
+				const from = startLine.from + range.start.character;
+				const to = endLine.from + range.end.character;
+				const strong = from <= pos && pos <= to;
+				return { from, to, strong };
+			})
+			.filter((item) => item.to > item.from);
+		liveView.dispatch({ effects: setOccurrences.of(items) });
+	};
+
+	const scheduleOccurrences = () => {
+		occSeqRef.current += 1;
+		if (occTimerRef.current !== null) {
+			window.clearTimeout(occTimerRef.current);
+			occTimerRef.current = null;
+		}
+		occTimerRef.current = window.setTimeout(() => {
+			occTimerRef.current = null;
+			void runOccurrences();
+		}, 250);
+	};
+
 	openSearchRef.current = openSearch;
 	closeSearchRef.current = closeSearch;
 	stepRef.current = stepMatch;
@@ -574,6 +641,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 					searchField,
 					searchDecorations,
 					inlayHintsField,
+					occurrencesField,
 					lineNumbers(),
 					lintGutter(),
 					highlightActiveLineGutter(),
@@ -771,6 +839,12 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 									return true;
 								}
 								hideSig();
+								occSeqRef.current += 1;
+								if (occTimerRef.current !== null) {
+									window.clearTimeout(occTimerRef.current);
+									occTimerRef.current = null;
+								}
+								clearOccurrences();
 								if (!searchOpenRef.current) return false;
 								closeSearchRef.current();
 								return true;
@@ -861,9 +935,16 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 								inlayTimerRef.current = null;
 								void runInlay();
 							}, 600);
+							occSeqRef.current += 1;
+							if (occTimerRef.current !== null) {
+								window.clearTimeout(occTimerRef.current);
+								occTimerRef.current = null;
+							}
+							clearOccurrences();
 						}
 						if (update.selectionSet) {
 							scheduleSig();
+							scheduleOccurrences();
 							const pos = update.state.selection.main.head;
 							const { line, character } = toLspPosition(update.view, pos);
 							const last = lastCursorRef.current;
@@ -880,6 +961,12 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 					EditorView.domEventHandlers({
 						blur: () => {
 							hideSig();
+							occSeqRef.current += 1;
+							if (occTimerRef.current !== null) {
+								window.clearTimeout(occTimerRef.current);
+								occTimerRef.current = null;
+							}
+							clearOccurrences();
 							return false;
 						},
 						mousedown: (event, view) => {

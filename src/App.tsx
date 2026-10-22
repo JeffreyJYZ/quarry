@@ -1,5 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Breadcrumb from "@/breadcrumb/Breadcrumb";
 import CallsPanel from "@/calls/CallsPanel";
 import FileTree from "@/components/FileTree";
 import RefsPanel from "@/components/RefsPanel";
@@ -1282,6 +1283,12 @@ export default function App() {
 								onSaveClose={handleSaveClose}
 								onDiscardClose={handleDiscardClose}
 								onCancelClose={handleCancelClose}
+							/>
+							<Breadcrumb
+								root={root ?? ""}
+								activePath={activePath}
+								cursor={cursor}
+								onNavigate={handleNavigate}
 							/>
 							<div className="editor-pane">
 								<Editor
