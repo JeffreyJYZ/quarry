@@ -524,3 +524,29 @@ export function onPtyOutput(handler: (event: PtyOutputEvent) => void): Promise<(
 export function onPtyExited(handler: (event: PtyExitedEvent) => void): Promise<() => void> {
 	return listen<PtyExitedEvent>("pty://exited", (event) => handler(event.payload));
 }
+
+export type SignatureInformation = { label: string; documentation: string | null };
+export type SignatureHelp = {
+	signatures: SignatureInformation[];
+	activeSignature: number;
+	activeParameter: number;
+};
+
+export function lspSignatureHelp(
+	root: string,
+	path: string,
+	line: number,
+	character: number,
+): Promise<SignatureHelp | null> {
+	return invoke<SignatureHelp | null>("lsp_signature_help", { root, path, line, character });
+}
+
+export type InlayHint = { line: number; character: number; label: string; kind: number | null };
+
+export function lspInlayHints(root: string, path: string): Promise<InlayHint[]> {
+	return invoke<InlayHint[]>("lsp_inlay_hints", { root, path });
+}
+
+export function dapRestart(session: string): Promise<DapSession> {
+	return invoke<DapSession>("dap_restart", { session });
+}

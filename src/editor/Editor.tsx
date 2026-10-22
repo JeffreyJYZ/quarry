@@ -1,6 +1,22 @@
-import { autocompletion } from "@codemirror/autocomplete";
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { indentUnit, syntaxHighlighting } from "@codemirror/language";
+import { autocompletion, closeBrackets } from "@codemirror/autocomplete";
+import {
+	defaultKeymap,
+	deleteLine,
+	history,
+	historyKeymap,
+	indentLess,
+	indentSelection,
+	indentWithTab,
+	toggleLineComment,
+} from "@codemirror/commands";
+import {
+	bracketMatching,
+	codeFolding,
+	foldGutter,
+	indentOnInput,
+	indentUnit,
+	syntaxHighlighting,
+} from "@codemirror/language";
 import { lintGutter, setDiagnostics } from "@codemirror/lint";
 import { Compartment, EditorState } from "@codemirror/state";
 import {
@@ -564,11 +580,17 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 					highlightActiveLine(),
 					drawSelection(),
 					history(),
+					bracketMatching(),
+					closeBrackets(),
+					indentOnInput(),
+					codeFolding(),
+					foldGutter(),
 					indentUnit.of("    "),
 					EditorState.tabSize.of(4),
 					keymap.of([
 						...defaultKeymap,
 						...historyKeymap,
+						indentWithTab,
 						{
 							key: "F12",
 							run: () => {
@@ -753,6 +775,62 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 								closeSearchRef.current();
 								return true;
 							},
+						},
+						{
+							key: "Mod-]",
+							run: (view) => {
+								indentSelection(view);
+								return true;
+							},
+						},
+						{
+							key: "Mod-[",
+							run: (view) => {
+								indentLess(view);
+								return true;
+							},
+						},
+						{
+							key: "Mod-/",
+							run: toggleLineComment,
+						},
+						{
+							key: "Mod-d",
+							run: (view) => {
+								const state = view.state;
+								const sel = state.selection.main;
+								let from = sel.from;
+								let to = sel.to;
+								if (from === to) {
+									const line = state.doc.lineAt(from);
+									const text = line.text;
+									const rel = from - line.from;
+									let start = rel;
+									let end = rel;
+									while (start > 0 && /[A-Za-z0-9_]/.test(text[start - 1]))
+										start -= 1;
+									while (end < text.length && /[A-Za-z0-9_]/.test(text[end]))
+										end += 1;
+									from = line.from + start;
+									to = line.from + end;
+									if (from === to) return false;
+									view.dispatch({ selection: { anchor: from, head: to } });
+								}
+								const word = state.doc.sliceString(from, to);
+								if (word === "") return false;
+								const doc = state.doc.toString();
+								let next = doc.indexOf(word, to);
+								if (next === -1) next = doc.indexOf(word, 0);
+								if (next === -1 || next === from) return false;
+								view.dispatch({
+									selection: { anchor: next, head: next + word.length },
+								});
+								return true;
+							},
+						},
+						{
+							key: "Mod-Shift-k",
+							run: deleteLine,
 						},
 					]),
 					language.of(languageForPath(latestRef.current.path)),

@@ -74,6 +74,7 @@ pub fn run() {
             dap::dap_data_breakpoint_info,
             dap::dap_set_data_breakpoints,
             dap::dap_stop,
+            dap::dap_restart,
             run_config::read_launch_config,
             run_config::write_launch_config,
             run_config::resolve_launch_config,

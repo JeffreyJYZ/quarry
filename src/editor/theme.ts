@@ -82,6 +82,31 @@ const lintStyles = {
 	".cm-diagnosticSource": { color: "var(--muted)", opacity: 1 },
 } as const;
 
+const foldStyles = {
+	".cm-foldGutter": {
+		width: "1em",
+		"& .cm-gutterElement": {
+			padding: "0",
+			textAlign: "center",
+		},
+	},
+	".cm-foldMarker": {
+		color: "var(--muted)",
+		cursor: "pointer",
+		fontSize: "12px",
+		lineHeight: "1",
+	},
+	".cm-foldPlaceholder": {
+		backgroundColor: "rgba(255, 255, 255, 0.06)",
+		border: "1px solid var(--line)",
+		borderRadius: "3px",
+		color: "var(--muted)",
+		padding: "0 4px",
+		margin: "0 2px",
+		fontSize: "12px",
+	},
+} as const;
+
 const breakpointStyles = {
 	".cm-breakpoint-gutter": {
 		width: "1.1em",
@@ -175,6 +200,7 @@ export const quarryTheme: Extension = EditorView.theme(
 		},
 		...lintStyles,
 		...breakpointStyles,
+		...foldStyles,
 	},
 	{ dark: true },
 );

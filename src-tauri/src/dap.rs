@@ -58,6 +58,9 @@ pub struct Session {
     /// The thread id of the last `stopped` event, which `continue` and the step commands need.
     stopped_thread: AtomicU32,
     alive: AtomicBool,
+    /// The launch parameters this session was created with, so a restart can relaunch identically.
+    /// `None` for sessions created by `dap_attach`.
+    pub launch_config: Option<LaunchConfig>,
 }
 
 impl Session {
@@ -69,6 +72,7 @@ impl Session {
             seq: AtomicI64::new(FIRST_REQUEST_SEQ),
             stopped_thread: AtomicU32::new(0),
             alive: AtomicBool::new(true),
+            launch_config: None,
         }
     }
 
@@ -199,7 +203,8 @@ pub async fn dap_launch(
         return Err(error);
     }
 
-    let id = register_session(app, &state, pipe)?;
+    let config_for_session = config.clone();
+    let id = register_session(app, &state, pipe, Some(config_for_session))?;
 
     Ok(DapSession {
         id,
@@ -235,7 +240,7 @@ pub async fn dap_attach(
         }
     };
 
-    let id = register_session(app, &state, pipe)?;
+    let id = register_session(app, &state, pipe, None)?;
 
     Ok(DapSession {
         id,
@@ -248,10 +253,13 @@ fn register_session(
     app: AppHandle,
     state: &DapState,
     mut pipe: ProcessPipe,
+    launch_config: Option<LaunchConfig>,
 ) -> Result<String, String> {
     let frames = pipe.take_frames();
     let id = format!("dap-{}", state.counter.fetch_add(1, Ordering::SeqCst) + 1);
-    let session = Arc::new(Session::new(id.clone(), pipe));
+    let mut session = Session::new(id.clone(), pipe);
+    session.launch_config = launch_config;
+    let session = Arc::new(session);
 
     let pump = Pump {
         app,
@@ -520,6 +528,53 @@ pub async fn dap_stop(state: State<'_, DapState>, session: String) -> Result<(),
     }
 
     Ok(())
+}
+
+/// Restart a debug session: terminate the existing one and launch a fresh one with the same
+/// launch parameters it was created with.
+///
+/// lldb-dap advertises neither `supportsRestartRequest` nor `supportsTerminateRequest`, so there is
+/// no `restart` DAP request to send: this is implemented as a best-effort `disconnect`, kill and
+/// removal followed by a full relaunch. Breakpoints are not re-sent by the backend; the frontend
+/// re-pushes them on relaunch.
+#[allow(dead_code)]
+#[tauri::command]
+pub async fn dap_restart(
+    app: AppHandle,
+    state: State<'_, DapState>,
+    session: String,
+) -> Result<DapSession, String> {
+    let old = lock(&state.sessions)
+        .remove(&session)
+        .ok_or_else(|| format!("no debug session {session}"))?;
+
+    let config = old
+        .launch_config
+        .clone()
+        .ok_or_else(|| format!("no debug session {session}"))?;
+
+    old.shutdown();
+
+    let adapter = resolve_adapter()?;
+    let cwd = real_directory(&config.cwd)?;
+
+    let mut command = Command::new(&adapter);
+    command.current_dir(&cwd);
+    command.env("PATH", resolve::child_path(Path::new(&adapter)));
+    let mut pipe = ProcessPipe::spawn(&mut command)
+        .map_err(|error| format!("cannot start {ADAPTER} ({adapter}) for {session}: {error}"))?;
+
+    if let Err(error) = handshake_launch(&mut pipe, &adapter, &config, &cwd) {
+        let _ = pipe.kill();
+        return Err(error);
+    }
+
+    let id = register_session(app, &state, pipe, Some(config.clone()))?;
+
+    Ok(DapSession {
+        id,
+        program: config.program,
+    })
 }
 
 /// Read frames off the adapter and keep both sides unblocked.
