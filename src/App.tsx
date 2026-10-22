@@ -38,6 +38,7 @@ import {
 	type ProjectInfo,
 	readSettings,
 	readTextFile,
+	rememberRoot,
 	runProgram,
 	type Settings,
 	stopProgram,
@@ -49,6 +50,7 @@ import {
 import { type FileBuffer, isDirty } from "@/project/buffer";
 import { describeError } from "@/project/errors";
 import { type SaveOutcome, saveBuffer, saveErrorMessage, saveMessage } from "@/project/save";
+import RecentProjects from "@/projects/RecentProjects";
 import { applyFileEdits } from "@/refactor/apply";
 import RunForm from "@/run/RunForm";
 import RunLog from "@/run/RunLog";
@@ -171,6 +173,7 @@ export default function App() {
 	/** Path whose dirty close is waiting on the inline Save/Discard choice. */
 	const [confirmClose, setConfirmClose] = useState<string | null>(null);
 	const [saveStatus, setSaveStatus] = useState<SaveStatus | null>(null);
+	const [recentRoots, setRecentRoots] = useState<string[]>([]);
 
 	useEffect(() => {
 		let unOutput: (() => void) | undefined;
@@ -272,6 +275,7 @@ export default function App() {
 				setDebugOpen(settings.debugOpen ?? false);
 				setGitOpen(settings.gitOpen ?? false);
 				setPanelOpen(settings.dockExpanded ?? null);
+				setRecentRoots(settings.recentRoots ?? []);
 				const storedTab = settings.dockTab;
 				setDockTab(
 					storedTab === "tests" || storedTab === "problems" ? storedTab : "problems",
@@ -613,19 +617,10 @@ export default function App() {
 		previousErrors.current = counts.errors;
 	}, [counts.errors]);
 
-	const handleOpenProject = useCallback(async () => {
+	const openRoot = useCallback(async (nextRoot: string) => {
 		setOpening(true);
 		setNotice(null);
 		try {
-			const picked = await open({
-				directory: true,
-				multiple: false,
-				title: "Open project",
-			});
-			const nextRoot = typeof picked === "string" ? picked : null;
-			if (!nextRoot) {
-				return;
-			}
 			const next = await openProject(nextRoot);
 			setProject(next);
 			setBuffers([]);
@@ -642,12 +637,36 @@ export default function App() {
 			setSearchOpen(false);
 			setShortcutsOpen(false);
 			setDebugOpen(false);
+			try {
+				const updated = await rememberRoot(nextRoot);
+				setRecentRoots(updated);
+			} catch {
+				/* ignore */
+			}
 		} catch (error) {
-			setNotice(describeError(error));
+			setNotice(`Could not open ${nextRoot}: ${describeError(error)}`);
+			setRecentRoots((current) => current.filter((entry) => entry !== nextRoot));
 		} finally {
 			setOpening(false);
 		}
 	}, []);
+
+	const handleOpenProject = useCallback(async () => {
+		try {
+			const picked = await open({
+				directory: true,
+				multiple: false,
+				title: "Open project",
+			});
+			const nextRoot = typeof picked === "string" ? picked : null;
+			if (!nextRoot) {
+				return;
+			}
+			await openRoot(nextRoot);
+		} catch (error) {
+			setNotice(describeError(error));
+		}
+	}, [openRoot]);
 
 	/** `Cmd+S` saves, `Cmd+Alt+S` saves everything, `Cmd+F` opens the palette outside the editor. */
 	useEffect(() => {
@@ -1163,6 +1182,12 @@ export default function App() {
 				>
 					{opening ? "Opening" : "Open project"}
 				</button>
+				<RecentProjects
+					roots={recentRoots}
+					current={root}
+					opening={opening}
+					onOpen={(rootToOpen) => void openRoot(rootToOpen)}
+				/>
 				<button
 					type="button"
 					className="button"

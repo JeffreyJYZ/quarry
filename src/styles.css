@@ -1884,6 +1884,62 @@ button.tree-note {
 	white-space: nowrap;
 }
 
+.recent-projects {
+	position: relative;
+	flex: 0 0 auto;
+}
+
+.recent-trigger {
+	padding: 0 8px;
+}
+
+.recent-list {
+	position: absolute;
+	top: calc(100% + 4px);
+	left: 0;
+	z-index: 40;
+	min-width: 260px;
+	max-height: 320px;
+	overflow: auto;
+	margin: 0;
+	padding: 4px;
+	list-style: none;
+	background: var(--surface, #1e1e1e);
+	border: 1px solid var(--border, #333);
+	border-radius: 6px;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.recent-item {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 12px;
+}
+
+.recent-item.highlight {
+	background: var(--hover, #2a2a2a);
+}
+
+.recent-dot {
+	color: var(--accent, #4a9eff);
+}
+
+.recent-name {
+	font-weight: 600;
+}
+
+.recent-parent {
+	color: var(--muted, #888);
+	font-size: 11px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .crumbs {
 	flex: 1 1 auto;
 	min-width: 0;
