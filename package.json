@@ -13,7 +13,8 @@
 		"fmt": "biome format --write .",
 		"verify": "bun run typecheck && biome check .",
 		"test": "bun test",
-		"gate": "bun run verify && bun test"
+		"gate": "bun run verify && bun test",
+		"verify:bundle": "bun run scripts/verify-bundle.ts"
 	},
 	"dependencies": {
 		"@codemirror/autocomplete": "^6.20.1",
