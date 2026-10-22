@@ -11,18 +11,21 @@ import {
 	dapAttach,
 	dapConfigurationDone,
 	dapDataBreakpointInfo,
+	dapExceptionFilters,
 	dapLaunch,
 	dapRestart,
 	dapScopes,
 	dapSetBreakpoints,
 	dapSetBreakpointsEx,
 	dapSetDataBreakpoints,
+	dapSetExceptionBreakpoints,
 	dapSetVariable,
 	dapStackTrace,
 	dapStop,
 	dapThreads,
 	dapVariables,
 	defaultLaunchConfig,
+	type ExceptionFilter,
 	type LaunchConfig,
 	type LaunchPreset,
 	onDapStopped,
@@ -183,6 +186,9 @@ export type DebugController = {
 	watchPoints: WatchRow[];
 	addWatchPoint: (containerRef: number, name: string) => void;
 	removeWatchPoint: (dataId: string) => void;
+	exceptionFilters: ExceptionFilter[];
+	exceptionChecked: Set<string>;
+	toggleExceptionFilter: (filter: string, checked: boolean) => void;
 	breakpoints: BreakpointRow[];
 	/** The same rows grouped by absolute path, in line order — what a gutter renders. */
 	breakpointsByPath: Map<string, BreakpointRow[]>;
@@ -219,6 +225,8 @@ export function useDebugSession(root: string | null): DebugController {
 	const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 	const [selectedVariable, setSelectedVariable] = useState<VariableRow | null>(null);
 	const [watchPoints, setWatchPoints] = useState<WatchRow[]>([]);
+	const [exceptionFilters, setExceptionFilters] = useState<ExceptionFilter[]>([]);
+	const [exceptionChecked, setExceptionChecked] = useState<Set<string>>(() => new Set());
 	const [breakpointMap, setBreakpointMap] = useState<Map<string, Map<number, BreakpointEntry>>>(
 		() => new Map(),
 	);
@@ -243,6 +251,7 @@ export function useDebugSession(root: string | null): DebugController {
 	const watchRef = useRef<WatchRow[]>([]);
 	const breakpointMapRef = useRef<Map<string, Map<number, BreakpointEntry>>>(breakpointMap);
 	const childrenRef = useRef<Map<number, DapVariable[]>>(children);
+	const exceptionCheckedRef = useRef<Set<string>>(exceptionChecked);
 	const expandedRef = useRef<Set<string>>(expanded);
 	const generationRef = useRef(0);
 
@@ -253,6 +262,7 @@ export function useDebugSession(root: string | null): DebugController {
 	breakpointMapRef.current = breakpointMap;
 	childrenRef.current = children;
 	expandedRef.current = expanded;
+	exceptionCheckedRef.current = exceptionChecked;
 
 	/* A new selection invalidates the resolved path shown under the select. */
 	const setPreset = useCallback((name: string) => {
@@ -300,6 +310,8 @@ export function useDebugSession(root: string | null): DebugController {
 		setExpanded(new Set());
 		setSelectedVariable(null);
 		setWatchPoints([]);
+		setExceptionFilters([]);
+		setExceptionChecked(new Set());
 		setBreakpointMap(new Map());
 		setError(null);
 		setConfigError(null);
@@ -802,6 +814,59 @@ export function useDebugSession(root: string | null): DebugController {
 		[commitMap, syncFile],
 	);
 
+	const loadExceptionFilters = useCallback(async (session: string, preserveChecked: boolean) => {
+		try {
+			const filters = await dapExceptionFilters(session);
+			if (sessionRef.current !== session) return;
+			setExceptionFilters(filters);
+			const available = new Set(filters.map((filter) => filter.filter));
+			let nextChecked: Set<string>;
+			if (preserveChecked) {
+				nextChecked = new Set(
+					[...exceptionCheckedRef.current].filter((filter) => available.has(filter)),
+				);
+			} else {
+				nextChecked = new Set(
+					filters.filter((filter) => filter.default).map((filter) => filter.filter),
+				);
+			}
+			exceptionCheckedRef.current = nextChecked;
+			setExceptionChecked(nextChecked);
+			try {
+				await dapSetExceptionBreakpoints(session, [...nextChecked]);
+			} catch (reason) {
+				if (sessionRef.current === session) {
+					setError(`Exceptions: ${describeError(reason)}`);
+				}
+			}
+		} catch (reason) {
+			if (sessionRef.current === session) {
+				setError(`Exceptions: ${describeError(reason)}`);
+				setExceptionFilters([]);
+			}
+		}
+	}, []);
+
+	const toggleExceptionFilter = useCallback(async (filter: string, checked: boolean) => {
+		const session = sessionRef.current;
+		if (session === null) return;
+		const previous = new Set(exceptionCheckedRef.current);
+		const next = new Set(previous);
+		if (checked) next.add(filter);
+		else next.delete(filter);
+		exceptionCheckedRef.current = next;
+		setExceptionChecked(next);
+		try {
+			await dapSetExceptionBreakpoints(session, [...next]);
+		} catch (reason) {
+			if (sessionRef.current === session) {
+				exceptionCheckedRef.current = previous;
+				setExceptionChecked(previous);
+				setError(`Exceptions: ${describeError(reason)}`);
+			}
+		}
+	}, []);
+
 	const runToCursor = useCallback(
 		async (path: string, line: number) => {
 			const session = sessionRef.current;
@@ -923,15 +988,18 @@ export function useDebugSession(root: string | null): DebugController {
 			setSessionKind("launch");
 			setRestarted(false);
 			setLaunching(false);
+			setExceptionFilters([]);
+			setExceptionChecked(new Set());
 			/* A fresh adapter knows nothing about rows from an earlier session. */
 			await syncAll();
+			await loadExceptionFilters(id, false);
 			try {
 				await dapConfigurationDone(id);
 			} catch (reason) {
 				setError(`Configuration done: ${describeError(reason)}`);
 			}
 		},
-		[syncAll, resolveConfig],
+		[syncAll, resolveConfig, loadExceptionFilters],
 	);
 
 	/** Build the project, then retry the launch once; a second failure is a plain error line. */
@@ -999,13 +1067,16 @@ export function useDebugSession(root: string | null): DebugController {
 		setRestarted(false);
 		setAttachPid(pid);
 		setLaunching(false);
+		setExceptionFilters([]);
+		setExceptionChecked(new Set());
 		await syncAll();
+		await loadExceptionFilters(id, false);
 		try {
 			await dapConfigurationDone(id);
 		} catch (reason) {
 			setError(`Configuration done: ${describeError(reason)}`);
 		}
-	}, [pidInput, syncAll]);
+	}, [pidInput, syncAll, loadExceptionFilters]);
 
 	const continueRun = useCallback(async () => {
 		const session = sessionRef.current;
@@ -1057,6 +1128,8 @@ export function useDebugSession(root: string | null): DebugController {
 		setSelectedVariable(null);
 		watchRef.current = [];
 		setWatchPoints([]);
+		setExceptionFilters([]);
+		setExceptionChecked(new Set());
 	}, []);
 
 	const restart = useCallback(async () => {
@@ -1083,6 +1156,7 @@ export function useDebugSession(root: string | null): DebugController {
 		sessionRef.current = nextId;
 		setSessionId(nextId);
 		setRestarted(true);
+		setExceptionFilters([]);
 		/* Re-push every breakpoint file. */
 		for (const path of [...breakpointMapRef.current.keys()]) {
 			const lines = breakpointMapRef.current.get(path);
@@ -1103,13 +1177,14 @@ export function useDebugSession(root: string | null): DebugController {
 			}
 			if (sessionRef.current !== nextId) return;
 		}
+		await loadExceptionFilters(nextId, true);
 		try {
 			await dapConfigurationDone(nextId);
 		} catch (reason) {
 			setError(`Configuration done: ${describeError(reason)}`);
 		}
 		setRestarting(false);
-	}, [restarting]);
+	}, [restarting, loadExceptionFilters]);
 
 	const handleTerminated = useCallback(
 		(session: string) => {
@@ -1277,6 +1352,9 @@ export function useDebugSession(root: string | null): DebugController {
 			void addWatchPoint(containerRef, name);
 		},
 		removeWatchPoint,
+		exceptionFilters,
+		exceptionChecked,
+		toggleExceptionFilter,
 		breakpoints,
 		breakpointsByPath,
 		setBreakpointField,
