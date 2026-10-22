@@ -47,7 +47,9 @@ read off `src-tauri/src/lib.rs` and `src/`:
   running process by pid via `processes::list_processes` and `src/debug/ProcessPicker.tsx`. Line
   breakpoints with verified and pending states, conditional and hit-count breakpoints, run to cursor
   (`Cmd+F10`, `runToCursor` in `src/debug/session.ts` with temporary breakpoint handling), threads,
-  frames, scopes, variables, hardware watchpoints, a paged hex memory pane and a disassembly pane.
+  frames (clicking a frame opens its source line), scopes, variables, hardware watchpoints, a paged
+  hex memory pane and a disassembly pane. Exception breakpoints: backend commands
+  (`dap::dap_set_exception_breakpoints`, `dap::dap_exception_filters`) ready, panel pending.
   Variable values can be edited via `dap::dap_set_variable` and memory cells via `dap::dap_write_memory`.
 - **Search**: `rg`-backed palette with results grouped by file, keyboard navigation, and a visible cap
   when the result set is truncated. Case-sensitive, regex and whole-word toggles are in
@@ -63,6 +65,7 @@ read off `src-tauri/src/lib.rs` and `src/`:
   (`git_commit`), branch listing and switching (`git_branches`, `git_checkout`, dropdown in
   `src/git/SourceControl.tsx`), a History tab listing recent commits (`git_log`), and a unified
   diff for a selected commit (`git_commit_diff`), plus `git_status` and `git_file_diff` commands.
+  `git_blame` backend exists; no gutter blame UI in `src/`.
 - **Breadcrumb**: a strip showing the file path and the symbol chain containing the caret, built from
   `lsp_symbols` in `src/breadcrumb/Breadcrumb.tsx`.
 
@@ -73,6 +76,8 @@ Still missing, and named here so it is not mistaken for done:
   memory views until a different adapter or toolchain is measured (see `docs/spikes/dap.md`, "Evaluate probe
   (2026-10-22)").
 - **No run panel beyond args/cwd and output** — `run_program` / `stop_program` stream `run://output`; the UI in
+- **No exception-breakpoint UI** — `dap::dap_set_exception_breakpoints` and
+  `dap::dap_exception_filters` exist, but `src/debug/DebugPanel.tsx` has no section for them.
   `src/run/` covers program, args, cwd and argv preview, but there is no richer run configuration UI.
 - **No remote development, embedded targets, profilers, databases, Docker, AI assistance or plugin API.**
 
