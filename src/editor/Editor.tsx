@@ -12,11 +12,18 @@ import {
 	keymap,
 	lineNumbers,
 } from "@codemirror/view";
-import { type JSX, useEffect, useRef } from "react";
+import { type JSX, useEffect, useRef, useState } from "react";
 import "@/editor/editor.css";
 import { breakpointGutter, normalizeLines, setBreakpoints } from "@/editor/breakpoints";
 import { lintSignature, toLintDiagnostics } from "@/editor/diagnostics";
 import { languageForPath } from "@/editor/languages";
+import {
+	emptySearchState,
+	type SearchMatch,
+	searchDecorations,
+	searchField,
+	setSearchMatches,
+} from "@/editor/search";
 import { quarryHighlightStyle, quarryTheme } from "@/editor/theme";
 import type { Diagnostic } from "@/project/api";
 import {
@@ -136,6 +143,33 @@ export default function Editor({
 }: EditorProps): JSX.Element {
 	const hostRef = useRef<HTMLDivElement | null>(null);
 	const viewRef = useRef<EditorView | null>(null);
+	const [searchOpen, setSearchOpen] = useState(false);
+	const [replaceMode, setReplaceMode] = useState(false);
+	const [query, setQuery] = useState("");
+	const [replacement, setReplacement] = useState("");
+	const [caseSensitive, setCaseSensitive] = useState(false);
+	const [useRegex, setUseRegex] = useState(false);
+	const [matches, setMatches] = useState<SearchMatch[]>([]);
+	const [active, setActive] = useState(0);
+	const [error, setError] = useState<string | null>(null);
+	const searchOpenRef = useRef(searchOpen);
+	searchOpenRef.current = searchOpen;
+	const queryRef = useRef(query);
+	queryRef.current = query;
+	const caseRef = useRef(caseSensitive);
+	caseRef.current = caseSensitive;
+	const regexRef = useRef(useRegex);
+	regexRef.current = useRegex;
+	const replacementRef = useRef(replacement);
+	replacementRef.current = replacement;
+	const matchesRef = useRef(matches);
+	matchesRef.current = matches;
+	const activeRef = useRef(active);
+	activeRef.current = active;
+	const openSearchRef = useRef<(replace: boolean) => void>(() => undefined);
+	const closeSearchRef = useRef<() => void>(() => undefined);
+	const stepRef = useRef<(delta: number) => void>(() => undefined);
+	const recomputeRef = useRef<() => void>(() => undefined);
 	const languageRef = useRef<Compartment | null>(null);
 	const publishedRef = useRef<{ view: EditorView | null; signature: string }>({
 		view: null,
@@ -160,6 +194,123 @@ export default function Editor({
 	referencesRef.current = onReferences ?? null;
 	const revealTokenRef = useRef<number | null>(null);
 
+	const recompute = () => {
+		const view = viewRef.current;
+		if (view === null) return;
+		const q = queryRef.current;
+		if (!searchOpenRef.current || q === "") {
+			setMatches([]);
+			setActive(0);
+			setError(null);
+			view.dispatch({ effects: setSearchMatches.of(emptySearchState) });
+			return;
+		}
+		let source = q;
+		if (!regexRef.current) {
+			source = q.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&");
+		}
+		let re: RegExp;
+		try {
+			const flags = caseRef.current ? "g" : "gi";
+			re = new RegExp(source, flags);
+		} catch {
+			setMatches([]);
+			setActive(0);
+			setError("invalid regex");
+			view.dispatch({ effects: setSearchMatches.of(emptySearchState) });
+			return;
+		}
+		setError(null);
+		const text = view.state.doc.toString();
+		const found: SearchMatch[] = [];
+		re.lastIndex = 0;
+		let match: RegExpExecArray | null = re.exec(text);
+		while (match !== null) {
+			if (match[0].length === 0) {
+				re.lastIndex += 1;
+				match = re.exec(text);
+				continue;
+			}
+			found.push({ from: match.index, to: match.index + match[0].length });
+			if (found.length > 10000) break;
+			match = re.exec(text);
+		}
+		setMatches(found);
+		const nextActive = found.length > 0 ? 0 : -1;
+		setActive(Math.max(nextActive, 0));
+		view.dispatch({
+			effects: setSearchMatches.of({
+				matches: found,
+				active: nextActive >= 0 ? nextActive : -1,
+			}),
+		});
+		if (found.length > 0) {
+			const first = found[0];
+			view.dispatch({ selection: { anchor: first.from, head: first.to } });
+		}
+	};
+
+	const openSearch = (replace: boolean) => {
+		setReplaceMode(replace);
+		setSearchOpen(true);
+		searchOpenRef.current = true;
+	};
+
+	const closeSearch = () => {
+		setSearchOpen(false);
+		searchOpenRef.current = false;
+		setMatches([]);
+		setActive(0);
+		setError(null);
+		const view = viewRef.current;
+		if (view !== null) {
+			view.dispatch({ effects: setSearchMatches.of(emptySearchState) });
+			view.focus();
+		}
+	};
+
+	const stepMatch = (delta: number) => {
+		const current = matchesRef.current;
+		if (current.length === 0) return;
+		const next = (activeRef.current + delta + current.length) % current.length;
+		setActive(next);
+		activeRef.current = next;
+		const view = viewRef.current;
+		if (view !== null) {
+			view.dispatch({
+				effects: setSearchMatches.of({ matches: current, active: next }),
+			});
+			const m = current[next];
+			view.dispatch({ selection: { anchor: m.from, head: m.to } });
+		}
+	};
+
+	const replaceOne = () => {
+		const view = viewRef.current;
+		const current = matchesRef.current;
+		if (view === null || current.length === 0) return;
+		const m = current[activeRef.current];
+		view.dispatch({
+			changes: { from: m.from, to: m.to, insert: replacementRef.current },
+		});
+	};
+
+	const replaceAll = () => {
+		const view = viewRef.current;
+		const current = matchesRef.current;
+		if (view === null || current.length === 0) return;
+		const changes = [...current].reverse().map((m) => ({
+			from: m.from,
+			to: m.to,
+			insert: replacementRef.current,
+		}));
+		view.dispatch({ changes });
+	};
+	openSearchRef.current = openSearch;
+	closeSearchRef.current = closeSearch;
+	stepRef.current = stepMatch;
+	recomputeRef.current = recompute;
+
 	useEffect(() => {
 		const host = hostRef.current;
 		if (host === null) return;
@@ -177,6 +328,8 @@ export default function Editor({
 				doc: latestRef.current.value,
 				extensions: [
 					breakpointGutter,
+					searchField,
+					searchDecorations,
 					lineNumbers(),
 					lintGutter(),
 					highlightActiveLineGutter(),
@@ -256,6 +409,36 @@ export default function Editor({
 								return true;
 							},
 						},
+						{
+							key: "Mod-f",
+							run: () => {
+								openSearchRef.current(false);
+								return true;
+							},
+						},
+						{
+							key: "Mod-Alt-f",
+							run: () => {
+								openSearchRef.current(true);
+								return true;
+							},
+						},
+						{
+							key: "Mod-g",
+							run: () => {
+								if (!searchOpenRef.current) return false;
+								stepRef.current(1);
+								return true;
+							},
+						},
+						{
+							key: "Escape",
+							run: () => {
+								if (!searchOpenRef.current) return false;
+								closeSearchRef.current();
+								return true;
+							},
+						},
 					]),
 					language.of(languageForPath(latestRef.current.path)),
 					quarryTheme,
@@ -269,6 +452,9 @@ export default function Editor({
 						const next = update.state.doc.toString();
 						if (next === latestRef.current.value) return;
 						latestRef.current.onChange(next);
+						if (searchOpenRef.current) {
+							window.setTimeout(() => recomputeRef.current(), 0);
+						}
 					}),
 					EditorView.domEventHandlers({
 						mousedown: (event, view) => {
@@ -473,5 +659,95 @@ export default function Editor({
 		view.focus();
 	}, [reveal]);
 
-	return <div className="editor-host" ref={hostRef} />;
+	// biome-ignore lint/correctness/useExhaustiveDependencies: recompute reads refs
+	useEffect(() => {
+		if (!searchOpen) return;
+		recompute();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [searchOpen, query, caseSensitive, useRegex]);
+
+	return (
+		<div className="editor-host" ref={hostRef} style={{ position: "relative" }}>
+			{searchOpen ? (
+				<div className="cm-search-bar">
+					<input
+						className="search-input"
+						value={query}
+						onChange={(e) => {
+							setQuery(e.target.value);
+							queryRef.current = e.target.value;
+						}}
+						onKeyDown={(e) => {
+							if (e.key === "Enter") {
+								e.preventDefault();
+								if (e.shiftKey) stepRef.current(-1);
+								else stepRef.current(1);
+							}
+							if (e.key === "Escape") {
+								e.preventDefault();
+								closeSearchRef.current();
+							}
+						}}
+					/>
+					<span className="search-count">
+						{matches.length === 0
+							? error !== null
+								? ""
+								: "0 of 0"
+							: `${active + 1} of ${matches.length}`}
+					</span>
+					{error !== null ? <span className="search-error">{error}</span> : null}
+					<button type="button" onClick={() => stepRef.current(-1)} aria-label="previous">
+						Prev
+					</button>
+					<button type="button" onClick={() => stepRef.current(1)} aria-label="next">
+						Next
+					</button>
+					<button
+						type="button"
+						className={caseSensitive ? "active" : ""}
+						onClick={() => {
+							setCaseSensitive((v) => !v);
+							caseRef.current = !caseSensitive;
+						}}
+						aria-label="case sensitive"
+					>
+						Aa
+					</button>
+					<button
+						type="button"
+						className={useRegex ? "active" : ""}
+						onClick={() => {
+							setUseRegex((v) => !v);
+							regexRef.current = !useRegex;
+						}}
+						aria-label="regex"
+					>
+						.*
+					</button>
+					{replaceMode ? (
+						<>
+							<input
+								className="replace-input"
+								value={replacement}
+								onChange={(e) => {
+									setReplacement(e.target.value);
+									replacementRef.current = e.target.value;
+								}}
+							/>
+							<button type="button" onClick={replaceOne}>
+								Replace
+							</button>
+							<button type="button" onClick={replaceAll}>
+								Replace all
+							</button>
+						</>
+					) : null}
+					<button type="button" onClick={closeSearchRef.current} aria-label="close">
+						Close
+					</button>
+				</div>
+			) : null}
+		</div>
+	);
 }
