@@ -12,6 +12,7 @@ it is evidence rather than direction.
 | [`003-diagnostics.md`](003-diagnostics.md)           | Language server attach (rust-analyzer or clangd), full-document sync, diagnostics event and Problems panel, cargo build diagnostics. |
 | [`004-search.md`](004-search.md)                     | Project search: ripgrep argv, result cap and truncation, palette behaviour, status bar slot.                                         |
 | [`005-dap-client.md`](005-dap-client.md)             | Debugger session core: `lldb-dap` launch, breakpoints, threads, frames, scopes, variables, memory, disassembly, data breakpoints.    |
+| [`006-remaining-parity.md`](006-remaining-parity.md) | Status of the daily loop, remaining gaps ranked by value, definition of done, and risks.                                             |
 
 ## Spike
 
