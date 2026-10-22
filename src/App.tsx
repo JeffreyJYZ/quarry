@@ -168,6 +168,7 @@ export default function App() {
 	const [railCollapsed, setRailCollapsed] = useState(false);
 	const [fileRevealToken, setFileRevealToken] = useState(0);
 	const [gitRefresh, setGitRefresh] = useState(0);
+	const [blameSaveToken, setBlameSaveToken] = useState(0);
 	const [gitDiffPath, setGitDiffPath] = useState<string | null>(null);
 	const [gitCommitDiffHash, setGitCommitDiffHash] = useState<string | null>(null);
 	const [terminalOpen, setTerminalOpen] = useState(false);
@@ -528,6 +529,9 @@ export default function App() {
 						return next;
 					});
 				}
+			}
+			if (saved > 0) {
+				setBlameSaveToken((current) => current + 1);
 			}
 			if (saved > 1 && !warned) {
 				showSaveStatus({ text: `Saved ${saved} files`, failed: false });
@@ -1342,10 +1346,13 @@ export default function App() {
 						root={root}
 						refreshToken={gitRefresh}
 						status={gitStatusState}
+						activePath={activePath}
+						saveToken={blameSaveToken}
 						onRefresh={refreshGit}
 						onOpenFile={(path) => void openPath(path, fileName(path))}
 						onDiff={setGitDiffPath}
 						onCommitDiff={setGitCommitDiffHash}
+						onNavigate={handleNavigate}
 						diffPath={gitDiffPath}
 					/>
 				) : (

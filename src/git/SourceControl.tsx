@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { GitCommitEntry } from "@/project/api";
+import { groupBlame } from "@/git/blame";
+import type { BlameLine, GitCommitEntry } from "@/project/api";
 import {
 	type Branch,
 	type GitStatus,
 	type GitStatusEntry,
+	gitBlame,
 	gitBranches,
 	gitCheckout,
 	gitCommit,
@@ -18,10 +20,13 @@ export type SourceControlProps = {
 	root: string;
 	refreshToken: number;
 	status: GitStatus | null;
+	activePath: string | null;
+	saveToken?: number;
 	onRefresh: () => Promise<void>;
 	onOpenFile: (path: string) => void;
 	onDiff: (path: string | null) => void;
 	onCommitDiff: (hash: string | null) => void;
+	onNavigate: (path: string, line: number, character: number) => void;
 	diffPath: string | null;
 };
 
@@ -74,10 +79,13 @@ export default function SourceControl({
 	root,
 	refreshToken,
 	status: statusProp,
+	activePath,
+	saveToken,
 	onRefresh,
 	onOpenFile,
 	onDiff,
 	onCommitDiff,
+	onNavigate,
 	diffPath,
 }: SourceControlProps) {
 	const status = statusProp;
@@ -99,7 +107,11 @@ export default function SourceControl({
 	const [branchSwitching, setBranchSwitching] = useState(false);
 	const [branchSwitched, setBranchSwitched] = useState<string | null>(null);
 	const [missingDiff, setMissingDiff] = useState<string | null>(null);
-	const [tab, setTab] = useState<"changes" | "history">("changes");
+	const [tab, setTab] = useState<"changes" | "history" | "blame">("changes");
+	const [blameCache, setBlameCache] = useState<Map<string, BlameLine[]>>(() => new Map());
+	const [blameLoading, setBlameLoading] = useState(false);
+	const [blameError, setBlameError] = useState<string | null>(null);
+	const [collapsed, setCollapsed] = useState<Set<number>>(() => new Set());
 	const [history, setHistory] = useState<GitCommitEntry[] | null>(null);
 	const [historyLimit, setHistoryLimit] = useState(50);
 	const [historyLoading, setHistoryLoading] = useState(false);
@@ -253,6 +265,55 @@ export default function SourceControl({
 		if (tab !== "history") return;
 		void loadHistory(historyLimit);
 	}, [tab, loadHistory, historyLimit]);
+
+	// Load blame lazily for the active file.
+	useEffect(() => {
+		if (tab !== "blame") return;
+		if (activePath === null) return;
+		const cached = blameCache.get(activePath);
+		if (cached !== undefined) {
+			setBlameError(null);
+			return;
+		}
+		let cancelled = false;
+		setBlameLoading(true);
+		setBlameError(null);
+		void (async () => {
+			try {
+				const result = await gitBlame(root, activePath);
+				if (cancelled) return;
+				setBlameCache((current) => {
+					const next = new Map(current);
+					next.set(activePath, result);
+					return next;
+				});
+			} catch (err) {
+				if (cancelled) return;
+				setBlameError(describeError(err));
+			} finally {
+				if (!cancelled) setBlameLoading(false);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [tab, activePath, root, blameCache]);
+
+	// Refetch after save.
+	useEffect(() => {
+		if (saveToken === undefined) return;
+		if (activePath === null) return;
+		setBlameCache((current) => {
+			const next = new Map(current);
+			next.delete(activePath);
+			return next;
+		});
+		setCollapsed(new Set());
+		if (tab === "blame") {
+			// trigger reload by toggling loading
+			setBlameLoading(true);
+		}
+	}, [saveToken, activePath, tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	useEffect(() => {
 		return () => {
@@ -590,6 +651,15 @@ export default function SourceControl({
 				>
 					History
 				</button>
+				{activePath !== null ? (
+					<button
+						type="button"
+						className={`git-tab${tab === "blame" ? " git-tab-active" : ""}`}
+						onClick={() => setTab("blame")}
+					>
+						Blame
+					</button>
+				) : null}
 			</div>
 			{tab === "changes" ? (
 				<>
@@ -694,6 +764,79 @@ export default function SourceControl({
 						) : null}
 					</div>
 				</>
+			) : tab === "blame" ? (
+				<div className="tree-scroll">
+					{activePath === null ? (
+						<p className="empty">No file open</p>
+					) : blameError !== null ? (
+						<p className="empty error">{blameError}</p>
+					) : blameLoading && !blameCache.has(activePath) ? (
+						<p className="empty">Loading…</p>
+					) : (blameCache.get(activePath) ?? []).length === 0 ? (
+						<p className="empty">No blame for untracked files</p>
+					) : (
+						<ul className="git-list">
+							{groupBlame(blameCache.get(activePath) ?? []).map(
+								(group, groupIndex) => (
+									<li
+										key={`${group.hash}-${group.startLine}`}
+										className="git-blame-group"
+									>
+										<button
+											type="button"
+											className="git-blame-header"
+											onClick={() =>
+												setCollapsed((current) => {
+													const next = new Set(current);
+													if (next.has(groupIndex))
+														next.delete(groupIndex);
+													else next.add(groupIndex);
+													return next;
+												})
+											}
+											title={group.subject}
+										>
+											<span className="git-commit-hash">
+												{group.hash.slice(0, 7)}
+											</span>
+											<span className="git-row-name" title={group.subject}>
+												{group.subject}
+											</span>
+											<span className="git-row-dir">
+												{group.author} · {group.startLine}–{group.endLine}
+											</span>
+										</button>
+										{collapsed.has(groupIndex) ? null : (
+											<ul className="git-list">
+												{group.lines.map((line) => (
+													<li key={line.line} className="git-row">
+														<button
+															type="button"
+															className="git-row-main"
+															onClick={() => {
+																if (activePath !== null) {
+																	onNavigate(
+																		activePath,
+																		line.line,
+																		0,
+																	);
+																}
+															}}
+														>
+															<span className="git-row-name">
+																{line.line}
+															</span>
+														</button>
+													</li>
+												))}
+											</ul>
+										)}
+									</li>
+								),
+							)}
+						</ul>
+					)}
+				</div>
 			) : (
 				<div className="tree-scroll">
 					{historyError !== null ? <p className="empty error">{historyError}</p> : null}
