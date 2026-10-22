@@ -127,6 +127,7 @@ bun run verify        # type check + biome check, the commit gate
 bun test              # frontend unit tests over pure helpers (rank, splitArgs, hex, buffer, blame, search model)
 bun run gate          # verify + tests, the commit gate
 bun run build         # type check + vite build
+bun run verify:bundle # check version agreement, .app, signature, launch smoke
 ```
 
 Rust tests run from the Tauri crate: `cd src-tauri && cargo test`. Rust checks run there too: `cd src-tauri && cargo check --all-targets` and `cd src-tauri && cargo clippy --all-targets -- -D warnings`.
@@ -135,7 +136,7 @@ The formatter for TypeScript, CSS and Markdown is Biome; `bun run verify` is the
 
 ## Tests
 
-Rust tests live in `src-tauri` and run with `cd src-tauri && cargo test`. Frontend unit tests are `bun test` over pure helpers: ranking in `src/quickopen/rank.ts`, argument splitting in `src/run/splitArgs.ts`, hex helpers in `src/debug/memory/hex.ts`, buffer handling in `src/project/buffer.ts`, blame helpers in `src/editor/blame.ts`, and the search model in `src/search/model.ts`. The smoke scripts under `scripts/` are the only place real language servers and debuggers are exercised. The commit gate is `bun run gate` (`bun run verify` plus `bun test`). Rust changes also require `cargo check --all-targets` and `cargo clippy --all-targets -- -D warnings` to pass; clippy is clean on the current tree with no `#[allow(clippy::…)]` added.
+Rust tests live in `src-tauri` and run with `cd src-tauri && cargo test`. Frontend unit tests are `bun test` over pure helpers: ranking in `src/quickopen/rank.ts`, argument splitting in `src/run/splitArgs.ts`, hex helpers in `src/debug/memory/hex.ts`, buffer handling in `src/project/buffer.ts`, blame helpers in `src/editor/blame.ts`, the search model in `src/search/model.ts`, and test filtering in `src/tests/filterTests.ts` (covered by `src/tests/filterTests.test.ts`). The smoke scripts under `scripts/` are the only place real language servers and debuggers are exercised. The commit gate is `bun run gate` (`bun run verify` plus `bun test`). Rust changes also require `cargo check --all-targets` and `cargo clippy --all-targets -- -D warnings` to pass; clippy is clean on the current tree with no `#[allow(clippy::…)]` added.
 
 ## Smoke scripts
 

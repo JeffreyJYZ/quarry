@@ -38,10 +38,8 @@ Product name: `quarry`. Bundle identifier: `land.jyz.quarry`. Bundle targets: `a
 
 Artefacts land under `src-tauri/target/release/bundle/` (platform bundles such as the macOS `.app` and `.dmg`), with the release binary at `src-tauri/target/release/quarry`.
 
-Launch smoke step (manual, run after the build):
-1. `open -a src-tauri/target/release/bundle/macos/quarry.app` (or `open` the `.app` directly).
-2. Confirm the `quarry` process is alive after 5 seconds.
-3. Quit the app cleanly.
+Launch smoke step (automated, run after the build):
+`bun run verify:bundle` checks the version strings agree across `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`, that `src-tauri/target/release/bundle/macos/quarry.app` exists with its size, the binary is executable, the code signature state via `codesign --verify --deep --strict` (reported, not fatal for an ad-hoc local build), and a bounded launch that must appear, stay alive and exit cleanly.
 ## 4. Version bumping
 
 The version lives in three places and they must agree before release. Checked against the current tree (all agree at `0.1.0`):
@@ -49,7 +47,7 @@ The version lives in three places and they must agree before release. Checked ag
 - `src-tauri/Cargo.toml`: `version = "0.1.0"`
 - `src-tauri/tauri.conf.json`: `"version": "0.1.0"`
 
-Bump all three together. A mismatch between them leaves the bundle, the crate and the npm metadata disagreeing.
+Bump all three together. A mismatch between them leaves the bundle, the crate and the npm metadata disagreeing. Run `bun run verify:bundle` afterwards to confirm all three agree.
 
 ## 5. Known gaps to state in release notes
 
@@ -65,3 +63,4 @@ Quote only provable facts:
 - Any smoke script fails (except the expected failures of `dap-eval-probe.ts`).
 - `cargo fmt --check` is dirty.
 - The working tree is uncommitted.
+- `bun run verify:bundle` reports FAIL.
