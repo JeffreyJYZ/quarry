@@ -64,7 +64,7 @@ fn walk(dir: &Path, files: &mut Vec<String>, cap: usize) {
         if metadata.is_dir() {
             let name = entry.file_name();
             let name = name.to_string_lossy();
-            if IGNORED_NAMES.contains(&name.as_ref()) {
+            if is_ignored(name.as_ref()) {
                 continue;
             }
             walk(&path, files, cap);
