@@ -64,6 +64,7 @@ pub fn run() {
             dap::dap_scopes,
             dap::dap_variables,
             dap::dap_read_memory,
+            dap::dap_write_memory,
             dap::dap_disassemble,
             dap::dap_data_breakpoint_info,
             dap::dap_set_data_breakpoints,

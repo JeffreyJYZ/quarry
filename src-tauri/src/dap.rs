@@ -1139,6 +1139,34 @@ fn data_breakpoint_info_from(body: &Value) -> DataBreakpointInfo {
     }
 }
 
+/// Standard base64 with `=` padding, encoded without a crate.
+fn base64_encode(bytes: &[u8]) -> String {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    let mut output = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let first = usize::from(chunk[0]);
+        let second = usize::from(chunk.get(1).copied().unwrap_or(0));
+        let third = usize::from(chunk.get(2).copied().unwrap_or(0));
+        let value = (first << 16) | (second << 8) | third;
+
+        output.push(char::from(ALPHABET[value >> 18]));
+        output.push(char::from(ALPHABET[(value >> 12) & 0x3f]));
+        if chunk.len() > 1 {
+            output.push(char::from(ALPHABET[(value >> 6) & 0x3f]));
+        } else {
+            output.push('=');
+        }
+        if chunk.len() > 2 {
+            output.push(char::from(ALPHABET[value & 0x3f]));
+        } else {
+            output.push('=');
+        }
+    }
+
+    output
+}
+
 /// Standard base64 with `=` padding, decoded without a crate.
 ///
 /// Whitespace is skipped, padding is only accepted at the tail, and a stray character is an error,
@@ -1394,4 +1422,56 @@ mod tests {
         assert_eq!(program_path(Some("/tmp/dap_spike")), "/tmp/dap_spike");
         assert_eq!(program_path(None), "");
     }
+
+    #[test]
+    fn base64_encode_round_trips_small_inputs() {
+        assert_eq!(base64_encode(b""), "");
+        assert_eq!(base64_encode(b"f"), "Zg==");
+        assert_eq!(base64_encode(b"fo"), "Zm8=");
+        assert_eq!(base64_encode(b"foo"), "Zm9v");
+        let bytes: Vec<u8> = (0..16).collect();
+        assert_eq!(base64_encode(&bytes), "AAECAwQFBgcICQoLDA0ODw==");
+    }
+
+    #[test]
+    fn write_memory_arguments_keep_the_address_shape() {
+        let prefixed = write_memory_arguments("0x1000", &[0xde, 0xad]);
+        assert_eq!(prefixed["memoryReference"], json!("0x1000"));
+        assert_eq!(prefixed["data"], json!("3q0="));
+        assert_eq!(prefixed["offset"], json!(0));
+
+        let unprefixed = write_memory_arguments("16FDFDCBC", &[0xde, 0xad]);
+        assert_eq!(unprefixed["memoryReference"], json!("16FDFDCBC"));
+    }
+}
+
+/// Write bytes into the debuggee's memory. `bytes` arrive as raw values from the memory pane.
+#[tauri::command]
+pub async fn dap_write_memory(
+    state: State<'_, DapState>,
+    session: String,
+    address: String,
+    bytes: Vec<u8>,
+) -> Result<(), String> {
+    if bytes.is_empty() {
+        return Err("writeMemory: `bytes` must not be empty".to_string());
+    }
+
+    let arguments = write_memory_arguments(&address, &bytes);
+
+    session_for(&state, &session)?
+        .request("writeMemory", arguments)
+        .map(|_| ())
+}
+
+/// Build the `writeMemory` request arguments for `address` and `bytes`.
+///
+/// The address is passed through unchanged: prefixed addresses keep their `0x` and the adapter's
+/// unprefixed `dataId`-shaped addresses are accepted as-is.
+fn write_memory_arguments(address: &str, bytes: &[u8]) -> Value {
+    json!({
+        "memoryReference": address,
+        "data": base64_encode(bytes),
+        "offset": 0,
+    })
 }
