@@ -9,7 +9,7 @@ Rust and C/C++ IDE. Tauri 2 + React 19 shell; clangd, rust-analyzer and lldb-dap
 - **No `cargo run` as a debug launch** — build first, pass `lldb-dap` the binary from cargo JSON.
 - **Rust module is `build_task.rs`**, never `build.rs` (Cargo's build script).
 - **`src/` only**, `@/*` maps to `./src/*`; no root-level `lib/`.
-- **Gates: `bun check` for types, `bun lint` + `bun fmt` for Biome, `bun run verify` before a commit** — tabs, indentWidth 4, lineWidth 100; warnings fail, so leave zero.
+- **Gates: `bun check` for types, `bun lint` + `bun fmt` for Biome, `bun test` for frontend units, `bun run gate` before a commit** — tabs, indentWidth 4, lineWidth 100; warnings fail, so leave zero.
 - **Biome stays the formatter even though Bun ships `bun fmt`** — `bun fmt` ignores `biome.json` and rewrites to two spaces, and `biome check` verifies formatting without writing while `bun fmt` writes.
 - **No `typescript` dependency**: `bun check` is the type checker and `vite build` transpiles; verified by removing the package and passing both (2026-10-22).
 - **`bun` only** — never npm; `bun run build` keeps `run` (built-in subcommand).

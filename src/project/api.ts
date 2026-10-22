@@ -123,8 +123,16 @@ export function searchProject(
 	root: string,
 	query: string,
 	maxResults?: number,
+	caseSensitive?: boolean,
+	fixedStrings?: boolean,
 ): Promise<SearchReport> {
-	return invoke<SearchReport>("search_project", { root, query, maxResults: maxResults ?? null });
+	return invoke<SearchReport>("search_project", {
+		root,
+		query,
+		maxResults: maxResults ?? null,
+		caseSensitive: caseSensitive ?? null,
+		fixedStrings: fixedStrings ?? null,
+	});
 }
 
 export async function onDiagnostics(

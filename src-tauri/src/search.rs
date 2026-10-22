@@ -28,6 +28,8 @@ pub async fn search_project(
     root: String,
     query: String,
     max_results: Option<u32>,
+    case_sensitive: Option<bool>,
+    fixed_strings: Option<bool>,
 ) -> Result<SearchReport, String> {
     let query = require_query(&query)?;
     if !Path::new(&root).is_dir() {
@@ -35,9 +37,13 @@ pub async fn search_project(
     }
 
     let max_results = max_results.unwrap_or(DEFAULT_MAX_RESULTS);
-    tauri::async_runtime::spawn_blocking(move || search(&root, &query, max_results))
-        .await
-        .map_err(|error| format!("search task failed: {error}"))?
+    let case_sensitive = case_sensitive.unwrap_or(false);
+    let fixed_strings = fixed_strings.unwrap_or(false);
+    tauri::async_runtime::spawn_blocking(move || {
+        search(&root, &query, max_results, case_sensitive, fixed_strings)
+    })
+    .await
+    .map_err(|error| format!("search task failed: {error}"))?
 }
 
 /// A query of spaces matches every line, so it is rejected rather than run.
@@ -51,7 +57,13 @@ fn require_query(query: &str) -> Result<String, String> {
 }
 
 /// Runs ripgrep and reports. Called on a blocking thread so the async runtime stays free.
-fn search(root: &str, query: &str, max_results: u32) -> Result<SearchReport, String> {
+fn search(
+    root: &str,
+    query: &str,
+    max_results: u32,
+    case_sensitive: bool,
+    fixed_strings: bool,
+) -> Result<SearchReport, String> {
     let started = Instant::now();
     let root = absolute_root(root);
 
@@ -64,7 +76,7 @@ fn search(root: &str, query: &str, max_results: u32) -> Result<SearchReport, Str
     }
 
     let binary = find_program(PROGRAM).ok_or_else(|| MISSING_PROGRAM.to_string())?;
-    let mut child = search_command(&binary, &root, query)
+    let mut child = search_command(&binary, &root, query, case_sensitive, fixed_strings)
         .spawn()
         .map_err(|error| format!("cannot run {binary}: {error}"))?;
 
@@ -99,14 +111,26 @@ fn search(root: &str, query: &str, max_results: u32) -> Result<SearchReport, Str
 
 /// The full argument list: JSON records, 1-based lines, smart case, no colour, the three excluded
 /// directories, the query as one literal `-e` argument, and the root. No shell is involved.
-fn search_command(binary: &str, root: &Path, query: &str) -> Command {
+/// Whole-word matching is deliberately NOT a flag here: the caller wraps the query in
+/// word boundaries (`\\b...\\b`) and passes it as the regex, so no `--word-regexp` is added.
+fn search_command(
+    binary: &str,
+    root: &Path,
+    query: &str,
+    case_sensitive: bool,
+    fixed_strings: bool,
+) -> Command {
     let mut command = Command::new(binary);
-    command
-        .arg("--json")
-        .arg("--line-number")
-        .arg("--smart-case")
-        .arg("--no-heading")
-        .arg("--color=never");
+    command.arg("--json").arg("--line-number");
+    if case_sensitive {
+        command.arg("--case-sensitive");
+    } else {
+        command.arg("--smart-case");
+    }
+    if fixed_strings {
+        command.arg("--fixed-strings");
+    }
+    command.arg("--no-heading").arg("--color=never");
     for excluded in EXCLUDES {
         command.arg("-g").arg(format!("!{excluded}"));
     }
@@ -377,5 +401,66 @@ mod tests {
         assert!(require_query("").is_err());
         assert!(require_query(" \n\t ").is_err());
         assert_eq!(require_query("needle").as_deref(), Ok("needle"));
+    }
+
+    #[test]
+    fn search_command_argv_default() {
+        let cmd = search_command("rg", root(), "needle", false, false);
+        let args: Vec<String> = cmd
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(
+            args,
+            vec![
+                "--json",
+                "--line-number",
+                "--smart-case",
+                "--no-heading",
+                "--color=never",
+                "-g",
+                "!target",
+                "-g",
+                "!node_modules",
+                "-g",
+                "!.git",
+                "-e",
+                "needle",
+                "/projects/demo",
+            ]
+        );
+    }
+
+    #[test]
+    fn search_command_argv_case_sensitive() {
+        let cmd = search_command("rg", root(), "needle", true, false);
+        let args: Vec<String> = cmd
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
+        assert!(args.contains(&"--case-sensitive".to_string()));
+        assert!(!args.contains(&"--smart-case".to_string()));
+    }
+
+    #[test]
+    fn search_command_argv_fixed_strings() {
+        let cmd = search_command("rg", root(), "needle", false, true);
+        let args: Vec<String> = cmd
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
+        assert!(args.contains(&"--fixed-strings".to_string()));
+    }
+
+    #[test]
+    fn search_command_argv_both() {
+        let cmd = search_command("rg", root(), "needle", true, true);
+        let args: Vec<String> = cmd
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
+        assert!(args.contains(&"--case-sensitive".to_string()));
+        assert!(args.contains(&"--fixed-strings".to_string()));
+        assert!(!args.contains(&"--smart-case".to_string()));
     }
 }
