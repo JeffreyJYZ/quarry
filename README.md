@@ -97,6 +97,8 @@ bun run build         # type check + vite build
 
 Rust tests run from the Tauri crate: `cd src-tauri && cargo test`.
 
+The formatter for TypeScript, CSS and Markdown is Biome; `bun run verify` is the commit gate.
+
 ## Smoke scripts
 
 - `scripts/lsp-smoke.ts` — initialize handshake against a language server.
