@@ -385,6 +385,130 @@ async function main() {
 		if (caResp?.error) {
 			// not fatal per spec (count zero is data), but request failure? spec: exit non-zero only failed handshake or failed sig/rename. codeAction failure not specified; treat as non-fatal data.
 		}
+
+		// call hierarchy: prepare at the same `run` identifier
+		const chpId = nextId();
+		client.send({
+			jsonrpc: "2.0",
+			id: chpId,
+			method: "textDocument/prepareCallHierarchy",
+			params: { textDocument: { uri: sourceUri }, position: { line, character } },
+		});
+		const chpResp = await client.waitForResponse(chpId, REQ_TIMEOUT);
+		let chpCount = 0;
+		let chpName = "none";
+		let chpKind = 0;
+		let chpHasSelectionRange = false;
+		let chpShapeOk = false;
+		let chpFirstItem: any = null;
+		if (chpResp && !chpResp.error) {
+			const r = chpResp.result;
+			if (Array.isArray(r)) {
+				chpCount = r.length;
+				if (r.length > 0) {
+					const it = r[0];
+					chpFirstItem = it;
+					chpName = it?.name ?? "none";
+					chpKind = typeof it?.kind === "number" ? it.kind : 0;
+					chpHasSelectionRange = !!it?.selectionRange;
+				}
+				chpShapeOk = true;
+			} else if (r === null) {
+				chpShapeOk = true;
+			}
+		}
+		if (!chpResp || chpResp.error) {
+			fatal = true;
+			summary.push(
+				`callHierarchy prepare: FAIL ${chpResp?.error ? JSON.stringify(chpResp.error) : "no response"}`,
+			);
+		} else {
+			summary.push(
+				`callHierarchy prepare: count=${chpCount} name=${chpName} kind=${chpKind} selectionRange=${chpHasSelectionRange} shape_ok=${chpShapeOk}`,
+			);
+		}
+
+		// incoming / outgoing only when prepare returned an item
+		let chInCount = 0;
+		let chInKeys: string[] = [];
+		let chInShapeOk = true;
+		let chOutCount = 0;
+		let chOutKeys: string[] = [];
+		let chOutShapeOk = true;
+		if (chpFirstItem) {
+			// incoming
+			const inId = nextId();
+			client.send({
+				jsonrpc: "2.0",
+				id: inId,
+				method: "callHierarchy/incomingCalls",
+				params: { item: chpFirstItem },
+			});
+			const inResp = await client.waitForResponse(inId, REQ_TIMEOUT);
+			if (!inResp || inResp.error) {
+				fatal = true;
+				chInShapeOk = false;
+				summary.push(
+					`callHierarchy incoming: FAIL ${inResp?.error ? JSON.stringify(inResp.error) : "no response"}`,
+				);
+			} else {
+				const r = inResp.result;
+				if (Array.isArray(r)) {
+					chInCount = r.length;
+					if (r.length > 0) chInKeys = Object.keys(r[0]).sort();
+					chInShapeOk = true;
+					if (r.length > 0) {
+						const e = r[0];
+						if (!e?.from || typeof e.from !== "object") chInShapeOk = false;
+					}
+				} else if (r === null) {
+					chInShapeOk = true;
+				} else {
+					chInShapeOk = false;
+				}
+				summary.push(
+					`callHierarchy incoming: count=${chInCount} keys=${JSON.stringify(chInKeys)} shape_ok=${chInShapeOk}`,
+				);
+			}
+
+			// outgoing
+			const outId = nextId();
+			client.send({
+				jsonrpc: "2.0",
+				id: outId,
+				method: "callHierarchy/outgoingCalls",
+				params: { item: chpFirstItem },
+			});
+			const outResp = await client.waitForResponse(outId, REQ_TIMEOUT);
+			if (!outResp || outResp.error) {
+				fatal = true;
+				chOutShapeOk = false;
+				summary.push(
+					`callHierarchy outgoing: FAIL ${outResp?.error ? JSON.stringify(outResp.error) : "no response"}`,
+				);
+			} else {
+				const r = outResp.result;
+				if (Array.isArray(r)) {
+					chOutCount = r.length;
+					if (r.length > 0) chOutKeys = Object.keys(r[0]).sort();
+					chOutShapeOk = true;
+					if (r.length > 0) {
+						const e = r[0];
+						if (!e?.to || typeof e.to !== "object") chOutShapeOk = false;
+					}
+				} else if (r === null) {
+					chOutShapeOk = true;
+				} else {
+					chOutShapeOk = false;
+				}
+				summary.push(
+					`callHierarchy outgoing: count=${chOutCount} keys=${JSON.stringify(chOutKeys)} shape_ok=${chOutShapeOk}`,
+				);
+			}
+		} else {
+			summary.push("callHierarchy incoming: skipped (no prepare item)");
+			summary.push("callHierarchy outgoing: skipped (no prepare item)");
+		}
 	} finally {
 		client.kill();
 	}

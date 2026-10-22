@@ -19,7 +19,7 @@ Acceptance:
    diagnostics, and the Problems panel merges them with server diagnostics.
 5. Closing a project kills its server; no orphan processes survive app exit.
 6. `cargo test`, `bun run check`, `bun run build` all pass.
-7. `bun run scripts/lsp-ux-smoke.ts` completes and reports signatureHelp/rename/codeAction shapes.
+7. `bun run scripts/lsp-ux-smoke.ts` completes and reports signatureHelp/rename/codeAction/callHierarchy shapes.
 
 Not in this slice: completion, hover, go-to-definition, rename, inline hints, semantic tokens.
 
