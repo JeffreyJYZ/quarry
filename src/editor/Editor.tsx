@@ -46,6 +46,8 @@ export type EditorProps = {
 	onNavigate?: (path: string, line: number, character: number) => void;
 	/** Receive reference locations. */
 	onReferences?: (locations: Location[]) => void;
+	/** Move the caret to a zero-based position and scroll it into view. */
+	reveal?: { line: number; character: number; token: number } | null;
 };
 
 const NO_LINES: number[] = [];
@@ -130,6 +132,7 @@ export default function Editor({
 	root = null,
 	onNavigate,
 	onReferences,
+	reveal = null,
 }: EditorProps): JSX.Element {
 	const hostRef = useRef<HTMLDivElement | null>(null);
 	const viewRef = useRef<EditorView | null>(null);
@@ -155,6 +158,7 @@ export default function Editor({
 	navigateRef.current = onNavigate ?? null;
 	const referencesRef = useRef<((locations: Location[]) => void) | null>(onReferences ?? null);
 	referencesRef.current = onReferences ?? null;
+	const revealTokenRef = useRef<number | null>(null);
 
 	useEffect(() => {
 		const host = hostRef.current;
@@ -446,6 +450,28 @@ export default function Editor({
 		publishedRef.current = { view, signature };
 		view.dispatch(setDiagnostics(view.state, mapped));
 	}, [diagnostics]);
+
+	// Reveal-only transaction: moves the caret, scrolls it into view and focuses. Keyed on the
+	// token so a repeated target still re-dispatches, while a same-token value does nothing.
+	useEffect(() => {
+		const view = viewRef.current;
+		if (view === null || reveal === null) return;
+		if (revealTokenRef.current === reveal.token) return;
+		revealTokenRef.current = reveal.token;
+		const doc = view.state.doc;
+		const lineCount = doc.lines;
+		const requestedLine = Math.trunc(reveal.line);
+		const clampedLine = Math.min(Math.max(requestedLine, 0), Math.max(lineCount - 1, 0));
+		const lineObj = doc.line(clampedLine + 1);
+		const requestedChar = Math.trunc(reveal.character);
+		const clampedChar = Math.min(Math.max(requestedChar, 0), lineObj.length);
+		const pos = lineObj.from + clampedChar;
+		view.dispatch({
+			selection: { anchor: pos },
+			effects: EditorView.scrollIntoView(pos),
+		});
+		view.focus();
+	}, [reveal]);
 
 	return <div className="editor-host" ref={hostRef} />;
 }

@@ -63,6 +63,10 @@ export default function App() {
 	const [panelOpen, setPanelOpen] = useState<boolean | null>(null);
 	const [dockTab, setDockTab] = useState<DockTab>("problems");
 	const [references, setReferences] = useState<Location[]>([]);
+	const [revealTarget, setRevealTarget] = useState<{ line: number; character: number } | null>(
+		null,
+	);
+	const [revealToken, setRevealToken] = useState(0);
 	const [refsOpen, setRefsOpen] = useState(false);
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [debugOpen, setDebugOpen] = useState(false);
@@ -340,6 +344,7 @@ export default function App() {
 
 	const handleOpenFile = useCallback(
 		(entry: FileEntry) => {
+			setRevealTarget(null);
 			void openPath(entry.path, entry.name);
 		},
 		[openPath],
@@ -367,8 +372,10 @@ export default function App() {
 	const closeSearch = useCallback(() => setSearchOpen(false), []);
 
 	const handleNavigate = useCallback(
-		(path: string, _line: number, _character: number) => {
+		(path: string, line: number, character: number) => {
 			void openPath(path, fileName(path));
+			setRevealTarget({ line, character });
+			setRevealToken((current) => current + 1);
 		},
 		[openPath],
 	);
@@ -446,6 +453,7 @@ export default function App() {
 	/** Switching tabs abandons a pending close, so no row keeps asking about a buffer it lost. */
 	const handleActivate = useCallback((path: string) => {
 		setConfirmClose(null);
+		setRevealTarget(null);
 		setActivePath(path);
 	}, []);
 
@@ -574,6 +582,11 @@ export default function App() {
 									onToggleBreakpoint={handleToggleBreakpoint}
 									onNavigate={handleNavigate}
 									onReferences={handleReferences}
+									reveal={
+										revealTarget === null
+											? null
+											: { ...revealTarget, token: revealToken }
+									}
 								/>
 							</div>
 						</>
