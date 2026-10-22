@@ -6,6 +6,7 @@ import {
 	groupMatches,
 	resultSummary,
 	type SearchOptions,
+	searchFlags,
 	transformQuery,
 } from "@/search/model";
 
@@ -51,6 +52,9 @@ export default function SearchPalette({ root, onOpen, onClose, initialQuery }: S
 	const rows = useMemo(() => groups.flatMap((group) => group.rows), [groups]);
 
 	const invalid = useMemo(() => {
+		if (!wholeWord) {
+			return false;
+		}
 		const trimmed = query.trim();
 		if (trimmed === "") {
 			return false;
@@ -61,7 +65,7 @@ export default function SearchPalette({ root, onOpen, onClose, initialQuery }: S
 		} catch {
 			return true;
 		}
-	}, [query, options]);
+	}, [query, options, wholeWord]);
 
 	const run = useCallback(
 		async (value: string) => {
@@ -76,22 +80,30 @@ export default function SearchPalette({ root, onOpen, onClose, initialQuery }: S
 				setActive(0);
 				return;
 			}
-			let transformed: string;
-			try {
-				transformed = transformQuery(next, options);
-				new RegExp(transformed);
-			} catch {
-				setReport(null);
-				setRanQuery(next);
-				setActive(0);
-				setError("invalid regular expression");
-				setBusy(false);
-				return;
+			const transformed = transformQuery(next, options);
+			if (wholeWord) {
+				try {
+					new RegExp(transformed);
+				} catch {
+					setReport(null);
+					setRanQuery(next);
+					setActive(0);
+					setError("invalid regular expression");
+					setBusy(false);
+					return;
+				}
 			}
 			setBusy(true);
 			setError(null);
 			try {
-				const result = await searchProject(root, transformed);
+				const flags = searchFlags(options);
+				const result = await searchProject(
+					root,
+					transformed,
+					undefined,
+					flags.caseSensitive,
+					flags.fixedStrings,
+				);
 				if (ticket !== sequence.current) {
 					return;
 				}
@@ -112,7 +124,7 @@ export default function SearchPalette({ root, onOpen, onClose, initialQuery }: S
 				}
 			}
 		},
-		[root, options],
+		[root, options, wholeWord],
 	);
 
 	useEffect(() => {
@@ -192,9 +204,12 @@ export default function SearchPalette({ root, onOpen, onClose, initialQuery }: S
 		sessionLastQuery = query;
 	}, [query]);
 
+	const flags = searchFlags(options);
 	const title = `case-sensitive: ${caseSensitive ? "on" : "off"}; regex: ${
 		regex ? "on" : "off"
-	}; whole word: ${wholeWord ? "on" : "off"}`;
+	}; whole word: ${wholeWord ? "on" : "off"}; sends caseSensitive=${flags.caseSensitive}, fixedStrings=${flags.fixedStrings}${
+		wholeWord ? " (whole word wraps query and forces fixedStrings false)" : ""
+	}`;
 
 	return (
 		<div className="search-palette" role="dialog" aria-label="Project search">

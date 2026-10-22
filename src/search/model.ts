@@ -65,24 +65,25 @@ export function clipLine(text: string): string {
 }
 
 /**
- * Transform the raw palette text into the regex the backend (rg) receives. The backend cannot take
- * flags, so every option becomes query text:
- *   - regex off: escape every regex metacharacter so `.` is literal.
- *   - whole word: wrap as `\b(?:<query>)\b`.
- *   - case sensitive: prefix `(?-i)` (rg defaults to case-insensitive via smart-case).
+ * Build the query string sent to the backend. Whole word wraps as `\b(?:<q>)\b`; otherwise the raw
+ * text is passed through unchanged (the backend now owns regex parsing and the flags).
  */
 export function transformQuery(raw: string, options: SearchOptions): string {
-	let query = raw;
-	if (!options.regex) {
-		query = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	}
 	if (options.wholeWord) {
-		query = `\\b(?:${query})\\b`;
+		return `\\b(?:${raw})\\b`;
 	}
-	if (options.caseSensitive) {
-		query = `(?-i)${query}`;
-	}
-	return query;
+	return raw;
+}
+
+/** Flags sent alongside the query. `.*` off => fixedStrings true; whole word forces fixedStrings false. */
+export function searchFlags(options: SearchOptions): {
+	caseSensitive: boolean;
+	fixedStrings: boolean;
+} {
+	return {
+		caseSensitive: options.caseSensitive,
+		fixedStrings: options.wholeWord ? false : !options.regex,
+	};
 }
 
 /** `12 results in 3 files · 5 ms`, or `12+ results in 3 files (truncated) · 5 ms`. */
