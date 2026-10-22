@@ -910,3 +910,108 @@ pub fn validate_branch_name(branch: &str) -> Result<(), String> {
 pub fn checkout_argv(branch: &str) -> Vec<String> {
     vec!["checkout".to_string(), branch.to_string()]
 }
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GitCommitEntry {
+    pub hash: String,
+    pub subject: String,
+    pub author: String,
+    pub when: String,
+}
+
+/// Default and bounds for `git_log`.
+const DEFAULT_LOG_LIMIT: u32 = 50;
+const MAX_LOG_LIMIT: u32 = 500;
+const MIN_LOG_LIMIT: u32 = 1;
+
+#[tauri::command]
+pub async fn git_log(root: String, limit: Option<u32>) -> Result<Vec<GitCommitEntry>, String> {
+    let limit = resolve_log_limit(limit)?;
+    tauri::async_runtime::spawn_blocking(move || log(&root, limit))
+        .await
+        .map_err(|error| format!("git log failed: {error}"))?
+}
+
+fn log(root: &str, limit: u32) -> Result<Vec<GitCommitEntry>, String> {
+    let program = git_program()?;
+    let argv = log_argv(limit);
+    let args: Vec<&str> = argv.iter().map(String::as_str).collect();
+    let output = run(&program, root, &args)?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if is_not_a_repository(&stderr) || is_no_commits(&stderr) {
+            return Ok(Vec::new());
+        }
+        return Err(operation_error("git log", &stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(parse_git_log(&stdout))
+}
+
+/// Resolves and validates the requested limit.
+pub fn resolve_log_limit(limit: Option<u32>) -> Result<u32, String> {
+    match limit {
+        None => Ok(DEFAULT_LOG_LIMIT),
+        Some(0) => Err(format!("limit must be at least {MIN_LOG_LIMIT}")),
+        Some(value) => Ok(value.min(MAX_LOG_LIMIT)),
+    }
+}
+
+/// Builds the argv for `git log`.
+pub fn log_argv(limit: u32) -> Vec<String> {
+    vec![
+        "log".to_string(),
+        format!("--max-count={}", limit),
+        "--pretty=format:%h%x09%s%x09%an%x09%ar".to_string(),
+    ]
+}
+
+/// Parses the tab-separated output of `git log`.
+pub fn parse_git_log(stdout: &str) -> Vec<GitCommitEntry> {
+    let mut entries = Vec::new();
+    for line in stdout.lines() {
+        if line.is_empty() {
+            continue;
+        }
+        let mut fields = line.split('\t');
+        let hash = fields.next().unwrap_or("").to_string();
+        let subject = fields.next().unwrap_or("").to_string();
+        let author = fields.next().unwrap_or("").to_string();
+        let when = fields.next().unwrap_or("").to_string();
+        entries.push(GitCommitEntry {
+            hash,
+            subject,
+            author,
+            when,
+        });
+    }
+    entries
+}
+
+fn is_no_commits(stderr: &str) -> bool {
+    stderr.contains("does not have any commits")
+}
+
+// Aliases for callers/tests that use the other naming.
+#[allow(dead_code)]
+pub fn parse_log(stdout: &str) -> Vec<GitCommitEntry> {
+    parse_git_log(stdout)
+}
+
+#[allow(dead_code)]
+pub fn git_log_argv(limit: u32) -> Vec<String> {
+    log_argv(limit)
+}
+
+#[allow(dead_code)]
+pub fn clamp_log_limit(limit: Option<u32>) -> Result<u32, String> {
+    resolve_log_limit(limit)
+}
+
+#[allow(dead_code)]
+pub fn normalize_limit(limit: Option<u32>) -> Result<u32, String> {
+    resolve_log_limit(limit)
+}
