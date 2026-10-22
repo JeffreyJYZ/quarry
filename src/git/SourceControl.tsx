@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { type GitStatus, type GitStatusEntry, gitStatus } from "@/project/api";
+import {
+	type GitStatus,
+	type GitStatusEntry,
+	gitStage,
+	gitStatus,
+	gitUnstage,
+} from "@/project/api";
 import { describeError } from "@/project/errors";
 
 export type SourceControlProps = {
@@ -47,6 +53,8 @@ export default function SourceControl({
 	const [status, setStatus] = useState<GitStatus | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
+	const [busy, setBusy] = useState<Set<string>>(() => new Set<string>());
+	const [selected, setSelected] = useState<string | null>(null);
 
 	const refresh = useCallback(async () => {
 		setLoading(true);
@@ -67,6 +75,74 @@ export default function SourceControl({
 		void refresh();
 	}, [refreshToken]);
 
+	const stage = useCallback(
+		async (paths: string[]) => {
+			if (paths.length === 0) return;
+			setBusy((current) => {
+				const next = new Set(current);
+				for (const path of paths) next.add(path);
+				return next;
+			});
+			setError(null);
+			try {
+				await gitStage(root, paths);
+				await refresh();
+			} catch (err) {
+				setError(describeError(err));
+			} finally {
+				setBusy((current) => {
+					const next = new Set(current);
+					for (const path of paths) next.delete(path);
+					return next;
+				});
+			}
+		},
+		[root, refresh],
+	);
+
+	const unstage = useCallback(
+		async (paths: string[]) => {
+			if (paths.length === 0) return;
+			setBusy((current) => {
+				const next = new Set(current);
+				for (const path of paths) next.add(path);
+				return next;
+			});
+			setError(null);
+			try {
+				await gitUnstage(root, paths);
+				await refresh();
+			} catch (err) {
+				setError(describeError(err));
+			} finally {
+				setBusy((current) => {
+					const next = new Set(current);
+					for (const path of paths) next.delete(path);
+					return next;
+				});
+			}
+		},
+		[root, refresh],
+	);
+
+	useEffect(() => {
+		const handler = (event: KeyboardEvent) => {
+			if (!event.metaKey || event.ctrlKey || event.altKey) return;
+			if (event.key !== "Enter") return;
+			if (selected === null || status === null) return;
+			const entry = status.entries.find((item) => item.path === selected);
+			if (!entry) return;
+			event.preventDefault();
+			if (event.shiftKey) {
+				if (entry.staged) void unstage([entry.path]);
+			} else {
+				if (!entry.staged) void stage([entry.path]);
+			}
+		};
+		window.addEventListener("keydown", handler, true);
+		return () => window.removeEventListener("keydown", handler, true);
+	}, [selected, status, stage, unstage]);
+
 	if (status === null && error === null && loading) {
 		return (
 			<aside className="rail">
@@ -78,7 +154,7 @@ export default function SourceControl({
 		);
 	}
 
-	if (error !== null) {
+	if (error !== null && status === null) {
 		return (
 			<aside className="rail">
 				<div className="rail-head">
@@ -96,30 +172,60 @@ export default function SourceControl({
 	const staged = status.entries.filter((entry) => entry.staged);
 	const changes = status.entries.filter((entry) => !entry.staged);
 
-	const renderRow = (entry: GitStatusEntry) => (
-		<li key={`${entry.staged ? "s" : "c"}:${entry.path}`} className="git-row">
-			<button
-				type="button"
-				className="git-row-main"
-				onClick={() => onOpenFile(entry.path)}
-				title={entry.path}
+	const renderRow = (entry: GitStatusEntry) => {
+		const isBusy = busy.has(entry.path);
+		return (
+			<li
+				key={`${entry.staged ? "s" : "c"}:${entry.path}`}
+				className={`git-row${isBusy ? " git-row-busy" : ""}${selected === entry.path ? " git-row-selected" : ""}`}
 			>
-				<span className={`git-status-letter ${STATUS_CLASS[entry.status]}`}>
-					{STATUS_LETTER[entry.status]}
-				</span>
-				<span className="git-row-name">{nameOf(entry.path)}</span>
-				<span className="git-row-dir">{dirOf(entry.path)}</span>
-			</button>
-			<button
-				type="button"
-				className="git-diff-btn"
-				onClick={() => onDiff(entry.path)}
-				aria-label={`diff ${entry.path}`}
-			>
-				diff
-			</button>
-		</li>
-	);
+				<button
+					type="button"
+					className="git-row-main"
+					onClick={() => {
+						setSelected(entry.path);
+						onOpenFile(entry.path);
+					}}
+					title={entry.path}
+				>
+					<span className={`git-status-letter ${STATUS_CLASS[entry.status]}`}>
+						{STATUS_LETTER[entry.status]}
+					</span>
+					<span className="git-row-name">{nameOf(entry.path)}</span>
+					<span className="git-row-dir">{dirOf(entry.path)}</span>
+				</button>
+				{entry.staged ? (
+					<button
+						type="button"
+						className="git-stage-btn"
+						disabled={isBusy}
+						onClick={() => void unstage([entry.path])}
+						aria-label={`unstage ${entry.path}`}
+					>
+						Unstage
+					</button>
+				) : (
+					<button
+						type="button"
+						className="git-stage-btn"
+						disabled={isBusy}
+						onClick={() => void stage([entry.path])}
+						aria-label={`stage ${entry.path}`}
+					>
+						Stage
+					</button>
+				)}
+				<button
+					type="button"
+					className="git-diff-btn"
+					onClick={() => onDiff(entry.path)}
+					aria-label={`diff ${entry.path}`}
+				>
+					diff
+				</button>
+			</li>
+		);
+	};
 
 	return (
 		<aside className="rail">
@@ -140,16 +246,37 @@ export default function SourceControl({
 					Refresh
 				</button>
 			</div>
+			{error !== null ? <p className="empty error">{error}</p> : null}
 			<div className="tree-scroll">
 				{staged.length > 0 ? (
 					<>
-						<div className="git-group-head">Staged</div>
+						<div className="git-group-head">
+							<span>Staged</span>
+							<button
+								type="button"
+								className="git-stage-btn git-group-action"
+								disabled={staged.some((entry) => busy.has(entry.path))}
+								onClick={() => void unstage(staged.map((entry) => entry.path))}
+							>
+								Unstage all
+							</button>
+						</div>
 						<ul className="git-list">{staged.map(renderRow)}</ul>
 					</>
 				) : null}
 				{changes.length > 0 ? (
 					<>
-						<div className="git-group-head">Changes</div>
+						<div className="git-group-head">
+							<span>Changes</span>
+							<button
+								type="button"
+								className="git-stage-btn git-group-action"
+								disabled={changes.some((entry) => busy.has(entry.path))}
+								onClick={() => void stage(changes.map((entry) => entry.path))}
+							>
+								Stage all
+							</button>
+						</div>
 						<ul className="git-list">{changes.map(renderRow)}</ul>
 					</>
 				) : null}

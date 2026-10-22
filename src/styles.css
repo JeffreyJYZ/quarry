@@ -2181,6 +2181,43 @@ button.tree-note {
 .git-row:hover {
 	background: var(--hover);
 }
+.git-row-busy {
+	opacity: 0.45;
+	pointer-events: none;
+}
+.git-row-selected {
+	background: var(--hover);
+}
+.git-stage-btn {
+	flex: 0 0 auto;
+	padding: 1px 6px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: transparent;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 9.5px;
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity 0.1s ease;
+}
+.git-group-head .git-stage-btn {
+	opacity: 1;
+}
+.git-row:hover .git-stage-btn,
+.git-row:focus-within .git-stage-btn {
+	opacity: 1;
+}
+.git-stage-btn:hover:not(:disabled) {
+	color: var(--text);
+	border-color: var(--muted);
+}
+.git-stage-btn:disabled {
+	cursor: default;
+}
+.git-group-action {
+	margin-left: auto;
+}
 .git-row-main {
 	display: flex;
 	align-items: center;
