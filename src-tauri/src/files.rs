@@ -13,8 +13,7 @@ pub const MAX_FILES: usize = 20_000;
 const IGNORED_NAMES: [&str; 5] = ["target", "node_modules", "dist", ".git", ".quarry"];
 
 /// Whether `name` is one of the directories the walk skips.
-#[allow(dead_code)]
-pub fn is_ignored(name: &str) -> bool {
+fn is_ignored(name: &str) -> bool {
     IGNORED_NAMES.contains(&name)
 }
 
