@@ -597,6 +597,29 @@ mod tests {
         assert_eq!(unquote_path("\"with space.rs\""), "with space.rs");
         assert_eq!(unquote_path("\"tab\\there.rs\""), "tab\there.rs");
     }
+
+    #[test]
+    fn commit_message_rejects_empty_and_whitespace() {
+        assert!(validate_commit_message("").is_err());
+        assert!(validate_commit_message("   \n\t").is_err());
+    }
+
+    #[test]
+    fn commit_message_rejects_oversized() {
+        let message = "a".repeat(4097);
+        assert!(validate_commit_message(&message).is_err());
+    }
+
+    #[test]
+    fn commit_message_accepts_normal() {
+        assert!(validate_commit_message("fix: thing").is_ok());
+    }
+
+    #[test]
+    fn commit_argv_keeps_a_leading_dash_as_the_value_of_m() {
+        let argv = commit_argv("-foo");
+        assert_eq!(argv, vec!["commit", "-m", "-foo"]);
+    }
 }
 
 /// Stage paths (relative to `root` or absolute inside it). Never a shell, never outside the root.
@@ -681,20 +704,13 @@ pub fn validate_paths(root: &str, paths: &[String]) -> Result<Vec<String>, Strin
 
 #[allow(dead_code)]
 pub fn stage_args(paths: &[String]) -> Vec<String> {
-    build_stage_argv(paths)
-}
-#[allow(dead_code)]
-pub fn build_stage_argv(paths: &[String]) -> Vec<String> {
     let mut argv = vec!["add".to_string(), "--".to_string()];
     argv.extend(paths.iter().cloned());
     argv
 }
+
 #[allow(dead_code)]
 pub fn unstage_args(paths: &[String]) -> Vec<String> {
-    build_unstage_argv(paths)
-}
-#[allow(dead_code)]
-pub fn build_unstage_argv(paths: &[String]) -> Vec<String> {
     let mut argv = vec![
         "restore".to_string(),
         "--staged".to_string(),
@@ -702,4 +718,73 @@ pub fn build_unstage_argv(paths: &[String]) -> Vec<String> {
     ];
     argv.extend(paths.iter().cloned());
     argv
+}
+
+/// Validates a commit message before it reaches git.
+pub fn validate_commit_message(message: &str) -> Result<(), String> {
+    if message.trim().is_empty() {
+        return Err("commit message must not be empty".to_string());
+    }
+    if message.len() > 4096 {
+        return Err("commit message exceeds 4096 bytes".to_string());
+    }
+    Ok(())
+}
+
+/// Builds the argv for `git commit`, with the message as the value of `-m`.
+pub fn commit_argv(message: &str) -> Vec<String> {
+    vec!["commit".to_string(), "-m".to_string(), message.to_string()]
+}
+
+/// Commit the staged changes with `message`. Refuses an empty message or an empty index.
+#[tauri::command]
+pub async fn git_commit(root: String, message: String) -> Result<String, String> {
+    validate_commit_message(&message)?;
+    tauri::async_runtime::spawn_blocking(move || commit(&root, &message))
+        .await
+        .map_err(|error| format!("git commit failed: {error}"))?
+}
+
+fn commit(root: &str, message: &str) -> Result<String, String> {
+    let program = git_program()?;
+
+    // Refuse an empty index before touching commit: a zero exit means "nothing staged".
+    let staged_check = Command::new(&program)
+        .args(["diff", "--cached", "--quiet"])
+        .current_dir(root)
+        .output()
+        .map_err(|error| format!("cannot run {program} in {root}: {error}"))?;
+    let stderr = String::from_utf8_lossy(&staged_check.stderr);
+    if is_not_a_repository(&stderr) {
+        return Err(format!("not a git repository: {root}"));
+    }
+    if staged_check.status.success() {
+        return Err("nothing staged to commit; stage something first".to_string());
+    }
+
+    let output = Command::new(&program)
+        .args(commit_argv(message))
+        .current_dir(root)
+        .output()
+        .map_err(|error| format!("cannot run {program} in {root}: {error}"))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if is_not_a_repository(&stderr) {
+            return Err(format!("not a git repository: {root}"));
+        }
+        return Err(operation_error("git commit", &stderr));
+    }
+
+    // The commit already landed; a failed rev-parse must not turn success into failure.
+    let hash_output = Command::new(&program)
+        .args(["rev-parse", "--short", "HEAD"])
+        .current_dir(root)
+        .output();
+    match hash_output {
+        Ok(result) if result.status.success() => {
+            Ok(String::from_utf8_lossy(&result.stdout).trim().to_string())
+        }
+        _ => Ok(String::new()),
+    }
 }

@@ -1,5 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
-import { type GitStatus, type GitStatusEntry, gitStage, gitUnstage } from "@/project/api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+	type GitStatus,
+	type GitStatusEntry,
+	gitCommit,
+	gitStage,
+	gitUnstage,
+} from "@/project/api";
 import { describeError } from "@/project/errors";
 
 export type SourceControlProps = {
@@ -49,10 +55,16 @@ export default function SourceControl({
 	onDiff,
 }: SourceControlProps) {
 	const status = statusProp;
+	const stagedCount = status?.entries.filter((entry) => entry.staged).length ?? 0;
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [busy, setBusy] = useState<Set<string>>(() => new Set<string>());
 	const [selected, setSelected] = useState<string | null>(null);
+	const [message, setMessage] = useState("");
+	const [commitError, setCommitError] = useState<string | null>(null);
+	const [committed, setCommitted] = useState<string | null>(null);
+	const [committing, setCommitting] = useState(false);
+	const committedTimer = useRef<number | null>(null);
 
 	const refresh = useCallback(async () => {
 		setLoading(true);
@@ -120,6 +132,38 @@ export default function SourceControl({
 		},
 		[root, refresh],
 	);
+
+	const commit = useCallback(async () => {
+		const trimmed = message.trim();
+		if (trimmed === "" || stagedCount === 0 || committing) return;
+		setCommitting(true);
+		setCommitError(null);
+		try {
+			const hash = await gitCommit(root, trimmed);
+			setMessage("");
+			setCommitted(hash);
+			if (committedTimer.current !== null) {
+				window.clearTimeout(committedTimer.current);
+			}
+			committedTimer.current = window.setTimeout(() => {
+				committedTimer.current = null;
+				setCommitted(null);
+			}, 4000);
+			await refresh();
+		} catch (err) {
+			setCommitError(describeError(err));
+		} finally {
+			setCommitting(false);
+		}
+	}, [message, stagedCount, committing, root, refresh]);
+
+	useEffect(() => {
+		return () => {
+			if (committedTimer.current !== null) {
+				window.clearTimeout(committedTimer.current);
+			}
+		};
+	}, []);
 
 	useEffect(() => {
 		const handler = (event: KeyboardEvent) => {
@@ -228,6 +272,47 @@ export default function SourceControl({
 			<div className="rail-head">
 				<span className="label">Source control</span>
 				<span className="git-branch">{status.branch}</span>
+			</div>
+			<div className="git-commit-box">
+				<textarea
+					className="git-commit-input"
+					rows={Math.min(5, Math.max(2, message.split("\\n").length))}
+					placeholder="Commit message"
+					value={message}
+					onChange={(event) => {
+						setMessage(event.target.value);
+						setCommitError(null);
+					}}
+					onKeyDown={(event) => {
+						if (event.key === "Escape") {
+							event.currentTarget.blur();
+							return;
+						}
+						if (
+							event.metaKey &&
+							!event.ctrlKey &&
+							!event.altKey &&
+							event.key === "Enter"
+						) {
+							event.preventDefault();
+							event.stopPropagation();
+							void commit();
+						}
+					}}
+				/>
+				<div className="git-commit-row">
+					<button
+						type="button"
+						className="git-commit-btn"
+						disabled={message.trim() === "" || stagedCount === 0 || committing}
+						onClick={() => void commit()}
+					>
+						{committing ? "Committing…" : "Commit"}
+					</button>
+					<span className="git-staged-count">{stagedCount} staged</span>
+				</div>
+				{commitError !== null ? <p className="git-commit-error">{commitError}</p> : null}
+				{committed !== null ? <p className="git-committed">Committed {committed}</p> : null}
 			</div>
 			<div className="git-meta">
 				<span className="git-counts">

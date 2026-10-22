@@ -91,6 +91,7 @@ pub fn run() {
             git::git_file_diff,
             git::git_stage,
             git::git_unstage,
+            git::git_commit,
             pty::pty_open,
             pty::pty_write,
             pty::pty_resize,
