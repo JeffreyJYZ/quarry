@@ -63,6 +63,7 @@ pub fn run() {
             dap::dap_stack_trace,
             dap::dap_scopes,
             dap::dap_variables,
+            dap::dap_set_variable,
             dap::dap_read_memory,
             dap::dap_write_memory,
             dap::dap_disassemble,

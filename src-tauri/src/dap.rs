@@ -1434,6 +1434,35 @@ mod tests {
     }
 
     #[test]
+    fn set_variable_arguments_carry_name_and_value() {
+        let arguments = set_variable_arguments(7, "n", "42");
+        assert_eq!(arguments["variablesReference"], json!(7));
+        assert_eq!(arguments["name"], json!("n"));
+        assert_eq!(arguments["value"], json!("42"));
+    }
+
+    #[test]
+    fn set_variable_rejects_empty_name() {
+        let error = validate_set_variable("", "42").expect_err("empty name");
+        assert!(error.contains("name"), "message: {error}");
+        assert!(error.contains("empty"), "message: {error}");
+    }
+
+    #[test]
+    fn set_variable_rejects_empty_value() {
+        let error = validate_set_variable("n", "").expect_err("empty value");
+        assert!(error.contains("value"), "message: {error}");
+        assert!(error.contains("empty"), "message: {error}");
+    }
+
+    #[test]
+    fn set_variable_result_requires_a_value_string() {
+        assert!(set_variable_result(&json!({ "value": "42" })).is_ok());
+        let error = set_variable_result(&json!({ "type": "int" })).expect_err("no value");
+        assert!(error.contains("no value"), "message: {error}");
+    }
+
+    #[test]
     fn write_memory_arguments_keep_the_address_shape() {
         let prefixed = write_memory_arguments("0x1000", &[0xde, 0xad]);
         assert_eq!(prefixed["memoryReference"], json!("0x1000"));
@@ -1474,4 +1503,47 @@ fn write_memory_arguments(address: &str, bytes: &[u8]) -> Value {
         "data": base64_encode(bytes),
         "offset": 0,
     })
+}
+
+/// Change a variable's value in the debuggee (DAP `setVariable`).
+fn validate_set_variable(name: &str, value: &str) -> Result<(), String> {
+    if name.is_empty() {
+        return Err("setVariable: `name` must not be empty".to_string());
+    }
+    if value.is_empty() {
+        return Err("setVariable: `value` must not be empty".to_string());
+    }
+    Ok(())
+}
+
+fn set_variable_arguments(variables_reference: u32, name: &str, value: &str) -> Value {
+    json!({
+        "variablesReference": variables_reference,
+        "name": name,
+        "value": value,
+    })
+}
+
+fn set_variable_result(body: &Value) -> Result<(), String> {
+    if body.get("value").and_then(Value::as_str).is_some() {
+        Ok(())
+    } else {
+        Err("setVariable: the adapter returned no value".to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn dap_set_variable(
+    state: State<'_, DapState>,
+    session: String,
+    variables_reference: u32,
+    name: String,
+    value: String,
+) -> Result<(), String> {
+    validate_set_variable(&name, &value)?;
+
+    let arguments = set_variable_arguments(variables_reference, &name, &value);
+
+    let body = session_for(&state, &session)?.request("setVariable", arguments)?;
+    set_variable_result(&body)
 }
