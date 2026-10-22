@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { dapReadMemory } from "@/project/api";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { dapReadMemory, dapWriteMemory } from "@/project/api";
 import { describeError } from "@/project/errors";
 import {
 	asciiByte,
@@ -59,6 +59,13 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 	const [busy, setBusy] = useState(false);
 	/** Bumped per read so an older reply can never overwrite a newer one. */
 	const sequence = useRef(0);
+
+	const [editMode, setEditMode] = useState(false);
+	const [editing, setEditing] = useState<bigint | null>(null);
+	const [editValue, setEditValue] = useState("");
+	const [rangeAnchor, setRangeAnchor] = useState<bigint | null>(null);
+	const [rangeEnd, setRangeEnd] = useState<bigint | null>(null);
+	const [rangeInput, setRangeInput] = useState("");
 
 	const pageSize = request?.size ?? DEFAULT_PAGE;
 
@@ -169,6 +176,115 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 
 	const selectedLabel = selected === null ? "" : formatAddress(selected);
 
+	let rangeStart: bigint | null = null;
+	let rangeFinish: bigint | null = null;
+	if (rangeAnchor !== null && rangeEnd !== null) {
+		if (rangeAnchor < rangeEnd) {
+			rangeStart = rangeAnchor;
+			rangeFinish = rangeEnd;
+		} else {
+			rangeStart = rangeEnd;
+			rangeFinish = rangeAnchor;
+		}
+	}
+	const rangeLabel =
+		rangeStart !== null && rangeFinish !== null
+			? `${formatAddress(rangeStart)}–${formatAddress(rangeFinish)}`
+			: null;
+	const rangeSize =
+		rangeStart !== null && rangeFinish !== null ? Number(rangeFinish - rangeStart + 1n) : 0;
+
+	const commitEdit = async (cell: bigint) => {
+		if (!session) {
+			setEditing(null);
+			return;
+		}
+		if (editValue.length !== 2) {
+			setEditing(null);
+			return;
+		}
+		const value = Number.parseInt(editValue, 16);
+		if (Number.isNaN(value)) {
+			setEditing(null);
+			return;
+		}
+		try {
+			await dapWriteMemory(session, formatAddress(cell), [value]);
+			setEditing(null);
+			setRequest((previous) =>
+				previous === null ? null : { ...previous, serial: previous.serial + 1 },
+			);
+		} catch (failure) {
+			setError(describeError(failure));
+			setEditing(null);
+		}
+	};
+
+	const commitRange = useCallback(async () => {
+		if (!session || rangeStart === null || rangeFinish === null) {
+			return;
+		}
+		if (rangeInput.length !== rangeSize * 2) {
+			return;
+		}
+		const bytes: number[] = [];
+		for (let index = 0; index < rangeSize; index += 1) {
+			bytes.push(Number.parseInt(rangeInput.slice(index * 2, index * 2 + 2), 16));
+		}
+		if (bytes.some((value) => Number.isNaN(value))) {
+			return;
+		}
+		try {
+			await dapWriteMemory(session, formatAddress(rangeStart), bytes);
+			setRangeInput("");
+			setRequest((previous) =>
+				previous === null ? null : { ...previous, serial: previous.serial + 1 },
+			);
+		} catch (failure) {
+			setError(describeError(failure));
+		}
+	}, [session, rangeStart, rangeFinish, rangeSize, rangeInput]);
+
+	useEffect(() => {
+		if (!editMode || rangeStart === null || rangeFinish === null) {
+			return;
+		}
+		const handler = (event: KeyboardEvent) => {
+			const target = event.target as HTMLElement | null;
+			if (
+				target !== null &&
+				(target.tagName === "INPUT" ||
+					target.tagName === "SELECT" ||
+					target.tagName === "TEXTAREA")
+			) {
+				return;
+			}
+			if (event.key === "Escape") {
+				setRangeInput("");
+				setRangeAnchor(null);
+				setRangeEnd(null);
+				return;
+			}
+			if (event.key === "Enter") {
+				event.preventDefault();
+				void commitRange();
+				return;
+			}
+			if (event.key === "Backspace") {
+				setRangeInput((value) => value.slice(0, -1));
+				return;
+			}
+			if (/^[0-9a-fA-F]$/.test(event.key)) {
+				setRangeInput((value) => {
+					const next = (value + event.key).slice(0, rangeSize * 2);
+					return next;
+				});
+			}
+		};
+		window.addEventListener("keydown", handler);
+		return () => window.removeEventListener("keydown", handler);
+	}, [editMode, rangeStart, rangeFinish, rangeSize, commitRange]);
+
 	return (
 		<div className="memory-pane">
 			<div className="memory-head">
@@ -220,6 +336,20 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 				>
 					Follow pointer
 				</button>
+				<button
+					type="button"
+					className={editMode ? "button active" : "button"}
+					aria-pressed={editMode}
+					onClick={() => setEditMode((value) => !value)}
+				>
+					Edit
+				</button>
+				{rangeLabel !== null && (
+					<span className="memory-muted memory-head-note">
+						{rangeLabel}
+						{rangeInput !== "" ? ` ${rangeInput}` : ""}
+					</span>
+				)}
 				{busy && <span className="memory-muted memory-head-note">reading</span>}
 			</div>
 			{error !== null && <p className="memory-error">{error}</p>}
@@ -248,17 +378,121 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 												{row.bytes.map((byte, index) => {
 													const cell = row.address + BigInt(index);
 													const current = selected === cell;
+													const inRange =
+														rangeStart !== null &&
+														rangeFinish !== null &&
+														cell >= rangeStart &&
+														cell <= rangeFinish;
+													if (editing === cell) {
+														return (
+															<input
+																key={cell.toString(16)}
+																className="memory-cell memory-cell-edit"
+																value={editValue}
+																spellCheck={false}
+																autoComplete="off"
+																maxLength={2}
+																aria-label={formatAddress(cell)}
+																onChange={(event) => {
+																	const filtered =
+																		event.target.value
+																			.replace(
+																				/[^0-9a-fA-F]/g,
+																				"",
+																			)
+																			.slice(0, 2);
+																	setEditValue(filtered);
+																}}
+																onKeyDown={(event) => {
+																	if (event.key === "Enter") {
+																		event.preventDefault();
+																		void commitEdit(cell);
+																	} else if (
+																		event.key === "Escape"
+																	) {
+																		event.preventDefault();
+																		setEditing(null);
+																		setEditValue("");
+																	} else if (
+																		event.key === "Tab"
+																	) {
+																		event.preventDefault();
+																		void commitEdit(cell).then(
+																			() => {
+																				const nextCell =
+																					cell + 1n;
+																				const nextByte =
+																					loaded !==
+																						null &&
+																					nextCell >=
+																						loaded.base &&
+																					nextCell <
+																						loaded.base +
+																							BigInt(
+																								loaded.size,
+																							)
+																						? loaded
+																								.bytes[
+																								Number(
+																									nextCell -
+																										loaded.base,
+																								)
+																							]
+																						: null;
+																				if (
+																					nextByte !==
+																					null
+																				) {
+																					setEditing(
+																						nextCell,
+																					);
+																					setEditValue(
+																						hexByte(
+																							nextByte,
+																						),
+																					);
+																				}
+																			},
+																		);
+																	}
+																}}
+															/>
+														);
+													}
 													return (
 														<button
 															type="button"
 															className={
-																current
+																current || inRange
 																	? "memory-cell selected"
 																	: "memory-cell"
 															}
 															key={cell.toString(16)}
 															aria-label={formatAddress(cell)}
-															onClick={() => setSelected(cell)}
+															onClick={(event) => {
+																if (event.shiftKey) {
+																	if (rangeAnchor === null) {
+																		setRangeAnchor(cell);
+																	} else {
+																		setRangeEnd(cell);
+																	}
+																	return;
+																}
+																setSelected(cell);
+																setRangeAnchor(null);
+																setRangeEnd(null);
+																setRangeInput("");
+															}}
+															onDoubleClick={() => {
+																if (!editMode || !session) {
+																	return;
+																}
+																if (byte === null) {
+																	return;
+																}
+																setEditing(cell);
+																setEditValue(hexByte(byte));
+															}}
 														>
 															{hexByte(byte)}
 														</button>
