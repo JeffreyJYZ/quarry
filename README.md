@@ -56,11 +56,14 @@ read off `src-tauri/src/lib.rs` and `src/`:
   session ends.
 - **Launch presets**: the debug panel's `Edit presets` editor adds, duplicates, removes and reorders
   presets, edits name, program, args, cwd and stop-on-entry, and writes them through
-  `write_launch_config`, which rejects empty and duplicate names. Args are typed as one space-split
-  string (`src/debug/presets.ts`; whitespace only, so quoting is not honoured), and the panel validates
-  the whole file before the write. The selection is held by preset name, so it survives a save, and
-  renaming the selected preset falls back to the first entry. `.quarry/launch.json` stays the source of
-  truth on disk; `build` and `initCommands` are not editable here and a save writes both empty.
+  `write_launch_config`, which rejects empty and duplicate names. Args are typed as one string and
+  parsed with the run form's own `splitArgs` (`src/debug/presets.ts` over `src/run/splitArgs.ts`),
+  rendered back for display by `joinArgs`, so `a "b c" d` keeps `b c` as one argument; the one gap
+  is a literal `"` inside an argument, which cannot round trip. The panel validates the whole file
+  before the write. The selection is held by preset name, so it survives a save, and renaming the
+  selected preset falls back to the first entry. `.quarry/launch.json` stays the source of truth on
+  disk; `build` and `initCommands` have no editor here, but a save carries both through from the
+  loaded preset unchanged, so editing another field cannot clear the Rust formatter import.
 - **Search**: `rg`-backed palette with results grouped by file, keyboard navigation, and a visible cap
   when the result set is truncated. Case-sensitive, regex and whole-word toggles are in
   `src/search/SearchPalette.tsx`.
