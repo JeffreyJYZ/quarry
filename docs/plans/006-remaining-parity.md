@@ -36,7 +36,7 @@ Each line names the command or component that proves the capability, taken from
 ## 2. Remaining gaps
 
 1. **Rust expression evaluation.** `evaluate` returns nothing usable across `repl`/`watch`/`hover`; `settings set target.language rust` changes nothing; `setExpression` kills the adapter. Escape hatches that work: `variables` (default or `filter: "named"`) and `readMemory` from a pointer found in `variables`. See `docs/spikes/dap.md`. Estimate: unknown.
-2. **Richer run configuration UI.** The run panel covers program, args, cwd, env and an argv preview (`src/run/RunForm.tsx`); no richer configuration surface beyond that. Estimate: unknown.
+2. **Run configuration beyond the run form.** Debug presets are editable from the debug panel (`Edit presets` in `src/debug/DebugPanel.tsx` over `src/debug/presets.ts`): add, duplicate, remove, reorder, and edit name, program, args, cwd and stop-on-entry, saved through `run_config::write_launch_config`, which rejects empty and duplicate names, with client-side validation before the write. Args are one space-split string, whitespace only, so quoting is not honoured. What remains: no editor for a preset's `build` or `initCommands`, and a save writes both empty, so hand-authored values do not survive an edit; no named run configurations for `run_program` (the run panel keeps program, args, cwd and env per root in memory, `src/run/RunForm.tsx`); and no build-profile selector (`buildProject` is only ever called with `debug`). Estimate: unknown.
 3. **Remote development.** Explicit non-goal per `001-clion-parity.md` §8. Do not schedule.
 4. **Embedded targets.** Explicit non-goal. Do not schedule.
 5. **Profiler.** Explicit non-goal. Do not schedule.
@@ -80,6 +80,7 @@ Gates:
 - **cmake absence.** `cmake` and `ninja` are not installed on this machine. Any C/C++ build path that assumes them fails at runtime. Mitigation: detect and report missing toolchains; do not assume presence.
 - **evaluate fallback.** `evaluate` falls back to Objective-C++ and errors on Rust syntax. A watch pane built on it would look implemented but return errors. Mitigation: gate the feature behind a measured workaround.
 - **Crate-wide `cargo fmt` rewriting `lsp.rs`.** `src-tauri/src/lsp.rs` is not rustfmt-clean; a crate-wide format adds an out-of-unit diff. Mitigation: format only the file being edited, e.g. `rustfmt --edition 2024 src/dap.rs`.
+- **A preset save drops `build` and `initCommands`.** `toLaunchPreset` in `src/debug/presets.ts` writes `build: null` and `initCommands: []` for every draft, so saving from the panel clears a hand-authored build hint or formatter import in `.quarry/launch.json`. Symptom: Rust values stop pretty-printing after a preset edit, because the `lldb_lookup.py` import was cleared. Mitigation: carry those fields through from the loaded preset until the editor covers them.
 
 ## 6. Reading order
 
