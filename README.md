@@ -28,7 +28,11 @@ read off `src-tauri/src/lib.rs` and `src/`:
   and references, `Cmd+K` for the shortcut sheet.
 - **Insight**: one language server per project root — `rust-analyzer` for Cargo, `clangd` for CMake or
   `compile_commands.json` — with full-document sync. Diagnostics stream into the editor and the Problems
-  dock, grouped by file with severity, line and message. Hover, go-to-definition, references and
+  dock, grouped by file with severity, line and message. The dock's severity counts in the header are
+  toggles that hide or show errors, warnings or info, several at once, all on by default; a "group by
+  file" toggle switches to a flat list ordered by severity, then path, then line, and the choice survives
+  a dock remount through session storage; each row copies as `path:line:col severity: message`; and the
+  empty state distinguishes no diagnostics from everything filtered out. Hover, go-to-definition, references and
   completion commands are wired; hover, completion (CompletionList with real labels), definition (LocationLink[]) and references are verified against rust-analyzer 1.99.0 via `bun run scripts/lsp-ux-smoke.ts`.
   Document outline via `lsp_symbols` and `src/outline/Outline.tsx`.
 - **Build**: `build_project` runs `cargo build --message-format=json` and merges its machine-readable
