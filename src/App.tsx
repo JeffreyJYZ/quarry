@@ -1975,15 +1975,6 @@ export default function App() {
 				>
 					New project
 				</button>
-				<button
-					type="button"
-					className="button button-icon"
-					aria-label="Settings"
-					title="Settings (⌘,)"
-					onClick={() => setSettingsOpen(true)}
-				>
-					⚙
-				</button>
 			</header>
 
 			{notice ? (
