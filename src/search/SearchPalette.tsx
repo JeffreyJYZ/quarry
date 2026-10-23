@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type SearchReport, searchProject } from "@/project/api";
+import { replaceProject, type SearchReport, searchProject } from "@/project/api";
+import "./search.css";
 import { describeError } from "@/project/errors";
 import {
+	buildPreview,
 	clipLine,
 	groupMatches,
+	isPreviewStale,
+	PREVIEW_LIMIT,
+	type PreviewLine,
+	type PreviewSnapshot,
 	resultSummary,
 	type SearchOptions,
 	searchFlags,
@@ -35,6 +41,10 @@ export default function SearchPalette({ root, onOpen, onClose, initialQuery }: S
 	const [caseSensitive, setCaseSensitive] = useState(sessionCaseSensitive);
 	const [regex, setRegex] = useState(sessionRegex);
 	const [wholeWord, setWholeWord] = useState(sessionWholeWord);
+	const [showReplace, setShowReplace] = useState(false);
+	const [replacement, setReplacement] = useState("");
+	const [preview, setPreview] = useState<PreviewSnapshot | null>(null);
+	const [replaceSummary, setReplaceSummary] = useState<string | null>(null);
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const listRef = useRef<HTMLDivElement | null>(null);
 	/** Bumped per search so a slow earlier reply never overwrites a newer one. */
@@ -173,6 +183,50 @@ export default function SearchPalette({ root, onOpen, onClose, initialQuery }: S
 
 	const trimmed = query.trim();
 
+	const doPreview = () => {
+		if (report === null || trimmed === "") {
+			return;
+		}
+		const built = buildPreview(
+			report.matches.map((m) => ({ path: m.path, line: m.line, text: m.text })),
+			trimmed,
+			replacement,
+			options,
+		);
+		setPreview({ query: trimmed, replacement, lines: built.lines, truncated: built.truncated });
+		setReplaceSummary(null);
+	};
+
+	const doReplaceAll = async () => {
+		if (isPreviewStale(preview, trimmed, replacement)) {
+			setError("preview is stale: run preview again before replacing");
+			return;
+		}
+		const flags = searchFlags(options);
+		setBusy(true);
+		setError(null);
+		try {
+			const res = await replaceProject(
+				root,
+				transformQuery(trimmed, options),
+				replacement,
+				flags.caseSensitive,
+				flags.fixedStrings,
+			);
+			const errPart = res.errors.length > 0 ? `; ${res.errors.length} errors` : "";
+			setReplaceSummary(
+				`${res.files_changed} files changed, ${res.replacements} replacements made${errPart}`,
+			);
+			if (res.errors.length > 0) {
+				setError(res.errors.join("; "));
+			}
+		} catch (failure) {
+			setError(describeError(failure));
+		} finally {
+			setBusy(false);
+		}
+	};
+
 	let state: string;
 	let stateClass = "search-state";
 	if (error !== null) {
@@ -266,8 +320,62 @@ export default function SearchPalette({ root, onOpen, onClose, initialQuery }: S
 				>
 					W
 				</button>
+				<button
+					type="button"
+					className={showReplace ? "search-toggle active" : "search-toggle"}
+					title="toggle replace field"
+					onClick={() => setShowReplace((v) => !v)}
+				>
+					↔
+				</button>
 				<span className="search-hint">enter</span>
 			</div>
+			{showReplace ? (
+				<div className="search-replace-row">
+					<input
+						className="search-input"
+						value={replacement}
+						placeholder="replacement"
+						aria-label="Replacement"
+						spellCheck={false}
+						autoComplete="off"
+						onChange={(event) => setReplacement(event.target.value)}
+					/>
+					<button type="button" className="search-toggle" onClick={doPreview}>
+						preview
+					</button>
+					<button
+						type="button"
+						className="search-toggle"
+						onClick={() => void doReplaceAll()}
+					>
+						replace all
+					</button>
+				</div>
+			) : null}
+			{preview !== null ? (
+				<div className="search-preview">
+					{preview.lines.map((p: PreviewLine) => (
+						<div
+							className="search-preview-line"
+							key={`${p.path}:${p.line}:${p.oldText}`}
+						>
+							<span className="search-pos">
+								{p.path}:{p.line}
+							</span>
+							<span className="search-text">{clipLine(p.oldText)}</span>
+							<span className="search-text">→ {clipLine(p.newText)}</span>
+						</div>
+					))}
+					{preview.truncated ? (
+						<p className="search-state">preview truncated (cap {PREVIEW_LIMIT})</p>
+					) : null}
+					{isPreviewStale(preview, trimmed, replacement) ? (
+						<p className="search-state error">preview is stale</p>
+					) : null}
+				</div>
+			) : null}
+			{replaceSummary !== null ? <p className="search-state">{replaceSummary}</p> : null}
 
 			<p className={stateClass} role="status">
 				{state}

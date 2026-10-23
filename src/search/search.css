@@ -1,0 +1,17 @@
+.search-replace-row {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+	margin-top: 0.5rem;
+}
+.search-preview {
+	max-height: 240px;
+	overflow: auto;
+	margin-top: 0.5rem;
+}
+.search-preview-line {
+	display: flex;
+	gap: 0.5rem;
+	font-family: monospace;
+	font-size: 0.85rem;
+}

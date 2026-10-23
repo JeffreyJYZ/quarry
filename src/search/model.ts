@@ -92,3 +92,91 @@ export function resultSummary(report: SearchReport, rendered: number, fileCount:
 	const suffix = report.truncated ? " (truncated)" : "";
 	return `${total} results in ${fileCount} files${suffix} · ${report.durationMs} ms`;
 }
+
+/** Cap on preview lines. */
+export const PREVIEW_LIMIT = 200;
+
+export type PreviewLine = {
+	path: string;
+	line: number;
+	oldText: string;
+	newText: string;
+};
+
+export type PreviewSnapshot = {
+	query: string;
+	replacement: string;
+	lines: PreviewLine[];
+	truncated: boolean;
+};
+
+/**
+ * Apply one replacement to a single line. Regex mode honours `$1`/`${name}` capture references;
+ * literal mode inserts the replacement verbatim. Toggles come through options.
+ */
+export function applyReplacement(
+	line: string,
+	query: string,
+	replacement: string,
+	options: SearchOptions,
+): string {
+	if (options.regex) {
+		const flags = options.caseSensitive ? "g" : "gi";
+		// whole word handled by transformQuery already; here query is already transformed? We pass raw query.
+		let re: RegExp;
+		try {
+			const source = options.wholeWord ? `\\b(?:${query})\\b` : query;
+			re = new RegExp(source, flags);
+		} catch {
+			return line;
+		}
+		const repl = replacement.replace(/\$\{(\w+)\}/g, "$<$1>");
+		return line.replace(re, repl);
+	}
+	// literal
+	if (query === "") {
+		return line;
+	}
+	const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const source = options.wholeWord ? `\\b(?:${escaped})\\b` : escaped;
+	const re = new RegExp(source, options.caseSensitive ? "g" : "gi");
+	return line.replace(re, () => replacement);
+}
+
+export function buildPreview(
+	matches: { path: string; line: number; text: string }[],
+	query: string,
+	replacement: string,
+	options: SearchOptions,
+	limit: number = PREVIEW_LIMIT,
+): { lines: PreviewLine[]; truncated: boolean } {
+	const lines: PreviewLine[] = [];
+	let truncated = false;
+	for (const m of matches) {
+		if (lines.length >= limit) {
+			truncated = true;
+			break;
+		}
+		lines.push({
+			path: m.path,
+			line: m.line,
+			oldText: m.text,
+			newText: applyReplacement(m.text, query, replacement, options),
+		});
+	}
+	if (matches.length > limit) {
+		truncated = true;
+	}
+	return { lines, truncated };
+}
+
+export function isPreviewStale(
+	snapshot: { query: string; replacement: string } | null,
+	query: string,
+	replacement: string,
+): boolean {
+	if (snapshot === null) {
+		return true;
+	}
+	return snapshot.query !== query || snapshot.replacement !== replacement;
+}
