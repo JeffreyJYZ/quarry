@@ -1,11 +1,14 @@
 #!/usr/bin/env bun
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dir, "..");
 const APP_PATH = join(ROOT, "src-tauri", "target", "release", "bundle", "macos", "quarry.app");
 const APP_BINARY = join(APP_PATH, "Contents", "MacOS", "quarry");
+const PLAIN_BINARY = join(ROOT, "src-tauri", "target", "release", "quarry");
+const DIST_DIR = join(ROOT, "dist");
+const REBUILD_HINT = "run: bun run tauri build --bundles app";
 
 function readPackageVersion(): string {
 	const raw = readFileSync(join(ROOT, "package.json"), "utf8");
@@ -26,6 +29,31 @@ function dirSizeMiB(p: string): number {
 	const kb = Number(out.trim().split(/\s+/)[0]);
 	return kb / 1024;
 }
+/** Newest file mtime under `dir`, or null when the directory is absent. */
+function newestFile(dir: string): { path: string; mtime: Date } | null {
+	if (!existsSync(dir)) return null;
+	let newest: { path: string; mtime: Date } | null = null;
+	const stack: string[] = [dir];
+	while (stack.length > 0) {
+		const current = stack.pop();
+		if (current === undefined) break;
+		for (const entry of readdirSync(current, { withFileTypes: true })) {
+			const p = join(current, entry.name);
+			if (entry.isDirectory()) {
+				stack.push(p);
+			} else if (entry.isFile()) {
+				const mtime = statSync(p).mtime;
+				if (newest === null || mtime.getTime() > newest.mtime.getTime())
+					newest = { path: p, mtime };
+			}
+		}
+	}
+	return newest;
+}
+function mtimeOf(p: string): Date | null {
+	return existsSync(p) ? statSync(p).mtime : null;
+}
+const iso = (d: Date | null) => (d === null ? "absent" : d.toISOString());
 function isAlive(pid: number): boolean {
 	try {
 		process.kill(pid, 0);
@@ -140,6 +168,26 @@ async function main(): Promise<number> {
 		}
 	}
 
+	// Freshness: only `tauri build` copies the current `dist/` into the `.app`. A plain
+	// `bun run build` plus `cargo build --release` refreshes `dist/` and the loose binary
+	// while the bundle keeps its old binary, so a launch silently runs stale UI.
+	const distNewest = newestFile(DIST_DIR);
+	const distMtime = distNewest?.mtime ?? null;
+	const appBinaryMtime = mtimeOf(APP_BINARY);
+	const plainBinaryMtime = mtimeOf(PLAIN_BINARY);
+	const staleReasons: string[] = [];
+	if (distMtime !== null && appBinaryMtime !== null) {
+		if (distMtime.getTime() > appBinaryMtime.getTime())
+			staleReasons.push(`STALE: dist is newer than the bundled app — ${REBUILD_HINT}`);
+	}
+	if (distMtime !== null && plainBinaryMtime !== null) {
+		if (distMtime.getTime() > plainBinaryMtime.getTime())
+			staleReasons.push(
+				`STALE: dist is newer than src-tauri/target/release/quarry — ${REBUILD_HINT}`,
+			);
+	}
+	const stale = staleReasons.length > 0;
+
 	const lines: string[] = [];
 	lines.push("verify-bundle");
 	lines.push(
@@ -147,10 +195,19 @@ async function main(): Promise<number> {
 	);
 	if (artefactOk) lines.push(`  artefact  ${APP_PATH} (${sizeMiB.toFixed(2)} MiB)`);
 	else lines.push(`  artefact  MISSING: ${APP_PATH} — build with: bun run tauri build`);
+	lines.push(
+		`  freshness dist=${iso(distMtime)} bundle=${iso(appBinaryMtime)} binary=${iso(plainBinaryMtime)}`,
+	);
+	for (const reason of staleReasons) lines.push(`  ${reason}`);
 	lines.push(`  signature ${sigStatus}${binaryExec ? "" : " (binary not executable)"}`);
 	lines.push(`  launch    ${launchDetail}`);
 	const failed =
-		!versionMatch || !artefactOk || !binaryExec || sigStatus.startsWith("FAILED") || !launchOk;
+		!versionMatch ||
+		!artefactOk ||
+		!binaryExec ||
+		sigStatus.startsWith("FAILED") ||
+		!launchOk ||
+		stale;
 	lines.push(`  result    ${failed ? "FAIL" : "PASS"}`);
 	console.log(lines.join("\n"));
 	return failed ? 1 : 0;
