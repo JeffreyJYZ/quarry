@@ -52,6 +52,7 @@ export default function TestsDock({
 	const [sort, setSort] = useState<SortDir>("az");
 	const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 	const [highlighted, setHighlighted] = useState(-1);
+	const [copyStatus, setCopyStatus] = useState<string | null>(null);
 	const filterRef = useRef<HTMLInputElement | null>(null);
 	const { load } = tests;
 
@@ -108,6 +109,34 @@ export default function TestsDock({
 		tests.runAllProgress === null
 			? null
 			: `running ${tests.runAllProgress.done}/${tests.runAllProgress.total}`;
+
+	const copyFailures = async (event: { stopPropagation: () => void }) => {
+		event.stopPropagation();
+		const lines: string[] = [];
+		for (const item of tests.items) {
+			const report = tests.results.get(item.name);
+			if (report === undefined || report.passed) {
+				continue;
+			}
+			const firstLine =
+				report.output
+					.split("\n")
+					.map((line) => line.trim())
+					.find((line) => line !== "") ?? "";
+			lines.push(`${item.name}: ${firstLine}`);
+		}
+		try {
+			if (navigator.clipboard === undefined) {
+				throw new Error("clipboard unavailable");
+			}
+			await navigator.clipboard.writeText(lines.join("\n"));
+			setCopyStatus("Copied");
+			window.setTimeout(() => setCopyStatus(null), 2000);
+		} catch (error) {
+			setCopyStatus(error instanceof Error ? error.message : "copy failed");
+			window.setTimeout(() => setCopyStatus(null), 2000);
+		}
+	};
 
 	const toggleGroup = (binary: string) => {
 		setCollapsedGroups((current) => {
@@ -258,6 +287,17 @@ export default function TestsDock({
 						>
 							clear results
 						</button>
+						<button
+							type="button"
+							className="dock-action"
+							disabled={failed === 0}
+							onClick={(event) => void copyFailures(event)}
+						>
+							copy failures
+						</button>
+						{copyStatus === null ? null : (
+							<span className="dock-copy-status">{copyStatus}</span>
+						)}
 						<button
 							type="button"
 							className="dock-action"

@@ -1713,6 +1713,9 @@ export default function App() {
 						<RunLog
 							lines={runLines}
 							exited={runExited}
+							argv={[runProgramState, ...splitArgs(runArgsState)].join(" ")}
+							running={runId !== null}
+							onRerun={() => void handleRun()}
 							onClear={() => {
 								setRunLines([]);
 								setRunExited(null);

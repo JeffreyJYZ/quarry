@@ -107,7 +107,8 @@ function TestRow({ item, result, running, highlighted, onRun }: TestRowProps) {
 	const { module, leaf } = splitName(item.name);
 	const failed = result !== undefined && !result.passed;
 
-	const copy = async () => {
+	const copyOutput = async (event: { stopPropagation: () => void }) => {
+		event.stopPropagation();
 		if (result === undefined) {
 			return;
 		}
@@ -116,7 +117,22 @@ function TestRow({ item, result, running, highlighted, onRun }: TestRowProps) {
 				throw new Error("clipboard unavailable");
 			}
 			await navigator.clipboard.writeText(result.output);
-			setCopyNote("copied");
+			setCopyNote("Copied");
+			window.setTimeout(() => setCopyNote(null), 2000);
+		} catch (error) {
+			setCopyNote(error instanceof Error ? error.message : "copy failed");
+		}
+	};
+
+	const copyName = async (event: { stopPropagation: () => void }) => {
+		event.stopPropagation();
+		try {
+			if (navigator.clipboard === undefined) {
+				throw new Error("clipboard unavailable");
+			}
+			await navigator.clipboard.writeText(item.name);
+			setCopyNote("Copied");
+			window.setTimeout(() => setCopyNote(null), 2000);
 		} catch (error) {
 			setCopyNote(error instanceof Error ? error.message : "copy failed");
 		}
@@ -141,12 +157,21 @@ function TestRow({ item, result, running, highlighted, onRun }: TestRowProps) {
 				</span>
 				<span className="test-duration">{duration}</span>
 				{failed && reason !== "" ? <span className="test-reason">{reason}</span> : null}
+				<button
+					type="button"
+					className="test-copy-name"
+					title={`copy ${item.name}`}
+					onClick={(event) => void copyName(event)}
+				>
+					copy name
+				</button>
 				{failed ? (
 					<button
 						type="button"
 						className="test-toggle"
 						aria-expanded={expanded}
-						onClick={() => {
+						onClick={(event) => {
+							event.stopPropagation();
 							setExpanded((current) => !current);
 							setCopyNote(null);
 						}}
@@ -159,7 +184,10 @@ function TestRow({ item, result, running, highlighted, onRun }: TestRowProps) {
 					className={running ? "test-run running" : "test-run"}
 					disabled={running}
 					title={running ? "running" : `run ${item.name}`}
-					onClick={() => onRun(item.name)}
+					onClick={(event) => {
+						event.stopPropagation();
+						onRun(item.name);
+					}}
 				>
 					{running ? RUNNING_GLYPH : "run"}
 				</button>
@@ -168,8 +196,12 @@ function TestRow({ item, result, running, highlighted, onRun }: TestRowProps) {
 				<div className="test-output-block">
 					<div className="test-output-head">
 						<span className="test-output-label">output</span>
-						<button type="button" className="test-copy" onClick={() => void copy()}>
-							copy
+						<button
+							type="button"
+							className="test-copy"
+							onClick={(event) => void copyOutput(event)}
+						>
+							copy output
 						</button>
 						{copyNote === null ? null : (
 							<span className="test-copy-note">{copyNote}</span>

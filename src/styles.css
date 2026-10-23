@@ -2787,6 +2787,22 @@ button.tree-note {
 	background: var(--hover);
 }
 
+.test-copy-name {
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.tests-item:hover .test-copy-name,
+.tests-item:focus-within .test-copy-name {
+	opacity: 1;
+}
+
+.dock-copy-status {
+	font-family: var(--mono);
+	font-size: 10px;
+	color: var(--accent);
+}
+
 .test-reason {
 	flex: 1 1 auto;
 	min-width: 0;
