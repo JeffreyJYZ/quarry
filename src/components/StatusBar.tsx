@@ -11,6 +11,12 @@ export type StatusBarProps = {
 	missingTools: number;
 	/** A failed save's message; success is not news and never lands here. */
 	saveError?: string | null;
+	/** Caret position, 1-based, or null with no editor. */
+	caret?: { line: number; column: number } | null;
+	/** File extension shown as a language chip, e.g. "rust" or "c++". */
+	language?: string | null;
+	/** Indent width the editor is using. */
+	tabSize?: number;
 	onOpenSettings: () => void;
 };
 
@@ -28,6 +34,9 @@ export default function StatusBar({
 	warnings,
 	missingTools,
 	saveError = null,
+	caret = null,
+	language = null,
+	tabSize = 4,
 	onOpenSettings,
 }: StatusBarProps) {
 	const gitSegment =
@@ -69,6 +78,19 @@ export default function StatusBar({
 				) : null}
 			</span>
 			<span className="status-right">
+				{caret === null ? null : (
+					<span className="status-caret" title="Caret position">
+						{caret.line}:{caret.column}
+					</span>
+				)}
+				{language === null ? null : (
+					<span className="status-language" title="Language">
+						{language}
+					</span>
+				)}
+				<span className="status-indent" title="Indent width">
+					{tabSize} spaces
+				</span>
 				{missingTools > 0 ? (
 					<span className="tool missing" title="Install the missing toolchains">
 						{missingTools} missing

@@ -109,6 +109,17 @@ const Terminal = lazy(() => import("@/terminal/Terminal"));
 
 const NO_BREAKPOINTS: BreakpointRow[] = [];
 
+/** The short language name the status bar shows for a path. */
+function languageLabel(path: string | null): string | null {
+	if (path === null) return null;
+	const dot = path.lastIndexOf(".");
+	if (dot === -1) return null;
+	const extension = path.slice(dot + 1).toLowerCase();
+	if (extension === "rs") return "rust";
+	if (["c", "h", "cc", "cpp", "cxx", "hh", "hpp"].includes(extension)) return "c++";
+	return extension;
+}
+
 const SHORTCUT_GROUPS = [
 	{
 		title: "Project",
@@ -2359,6 +2370,11 @@ export default function App() {
 				warnings={counts.warnings}
 				missingTools={missingTools}
 				saveError={saveError}
+				caret={
+					cursor === null ? null : { line: cursor.line + 1, column: cursor.character + 1 }
+				}
+				language={languageLabel(activePath)}
+				tabSize={effective.editorTabSize}
 				onOpenSettings={() => setSettingsOpen(true)}
 			/>
 			{settingsOpen ? (

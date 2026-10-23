@@ -837,6 +837,17 @@ button.tree-note {
 	text-overflow: ellipsis;
 }
 
+/* The caret, language and indent cluster: quiet, monospace, right-aligned like CLion's. */
+.status-caret,
+.status-language,
+.status-indent {
+	white-space: nowrap;
+}
+
+.status-language {
+	color: var(--text);
+}
+
 .statusbar .sep {
 	margin: 0 3px;
 	color: #2f363f;
