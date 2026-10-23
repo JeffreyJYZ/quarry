@@ -1069,7 +1069,14 @@ button.tree-note {
 	cursor: pointer;
 }
 
-.problems-file-copy:hover {
+.problems-file-copy {
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.problems-file-copy:hover,
+.problems-item:focus-within .problems-file-copy {
+	opacity: 1;
 	color: var(--text);
 	border-color: var(--muted);
 }

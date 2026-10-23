@@ -1,9 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { diagnosticKey } from "@/lsp/diagnostics";
-import { directoryOf, type ProblemFile } from "@/problems/model";
+import {
+	copyLine,
+	directoryOf,
+	filterProblemFiles,
+	flatProblems,
+	type ProblemFile,
+} from "@/problems/model";
 import type { Diagnostic } from "@/project/api";
 import { type CodeAction, lspCodeActions } from "@/project/api";
 import { applyFileEdits } from "@/refactor/apply";
+
+const GROUPING_KEY = "quarry.problems.groupByFile";
+
+function storedGrouping(): boolean {
+	try {
+		return window.sessionStorage.getItem(GROUPING_KEY) !== "flat";
+	} catch {
+		return true;
+	}
+}
+
+function storeGrouping(grouped: boolean): void {
+	try {
+		window.sessionStorage.setItem(GROUPING_KEY, grouped ? "file" : "flat");
+	} catch {
+		// Session storage can be unavailable; the choice still holds for this mount.
+	}
+}
 
 export type ProblemsPanelProps = {
 	files: ProblemFile[];
@@ -54,6 +78,30 @@ export default function ProblemsPanel({
 }: ProblemsPanelProps) {
 	const total = files.reduce((sum, file) => sum + file.diagnostics.length, 0);
 	const other = total - errors - warnings;
+
+	const [allowed, setAllowed] = useState<Set<number>>(() => new Set([1, 2, 3, 4]));
+	const [groupByFile, setGroupByFile] = useState(storedGrouping);
+
+	const chooseGrouping = (grouped: boolean) => {
+		setGroupByFile(grouped);
+		storeGrouping(grouped);
+	};
+
+	const toggleSeverity = (severities: number[]) => {
+		setAllowed((current) => {
+			const next = new Set(current);
+			const allOn = severities.every((severity) => next.has(severity));
+			if (allOn) {
+				for (const severity of severities) next.delete(severity);
+			} else {
+				for (const severity of severities) next.add(severity);
+			}
+			return next;
+		});
+	};
+
+	const filteredFiles = filterProblemFiles(files, allowed);
+	const flat = flatProblems(files, allowed);
 
 	const cache = useRef<Map<string, CodeAction[]>>(new Map());
 	const [menuKey, setMenuKey] = useState<string | null>(null);
@@ -174,28 +222,93 @@ export default function ProblemsPanel({
 
 	return (
 		<section className="problems" aria-label="Problems">
-			<button type="button" className="problems-head" onClick={onToggle} aria-expanded={true}>
-				<span className="problems-caret open" aria-hidden="true" />
-				<span className="problems-title">Problems</span>
+			<div className="problems-head">
+				<button
+					type="button"
+					className="problems-head-toggle"
+					onClick={onToggle}
+					aria-expanded={true}
+				>
+					<span className="problems-caret open" aria-hidden="true" />
+					<span className="problems-title">Problems</span>
+				</button>
 				<span className="problems-counts">
-					<span className="count error">{errors} errors</span>
+					<button
+						type="button"
+						className={
+							allowed.has(1)
+								? "problems-filter-option active"
+								: "problems-filter-option"
+						}
+						aria-pressed={allowed.has(1)}
+						onClick={(event) => {
+							event.stopPropagation();
+							toggleSeverity([1]);
+						}}
+					>
+						{errors} errors
+					</button>
 					<span className="sep">·</span>
-					<span className="count warning">{warnings} warnings</span>
+					<button
+						type="button"
+						className={
+							allowed.has(2)
+								? "problems-filter-option active"
+								: "problems-filter-option"
+						}
+						aria-pressed={allowed.has(2)}
+						onClick={(event) => {
+							event.stopPropagation();
+							toggleSeverity([2]);
+						}}
+					>
+						{warnings} warnings
+					</button>
 					{other > 0 ? (
 						<>
 							<span className="sep">·</span>
-							<span className="count">{other} info</span>
+							<button
+								type="button"
+								className={
+									allowed.has(3) || allowed.has(4)
+										? "problems-filter-option active"
+										: "problems-filter-option"
+								}
+								aria-pressed={allowed.has(3) || allowed.has(4)}
+								onClick={(event) => {
+									event.stopPropagation();
+									toggleSeverity([3, 4]);
+								}}
+							>
+								{other} info
+							</button>
 						</>
 					) : null}
+					<span className="sep">·</span>
+					<button
+						type="button"
+						className={
+							groupByFile ? "problems-filter-option active" : "problems-filter-option"
+						}
+						aria-pressed={groupByFile}
+						onClick={(event) => {
+							event.stopPropagation();
+							chooseGrouping(!groupByFile);
+						}}
+					>
+						group by file
+					</button>
 				</span>
-			</button>
+			</div>
 			{applied !== null ? <div className="problems-applied">Applied: {applied}</div> : null}
 			{menuError !== null ? <div className="problems-error">{menuError}</div> : null}
 			<div className="problems-body">
 				{files.length === 0 ? (
 					<p className="problems-empty">No problems</p>
-				) : (
-					files.map((file) => (
+				) : filteredFiles.length === 0 ? (
+					<p className="problems-empty">No problems match the filter</p>
+				) : groupByFile ? (
+					filteredFiles.map((file) => (
 						<div
 							key={file.path}
 							className={
@@ -252,11 +365,24 @@ export default function ProblemsPanel({
 											<button
 												type="button"
 												className="problem-fix"
-												onClick={() =>
-													void openMenu(file.path, line, character)
-												}
+												onClick={(event) => {
+													event.stopPropagation();
+													void openMenu(file.path, line, character);
+												}}
 											>
 												Fix
+											</button>
+											<button
+												type="button"
+												className="problems-file-copy"
+												onClick={(event) => {
+													event.stopPropagation();
+													void navigator.clipboard.writeText(
+														copyLine(file.path, diagnostic),
+													);
+												}}
+											>
+												Copy
 											</button>
 											{menuOpen ? (
 												<div className="problem-menu">
@@ -277,9 +403,10 @@ export default function ProblemsPanel({
 																onMouseEnter={() =>
 																	setMenuIndex(index)
 																}
-																onClick={() =>
-																	void applyAction(action)
-																}
+																onClick={(event) => {
+																	event.stopPropagation();
+																	void applyAction(action);
+																}}
 															>
 																{action.title}
 															</button>
@@ -293,6 +420,45 @@ export default function ProblemsPanel({
 							</ul>
 						</div>
 					))
+				) : (
+					<ul className="problems-list">
+						{flat.map((row) => {
+							const { line, character } = row.diagnostic.range.start;
+							return (
+								<li key={diagnosticKey(row.diagnostic)} className="problems-item">
+									<button
+										type="button"
+										className="problems-row"
+										title={row.diagnostic.message}
+										onClick={() => onSelect(row.path, line, character)}
+									>
+										<span
+											className={`problem-dot ${SEVERITY_CLASS[row.diagnostic.severity]}`}
+											aria-hidden="true"
+										/>
+										<span className="problem-pos">
+											{row.name} {line + 1}:{character + 1}
+										</span>
+										<span className="problem-message">
+											{row.diagnostic.message}
+										</span>
+									</button>
+									<button
+										type="button"
+										className="problems-file-copy"
+										onClick={(event) => {
+											event.stopPropagation();
+											void navigator.clipboard.writeText(
+												copyLine(row.path, row.diagnostic),
+											);
+										}}
+									>
+										Copy
+									</button>
+								</li>
+							);
+						})}
+					</ul>
 				)}
 			</div>
 		</section>
