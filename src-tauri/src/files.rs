@@ -9,13 +9,8 @@ use std::path::{Path, PathBuf};
 /// Cap on returned files; the UI filters what it receives.
 pub const MAX_FILES: usize = 20_000;
 
-/// Directories that are never descended into.
-const IGNORED_NAMES: [&str; 5] = ["target", "node_modules", "dist", ".git", ".quarry"];
-
-/// Whether `name` is one of the directories the walk skips.
-fn is_ignored(name: &str) -> bool {
-    IGNORED_NAMES.contains(&name)
-}
+/// Directories that are never descended into (shared with the rest of the crate).
+use crate::ignore;
 
 #[tauri::command]
 pub async fn list_files(root: String) -> Result<Vec<String>, String> {
@@ -64,7 +59,7 @@ fn walk(dir: &Path, files: &mut Vec<String>, cap: usize) {
         if metadata.is_dir() {
             let name = entry.file_name();
             let name = name.to_string_lossy();
-            if is_ignored(name.as_ref()) {
+            if ignore::is_dir(name.as_ref()) {
                 continue;
             }
             walk(&path, files, cap);
@@ -82,6 +77,7 @@ fn absolute_root(root: &str) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ignore;
     use std::env;
     use std::os::unix::fs::symlink;
     use std::path::PathBuf;
@@ -126,10 +122,10 @@ mod tests {
     #[test]
     fn ignored_set_covers_every_skipped_name() {
         for name in ["target", "node_modules", "dist", ".git", ".quarry"] {
-            assert!(is_ignored(name), "{name} should be ignored");
+            assert!(ignore::is_dir(name), "{name} should be ignored");
         }
-        assert!(!is_ignored("src"));
-        assert!(!is_ignored("lib"));
+        assert!(!ignore::is_dir("src"));
+        assert!(!ignore::is_dir("lib"));
     }
 
     #[test]

@@ -3,6 +3,7 @@ mod dap;
 mod files;
 mod format;
 mod git;
+mod ignore;
 mod launch;
 mod lsp;
 mod processes;

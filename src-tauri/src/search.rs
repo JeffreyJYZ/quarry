@@ -18,8 +18,7 @@ use std::time::Instant;
 /// Default cap on returned matches.
 pub const DEFAULT_MAX_RESULTS: u32 = 300;
 
-/// Directories that never belong in a text search: build output, dependencies and git internals.
-const EXCLUDES: [&str; 3] = ["target", "node_modules", ".git"];
+use crate::ignore;
 const PROGRAM: &str = "rg";
 const MISSING_PROGRAM: &str = "ripgrep (rg) is not installed: run `brew install ripgrep`";
 
@@ -131,8 +130,8 @@ fn search_command(
         command.arg("--fixed-strings");
     }
     command.arg("--no-heading").arg("--color=never");
-    for excluded in EXCLUDES {
-        command.arg("-g").arg(format!("!{excluded}"));
+    for excluded in ignore::ripgrep_excludes() {
+        command.arg("-g").arg(excluded);
     }
     command
         .arg("-e")
@@ -423,7 +422,11 @@ mod tests {
                 "-g",
                 "!node_modules",
                 "-g",
+                "!dist",
+                "-g",
                 "!.git",
+                "-g",
+                "!.quarry",
                 "-e",
                 "needle",
                 "/projects/demo",

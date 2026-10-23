@@ -22,9 +22,7 @@ pub const NEW_FILE_MODE: u32 = 0o644;
 /// Distinguishes concurrent writes of the same target inside one process.
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-/// macOS metadata, never useful in the tree.
-/// Noise the explorer never shows: build trees, dependency caches and editor bookkeeping.
-const IGNORED_NAMES: [&str; 5] = [".DS_Store", ".git", "node_modules", "target", "dist"];
+use crate::ignore;
 
 #[tauri::command]
 pub fn list_dir(path: String) -> Result<Vec<FileEntry>, String> {
@@ -41,7 +39,7 @@ pub fn list_dir(path: String) -> Result<Vec<FileEntry>, String> {
     for entry in read {
         let entry = entry.map_err(|error| format!("cannot list {path}: {error}"))?;
         let name = entry.file_name().to_string_lossy().into_owned();
-        if IGNORED_NAMES.contains(&name.as_str()) {
+        if ignore::is_dir(name.as_str()) || ignore::is_file(name.as_str()) {
             continue;
         }
 
