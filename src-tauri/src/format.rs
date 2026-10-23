@@ -555,7 +555,10 @@ mod tests {
     fn clang_format_argv_assumes_the_document_path() {
         let args = argv(Formatter::ClangFormat, "/projects/demo/src/main.cpp");
         assert_eq!(args[0], "-assume-filename=/projects/demo/src/main.cpp");
-        assert!(args[1].starts_with("-style="), "no style argument: {args:?}");
+        assert!(
+            args[1].starts_with("-style="),
+            "no style argument: {args:?}"
+        );
         // A space in the path stays inside one argument: no shell ever splits it.
         let spaced = argv(Formatter::ClangFormat, "/projects/my demo/main.c");
         assert_eq!(spaced[0], "-assume-filename=/projects/my demo/main.c");

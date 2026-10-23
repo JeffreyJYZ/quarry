@@ -34,9 +34,36 @@ pub struct Resolved {
     pub source: Source,
 }
 
-/// Find `name` on `PATH`, then through `xcrun`.
+/// Directories a GUI launch never inherits, checked after `PATH` and before `xcrun`.
+///
+/// A Finder-launched app gets launchd's `PATH`, which on this machine is empty: the rustup shims
+/// (`rust-analyzer`, `cargo`) and the Homebrew bin are invisible, so a Rust project opened from the
+/// Dock would silently have no language server and therefore no diagnostics.
+fn fallback_directories() -> Vec<PathBuf> {
+    let mut directories = vec![
+        PathBuf::from("/opt/homebrew/opt/rustup/bin"),
+        PathBuf::from("/opt/homebrew/bin"),
+        PathBuf::from("/usr/local/bin"),
+    ];
+    if let Some(home) = env::var_os("HOME") {
+        let home = PathBuf::from(home);
+        directories.push(home.join(".cargo").join("bin"));
+        directories.push(home.join(".local").join("bin"));
+    }
+    directories
+}
+
+/// Find `name` on `PATH`, then in the toolchain directories a GUI launch cannot see, then `xcrun`.
 pub fn resolve(name: &str) -> Option<Resolved> {
     if let Some(path) = on_path(name) {
+        return Some(Resolved {
+            name: name.to_string(),
+            path,
+            source: Source::Path,
+        });
+    }
+
+    if let Some(path) = on_path_in(&fallback_directories(), name) {
         return Some(Resolved {
             name: name.to_string(),
             path,
@@ -304,6 +331,30 @@ mod tests {
                 assert!(seen.insert(entry.clone()), "duplicate entry: {entry:?}");
             }
         });
+    }
+
+    #[test]
+    fn the_gui_fallback_list_covers_rustup_and_homebrew() {
+        let directories = super::fallback_directories();
+        assert!(
+            directories.contains(&std::path::PathBuf::from("/opt/homebrew/opt/rustup/bin")),
+            "rustup shims are missing from the fallback probe"
+        );
+        assert!(
+            directories.iter().any(|dir| dir.ends_with(".cargo/bin")),
+            "~/.cargo/bin is missing from the fallback probe"
+        );
+    }
+
+    #[test]
+    fn a_tool_only_in_a_fallback_directory_is_still_found() {
+        // The rustup shim directory is where a Dock-launched app has to look for rust-analyzer.
+        let shim = std::path::PathBuf::from("/opt/homebrew/opt/rustup/bin/rust-analyzer");
+        if !shim.exists() {
+            return;
+        }
+        let found = super::on_path_in(&super::fallback_directories(), "rust-analyzer");
+        assert_eq!(found, Some(shim));
     }
 
     #[test]

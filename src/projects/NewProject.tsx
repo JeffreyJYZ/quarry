@@ -11,11 +11,12 @@ export type NewProjectProps = {
 	onCreated: (root: string) => void;
 };
 
-type Kind = "rust-bin" | "rust-lib" | "cpp-cmake";
+type Kind = "rust-bin" | "rust-lib" | "c-cmake" | "cpp-cmake";
 
 const KINDS: { value: Kind; label: string; hint: string }[] = [
 	{ value: "rust-bin", label: "Rust binary", hint: "cargo run prints a greeting" },
 	{ value: "rust-lib", label: "Rust library", hint: "one function and one passing test" },
+	{ value: "c-cmake", label: "C (CMake)", hint: "CMakeLists plus src/main.c" },
 	{ value: "cpp-cmake", label: "C++ (CMake)", hint: "CMakeLists plus src/main.cpp" },
 ];
 

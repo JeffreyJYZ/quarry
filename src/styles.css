@@ -455,6 +455,8 @@ button.tree-note {
 	position: relative;
 	display: flex;
 	flex-direction: column;
+	/* The shell body is a flex row now, so the canvas has to claim the leftover width itself. */
+	flex: 1 1 auto;
 	min-width: 0;
 	min-height: 0;
 	overflow: hidden;

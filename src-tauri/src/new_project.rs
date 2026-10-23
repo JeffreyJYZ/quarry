@@ -47,10 +47,10 @@ pub fn create_project(parent: String, name: String, kind: String) -> Result<Proj
     }
 
     match kind.as_str() {
-        "rust-bin" | "rust-lib" | "cpp-cmake" => {}
+        "rust-bin" | "rust-lib" | "c-cmake" | "cpp-cmake" => {}
         _ => {
             return Err(format!(
-                "unknown project kind \"{kind}\"; accepted values: rust-bin, rust-lib, cpp-cmake."
+                "unknown project kind \"{kind}\"; accepted values: rust-bin, rust-lib, c-cmake, cpp-cmake."
             ));
         }
     }
@@ -80,6 +80,19 @@ pub fn create_project(parent: String, name: String, kind: String) -> Result<Proj
                 "pub fn add(a: usize, b: usize) -> usize {\n    a + b\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n\n    #[test]\n    fn it_works() {\n        assert_eq!(add(2, 2), 4);\n    }\n}\n",
             )?;
             write_file(&target, ".gitignore", "/target\n")?;
+        }
+        "c-cmake" => {
+            write_file(&target, "CMakeLists.txt", &c_cmake_lists(&trimmed_name))?;
+            fs::create_dir_all(target.join("src"))
+                .map_err(|e| format!("cannot create src: {e}"))?;
+            write_file(
+                &target,
+                "src/main.c",
+                &format!(
+                    "#include <stdio.h>\n\nint main(void) {{\n    printf(\"Hello from {trimmed_name}\\n\");\n    return 0;\n}}\n"
+                ),
+            )?;
+            write_file(&target, ".gitignore", "/build\n")?;
         }
         "cpp-cmake" => {
             write_file(&target, "CMakeLists.txt", &cpp_cmake_lists(&trimmed_name))?;
@@ -119,4 +132,133 @@ fn cpp_cmake_lists(name: &str) -> String {
     format!(
         "cmake_minimum_required(VERSION 3.20)\nproject({name} CXX)\n\nset(CMAKE_CXX_STANDARD 20)\nset(CMAKE_CXX_STANDARD_REQUIRED ON)\n\nadd_executable({name} src/main.cpp)\n"
     )
+}
+
+fn c_cmake_lists(name: &str) -> String {
+    format!(
+        "cmake_minimum_required(VERSION 3.20)\nproject({name} C)\n\nset(CMAKE_C_STANDARD 17)\nset(CMAKE_C_STANDARD_REQUIRED ON)\n\nadd_executable({name} src/main.c)\n"
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn scratch(label: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("quarry-new-project-{}-{label}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("creates the scratch directory");
+        dir
+    }
+
+    fn create(parent: &Path, name: &str, kind: &str) -> Result<ProjectInfo, String> {
+        create_project(
+            parent.display().to_string(),
+            name.to_string(),
+            kind.to_string(),
+        )
+    }
+
+    #[test]
+    fn every_kind_writes_its_files_and_is_detected() {
+        let cases = [
+            ("rust-bin", "src/main.rs", crate::types::ProjectKind::Cargo),
+            ("rust-lib", "src/lib.rs", crate::types::ProjectKind::Cargo),
+            ("c-cmake", "src/main.c", crate::types::ProjectKind::Cmake),
+            (
+                "cpp-cmake",
+                "src/main.cpp",
+                crate::types::ProjectKind::Cmake,
+            ),
+        ];
+        for (kind, entry, expected) in cases {
+            let parent = scratch(kind);
+            let info = create(&parent, "demo", kind).expect("creates the project");
+            assert_eq!(info.name, "demo", "{kind} name");
+            assert!(
+                Path::new(&info.root).join(entry).is_file(),
+                "{kind} did not write {entry}"
+            );
+            assert_eq!(info.kind, expected, "{kind} detected as the wrong kind");
+            if kind.ends_with("cmake") {
+                let manifest = fs::read_to_string(Path::new(&info.root).join("CMakeLists.txt"))
+                    .expect("reads");
+                let language = if kind == "c-cmake" { "C" } else { "CXX" };
+                assert!(
+                    manifest.contains(&format!("project(demo {language})")),
+                    "{kind} manifest: {manifest}"
+                );
+            }
+            let _ = fs::remove_dir_all(&parent);
+        }
+    }
+
+    #[test]
+    fn the_c_scaffold_is_plain_c() {
+        let parent = scratch("c-contents");
+        let info = create(&parent, "capp", "c-cmake").expect("creates the project");
+        let source = fs::read_to_string(Path::new(&info.root).join("src/main.c")).expect("reads");
+        assert!(source.contains("#include <stdio.h>"), "{source}");
+        assert!(source.contains("int main(void)"), "{source}");
+        assert!(
+            !source.contains("iostream"),
+            "C scaffold leaked C++: {source}"
+        );
+        let _ = fs::remove_dir_all(&parent);
+    }
+
+    #[test]
+    fn a_library_scaffold_carries_a_passing_test() {
+        let parent = scratch("lib-contents");
+        let info = create(&parent, "demo", "rust-lib").expect("creates the project");
+        let source = fs::read_to_string(Path::new(&info.root).join("src/lib.rs")).expect("reads");
+        assert!(source.contains("#[test]"), "{source}");
+        let _ = fs::remove_dir_all(&parent);
+    }
+
+    #[test]
+    fn bad_names_and_targets_are_refused() {
+        let parent = scratch("refusals");
+        assert!(
+            create(&parent, "  ", "rust-bin")
+                .unwrap_err()
+                .contains("empty")
+        );
+        assert!(
+            create(&parent, "a/b", "rust-bin")
+                .unwrap_err()
+                .contains("single path segment")
+        );
+        assert!(
+            create(&parent, "..", "rust-bin")
+                .unwrap_err()
+                .contains("single path segment")
+        );
+
+        fs::create_dir_all(parent.join("taken")).expect("creates the taken directory");
+        assert!(
+            create(&parent, "taken", "rust-bin")
+                .unwrap_err()
+                .contains("already exists")
+        );
+
+        assert!(
+            create(&parent, "demo", "kotlin")
+                .unwrap_err()
+                .contains("accepted values")
+        );
+        let _ = fs::remove_dir_all(&parent);
+    }
+
+    #[test]
+    fn a_relative_parent_is_refused() {
+        let error = create_project(
+            "relative/dir".to_string(),
+            "demo".to_string(),
+            "rust-bin".to_string(),
+        )
+        .unwrap_err();
+        assert!(error.contains("absolute"), "{error}");
+    }
 }

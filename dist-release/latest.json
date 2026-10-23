@@ -1,23 +1,23 @@
 {
-  "version": "0.1.0-alpha.4",
-  "notes": "- chore: release alphas locally, CI only for betas and stable\n- feat: show caret, language and indent in the bottom bar\n- chore: bump to 0.1.0-alpha.3\n- feat: organise imports on Ctrl Opt O\n- feat: go-to palettes, generate menu, and the CLion command keys\n- feat: adopt CLions macOS run and debug keybindings\n- fix: keep the caret the only bright mark in the editor",
-  "pub_date": "2026-10-23T08:41:45.017Z",
-  "platforms": {
-    "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSQjI0ZjlNYzhxb1hTUHcvZWhBcDVLMDNSeWM4eUVBaERQc2ZHUzlTaGRZWEZrbmxkckF6b1BhbWRxS2M0RXpvYlZtNFVxaUpJNDJ0QzhNby9oUm1EQmVzV1F6emVidEEwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNzQ0ODA0CWZpbGU6cXVhcnJ5LmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuMC1hbHBoYS40CmdwZWdmOURETzFyN1RralBjOTlBcmcwbEZ5VzdGSHdMbDNvbng0c1UyZnErVkJ3UGdpTGozSW1ZWDZQR203UG52TGh3cnVhdUVHSnFsNmt6eVVqMUJ3PT0K",
-      "url": "https://github.com/JeffreyJYZ/quarry/releases/download/quarry-alpha4/quarry.app.tar.gz"
-    },
-    "darwin-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSQjI0ZjlNYzhxb1hTUHcvZWhBcDVLMDNSeWM4eUVBaERQc2ZHUzlTaGRZWEZrbmxkckF6b1BhbWRxS2M0RXpvYlZtNFVxaUpJNDJ0QzhNby9oUm1EQmVzV1F6emVidEEwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNzQ0ODA0CWZpbGU6cXVhcnJ5LmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuMC1hbHBoYS40CmdwZWdmOURETzFyN1RralBjOTlBcmcwbEZ5VzdGSHdMbDNvbng0c1UyZnErVkJ3UGdpTGozSW1ZWDZQR203UG52TGh3cnVhdUVHSnFsNmt6eVVqMUJ3PT0K",
-      "url": "https://github.com/JeffreyJYZ/quarry/releases/download/quarry-alpha4/quarry.app.tar.gz"
-    },
-    "darwin-aarch64-app": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSQjI0ZjlNYzhxb1hTUHcvZWhBcDVLMDNSeWM4eUVBaERQc2ZHUzlTaGRZWEZrbmxkckF6b1BhbWRxS2M0RXpvYlZtNFVxaUpJNDJ0QzhNby9oUm1EQmVzV1F6emVidEEwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNzQ0ODA0CWZpbGU6cXVhcnJ5LmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuMC1hbHBoYS40CmdwZWdmOURETzFyN1RralBjOTlBcmcwbEZ5VzdGSHdMbDNvbng0c1UyZnErVkJ3UGdpTGozSW1ZWDZQR203UG52TGh3cnVhdUVHSnFsNmt6eVVqMUJ3PT0K",
-      "url": "https://github.com/JeffreyJYZ/quarry/releases/download/quarry-alpha4/quarry.app.tar.gz"
-    },
-    "darwin-x86_64-app": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSQjI0ZjlNYzhxb1hTUHcvZWhBcDVLMDNSeWM4eUVBaERQc2ZHUzlTaGRZWEZrbmxkckF6b1BhbWRxS2M0RXpvYlZtNFVxaUpJNDJ0QzhNby9oUm1EQmVzV1F6emVidEEwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNzQ0ODA0CWZpbGU6cXVhcnJ5LmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuMC1hbHBoYS40CmdwZWdmOURETzFyN1RralBjOTlBcmcwbEZ5VzdGSHdMbDNvbng0c1UyZnErVkJ3UGdpTGozSW1ZWDZQR203UG52TGh3cnVhdUVHSnFsNmt6eVVqMUJ3PT0K",
-      "url": "https://github.com/JeffreyJYZ/quarry/releases/download/quarry-alpha4/quarry.app.tar.gz"
-    }
-  }
+	"version": "0.1.0-alpha.4",
+	"notes": "- chore: release alphas locally, CI only for betas and stable\n- feat: show caret, language and indent in the bottom bar\n- chore: bump to 0.1.0-alpha.3\n- feat: organise imports on Ctrl Opt O\n- feat: go-to palettes, generate menu, and the CLion command keys\n- feat: adopt CLions macOS run and debug keybindings\n- fix: keep the caret the only bright mark in the editor",
+	"pub_date": "2026-10-23T08:41:45.017Z",
+	"platforms": {
+		"darwin-aarch64": {
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSQjI0ZjlNYzhxb1hTUHcvZWhBcDVLMDNSeWM4eUVBaERQc2ZHUzlTaGRZWEZrbmxkckF6b1BhbWRxS2M0RXpvYlZtNFVxaUpJNDJ0QzhNby9oUm1EQmVzV1F6emVidEEwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNzQ0ODA0CWZpbGU6cXVhcnJ5LmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuMC1hbHBoYS40CmdwZWdmOURETzFyN1RralBjOTlBcmcwbEZ5VzdGSHdMbDNvbng0c1UyZnErVkJ3UGdpTGozSW1ZWDZQR203UG52TGh3cnVhdUVHSnFsNmt6eVVqMUJ3PT0K",
+			"url": "https://github.com/JeffreyJYZ/quarry/releases/download/quarry-alpha4/quarry.app.tar.gz"
+		},
+		"darwin-x86_64": {
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSQjI0ZjlNYzhxb1hTUHcvZWhBcDVLMDNSeWM4eUVBaERQc2ZHUzlTaGRZWEZrbmxkckF6b1BhbWRxS2M0RXpvYlZtNFVxaUpJNDJ0QzhNby9oUm1EQmVzV1F6emVidEEwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNzQ0ODA0CWZpbGU6cXVhcnJ5LmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuMC1hbHBoYS40CmdwZWdmOURETzFyN1RralBjOTlBcmcwbEZ5VzdGSHdMbDNvbng0c1UyZnErVkJ3UGdpTGozSW1ZWDZQR203UG52TGh3cnVhdUVHSnFsNmt6eVVqMUJ3PT0K",
+			"url": "https://github.com/JeffreyJYZ/quarry/releases/download/quarry-alpha4/quarry.app.tar.gz"
+		},
+		"darwin-aarch64-app": {
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSQjI0ZjlNYzhxb1hTUHcvZWhBcDVLMDNSeWM4eUVBaERQc2ZHUzlTaGRZWEZrbmxkckF6b1BhbWRxS2M0RXpvYlZtNFVxaUpJNDJ0QzhNby9oUm1EQmVzV1F6emVidEEwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNzQ0ODA0CWZpbGU6cXVhcnJ5LmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuMC1hbHBoYS40CmdwZWdmOURETzFyN1RralBjOTlBcmcwbEZ5VzdGSHdMbDNvbng0c1UyZnErVkJ3UGdpTGozSW1ZWDZQR203UG52TGh3cnVhdUVHSnFsNmt6eVVqMUJ3PT0K",
+			"url": "https://github.com/JeffreyJYZ/quarry/releases/download/quarry-alpha4/quarry.app.tar.gz"
+		},
+		"darwin-x86_64-app": {
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSQjI0ZjlNYzhxb1hTUHcvZWhBcDVLMDNSeWM4eUVBaERQc2ZHUzlTaGRZWEZrbmxkckF6b1BhbWRxS2M0RXpvYlZtNFVxaUpJNDJ0QzhNby9oUm1EQmVzV1F6emVidEEwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNzQ0ODA0CWZpbGU6cXVhcnJ5LmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuMC1hbHBoYS40CmdwZWdmOURETzFyN1RralBjOTlBcmcwbEZ5VzdGSHdMbDNvbng0c1UyZnErVkJ3UGdpTGozSW1ZWDZQR203UG52TGh3cnVhdUVHSnFsNmt6eVVqMUJ3PT0K",
+			"url": "https://github.com/JeffreyJYZ/quarry/releases/download/quarry-alpha4/quarry.app.tar.gz"
+		}
+	}
 }
