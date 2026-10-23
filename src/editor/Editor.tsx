@@ -18,7 +18,7 @@ import {
 	syntaxHighlighting,
 } from "@codemirror/language";
 import { lintGutter, setDiagnostics } from "@codemirror/lint";
-import { Compartment, EditorState } from "@codemirror/state";
+import { Compartment, EditorSelection, EditorState } from "@codemirror/state";
 import {
 	drawSelection,
 	EditorView,
@@ -36,7 +36,7 @@ import { breakpointGutter, normalizeLines, setBreakpoints } from "@/editor/break
 import { lintSignature, toLintDiagnostics } from "@/editor/diagnostics";
 import { inlayHintsField, setInlayHints } from "@/editor/inlayHints";
 import { languageForPath } from "@/editor/languages";
-import { occurrencesField, setOccurrences } from "@/editor/occurrences";
+import { occurrenceStarts, occurrencesField, setOccurrences } from "@/editor/occurrences";
 import {
 	emptySearchState,
 	type SearchMatch,
@@ -284,6 +284,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 	const occSeqRef = useRef(0);
 	const occTimerRef = useRef<number | null>(null);
 	const occPosRef = useRef<number | null>(null);
+	const occurrenceHistoryRef = useRef<EditorSelection[]>([]);
 
 	const recompute = () => {
 		const view = viewRef.current;
@@ -878,13 +879,15 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 							key: "Mod-d",
 							run: (view) => {
 								const state = view.state;
-								const sel = state.selection.main;
-								let from = sel.from;
-								let to = sel.to;
-								if (from === to) {
-									const line = state.doc.lineAt(from);
+								const sel = state.selection;
+								const main = sel.main;
+								let word = "";
+								let from = main.from;
+								let to = main.to;
+								if (main.empty) {
+									const line = state.doc.lineAt(main.head);
 									const text = line.text;
-									const rel = from - line.from;
+									const rel = main.head - line.from;
 									let start = rel;
 									let end = rel;
 									while (start > 0 && /[A-Za-z0-9_]/.test(text[start - 1]))
@@ -894,17 +897,83 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 									from = line.from + start;
 									to = line.from + end;
 									if (from === to) return false;
+									occurrenceHistoryRef.current.push(sel);
 									view.dispatch({ selection: { anchor: from, head: to } });
+									return true;
 								}
-								const word = state.doc.sliceString(from, to);
+								word = state.doc.sliceString(from, to);
 								if (word === "") return false;
 								const doc = state.doc.toString();
-								let next = doc.indexOf(word, to);
-								if (next === -1) next = doc.indexOf(word, 0);
-								if (next === -1 || next === from) return false;
+								const selected = new Set(sel.ranges.map((r) => r.from));
+								const searchStart = Math.max(...sel.ranges.map((r) => r.to));
+								let pos = doc.indexOf(word, searchStart);
+								if (pos === -1) pos = doc.indexOf(word, 0);
+								while (pos !== -1 && selected.has(pos)) {
+									const next = doc.indexOf(word, pos + 1);
+									if (next === -1 || next === pos) {
+										pos = doc.indexOf(word, 0);
+										if (selected.has(pos)) pos = -1;
+										break;
+									}
+									pos = next;
+								}
+								if (pos === -1 || selected.has(pos)) return false;
+								occurrenceHistoryRef.current.push(sel);
+								const ranges = [
+									...sel.ranges,
+									EditorSelection.range(pos, pos + word.length),
+								];
 								view.dispatch({
-									selection: { anchor: next, head: next + word.length },
+									selection: EditorSelection.create(ranges, sel.mainIndex),
 								});
+								return true;
+							},
+						},
+						{
+							key: "Mod-Shift-l",
+							run: (view) => {
+								const state = view.state;
+								const sel = state.selection;
+								const main = sel.main;
+								let from = main.from;
+								let to = main.to;
+								let word = "";
+								if (main.empty) {
+									const line = state.doc.lineAt(main.head);
+									const text = line.text;
+									const rel = main.head - line.from;
+									let start = rel;
+									let end = rel;
+									while (start > 0 && /[A-Za-z0-9_]/.test(text[start - 1]))
+										start -= 1;
+									while (end < text.length && /[A-Za-z0-9_]/.test(text[end]))
+										end += 1;
+									from = line.from + start;
+									to = line.from + end;
+									if (from === to) return false;
+									word = state.doc.sliceString(from, to);
+								} else {
+									word = state.doc.sliceString(from, to);
+								}
+								if (word === "") return false;
+								const doc = state.doc.toString();
+								const positions = occurrenceStarts(doc, word);
+								if (positions.length === 0) return false;
+								occurrenceHistoryRef.current.push(sel);
+								const ranges = positions.map((p) =>
+									EditorSelection.range(p, p + word.length),
+								);
+								view.dispatch({ selection: EditorSelection.create(ranges, 0) });
+								return true;
+							},
+						},
+						{
+							key: "Mod-u",
+							run: (view) => {
+								const stack = occurrenceHistoryRef.current;
+								const previous = stack.pop();
+								if (previous === undefined) return false;
+								view.dispatch({ selection: previous });
 								return true;
 							},
 						},

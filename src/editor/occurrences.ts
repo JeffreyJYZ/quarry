@@ -5,6 +5,20 @@ export type OccurrenceItem = { from: number; to: number; strong: boolean };
 
 export const setOccurrences = StateEffect.define<OccurrenceItem[] | null>();
 
+/** Return the start offsets of every non-overlapping occurrence of `word` in `text`. */
+export function occurrenceStarts(text: string, word: string): number[] {
+	const result: number[] = [];
+	if (word === "") return result;
+	let index = 0;
+	while (true) {
+		const found = text.indexOf(word, index);
+		if (found === -1) break;
+		result.push(found);
+		index = found + word.length;
+	}
+	return result;
+}
+
 export const occurrencesField = StateField.define<ReturnType<typeof Decoration.set>>({
 	create() {
 		return Decoration.none;

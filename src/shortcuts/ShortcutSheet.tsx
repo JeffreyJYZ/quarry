@@ -15,10 +15,29 @@ export type ShortcutSheetProps = {
 	onClose: () => void;
 };
 
-const GROUPS: ShortcutGroup[] = [];
+const GROUPS: ShortcutGroup[] = [
+	{
+		title: "Editor",
+		entries: [
+			{ keys: ["Cmd", "D"], action: "Select next occurrence" },
+			{ keys: ["Cmd", "Shift", "L"], action: "Select all occurrences" },
+			{ keys: ["Cmd", "U"], action: "Undo last occurrence selection" },
+		],
+	},
+];
 
 export default function ShortcutSheet({ groups, onClose }: ShortcutSheetProps) {
 	const containerRef = useRef<HTMLDivElement | null>(null);
+	const mergedGroups: ShortcutGroup[] = groups.some((group) => group.title === "Editing")
+		? groups.map((group) =>
+				group.title === "Editing"
+					? {
+							...group,
+							entries: [...group.entries, ...GROUPS.flatMap((g) => g.entries)],
+						}
+					: group,
+			)
+		: [...groups, ...GROUPS];
 	const previousFocus = useRef<HTMLElement | null>(null);
 
 	useEffect(() => {
@@ -67,7 +86,7 @@ export default function ShortcutSheet({ groups, onClose }: ShortcutSheetProps) {
 					<span className="label">shortcuts</span>
 				</div>
 				<div className="shortcut-body">
-					{groups.map((group) => (
+					{mergedGroups.map((group) => (
 						<section className="shortcut-group" key={group.title}>
 							<h2 className="shortcut-group-title">{group.title}</h2>
 							<ul className="shortcut-list">
