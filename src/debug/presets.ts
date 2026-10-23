@@ -1,3 +1,6 @@
+import type { LaunchPreset } from "@/project/api";
+import { splitArgs } from "@/run/splitArgs";
+
 export const PRESET_FIELDS = [
 	"name",
 	"program",
@@ -8,34 +11,52 @@ export const PRESET_FIELDS = [
 	"initCommands",
 ] as const;
 
+/**
+ * The editor's text fields plus the two fields it shows no control for. `build` and `initCommands`
+ * ride along untouched so saving the editor cannot drop them: `initCommands` carries the
+ * `lldb_lookup.py` import that makes Rust `Vec`/`String` pretty-print.
+ */
 export type DraftPreset = {
 	name: string;
 	program: string;
 	args: string;
 	cwd: string;
+	build: string | null;
 	stopOnEntry: boolean;
+	initCommands: string[];
 };
 
-export function splitArgs(input: string): string[] {
-	return input
-		.trim()
-		.split(/\s+/)
-		.filter((part) => part.length > 0);
+/** Quote only what would otherwise split or vanish, so the display round trips through `splitArgs`. */
+function quoteArg(arg: string): string {
+	return arg === "" || /\s/.test(arg) ? `"${arg}"` : arg;
 }
 
+/** The display inverse of `splitArgs`: an argv array as the editor's single args line. */
 export function joinArgs(args: readonly string[]): string {
-	return args.join(" ");
+	return args.map(quoteArg).join(" ");
 }
 
-export function toLaunchPreset(draft: DraftPreset) {
+export function toDraftPreset(preset: LaunchPreset): DraftPreset {
+	return {
+		name: preset.name,
+		program: preset.program ?? "",
+		args: joinArgs(preset.args),
+		cwd: preset.cwd ?? "",
+		build: preset.build,
+		stopOnEntry: preset.stopOnEntry,
+		initCommands: [...preset.initCommands],
+	};
+}
+
+export function toLaunchPreset(draft: DraftPreset): LaunchPreset {
 	return {
 		name: draft.name.trim(),
 		program: draft.program.trim() === "" ? null : draft.program.trim(),
 		args: splitArgs(draft.args),
 		cwd: draft.cwd.trim() === "" ? null : draft.cwd.trim(),
-		build: null,
+		build: draft.build,
 		stopOnEntry: draft.stopOnEntry,
-		initCommands: [],
+		initCommands: [...draft.initCommands],
 	};
 }
 

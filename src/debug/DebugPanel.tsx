@@ -3,7 +3,12 @@ import BreakpointItem from "@/debug/BreakpointItem";
 import DisasmPane from "@/debug/memory/DisasmPane";
 import MemoryPane from "@/debug/memory/MemoryPane";
 import ProcessPicker from "@/debug/ProcessPicker";
-import { type DraftPreset, joinArgs, toLaunchPreset, validateLaunchFile } from "@/debug/presets";
+import {
+	type DraftPreset,
+	toDraftPreset,
+	toLaunchPreset,
+	validateLaunchFile,
+} from "@/debug/presets";
 import type { DebugController, VariableRow } from "@/debug/session";
 import { pinKey } from "@/debug/watch";
 import { fileName } from "@/problems/model";
@@ -250,15 +255,7 @@ export default function DebugPanel({
 	const [discardConfirm, setDiscardConfirm] = useState(false);
 
 	function openEditor() {
-		setDrafts(
-			debug.presets.map((preset) => ({
-				name: preset.name,
-				program: preset.program ?? "",
-				args: joinArgs(preset.args),
-				cwd: preset.cwd ?? "",
-				stopOnEntry: preset.stopOnEntry,
-			})),
-		);
+		setDrafts(debug.presets.map(toDraftPreset));
 		setSaveError(null);
 		setDiscardConfirm(false);
 		setEditingPresets(true);
@@ -534,7 +531,9 @@ export default function DebugPanel({
 										program: "",
 										args: "",
 										cwd: "",
+										build: null,
 										stopOnEntry: false,
+										initCommands: [],
 									},
 								])
 							}
