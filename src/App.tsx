@@ -44,6 +44,7 @@ import {
 	gitBlame,
 	gitStatus,
 	type Location,
+	lspCodeActions,
 	onRunExited,
 	onRunOutput,
 	openProject,
@@ -1706,6 +1707,11 @@ export default function App() {
 				if (activePath !== null) setGenerateOpen(true);
 				return;
 			}
+			if (event.ctrlKey && event.altKey && !event.metaKey && key === "o") {
+				event.preventDefault();
+				organizeRef.current();
+				return;
+			}
 			if (mod && !event.altKey && key === "1") {
 				event.preventDefault();
 				setRailCollapsed((current) => !current);
@@ -1731,6 +1737,9 @@ export default function App() {
 		return () => window.removeEventListener("keydown", onKeyDown);
 	}, [activePath, cursor, debug, handleRun, handleStop, root, runId, toggleBreakpoint]);
 
+	/** The key handler runs before the callback exists, so it reaches it through a ref. */
+	const organizeRef = useRef<() => void>(() => {});
+
 	/** Applies one Generate item to the active buffer; the editor syncs from its value prop. */
 	const applyGenerate = useCallback(
 		(item: GenerateItem) => {
@@ -1752,6 +1761,36 @@ export default function App() {
 		},
 		[activePath, cursor],
 	);
+
+	/**
+	 * Organise imports, the way CLion's Ctrl Opt O does it: ask the server for code actions at the
+	 * top of the file and apply the first one the server marks as an import organiser. Servers that
+	 * do not implement it answer with nothing, which is reported rather than silently ignored.
+	 */
+	const organizeImports = useCallback(async () => {
+		const currentRoot = project?.root ?? null;
+		const path = activePath;
+		if (currentRoot === null || path === null) return;
+		setFormatting(true);
+		try {
+			const actions = await lspCodeActions(currentRoot, path, 0, 0);
+			const organize = actions.find((action) =>
+				(action.kind ?? "").startsWith("source.organizeImports"),
+			);
+			if (organize === undefined) {
+				setNotice("This language server has no organise-imports action");
+				return;
+			}
+			handleApplyEdits(organize.edits);
+			setNotice(organize.title);
+		} catch (error) {
+			setNotice(describeError(error));
+		} finally {
+			setFormatting(false);
+		}
+	}, [activePath, handleApplyEdits, project]);
+
+	organizeRef.current = () => void organizeImports();
 
 	return (
 		<div className="shell">
