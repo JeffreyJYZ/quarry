@@ -17,6 +17,8 @@ export type StatusBarProps = {
 	language?: string | null;
 	/** Indent width the editor is using. */
 	tabSize?: number;
+	/** Language server name once it is up, "starting" while it comes up, "unavailable" when it failed. */
+	server?: string | null;
 	onOpenSettings: () => void;
 };
 
@@ -37,6 +39,7 @@ export default function StatusBar({
 	caret = null,
 	language = null,
 	tabSize = 4,
+	server = null,
 	onOpenSettings,
 }: StatusBarProps) {
 	const gitSegment =
@@ -78,6 +81,11 @@ export default function StatusBar({
 				) : null}
 			</span>
 			<span className="status-right">
+				{server === null ? null : (
+					<span className="status-server" title="Language server">
+						{server}
+					</span>
+				)}
 				{caret === null ? null : (
 					<span className="status-caret" title="Caret position">
 						{caret.line}:{caret.column}

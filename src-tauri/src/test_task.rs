@@ -12,7 +12,7 @@
 use crate::project;
 use crate::types::{ProjectKind, TestItem, TestReport};
 use std::io::{BufRead, BufReader, Read};
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::{ExitStatus, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -147,7 +147,7 @@ fn capture(
     timeout: Duration,
 ) -> Result<Captured, String> {
     let program = cargo_program();
-    let mut child = Command::new(&program)
+    let mut child = crate::resolve::command(&program)?
         .current_dir(build_root)
         .args(args)
         .stdin(Stdio::null())

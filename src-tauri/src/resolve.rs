@@ -82,6 +82,20 @@ pub fn resolve(name: &str) -> Option<Resolved> {
     None
 }
 
+/// A `Command` for a tool, found the same way, with a `PATH` a child can actually use.
+///
+/// `Command::new("cargo")` fails with `os error 2` in a Dock launch, because the process inherits
+/// launchd's empty `PATH`; resolving the binary and handing the child the toolchain directories fixes
+/// both halves of that: the spawn finds the program, and the program finds its own tools.
+pub fn command(program: &str) -> Result<std::process::Command, String> {
+    let resolved = resolve(program).ok_or_else(|| {
+        format!("{program} was not found on PATH, in the toolchain directories, or through xcrun")
+    })?;
+    let mut command = std::process::Command::new(&resolved.path);
+    command.env("PATH", child_path(&resolved.path));
+    Ok(command)
+}
+
 /// Walk `PATH` by hand rather than shelling out, so a directory is never interpreted or expanded.
 /// The first entry that holds an executable file wins.
 pub fn on_path(name: &str) -> Option<PathBuf> {

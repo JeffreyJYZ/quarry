@@ -2398,6 +2398,13 @@ export default function App() {
 				}
 				language={languageLabel(activePath)}
 				tabSize={effective.editorTabSize}
+				server={
+					root === null
+						? null
+						: lspStatus === undefined || lspStatus === null
+							? "lsp starting"
+							: lspStatus.server
+				}
 				onOpenSettings={() => setSettingsOpen(true)}
 			/>
 			{settingsOpen ? (

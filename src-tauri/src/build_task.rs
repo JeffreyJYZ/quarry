@@ -112,7 +112,7 @@ fn run_build(build_root: &str, release: bool) -> Result<BuildReport, String> {
     let started = Instant::now();
     let program = cargo_program();
 
-    let mut command = Command::new(&program);
+    let mut command = crate::resolve::command(&program)?;
     command
         .current_dir(build_root)
         .arg("build")
@@ -426,7 +426,7 @@ struct CmakeOutcome {
 
 /// Runs cmake with an argv whose first element is the program name.
 fn run_cmake(argv: &[String], build_root: &str) -> Result<CmakeOutcome, String> {
-    let mut command = Command::new(CMAKE_PROGRAM);
+    let mut command = crate::resolve::command(CMAKE_PROGRAM)?;
     command.args(&argv[1..]).current_dir(build_root);
 
     let output = command
