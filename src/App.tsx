@@ -860,7 +860,7 @@ export default function App() {
 
 	const reportNotice = useCallback((message: string) => setNotice(message), []);
 	// The hook owns the server lifecycle and reports its own failures; the bar no longer shows it.
-	useLspServer(root, reportNotice);
+	const lspStatus = useLspServer(root, reportNotice);
 	const debug = useDebugSession(root, buildProfile);
 
 	/* Breakpoints live in the debug session, keyed by absolute path, so a tab switch or a gutter
@@ -899,6 +899,7 @@ export default function App() {
 		path: active?.path ?? null,
 		text: active?.text ?? "",
 		report: reportNotice,
+		ready: lspStatus !== null,
 	});
 
 	const diagnostics = useMemo(

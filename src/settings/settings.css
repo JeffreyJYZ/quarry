@@ -222,3 +222,8 @@
 	border-top: 1px solid var(--line);
 	background: var(--rail);
 }
+
+.settings-actions {
+	display: inline-flex;
+	gap: 8px;
+}

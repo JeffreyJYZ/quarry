@@ -59,19 +59,21 @@ export type DocumentSyncOptions = {
 	path: string | null;
 	text: string;
 	report: (message: string) => void;
+	/** False until the server for this root has started; opening a document before that has no session. */
+	ready: boolean;
 };
 
 /**
  * Tell the server which document is open, push full text after a quiet period, and close the
  * document when its tab goes away. Every rejection is reported as one line, never thrown.
  */
-export function useDocumentSync({ root, path, text, report }: DocumentSyncOptions): void {
+export function useDocumentSync({ root, path, text, report, ready }: DocumentSyncOptions): void {
 	const latest = useRef({ text, report });
 	latest.current = { text, report };
 	const opened = useRef<{ root: string; path: string; text: string } | null>(null);
 
 	useEffect(() => {
-		if (root === null || path === null) {
+		if (root === null || path === null || !ready) {
 			return;
 		}
 		const initial = latest.current.text;
@@ -103,7 +105,7 @@ export function useDocumentSync({ root, path, text, report }: DocumentSyncOption
 				latest.current.report(`Close document: ${describeError(error)}`);
 			});
 		};
-	}, [root, path]);
+	}, [root, path, ready]);
 
 	useEffect(() => {
 		if (root === null || path === null) {

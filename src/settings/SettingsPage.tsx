@@ -1,4 +1,6 @@
 import { type JSX, useEffect, useRef, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
+import { checkForUpdates, installNow, useUpdates } from "@/updates/store";
 import {
 	BUILD_PROFILES,
 	type BuildProfile,
@@ -129,6 +131,12 @@ export default function SettingsPage({
 	initialTab = "user",
 }: SettingsPageProps): JSX.Element | null {
 	const [tab, setTab] = useState<Tab>(initialTab);
+	const updates = useUpdates();
+	const [version, setVersion] = useState("");
+
+	useEffect(() => {
+		void getVersion().then(setVersion, () => setVersion(""));
+	}, []);
 	const panelRef = useRef<HTMLDivElement>(null);
 	const effective = effectivePreferences(user, project);
 	const projectEmpty = project === null || projectSettingsAreEmpty(project);
@@ -292,6 +300,47 @@ export default function SettingsPage({
 								</div>
 							</section>
 
+							<section className="settings-section">
+								<h3 className="settings-heading">Updates</h3>
+								<div className="settings-row">
+									<span>
+										{version === "" ? "Version unknown" : `Version ${version}`}
+									</span>
+									<div className="settings-actions">
+										{updates.offer?.kind === "updater" ? (
+											<button
+												type="button"
+												className="button"
+												disabled={updates.phase === "downloading"}
+												onClick={() => void installNow()}
+											>
+												{updates.phase === "downloading"
+													? `Installing ${updates.progress ?? 0}%`
+													: `Install ${updates.offer.version}`}
+											</button>
+										) : null}
+										<button
+											type="button"
+											className="button"
+											disabled={updates.phase === "checking"}
+											onClick={() => void checkForUpdates()}
+										>
+											{updates.phase === "checking"
+												? "Checking…"
+												: "Check for updates"}
+										</button>
+									</div>
+								</div>
+								<p className="settings-hint">
+									{updates.phase === "failed" && updates.message !== null
+										? `Update check failed: ${updates.message}`
+										: updates.phase === "current"
+											? "This build is the latest published version."
+											: updates.offer !== null
+												? `${updates.offer.version} is available.`
+												: "Checks run at launch; this button checks now."}
+								</p>
+							</section>
 							<section className="settings-section">
 								<h3 className="settings-heading">Panels</h3>
 								<div className="settings-row">
