@@ -6,6 +6,7 @@ import {
 	buildRows,
 	CHUNK_BYTES,
 	formatAddress,
+	formatHexText,
 	formatRowAddress,
 	hexByte,
 	hexValue,
@@ -66,8 +67,31 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 	const [rangeAnchor, setRangeAnchor] = useState<bigint | null>(null);
 	const [rangeEnd, setRangeEnd] = useState<bigint | null>(null);
 	const [rangeInput, setRangeInput] = useState("");
+	const [history, setHistory] = useState<bigint[]>([]);
+	const [historyIndex, setHistoryIndex] = useState(-1);
+	const [copied, setCopied] = useState<string | null>(null);
+	const copiedTimer = useRef<number | null>(null);
 
 	const pageSize = request?.size ?? DEFAULT_PAGE;
+
+	const recordVisit = useCallback(
+		(next: bigint) => {
+			setHistory((previous) => {
+				const base = previous.slice(0, historyIndex + 1);
+				if (base.length > 0 && base[base.length - 1] === next) {
+					return previous;
+				}
+				const nextHistory = [...base, next];
+				const sliced =
+					nextHistory.length > 20
+						? nextHistory.slice(nextHistory.length - 20)
+						: nextHistory;
+				setHistoryIndex(sliced.length - 1);
+				return sliced;
+			});
+		},
+		[historyIndex],
+	);
 
 	// Follow the selected frame while the toggle is on; typing switches it off so a pinned address
 	// survives the next stop.
@@ -85,9 +109,10 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 			if (previous !== null && previous.start === next) {
 				return previous;
 			}
+			recordVisit(next);
 			return { start: next, size: previous?.size ?? DEFAULT_PAGE, serial: 0 };
 		});
-	}, [address, followed]);
+	}, [address, followed, recordVisit]);
 
 	useEffect(() => {
 		if (request === null) {
@@ -152,6 +177,7 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 		}
 		setError(null);
 		setSelected(null);
+		recordVisit(next);
 		setRequest({ start: next, size: pageSize, serial: (request?.serial ?? 0) + 1 });
 	};
 
@@ -217,6 +243,69 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 		} catch (failure) {
 			setError(describeError(failure));
 			setEditing(null);
+		}
+	};
+
+	const goBack = () => {
+		if (historyIndex <= 0) {
+			return;
+		}
+		const nextIndex = historyIndex - 1;
+		const next = history[nextIndex];
+		setHistoryIndex(nextIndex);
+		setInput(formatAddress(next));
+		setSelected(null);
+		setError(null);
+		setRequest((previous) => ({
+			start: next,
+			size: previous?.size ?? DEFAULT_PAGE,
+			serial: (previous?.serial ?? 0) + 1,
+		}));
+	};
+
+	const goForward = () => {
+		if (historyIndex >= history.length - 1) {
+			return;
+		}
+		const nextIndex = historyIndex + 1;
+		const next = history[nextIndex];
+		setHistoryIndex(nextIndex);
+		setInput(formatAddress(next));
+		setSelected(null);
+		setError(null);
+		setRequest((previous) => ({
+			start: next,
+			size: previous?.size ?? DEFAULT_PAGE,
+			serial: (previous?.serial ?? 0) + 1,
+		}));
+	};
+
+	const flashCopied = (text: string) => {
+		setCopied(text);
+		if (copiedTimer.current !== null) {
+			window.clearTimeout(copiedTimer.current);
+		}
+		copiedTimer.current = window.setTimeout(() => setCopied(null), 2000);
+	};
+
+	const copyHex = async () => {
+		if (loaded === null) {
+			return;
+		}
+		try {
+			await navigator.clipboard.writeText(formatHexText(loaded.base, loaded.bytes));
+		} catch (failure) {
+			setError(describeError(failure));
+		}
+	};
+
+	const copyAddress = async (target: bigint) => {
+		const text = formatAddress(target);
+		try {
+			await navigator.clipboard.writeText(text);
+			flashCopied(text);
+		} catch (failure) {
+			setError(describeError(failure));
 		}
 	};
 
@@ -327,6 +416,25 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 				<button type="button" className="button" onClick={commit}>
 					Refresh
 				</button>
+				<button type="button" className="button" onClick={() => void copyHex()}>
+					Copy
+				</button>
+				<button
+					type="button"
+					className="button"
+					disabled={historyIndex <= 0}
+					onClick={goBack}
+				>
+					Back
+				</button>
+				<button
+					type="button"
+					className="button"
+					disabled={historyIndex >= history.length - 1}
+					onClick={goForward}
+				>
+					Forward
+				</button>
 				<button
 					type="button"
 					className={followed ? "button active" : "button"}
@@ -353,6 +461,7 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 				{busy && <span className="memory-muted memory-head-note">reading</span>}
 			</div>
 			{error !== null && <p className="memory-error">{error}</p>}
+			{copied !== null && <p className="memory-muted">{`Copied ${copied}`}</p>}
 			{request === null ? (
 				<p className="memory-empty">No memory address selected</p>
 			) : loaded === null ? (
@@ -367,9 +476,13 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 									className={unreadable ? "memory-row unreadable" : "memory-row"}
 									key={row.address.toString(16)}
 								>
-									<span className="memory-addr">
+									<button
+										type="button"
+										className="memory-addr"
+										onClick={() => void copyAddress(row.address)}
+									>
 										{formatRowAddress(row.address, row.digits)}
-									</span>
+									</button>
 									{unreadable ? (
 										<span className="memory-band">unmapped</span>
 									) : (

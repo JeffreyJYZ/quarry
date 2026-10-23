@@ -125,3 +125,14 @@ export function interpretAt(bytes: Array<number | null>, offset: number): Interp
 		return { width, value, partial };
 	});
 }
+
+/** Render loaded bytes as hex text: 16 bytes per line, address-prefixed, matching the pane. */
+export function formatHexText(base: bigint, bytes: Array<number | null>): string {
+	const rows = buildRows(base, bytes);
+	return rows
+		.map(
+			(row) =>
+				`${formatRowAddress(row.address, row.digits)}  ${row.bytes.map(hexByte).join(" ")}`,
+		)
+		.join("\n");
+}

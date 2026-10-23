@@ -3,6 +3,7 @@ import {
 	asciiByte,
 	buildRows,
 	formatAddress,
+	formatHexText,
 	formatRowAddress,
 	hexByte,
 	hexValue,
@@ -162,5 +163,11 @@ describe("interpretAt", () => {
 		const bytes: Array<number | null> = [0xaa, null];
 		const r = interpretAt(bytes, 0);
 		expect(r[1].partial).toBe(true);
+	});
+});
+
+describe("formatHexText", () => {
+	test("three bytes at 0x1000", () => {
+		expect(formatHexText(0x1000n, [1, 2, 3])).toBe("0x00001000  01 02 03");
 	});
 });
