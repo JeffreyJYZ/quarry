@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { readSettings, writeSettings } from "@/project/api";
+import { removeRecentRoot } from "@/projects/recent";
 
 type Props = {
 	roots: string[];
@@ -17,10 +19,16 @@ function splitPath(path: string): { name: string; parent: string } {
 }
 
 export default function RecentProjects({ roots, current, opening, onOpen }: Props) {
+	const [items, setItems] = useState<string[]>(roots);
 	const [open, setOpen] = useState(false);
 	const [highlight, setHighlight] = useState(0);
+	const [error, setError] = useState<string | null>(null);
 	const triggerRef = useRef<HTMLButtonElement | null>(null);
 	const listRef = useRef<HTMLDivElement | null>(null);
+
+	useEffect(() => {
+		setItems(roots);
+	}, [roots]);
 
 	useEffect(() => {
 		if (!open) return;
@@ -39,15 +47,45 @@ export default function RecentProjects({ roots, current, opening, onOpen }: Prop
 		triggerRef.current?.focus();
 	}, []);
 
+	const persist = useCallback(async (next: string[]) => {
+		try {
+			const settings = await readSettings();
+			await writeSettings({ ...settings, recentRoots: next });
+		} catch (caught) {
+			setError(caught instanceof Error ? caught.message : String(caught));
+		}
+	}, []);
+
+	const handleRemove = useCallback(
+		async (event: React.MouseEvent, root: string) => {
+			event.stopPropagation();
+			event.preventDefault();
+			const next = removeRecentRoot(items, root);
+			setItems(next);
+			await persist(next);
+		},
+		[items, persist],
+	);
+
+	const handleCopy = useCallback(async (event: React.MouseEvent, root: string) => {
+		event.stopPropagation();
+		event.preventDefault();
+		try {
+			await navigator.clipboard.writeText(root);
+		} catch (caught) {
+			setError(caught instanceof Error ? caught.message : String(caught));
+		}
+	}, []);
+
 	const openAt = useCallback(
 		(index: number) => {
-			const root = roots[index];
+			const root = items[index];
 			if (root === undefined) return;
 			setOpen(false);
 			triggerRef.current?.focus();
 			onOpen(root);
 		},
-		[roots, onOpen],
+		[items, onOpen],
 	);
 
 	const handleTriggerKeyDown = useCallback((event: React.KeyboardEvent<HTMLButtonElement>) => {
@@ -62,7 +100,7 @@ export default function RecentProjects({ roots, current, opening, onOpen }: Prop
 		(event: React.KeyboardEvent<HTMLDivElement>) => {
 			if (event.key === "ArrowDown") {
 				event.preventDefault();
-				setHighlight((current) => Math.min(current + 1, roots.length - 1));
+				setHighlight((current) => Math.min(current + 1, items.length - 1));
 			} else if (event.key === "ArrowUp") {
 				event.preventDefault();
 				setHighlight((current) => Math.max(current - 1, 0));
@@ -74,11 +112,15 @@ export default function RecentProjects({ roots, current, opening, onOpen }: Prop
 				close();
 			}
 		},
-		[roots.length, highlight, openAt, close],
+		[items.length, highlight, openAt, close],
 	);
 
-	if (roots.length === 0) {
-		return null;
+	if (items.length === 0) {
+		return (
+			<div className="recent-projects">
+				<span className="recent-empty">No recent projects</span>
+			</div>
+		);
 	}
 
 	return (
@@ -106,7 +148,7 @@ export default function RecentProjects({ roots, current, opening, onOpen }: Prop
 					tabIndex={-1}
 					onKeyDown={handleListKeyDown}
 				>
-					{roots.map((root, index) => {
+					{items.map((root, index) => {
 						const { name, parent } = splitPath(root);
 						const isCurrent = root === current;
 						return (
@@ -128,9 +170,26 @@ export default function RecentProjects({ roots, current, opening, onOpen }: Prop
 								{isCurrent ? <span className="recent-dot">●</span> : null}
 								<span className="recent-name">{name}</span>
 								{parent ? <span className="recent-parent">{parent}</span> : null}
+								<button
+									type="button"
+									className="recent-action"
+									title="Copy path"
+									onClick={(event) => void handleCopy(event, root)}
+								>
+									{"\u2398"}
+								</button>
+								<button
+									type="button"
+									className="recent-action"
+									title="Remove"
+									onClick={(event) => void handleRemove(event, root)}
+								>
+									{"\u00D7"}
+								</button>
 							</div>
 						);
 					})}
+					{error ? <div className="recent-error">{error}</div> : null}
 				</div>
 			) : null}
 		</div>

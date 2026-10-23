@@ -1944,6 +1944,34 @@ button.tree-note {
 	white-space: nowrap;
 }
 
+.recent-action {
+	opacity: 0;
+	margin-left: auto;
+	padding: 0 4px;
+	border: none;
+	background: transparent;
+	color: var(--muted, #888);
+	cursor: pointer;
+	font-size: 12px;
+}
+
+.recent-item:hover .recent-action,
+.recent-item:focus-within .recent-action {
+	opacity: 1;
+}
+
+.recent-empty {
+	font-size: 12px;
+	color: var(--muted, #888);
+	padding: 4px 8px;
+}
+
+.recent-error {
+	font-size: 11px;
+	color: var(--danger, #e55);
+	padding: 4px 8px;
+}
+
 /* Build split control: the main button builds, the chevron picks debug or release. */
 .build-split {
 	position: relative;
