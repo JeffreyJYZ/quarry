@@ -9,6 +9,7 @@ use crate::types::FileEntry;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -149,7 +150,11 @@ fn fill_temp_file(temp: &Path, text: &str, mode: u32) -> Result<(), String> {
     file.write_all(text.as_bytes())
         .map_err(|error| error.to_string())?;
     file.sync_all().map_err(|error| error.to_string())?;
-    fs::set_permissions(temp, fs::Permissions::from_mode(mode)).map_err(|error| error.to_string())
+    #[cfg(unix)]
+    fs::set_permissions(temp, fs::Permissions::from_mode(mode)).map_err(|error| error.to_string())?;
+    #[cfg(not(unix))]
+    let _ = mode;
+    Ok(())
 }
 
 #[cfg(test)]
