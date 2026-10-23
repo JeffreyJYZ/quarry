@@ -1,2 +1,0 @@
-- chore: bump to 0.1.0-alpha.6
-- feat: colour the terminal, dock it on either side, and stop leaking server errors

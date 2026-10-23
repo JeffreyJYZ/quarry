@@ -10,7 +10,7 @@
  * Usage: bun scripts/release-local.ts [--tag quarry-alphaN] [--skip-build] [--notes FILE]
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -157,6 +157,21 @@ async function main(): Promise<number> {
 
 	const signature = readFileSync(signatureFile, "utf8").trim();
 	if (signature === "") fail("the updater signature is empty");
+	// The trusted comment carries the version that was signed. A failed build leaves the previous
+	// archive in place, so without this check a release can publish last build's bytes under this
+	// version's name, and the updater then reinstalls the old app forever.
+	const signed = Buffer.from(signature, "base64").toString("utf8");
+	const signedVersion = /version:(\S+)/.exec(signed)?.[1];
+	if (signedVersion !== version) {
+		fail(
+			`the updater archive was signed for ${signedVersion ?? "an unknown version"}, not ${version}: rebuild before publishing`,
+		);
+	}
+	const archiveMtime = statSync(archive).mtimeMs;
+	const appMtime = statSync(join(BUNDLE, "quarry.app", "Contents", "MacOS", "quarry")).mtimeMs;
+	if (archiveMtime < appMtime) {
+		fail("the updater archive is older than the app binary: rebuild before publishing");
+	}
 
 	const entry = {
 		signature,

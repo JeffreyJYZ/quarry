@@ -32,3 +32,6 @@ src-tauri/target
 
 # Local reference material (screenshots of other IDEs), never shipped
 docs/reference/
+
+# Release scratch written by scripts/release-local.ts
+dist-release/
