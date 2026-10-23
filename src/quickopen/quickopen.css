@@ -1,0 +1,16 @@
+.quick-open-hit {
+	color: var(--accent, #60a5fa);
+	font-weight: 600;
+}
+
+.quick-open-group-label {
+	padding: 4px 10px;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	opacity: 0.6;
+}
+
+.quick-open-dot {
+	margin-right: 4px;
+}

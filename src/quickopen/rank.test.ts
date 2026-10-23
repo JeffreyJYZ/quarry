@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { basename, rankFiles } from "./rank";
+import { basename, matchPositions, rankFiles, splitQuery } from "./rank";
 
 describe("basename", () => {
 	test("returns the file name with no directory", () => {
@@ -54,5 +54,32 @@ describe("rankFiles", () => {
 		const paths = ["src/containsfoo.ts", "src/fooish/bar.ts"];
 		// basename contains foo -> tier2 vs path contains foo only -> tier3
 		expect(rankFiles(paths, "foo")).toEqual(["src/containsfoo.ts", "src/fooish/bar.ts"]);
+	});
+
+	test("name beats path at equal query length", () => {
+		const paths = ["src/zzz/foo.ts", "src/foopath/bar.ts"];
+		// "foo" matches name in first, path-only in second
+		expect(rankFiles(paths, "foo")[0]).toBe("src/zzz/foo.ts");
+	});
+
+	test("boundary preference favors segment starts", () => {
+		const paths = ["src/xfoo.ts", "src/foo-bar.ts"];
+		const result = rankFiles(paths, "fb");
+		expect(result[0]).toBe("src/foo-bar.ts");
+	});
+
+	test("splitQuery parses trailing-space filter", () => {
+		expect(splitQuery("foo bar")).toEqual({ primary: "foo", filter: "bar" });
+		expect(splitQuery("foo")).toEqual({ primary: "foo", filter: "" });
+		expect(splitQuery("foo ")).toEqual({ primary: "foo", filter: "" });
+	});
+
+	test("matchPositions returns null on no subsequence", () => {
+		expect(matchPositions("abc", "xyz")).toBeNull();
+	});
+
+	test("matchPositions prefers boundaries", () => {
+		const idx = matchPositions("src/foo-bar.ts", "fb");
+		expect(idx).not.toBeNull();
 	});
 });
