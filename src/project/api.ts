@@ -78,6 +78,8 @@ export type BuildReport = {
 	diagnostics: Diagnostic[];
 	durationMs: number;
 	summary: string;
+	/** Executable the build reported, absent for libraries and text-only builds. */
+	artifact?: string | null;
 };
 
 export function startLsp(root: string): Promise<LspStatus> {

@@ -113,6 +113,8 @@ pub struct BuildReport {
     pub duration_ms: u64,
     /// Last non-empty line of the build output, for the status bar.
     pub summary: String,
+    /// Executable cargo reported for this build, so a debug launch can use the artefact it just built.
+    pub artifact: Option<String>,
 }
 
 /// One match inside a file, from a project-wide text search.

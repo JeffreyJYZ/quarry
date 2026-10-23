@@ -135,6 +135,7 @@ fn run_build(build_root: &str, release: bool) -> Result<BuildReport, String> {
         diagnostics: parsed.diagnostics,
         duration_ms,
         summary: summarize(&stderr, &parsed.unlocated),
+        artifact: parsed.artifact,
     })
 }
 
@@ -153,6 +154,8 @@ struct ParsedBuild {
     success: Option<bool>,
     /// Compiler messages with no file to point at, kept for the fallback summary.
     unlocated: Vec<String>,
+    /// Last executable a `compiler-artifact` message reported; `None` for libraries and build scripts.
+    artifact: Option<String>,
 }
 
 /// One line of the stream.
@@ -162,6 +165,8 @@ enum ParsedLine {
     Unlocated(String),
     /// `build-finished`: the authoritative verdict.
     Finished(bool),
+    /// `compiler-artifact` carrying an executable.
+    Artifact(String),
     /// Non-JSON chatter, or a reason this slice does not use.
     Ignored,
 }
@@ -171,6 +176,7 @@ fn parse_cargo_json(stdout: &str, build_root: &Path) -> ParsedBuild {
         diagnostics: Vec::new(),
         success: None,
         unlocated: Vec::new(),
+        artifact: None,
     };
 
     for line in stdout.lines() {
@@ -178,6 +184,7 @@ fn parse_cargo_json(stdout: &str, build_root: &Path) -> ParsedBuild {
             ParsedLine::Diagnostics(diagnostics) => parsed.diagnostics.extend(diagnostics),
             ParsedLine::Unlocated(text) => parsed.unlocated.push(text),
             ParsedLine::Finished(success) => parsed.success = Some(success),
+            ParsedLine::Artifact(path) => parsed.artifact = Some(path),
             ParsedLine::Ignored => {}
         }
     }
@@ -202,6 +209,10 @@ fn parse_message_line(line: &str, build_root: &Path) -> ParsedLine {
             ParsedLine::Diagnostics(diagnostics)
         }
         Some("build-finished") => ParsedLine::Finished(value["success"].as_bool().unwrap_or(false)),
+        Some("compiler-artifact") => match value["executable"].as_str() {
+            Some(path) if !path.is_empty() => ParsedLine::Artifact(path.to_string()),
+            _ => ParsedLine::Ignored,
+        },
         _ => ParsedLine::Ignored,
     }
 }
@@ -364,6 +375,7 @@ fn run_cmake_build(
         diagnostics: parse_text_diagnostics(&text, Path::new(build_root)),
         duration_ms,
         summary: summarize_text(&text),
+        artifact: None,
     })
 }
 
@@ -510,6 +522,7 @@ pub fn run_plain_clang_build(root: &str, name: &str) -> Result<BuildReport, Stri
         diagnostics,
         duration_ms,
         summary: summarize_text_with(&text, DEFAULT_CLANG_SUMMARY),
+        artifact: Some(build_dir.join(name).display().to_string()),
     })
 }
 
@@ -827,6 +840,36 @@ mod tests {
             parse_cargo_json(finished, build_root()).success,
             Some(false)
         );
+    }
+
+    #[test]
+    fn an_executable_artifact_is_reported() {
+        let line = r#"{"reason":"compiler-artifact","target":{"name":"demo","kind":["bin"]},"executable":"/projects/demo/target/release/demo"}"#;
+
+        assert!(matches!(
+            parse_message_line(line, build_root()),
+            ParsedLine::Artifact(_)
+        ));
+
+        let stream = format!(
+            "{line}\n{}",
+            r#"{"reason":"build-finished","success":true}"#
+        );
+        assert_eq!(
+            parse_cargo_json(&stream, build_root()).artifact.as_deref(),
+            Some("/projects/demo/target/release/demo")
+        );
+    }
+
+    #[test]
+    fn an_artifact_without_executable_is_skipped() {
+        let line = r#"{"reason":"compiler-artifact","target":{"name":"demo"},"executable":null,"filenames":[]}"#;
+
+        assert!(matches!(
+            parse_message_line(line, build_root()),
+            ParsedLine::Ignored
+        ));
+        assert_eq!(parse_cargo_json(line, build_root()).artifact, None);
     }
 
     #[test]
