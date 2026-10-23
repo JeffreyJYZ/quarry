@@ -20,6 +20,7 @@ use crate::types::{
     FileEdit, HoverInfo, InlayHint, Location, LspStatus, Position, ProjectKind, Range,
     SignatureHelp, SignatureInformation, Symbol, TextEdit,
 };
+use serde::Serialize;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::path::Path;
@@ -76,6 +77,9 @@ pub struct Session {
     next_call_hierarchy_id: u32,
     /// Raw `CallHierarchyItem` JSON keyed by the id handed out to the UI.
     call_hierarchy_items: HashMap<u32, Value>,
+    /// Raw `TypeHierarchyItem` JSON keyed by [`type_hierarchy_key`], so a follow-up hands the server
+    /// back the item it sent, `data` included.
+    type_hierarchy_items: HashMap<String, Value>,
 }
 
 /// One request that is waiting for its answer.
@@ -123,6 +127,7 @@ impl Session {
     /// and those errors are deliberately ignored here.
     fn stop(&mut self) {
         self.call_hierarchy_items.clear();
+        self.type_hierarchy_items.clear();
         self.documents.clear();
         self.document_ends.clear();
         let _ = self
@@ -217,6 +222,7 @@ async fn start_lsp_session(
         pending: HashMap::new(),
         next_call_hierarchy_id: 1,
         call_hierarchy_items: HashMap::new(),
+        type_hierarchy_items: HashMap::new(),
     }));
 
     let pump_session = Arc::clone(&session);
@@ -2085,3 +2091,400 @@ fn parse_document_highlight(value: &Value) -> Option<Range> {
 }
 
 // Aliases removed: keep one parser name per shape.
+
+/// One node of a type hierarchy.
+///
+/// Both type-hierarchy commands answer with this shape, so the UI renders either direction from one
+/// model: `prepare` returns nodes with empty `parents` and `children`, and the follow-up fills them.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TypeHierarchyNode {
+    pub name: String,
+    /// LSP `SymbolKind`.
+    pub kind: u32,
+    /// The server's own URI, kept verbatim so a follow-up hands back what the server sent.
+    pub uri: String,
+    pub path: String,
+    pub line: u32,
+    pub character: u32,
+    pub detail: Option<String>,
+    pub children: Vec<TypeHierarchyNode>,
+    pub parents: Vec<TypeHierarchyNode>,
+}
+
+/// The follow-up answer: the item that was asked about, with the neighbours the server reported.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+pub struct TypeHierarchyAnswer {
+    pub item: TypeHierarchyNode,
+}
+
+/// Keys a follow-up answer may name the parents under, in the order they are looked for.
+const PARENT_KEYS: [&str; 2] = ["parents", "supertypes"];
+
+/// Keys a follow-up answer may name the children under, in the order they are looked for.
+const CHILD_KEYS: [&str; 2] = ["children", "subtypes"];
+
+/// `textDocument/prepareTypeHierarchy`: the types at one position, as hierarchy roots.
+///
+/// `project_root` and `root` are the same argument: the frontend may pass either key, because every
+/// other LSP command here takes `root` while this unit was specified as `project_root`.
+///
+/// A `null` answer — a server without type hierarchy — reads as an empty list, because "not
+/// supported" carries nothing for the user to act on.
+#[tauri::command]
+pub async fn lsp_prepare_type_hierarchy(
+    state: State<'_, LspState>,
+    root: Option<String>,
+    project_root: Option<String>,
+    path: String,
+    line: u32,
+    character: u32,
+) -> Result<Vec<TypeHierarchyNode>, String> {
+    let root = project_root
+        .or(root)
+        .ok_or_else(|| "no project root given".to_string())?;
+    let session = session_for(&state, &root)?;
+    let result = send_request(
+        &session,
+        "textDocument/prepareTypeHierarchy",
+        position_params(&path_to_uri(&path), line, character),
+    )
+    .await?;
+
+    let parsed = type_hierarchy_nodes(&result);
+    let mut guard = lock(&session);
+    for (node, raw) in &parsed {
+        guard
+            .type_hierarchy_items
+            .insert(type_hierarchy_key(node), (*raw).clone());
+    }
+    Ok(parsed.into_iter().map(|(node, _)| node).collect())
+}
+
+/// `typeHierarchy/supertypes` and `typeHierarchy/subtypes` for one prepared item.
+///
+/// `item` is what the UI holds: a [`TypeHierarchyNode`] this module returned, or the raw
+/// `TypeHierarchyItem` a server sent, optionally inside the `{ item }` answer envelope. A raw item is
+/// echoed back untouched, so a server that keeps state in `data` still recognises it (clangd stores a
+/// USR there); a node is resolved through the session's raw-item cache and, failing that, rebuilt.
+///
+/// A `null` direction reads as an empty `parents` or `children` list, never as an error.
+#[tauri::command]
+pub async fn lsp_type_hierarchy(
+    state: State<'_, LspState>,
+    root: Option<String>,
+    project_root: Option<String>,
+    item: Value,
+) -> Result<TypeHierarchyAnswer, String> {
+    let root = project_root
+        .or(root)
+        .ok_or_else(|| "no project root given".to_string())?;
+    let session = session_for(&state, &root)?;
+
+    let handed_back = item.get("item").unwrap_or(&item);
+    let mut base = type_hierarchy_node_from_item(handed_back)
+        .ok_or_else(|| format!("not a type hierarchy item: {handed_back}"))?;
+
+    let request_item = if handed_back.get("selectionRange").is_some() {
+        handed_back.clone()
+    } else {
+        lock(&session)
+            .type_hierarchy_items
+            .get(&type_hierarchy_key(&base))
+            .cloned()
+            .unwrap_or_else(|| type_hierarchy_item(&base))
+    };
+
+    let parents = send_request(
+        &session,
+        "typeHierarchy/supertypes",
+        json!({ "item": &request_item }),
+    )
+    .await?;
+    let children = send_request(
+        &session,
+        "typeHierarchy/subtypes",
+        json!({ "item": &request_item }),
+    )
+    .await?;
+
+    base.parents = hierarchy_items(&parents, &PARENT_KEYS);
+    base.children = hierarchy_items(&children, &CHILD_KEYS);
+
+    Ok(TypeHierarchyAnswer { item: base })
+}
+
+/// The nodes a `prepareTypeHierarchy` answer carries, each paired with the raw item it came from.
+///
+/// The answer may be an item list or a single item; `null` and anything unparseable read as empty.
+fn type_hierarchy_nodes(result: &Value) -> Vec<(TypeHierarchyNode, &Value)> {
+    let entries: Vec<&Value> = match result {
+        Value::Array(items) => items.iter().collect(),
+        Value::Object(_) => vec![result],
+        _ => Vec::new(),
+    };
+
+    entries
+        .into_iter()
+        .map(|entry| entry.get("item").unwrap_or(entry))
+        .filter_map(|item| type_hierarchy_node_from_item(item).map(|node| (node, item)))
+        .collect()
+}
+
+/// Read one `TypeHierarchyItem` — or the node this module returned for it — into the UI shape.
+///
+/// The caret sits at `selectionRange.start`, falling back to `range.start`, then to a node's own
+/// `line` and `character`. An item that does not point at a file is dropped: nothing can be opened.
+fn type_hierarchy_node_from_item(item: &Value) -> Option<TypeHierarchyNode> {
+    let name = item.get("name").and_then(Value::as_str)?;
+    if name.is_empty() {
+        return None;
+    }
+    let uri = item.get("uri").and_then(Value::as_str)?;
+    let path = uri_to_path(uri)?;
+    if !path.starts_with('/') {
+        return None;
+    }
+    let start = item
+        .get("selectionRange")
+        .or_else(|| item.get("range"))
+        .map(parse_range)
+        .map(|range| range.start)
+        .unwrap_or_else(|| position(Some(item)));
+
+    Some(TypeHierarchyNode {
+        name: name.to_string(),
+        kind: item
+            .get("kind")
+            .and_then(Value::as_u64)
+            .and_then(|kind| u32::try_from(kind).ok())
+            .unwrap_or(0),
+        uri: uri.to_string(),
+        path,
+        line: start.line,
+        character: start.character,
+        detail: item
+            .get("detail")
+            .and_then(Value::as_str)
+            .filter(|detail| !detail.is_empty())
+            .map(str::to_string),
+        children: Vec::new(),
+        parents: Vec::new(),
+    })
+}
+
+/// The nodes one direction's answer carries.
+///
+/// The answer is the item list itself, or an object naming it under `keys`, possibly inside an
+/// `item` key. A missing direction and a `null` direction are both empty.
+fn hierarchy_items(answer: &Value, keys: &[&str]) -> Vec<TypeHierarchyNode> {
+    let Some(entries) = hierarchy_entry_list(answer, keys) else {
+        return Vec::new();
+    };
+
+    entries
+        .iter()
+        .map(|entry| entry.get("item").unwrap_or(entry))
+        .filter_map(type_hierarchy_node_from_item)
+        .collect()
+}
+
+fn hierarchy_entry_list<'a>(answer: &'a Value, keys: &[&str]) -> Option<&'a Vec<Value>> {
+    if let Some(entries) = answer.as_array() {
+        return Some(entries);
+    }
+    if let Some(inner) = answer.get("item")
+        && let Some(entries) = named_list(inner, keys)
+    {
+        return Some(entries);
+    }
+    named_list(answer, keys)
+}
+
+fn named_list<'a>(value: &'a Value, keys: &[&str]) -> Option<&'a Vec<Value>> {
+    let object = value.as_object()?;
+    keys.iter()
+        .find_map(|key| object.get(*key).and_then(Value::as_array))
+}
+
+/// Identity of one node inside a session: the server's URI plus the caret position and the name.
+///
+/// The raw item is filed under this key, so a follow-up hands the server back exactly what it sent,
+/// `data` included.
+fn type_hierarchy_key(node: &TypeHierarchyNode) -> String {
+    format!(
+        "{}|{}:{}|{}",
+        node.uri, node.line, node.character, node.name
+    )
+}
+
+/// Rebuild a `TypeHierarchyItem` from a node, for expanding a node the session never prepared.
+fn type_hierarchy_item(node: &TypeHierarchyNode) -> Value {
+    let range = json!({
+        "start": { "line": node.line, "character": node.character },
+        "end": { "line": node.line, "character": node.character },
+    });
+    json!({
+        "name": node.name,
+        "kind": node.kind,
+        "uri": node.uri,
+        "detail": node.detail,
+        "range": range,
+        "selectionRange": range,
+    })
+}
+
+#[cfg(test)]
+mod type_hierarchy_tests {
+    use super::*;
+
+    /// Captured shape of a `textDocument/prepareTypeHierarchy` answer for one struct.
+    fn prepare_answer() -> Value {
+        json!([{
+            "name": "Shape",
+            "kind": 23,
+            "uri": path_to_uri("/p/src/shape.rs"),
+            "range": {
+                "start": { "line": 3, "character": 0 },
+                "end": { "line": 9, "character": 1 },
+            },
+            "selectionRange": {
+                "start": { "line": 3, "character": 6 },
+                "end": { "line": 3, "character": 11 },
+            },
+        }])
+    }
+
+    fn item(name: &str, path: &str, line: u32, character: u32) -> Value {
+        json!({
+            "name": name,
+            "kind": 23,
+            "uri": path_to_uri(path),
+            "range": {
+                "start": { "line": line, "character": 0 },
+                "end": { "line": line + 2, "character": 1 },
+            },
+            "selectionRange": {
+                "start": { "line": line, "character": character },
+                "end": { "line": line, "character": character + 5 },
+            },
+        })
+    }
+
+    #[test]
+    fn prepare_answer_becomes_nodes() {
+        let answer = prepare_answer();
+        let parsed = type_hierarchy_nodes(&answer);
+        assert_eq!(parsed.len(), 1);
+
+        let node = &parsed[0].0;
+        assert_eq!(node.name, "Shape");
+        assert_eq!(node.kind, 23);
+        assert_eq!(node.uri, path_to_uri("/p/src/shape.rs"));
+        assert_eq!(node.path, "/p/src/shape.rs");
+        assert_eq!(node.line, 3);
+        assert_eq!(node.character, 6, "selectionRange wins over range");
+        assert!(node.detail.is_none());
+        assert!(node.children.is_empty());
+        assert!(node.parents.is_empty());
+
+        assert_eq!(
+            parsed[0].1["selectionRange"]["start"]["character"],
+            json!(6),
+            "the raw item is kept for the follow-up"
+        );
+    }
+
+    #[test]
+    fn null_prepare_answer_is_empty() {
+        assert!(type_hierarchy_nodes(&Value::Null).is_empty());
+        assert!(type_hierarchy_nodes(&json!(42)).is_empty());
+        assert!(type_hierarchy_nodes(&json!([])).is_empty());
+        assert!(type_hierarchy_nodes(&json!([{ "name": "NoUri", "kind": 23 }])).is_empty());
+        assert!(type_hierarchy_nodes(&json!([{ "name": "", "uri": "file:///p/a.rs" }])).is_empty());
+        assert!(
+            type_hierarchy_nodes(&json!([{ "name": "Untitled", "uri": "untitled:Untitled-1" }]))
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn follow_up_reads_the_parents_and_children_shape() {
+        let answer = json!({
+            "parents": [item("Base", "/p/src/base.rs", 0, 7)],
+            "children": [item("Extra", "/p/src/extra.rs", 4, 7)],
+        });
+
+        let parents = hierarchy_items(&answer, &PARENT_KEYS);
+        assert_eq!(parents.len(), 1);
+        assert_eq!(parents[0].name, "Base");
+        assert_eq!(parents[0].line, 0);
+        assert_eq!(parents[0].character, 7);
+
+        let children = hierarchy_items(&answer, &CHILD_KEYS);
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].name, "Extra");
+        assert_eq!(children[0].path, "/p/src/extra.rs");
+    }
+
+    #[test]
+    fn follow_up_reads_the_array_shape() {
+        let answer = json!([item("ShapeChild", "/p/src/child.rs", 1, 2)]);
+        let children = hierarchy_items(&answer, &CHILD_KEYS);
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].name, "ShapeChild");
+        assert_eq!(children[0].line, 1);
+        assert_eq!(children[0].character, 2);
+        assert!(children[0].parents.is_empty());
+    }
+
+    #[test]
+    fn follow_up_reads_the_item_envelope() {
+        let mut shape = item("Shape", "/p/src/shape.rs", 3, 6);
+        shape["supertypes"] = json!([item("Base", "/p/src/base.rs", 0, 7)]);
+        let answer = json!({ "item": shape });
+
+        let parents = hierarchy_items(&answer, &PARENT_KEYS);
+        assert_eq!(parents.len(), 1);
+        assert_eq!(parents[0].name, "Base");
+        assert!(hierarchy_items(&answer, &CHILD_KEYS).is_empty());
+    }
+
+    #[test]
+    fn a_null_direction_is_empty() {
+        assert!(hierarchy_items(&Value::Null, &PARENT_KEYS).is_empty());
+        assert!(hierarchy_items(&json!({ "parents": null }), &PARENT_KEYS).is_empty());
+        assert!(hierarchy_items(&json!({}), &CHILD_KEYS).is_empty());
+        assert!(hierarchy_items(&json!("nope"), &CHILD_KEYS).is_empty());
+    }
+
+    #[test]
+    fn a_node_round_trips_as_a_request_item() {
+        let node = type_hierarchy_nodes(&prepare_answer())
+            .into_iter()
+            .next()
+            .expect("node")
+            .0;
+
+        let rebuilt = type_hierarchy_item(&node);
+        assert_eq!(rebuilt["name"], json!("Shape"));
+        assert_eq!(rebuilt["uri"], json!(path_to_uri("/p/src/shape.rs")));
+        assert_eq!(
+            rebuilt["selectionRange"]["start"],
+            json!({ "line": 3, "character": 6 })
+        );
+
+        let again = type_hierarchy_node_from_item(&rebuilt).expect("node");
+        assert_eq!(again, node);
+    }
+
+    #[test]
+    fn a_raw_item_is_echoed_with_its_data() {
+        let mut raw = item("Shape", "/p/src/shape.rs", 3, 6);
+        raw["data"] = json!({ "usr": "c:@S@Shape" });
+        let node = type_hierarchy_node_from_item(&raw).expect("node");
+
+        assert!(raw.get("selectionRange").is_some());
+        assert_eq!(type_hierarchy_key(&node), format!("{}|3:6|Shape", node.uri));
+    }
+}
