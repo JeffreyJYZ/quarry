@@ -73,7 +73,9 @@ read off `src-tauri/src/lib.rs` and `src/`:
   Variable values can be edited via `dap::dap_set_variable` and memory cells via `dap::dap_write_memory`. A
   pinned-variable watch pane re-reads pinned in-scope variables on each stop, reporting `not in scope` when a
   pinned variable is absent and `unavailable` when its read fails; pins survive a restart and clear when the
-  session ends.
+  session ends. A launch-time build uses the toolbar's selected profile and hands the debugger the
+  executable the build reported, so a release session does not run a stale debug binary; a session
+  whose profile changed while live says so in the panel.
 - **Launch presets**: the debug panel's `Edit presets` editor adds, duplicates, removes and reorders
   presets, and edits every field a preset holds: name, program, args, cwd, stop-on-entry, `build` and
   `initCommands`. `build` is a single-line field (placeholder `cargo build`) holding the preset's build
@@ -92,7 +94,10 @@ read off `src-tauri/src/lib.rs` and `src/`:
   to run on a stale preview, applies capture groups in regex mode, and reports one summary line
   (`files changed, replacements made`) with per-file errors collected in `errors`.
 - **Quick open**: `Cmd+P` file picker over `files::list_files`, ranked in `src/quickopen/QuickOpen.tsx`
-  and `src/quickopen/rank.ts`, with a recent-files list.
+  and `src/quickopen/rank.ts`, with a recent-files list. Ranking puts a file-name match above a
+  path-only match of the same query length and prefers matches at word and path-segment boundaries;
+  matched characters are highlighted, a trailing space followed by more text filters the current
+  results without another search, and recent files appear in their own group above the rest.
 - **Recent projects**: dropdown of previously opened roots backed by `settings::remember_root` and
   `src/projects/RecentProjects.tsx`. A row can be removed without closing the open project; removal
   persists through `persist` in `src/projects/RecentProjects.tsx`, which reads settings, replaces
@@ -121,7 +126,12 @@ read off `src-tauri/src/lib.rs` and `src/`:
   `copy hash` on history rows and blame groups, with propagation stopped so the row action does
   not fire.
 - **Breadcrumb**: a strip showing the file path and the symbol chain containing the caret, built from
-  `lsp_symbols` in `src/breadcrumb/Breadcrumb.tsx`.
+  `lsp_symbols` in `src/breadcrumb/Breadcrumb.tsx`. Each segment copies its qualified name
+  (`a::b::c`), and the whole chain copies from one action.
+- **Type hierarchy**: `Shift+Alt+T` opens `src/lsp/TypeHierarchyPanel.tsx` over
+  `lsp::lsp_prepare_type_hierarchy` and `lsp::lsp_type_hierarchy`. Supertypes and subtypes are separate
+  views, each level is fetched only when a node is expanded, arrow keys and `Enter` work the tree,
+  `Escape` closes it, and a server that reports no hierarchy for the symbol says so instead of erroring.
 
 Still missing, and named here so it is not mistaken for done:
 - **No expression evaluation, so no watch expressions from expressions** — Rust expression evaluation cannot be
