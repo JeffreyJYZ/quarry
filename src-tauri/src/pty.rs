@@ -15,6 +15,12 @@ const OUTPUT_EVENT: &str = "pty://output";
 const EXITED_EVENT: &str = "pty://exited";
 const BUF_SIZE: usize = 8192;
 
+#[derive(serde::Serialize)]
+pub struct PtyOpenResult {
+    pub id: String,
+    pub pid: Option<u32>,
+}
+
 pub struct PtyState {
     sessions: Mutex<HashMap<String, Session>>,
     counter: AtomicU64,
@@ -54,7 +60,7 @@ pub async fn pty_open(
     cwd: String,
     rows: u16,
     cols: u16,
-) -> Result<String, String> {
+) -> Result<PtyOpenResult, String> {
     let cwd_path = validate_cwd(&cwd)?;
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
     let pty_system = native_pty_system();
@@ -72,6 +78,7 @@ pub async fn pty_open(
         .slave
         .spawn_command(cmd)
         .map_err(|e| format!("cannot spawn shell in {cwd}: {e}"))?;
+    let pid = child.process_id();
     let child = Arc::new(Mutex::new(Some(child)));
     let writer = pair
         .master
@@ -103,7 +110,7 @@ pub async fn pty_open(
             format!("cannot start reader: {e}")
         })?;
 
-    Ok(id)
+    Ok(PtyOpenResult { id, pid })
 }
 
 #[tauri::command]
