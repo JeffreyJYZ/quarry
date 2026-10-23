@@ -9,6 +9,15 @@ import {
 	ptyResize,
 	ptyWrite,
 } from "@/project/api";
+import "./terminal.css";
+import {
+	DEFAULT_FONT_SIZE,
+	decreaseFontSize,
+	increaseFontSize,
+	parseOsc7Cwd,
+	resetFontSize,
+	scrollbackText,
+} from "./fontSize";
 
 const MAX_LINES = 4000;
 const RESIZE_DEBOUNCE_MS = 120;
@@ -21,6 +30,7 @@ export type TerminalProps = {
 type Session = {
 	id: number;
 	ptyId: string | null;
+	pid: number | null;
 	cwd: string;
 	lines: string[];
 	dropped: number;
@@ -28,6 +38,7 @@ type Session = {
 	error: string | null;
 	opening: boolean;
 	stick: boolean;
+	fontSize: number;
 };
 
 function describe(err: unknown): string {
@@ -99,6 +110,7 @@ export default function Terminal({ root, activePath }: TerminalProps) {
 		const session: Session = {
 			id,
 			ptyId: null,
+			pid: null,
 			cwd,
 			lines: [],
 			dropped: 0,
@@ -106,6 +118,7 @@ export default function Terminal({ root, activePath }: TerminalProps) {
 			error: null,
 			opening: true,
 			stick: true,
+			fontSize: DEFAULT_FONT_SIZE,
 		};
 		setSessions((current) => [...current, session]);
 		setActiveId(id);
@@ -115,12 +128,12 @@ export default function Terminal({ root, activePath }: TerminalProps) {
 			const cols = Math.max(20, Math.floor(width / 8));
 			const h = el ? el.clientHeight : 200;
 			const rows = Math.max(8, Math.floor(h / 18));
-			const ptyId = await ptyOpen(cwd, rows, cols);
+			const result = await ptyOpen(cwd, rows, cols);
 			if (sessionsRef.current.find((s) => s.id === id) === undefined) {
-				void ptyClose(ptyId).catch(() => undefined);
+				void ptyClose(result.id).catch(() => undefined);
 				return;
 			}
-			updateSession(id, (s) => ({ ...s, ptyId, opening: false }));
+			updateSession(id, (s) => ({ ...s, ptyId: result.id, pid: result.pid, opening: false }));
 		} catch (err) {
 			updateSession(id, (s) => ({
 				...s,
@@ -157,7 +170,10 @@ export default function Terminal({ root, activePath }: TerminalProps) {
 					setSessions((current) =>
 						current.map((s) => {
 							if (s.ptyId !== event.id) return s;
-							return appendData(s, event.data);
+							const next = appendData(s, event.data);
+							const cwd = parseOsc7Cwd(event.data);
+							if (cwd !== null) return { ...next, cwd };
+							return next;
 						}),
 					);
 				});
@@ -265,15 +281,18 @@ export default function Terminal({ root, activePath }: TerminalProps) {
 		const cwd =
 			session?.cwd ??
 			(activePath !== null && activePath !== undefined ? dirOf(activePath) : root);
+		const fontSize = session?.fontSize ?? DEFAULT_FONT_SIZE;
 		updateSession(activeId, (s) => ({
 			...s,
 			ptyId: null,
+			pid: null,
 			lines: [],
 			dropped: 0,
 			exited: null,
 			error: null,
 			opening: true,
 			stick: true,
+			fontSize,
 		}));
 		void (async () => {
 			try {
@@ -282,8 +301,13 @@ export default function Terminal({ root, activePath }: TerminalProps) {
 				const cols = Math.max(20, Math.floor(width / 8));
 				const h = el ? el.clientHeight : 200;
 				const rows = Math.max(8, Math.floor(h / 18));
-				const ptyId = await ptyOpen(cwd, rows, cols);
-				updateSession(activeId, (s) => ({ ...s, ptyId, opening: false }));
+				const result = await ptyOpen(cwd, rows, cols);
+				updateSession(activeId, (s) => ({
+					...s,
+					ptyId: result.id,
+					pid: result.pid,
+					opening: false,
+				}));
 			} catch (err) {
 				updateSession(activeId, (s) => ({
 					...s,
@@ -433,25 +457,27 @@ export default function Terminal({ root, activePath }: TerminalProps) {
 		<section className="terminal" aria-label="Terminal">
 			<div className="terminal-tabs">
 				{sessions.map((s) => (
-					<button
+					<div
 						key={s.id}
-						type="button"
 						className={`terminal-tab${s.id === activeId ? " active" : ""}${s.exited !== null ? " exited" : ""}`}
-						onClick={() => setActiveId(s.id)}
 						title={s.cwd}
 					>
-						<span>{shortCwd(s.cwd)}</span>
+						<button
+							type="button"
+							className="terminal-tab-label"
+							onClick={() => setActiveId(s.id)}
+						>
+							<span>{shortCwd(s.cwd)}</span>
+						</button>
 						<button
 							type="button"
 							className="terminal-tab-close"
-							onClick={(e) => {
-								e.stopPropagation();
-								closeSession(s.id);
-							}}
+							aria-label={`close ${shortCwd(s.cwd)}`}
+							onClick={() => closeSession(s.id)}
 						>
 							×
 						</button>
-					</button>
+					</div>
 				))}
 				<button
 					type="button"
@@ -471,6 +497,58 @@ export default function Terminal({ root, activePath }: TerminalProps) {
 						<span className="terminal-size">
 							{size.cols}x{size.rows}
 						</span>
+						<button
+							type="button"
+							className="terminal-btn"
+							onClick={() => {
+								updateSession(active.id, (s) => ({
+									...s,
+									fontSize: increaseFontSize(s.fontSize),
+								}));
+							}}
+						>
+							A+
+						</button>
+						<button
+							type="button"
+							className="terminal-btn"
+							onClick={() => {
+								updateSession(active.id, (s) => ({
+									...s,
+									fontSize: decreaseFontSize(s.fontSize),
+								}));
+							}}
+						>
+							A-
+						</button>
+						<button
+							type="button"
+							className="terminal-btn"
+							onClick={() => {
+								updateSession(active.id, (s) => ({
+									...s,
+									fontSize: resetFontSize(),
+								}));
+							}}
+						>
+							A0
+						</button>
+						<button
+							type="button"
+							className="terminal-btn"
+							onClick={() => {
+								void navigator.clipboard
+									.writeText(scrollbackText(active.lines))
+									.catch((err) => {
+										updateSession(active.id, (s) => ({
+											...s,
+											error: `Copy failed: ${describe(err)}`,
+										}));
+									});
+							}}
+						>
+							Copy all
+						</button>
 						<button type="button" className="terminal-restart" onClick={restart}>
 							Restart
 						</button>
@@ -494,9 +572,19 @@ export default function Terminal({ root, activePath }: TerminalProps) {
 			) : active.error !== null ? (
 				<div className="terminal-error">{active.error}</div>
 			) : (
-				<div ref={containerRef} className="terminal-body" onScroll={onScroll}>
-					<pre className="terminal-pre">{displayed.join("\n")}</pre>
-				</div>
+				<>
+					<div ref={containerRef} className="terminal-body" onScroll={onScroll}>
+						<pre className="terminal-pre" style={{ fontSize: `${active.fontSize}px` }}>
+							{displayed.join("\n")}
+						</pre>
+					</div>
+					<div className="terminal-status">
+						<span>pid {active.pid ?? "—"}</span>
+						<span className="terminal-status-cwd" title={active.cwd}>
+							{active.cwd}
+						</span>
+					</div>
+				</>
 			)}
 			<textarea
 				ref={inputRef}

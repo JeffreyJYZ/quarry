@@ -1,0 +1,46 @@
+.terminal-btn {
+	flex: 0 0 auto;
+	padding: 2px 6px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: transparent;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10px;
+	cursor: pointer;
+}
+
+.terminal-status {
+	flex: 0 0 auto;
+	display: flex;
+	gap: 12px;
+	padding: 2px 12px;
+	border-top: 1px solid var(--line);
+	font-family: var(--mono);
+	font-size: 10px;
+	color: var(--muted);
+}
+
+.terminal-status-cwd {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.terminal-tab-label {
+	display: inline-flex;
+	align-items: center;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	letter-spacing: inherit;
+	cursor: pointer;
+}
+
+.terminal-tab-label:focus-visible,
+.terminal-tab-close:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: 1px;
+}
