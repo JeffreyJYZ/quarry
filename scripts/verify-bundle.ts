@@ -7,6 +7,16 @@ const ROOT = join(import.meta.dir, "..");
 const APP_PATH = join(ROOT, "src-tauri", "target", "release", "bundle", "macos", "quarry.app");
 const APP_BINARY = join(APP_PATH, "Contents", "MacOS", "quarry");
 const PLAIN_BINARY = join(ROOT, "src-tauri", "target", "release", "quarry");
+const UPDATER_TAR = join(
+	ROOT,
+	"src-tauri",
+	"target",
+	"release",
+	"bundle",
+	"macos",
+	"quarry.app.tar.gz",
+);
+const UPDATER_SIG = `${UPDATER_TAR}.sig`;
 const DIST_DIR = join(ROOT, "dist");
 const REBUILD_HINT = "run: bun run tauri build --bundles app";
 
@@ -23,6 +33,24 @@ function readCargoVersion(): string {
 function readTauriVersion(): string {
 	const raw = readFileSync(join(ROOT, "src-tauri", "tauri.conf.json"), "utf8");
 	return (JSON.parse(raw) as { version: string }).version;
+}
+/** Whether the build must produce updater artefacts, and whether a public key is baked in. */
+function readUpdaterConfig(): { artifacts: boolean; pubkey: string | null } {
+	const raw = JSON.parse(readFileSync(join(ROOT, "src-tauri", "tauri.conf.json"), "utf8")) as {
+		bundle?: { createUpdaterArtifacts?: boolean | string };
+		plugins?: { updater?: { pubkey?: string } };
+	};
+	return {
+		artifacts: raw.bundle?.createUpdaterArtifacts === true,
+		pubkey: raw.plugins?.updater?.pubkey ?? null,
+	};
+}
+/** Tauri's `.sig` is base64 of a minisign blob; an empty or truncated file fails here. */
+function signatureOk(path: string): boolean {
+	if (!existsSync(path)) return false;
+	const text = readFileSync(path, "utf8").trim();
+	if (text === "") return false;
+	return Buffer.from(text, "base64").toString("utf8").includes("untrusted comment");
 }
 function dirSizeMiB(p: string): number {
 	const out = execFileSync("du", ["-sk", p], { encoding: "utf8" });
@@ -188,6 +216,44 @@ async function main(): Promise<number> {
 	}
 	const stale = staleReasons.length > 0;
 
+	// Updater artefacts: an installed app updates only from a signed archive beside a
+	// `latest.json`, so a missing or stale pair means the release cannot be installed.
+	const updaterConfig = readUpdaterConfig();
+	const updaterReasons: string[] = [];
+	let updaterDetail = "not configured";
+	if (updaterConfig.artifacts) {
+		const tarMtime = mtimeOf(UPDATER_TAR);
+		const sigOk = signatureOk(UPDATER_SIG);
+		if (tarMtime === null) {
+			updaterReasons.push(
+				`MISSING updater archive: ${UPDATER_TAR} — ${REBUILD_HINT} with TAURI_SIGNING_PRIVATE_KEY set`,
+			);
+		}
+		if (!sigOk) {
+			updaterReasons.push(`MISSING or unreadable updater signature: ${UPDATER_SIG}`);
+		}
+		if (distMtime !== null && tarMtime !== null && distMtime.getTime() > tarMtime.getTime()) {
+			updaterReasons.push(`STALE: dist is newer than the updater archive — ${REBUILD_HINT}`);
+		}
+		if (
+			appBinaryMtime !== null &&
+			tarMtime !== null &&
+			appBinaryMtime.getTime() > tarMtime.getTime()
+		) {
+			updaterReasons.push(
+				`STALE: the bundled app is newer than the updater archive — ${REBUILD_HINT}`,
+			);
+		}
+		if (updaterConfig.pubkey === null || updaterConfig.pubkey.trim() === "") {
+			updaterReasons.push("MISSING plugins.updater.pubkey in src-tauri/tauri.conf.json");
+		}
+		const size =
+			tarMtime === null
+				? "absent"
+				: `${(statSync(UPDATER_TAR).size / 1024 / 1024).toFixed(2)} MiB`;
+		updaterDetail = `${size} sig=${sigOk ? "present" : "absent"}`;
+	}
+
 	const lines: string[] = [];
 	lines.push("verify-bundle");
 	lines.push(
@@ -200,6 +266,8 @@ async function main(): Promise<number> {
 	);
 	for (const reason of staleReasons) lines.push(`  ${reason}`);
 	lines.push(`  signature ${sigStatus}${binaryExec ? "" : " (binary not executable)"}`);
+	lines.push(`  updater   ${updaterDetail}`);
+	for (const reason of updaterReasons) lines.push(`  ${reason}`);
 	lines.push(`  launch    ${launchDetail}`);
 	const failed =
 		!versionMatch ||
@@ -207,7 +275,8 @@ async function main(): Promise<number> {
 		!binaryExec ||
 		sigStatus.startsWith("FAILED") ||
 		!launchOk ||
-		stale;
+		stale ||
+		updaterReasons.length > 0;
 	lines.push(`  result    ${failed ? "FAIL" : "PASS"}`);
 	console.log(lines.join("\n"));
 	return failed ? 1 : 0;

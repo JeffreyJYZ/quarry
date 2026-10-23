@@ -71,6 +71,7 @@ import ShortcutSheet from "@/shortcuts/ShortcutSheet";
 
 import TestsDock, { type DockTab } from "@/tests/TestsDock";
 import { useTests } from "@/tests/useTests";
+import UpdateNotice from "@/updates/UpdateNotice";
 import "./styles.css";
 
 const DebugPanel = lazy(() => import("@/debug/DebugPanel"));
@@ -1477,6 +1478,7 @@ export default function App() {
 
 	return (
 		<div className="shell">
+			<UpdateNotice />
 			<header className="titlebar" data-tauri-drag-region="">
 				<span className="wordmark">quarry</span>
 				<button
