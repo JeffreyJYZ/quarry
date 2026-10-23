@@ -10,6 +10,7 @@ const RUNNING_GLYPH = "◦";
 
 export type TestsPanelProps = {
 	items: TestItem[];
+	totalCount?: number;
 	loading: boolean;
 	loadError: string | null;
 	results: ReadonlyMap<string, TestReport>;
@@ -303,6 +304,7 @@ function TestGroups({
  */
 export default function TestsPanel({
 	items,
+	totalCount,
 	loading,
 	loadError,
 	results,
@@ -318,7 +320,7 @@ export default function TestsPanel({
 }: TestsPanelProps) {
 	const groups = groupByBinary(items);
 	const summaryClass = summary?.includes("stopped at") ? " bad" : "";
-	const total = items.length;
+	const total = totalCount ?? items.length;
 	const failedCount = items.filter((item) => {
 		const report = results.get(item.name);
 		return report !== undefined && !report.passed;
@@ -330,7 +332,7 @@ export default function TestsPanel({
 		<div className="tests">
 			{loading || loadError !== null ? null : (
 				<p className="tests-summary">
-					{total} tests · {failedCount} failed · {notRunCount} not run
+					{items.length} of {total} tests · {failedCount} failed · {notRunCount} not run
 				</p>
 			)}
 			{summary === null ? null : <p className={`tests-summary${summaryClass}`}>{summary}</p>}

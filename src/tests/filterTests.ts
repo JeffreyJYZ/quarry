@@ -29,6 +29,43 @@ export function statusOf(item: TestItem, results: ReadonlyMap<string, TestReport
 	return report.passed ? "passed" : "failed";
 }
 
+/** Case-insensitive match against a test's name and its binary (file path). */
+export function matchesTestFilter(item: TestItem, needle: string): boolean {
+	const query = needle.trim().toLowerCase();
+	if (query === "") {
+		return true;
+	}
+	return item.name.toLowerCase().includes(query) || item.binary.toLowerCase().includes(query);
+}
+
+/** One `path::test_name` line per failed test, in list order. */
+export function composeFailureLines(
+	items: TestItem[],
+	results: ReadonlyMap<string, TestReport>,
+): string[] {
+	const lines: string[] = [];
+	for (const item of items) {
+		const report = results.get(item.name);
+		if (report === undefined || report.passed) {
+			continue;
+		}
+		lines.push(item.name);
+	}
+	return lines;
+}
+
+/** Caps a failure output and reports whether anything was dropped. */
+export function truncateFailureOutput(
+	output: string,
+	limit: number = 200,
+): { text: string; truncated: boolean } {
+	const lines = output.split("\\n");
+	if (lines.length <= limit) {
+		return { text: output, truncated: false };
+	}
+	return { text: lines.slice(0, limit).join("\\n"), truncated: true };
+}
+
 export function applyTestFilters(
 	items: TestItem[],
 	results: ReadonlyMap<string, TestReport>,

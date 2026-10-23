@@ -5,6 +5,7 @@ import ProblemsPanel from "@/problems/ProblemsPanel";
 import type { FileBuffer } from "@/project/buffer";
 import {
 	applyTestFilters,
+	composeFailureLines,
 	type ResultFilter,
 	resultLabel,
 	type SortDir,
@@ -112,19 +113,7 @@ export default function TestsDock({
 
 	const copyFailures = async (event: { stopPropagation: () => void }) => {
 		event.stopPropagation();
-		const lines: string[] = [];
-		for (const item of tests.items) {
-			const report = tests.results.get(item.name);
-			if (report === undefined || report.passed) {
-				continue;
-			}
-			const firstLine =
-				report.output
-					.split("\n")
-					.map((line) => line.trim())
-					.find((line) => line !== "") ?? "";
-			lines.push(`${item.name}: ${firstLine}`);
-		}
+		const lines = composeFailureLines(tests.items, tests.results);
 		try {
 			if (navigator.clipboard === undefined) {
 				throw new Error("clipboard unavailable");
@@ -258,6 +247,7 @@ export default function TestsDock({
 										className={
 											resultFilter === value ? "dock-seg active" : "dock-seg"
 										}
+										aria-pressed={resultFilter === value}
 										disabled={runningAll}
 										onClick={() => {
 											setResultFilter(value);
@@ -272,6 +262,7 @@ export default function TestsDock({
 						<button
 							type="button"
 							className="dock-action"
+							aria-pressed={sort === "za"}
 							disabled={runningAll}
 							onClick={() => setSort((current) => (current === "az" ? "za" : "az"))}
 						>
@@ -295,6 +286,26 @@ export default function TestsDock({
 						>
 							copy failures
 						</button>
+						<button
+							type="button"
+							className="dock-action"
+							disabled={failed === 0 || tests.running.size > 0}
+							onClick={() => {
+								const names = tests.items
+									.filter((item) => {
+										const report = tests.results.get(item.name);
+										return report !== undefined && !report.passed;
+									})
+									.map((item) => item.name);
+								if (names.length === 0) {
+									tests.runAll([]);
+									return;
+								}
+								tests.runAll(names);
+							}}
+						>
+							rerun failed
+						</button>
 						{copyStatus === null ? null : (
 							<span className="dock-copy-status">{copyStatus}</span>
 						)}
@@ -314,6 +325,7 @@ export default function TestsDock({
 					{tab === "tests" ? (
 						<TestsPanel
 							items={filtered}
+							totalCount={tests.items.length}
 							loading={tests.loading}
 							loadError={tests.loadError}
 							results={tests.results}

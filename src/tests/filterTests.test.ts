@@ -2,9 +2,12 @@ import { describe, expect, test } from "bun:test";
 import type { TestItem, TestReport } from "@/project/api";
 import {
 	applyTestFilters,
+	composeFailureLines,
+	matchesTestFilter,
 	resultLabel,
 	statusOf,
 	type TestFilterOptions,
+	truncateFailureOutput,
 } from "@/tests/filterTests";
 
 const item = (name: string, binary: string): TestItem => ({ name, binary });
@@ -99,5 +102,41 @@ describe("resultLabel", () => {
 		expect(resultLabel("failed")).toBe("Failed");
 		expect(resultLabel("passed")).toBe("Passed");
 		expect(resultLabel("notrun")).toBe("Not run");
+	});
+});
+
+describe("matchesTestFilter", () => {
+	test("matches case-insensitively against name and path", () => {
+		const item = { name: "Foo::Bar", binary: "src/Lib.rs" };
+		expect(matchesTestFilter(item, "foo")).toBe(true);
+		expect(matchesTestFilter(item, "LIB.RS")).toBe(true);
+		expect(matchesTestFilter(item, "nope")).toBe(false);
+	});
+});
+
+describe("composeFailureLines", () => {
+	test("emits path::name for failed tests only", () => {
+		const items = [item("a::t", "lib"), item("b::t", "lib")];
+		const results = new Map<string, TestReport>([
+			["a::t", report(false)],
+			["b::t", report(true)],
+		]);
+		expect(composeFailureLines(items, results)).toEqual(["a::t"]);
+	});
+});
+
+describe("truncateFailureOutput", () => {
+	test("truncates long output and reports it", () => {
+		const output = Array.from({ length: 5 }, (_, i) => `line ${i}`).join("\\n");
+		const result = truncateFailureOutput(output, 2);
+		expect(result.truncated).toBe(true);
+		expect(result.text).toBe("line 0\\nline 1");
+	});
+
+	test("leaves short output alone", () => {
+		const output = "a\\nb";
+		const result = truncateFailureOutput(output, 2);
+		expect(result.truncated).toBe(false);
+		expect(result.text).toBe(output);
 	});
 });

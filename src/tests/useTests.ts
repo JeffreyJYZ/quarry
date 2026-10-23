@@ -120,7 +120,11 @@ export function useTests(root: string | null): TestsController {
 	/* `Run all` walks the filtered list in order and stops at the first failure. */
 	const runAll = useCallback(
 		async (names: string[]): Promise<void> => {
-			if (root === null || names.length === 0 || runningAll.current) {
+			if (root === null || runningAll.current) {
+				return;
+			}
+			if (names.length === 0) {
+				setSummary("Nothing to run");
 				return;
 			}
 			runningAll.current = true;
