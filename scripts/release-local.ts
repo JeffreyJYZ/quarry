@@ -61,6 +61,29 @@ function dmgPath(version: string): string | null {
 	return join(DMG_DIR, candidates.sort().at(-1) as string);
 }
 
+/**
+ * Writes the dmg straight from the built bundle.
+ *
+ * Tauri's own dmg step asks Finder, through AppleScript, to hide a status bar on the mounted volume;
+ * that fails with -10006 whenever Finder is busy, which takes the whole release down. hdiutil copies
+ * the folder and converts it, with no Finder and no mount.
+ */
+function makeDmg(version: string): void {
+	const app = join(BUNDLE, "quarry.app");
+	if (!existsSync(app)) fail(`missing app bundle: ${app}`);
+	execFileSync("mkdir", ["-p", DMG_DIR]);
+	const arch = execFileSync("uname", ["-m"], { encoding: "utf8" }).trim() === "arm64"
+		? "aarch64"
+		: "x64";
+	const target = join(DMG_DIR, `quarry_${version}_${arch}.dmg`);
+	execFileSync(
+		"hdiutil",
+		["create", "-volname", "quarry", "-srcfolder", app, "-ov", "-format", "UDZO", target],
+		{ stdio: ["ignore", "pipe", "pipe"] },
+	);
+	log(`dmg ${target}`);
+}
+
 /** Detaches every mounted quarry volume, so a stray Finder window never survives a release. */
 function detachVolumes(): void {
 	const volumes = existsSync("/Volumes") ? readdirSync("/Volumes") : [];
@@ -116,12 +139,15 @@ async function main(): Promise<number> {
 
 	if (!process.argv.includes("--skip-build")) {
 		log(`building ${version} (universal, signed)`);
-		run("bun", ["run", "tauri", "build", "--bundles", "app,dmg"], {
+		run("bun", ["run", "tauri", "build", "--bundles", "app"], {
 			TAURI_SIGNING_PRIVATE_KEY: join(homedir(), ".tauri", "quarry-updater.key"),
 			TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "",
 		});
+		makeDmg(version);
 		detachVolumes();
 	}
+
+	if (dmgPath(version) === null) makeDmg(version);
 
 	const archive = ARCHIVE;
 	const signatureFile = ARCHIVE_SIG;
