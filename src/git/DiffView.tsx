@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { gitStageHunk, gitUnstageHunk } from "@/git/api";
+import { splitHunks } from "@/git/hunks";
 import { type CommitDiff, type GitFileDiff, gitCommitDiff, gitFileDiff } from "@/project/api";
 import { describeError } from "@/project/errors";
 
@@ -6,10 +8,11 @@ export type DiffViewProps = {
 	root: string;
 	path?: string | null;
 	commit?: string | null;
+	staged?: boolean;
 	onClose: () => void;
 };
 
-export default function DiffView({ root, path, commit, onClose }: DiffViewProps) {
+export default function DiffView({ root, path, commit, staged = false, onClose }: DiffViewProps) {
 	const isCommit = commit !== null && commit !== undefined;
 	const key = isCommit ? (commit as string) : (path as string);
 	const [diff, setDiff] = useState<GitFileDiff | CommitDiff | null>(null);
@@ -40,7 +43,6 @@ export default function DiffView({ root, path, commit, onClose }: DiffViewProps)
 		};
 	}, [root, key, isCommit]);
 
-	const lines = diff !== null && !diff.binary ? diff.diff.split("\n") : [];
 	const title = isCommit ? `commit ${key}` : key;
 
 	return (
@@ -63,18 +65,39 @@ export default function DiffView({ root, path, commit, onClose }: DiffViewProps)
 				) : diff.diff.trim() === "" ? (
 					<p className="git-diff-line">No changes</p>
 				) : (
-					lines.map((line, index) => {
-						let cls = "git-diff-line";
-						if (line.startsWith("+") && !line.startsWith("+++")) cls += " added";
-						else if (line.startsWith("-") && !line.startsWith("---")) cls += " removed";
-						else if (line.startsWith("@@")) cls += " hunk";
-						return (
-							// biome-ignore lint/suspicious/noArrayIndexKey: diff lines may repeat
-							<div key={index} className={cls}>
-								{line === "" ? " " : line}
+					splitHunks((diff as GitFileDiff | CommitDiff).diff).map((hunk) => (
+						<div key={hunk.id} className="git-diff-hunk">
+							<div className="git-diff-hunk-head">
+								<span className="git-diff-line hunk">{hunk.header}</span>
+								<button
+									type="button"
+									className="git-stage-btn git-hunk-btn"
+									onClick={() =>
+										void (
+											staged
+												? gitUnstageHunk(root, key, hunk.id)
+												: gitStageHunk(root, key, hunk.id)
+										).catch(() => {})
+									}
+								>
+									{staged ? "unstage" : "stage"}
+								</button>
 							</div>
-						);
-					})
+							{hunk.body.map((line, index) => {
+								let cls = "git-diff-line";
+								if (line.startsWith("+") && !line.startsWith("+++"))
+									cls += " added";
+								else if (line.startsWith("-") && !line.startsWith("---"))
+									cls += " removed";
+								return (
+									// biome-ignore lint/suspicious/noArrayIndexKey: diff lines may repeat
+									<div key={index} className={cls}>
+										{line === "" ? " " : line}
+									</div>
+								);
+							})}
+						</div>
+					))
 				)}
 			</div>
 		</section>
