@@ -105,7 +105,14 @@ pub fn write_text_file(path: String, text: String) -> Result<(), String> {
             if metadata.is_dir() {
                 return Err(format!("not a file: {path}"));
             }
-            metadata.permissions().mode() & 0o777
+            #[cfg(unix)]
+            {
+                metadata.permissions().mode() & 0o777
+            }
+            #[cfg(not(unix))]
+            {
+                NEW_FILE_MODE
+            }
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => NEW_FILE_MODE,
         Err(error) => return Err(format!("cannot write {path}: {error}")),
