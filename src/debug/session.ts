@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { dapContinueOn, dapStepOn } from "@/debug/dap";
+import {
+	type BuildProfile,
+	liveSessionProfileMismatch,
+	resolveDebugArtifact,
+} from "@/debug/profile";
 import { type Pin, type PinResult, pinKey } from "@/debug/watch";
 import { fileName } from "@/problems/model";
 import {
@@ -153,6 +158,10 @@ export type DebugController = {
 	sessionId: string | null;
 	/** How the live session started; null with no session. */
 	sessionKind: string | null;
+	/** Build profile the live session launched with; null with no session. */
+	sessionBuildProfile: BuildProfile | null;
+	/** Non-null when the build profile changed while a session is live. */
+	profileMismatch: string | null;
 	/** True while a restart is in flight. */
 	restarting: boolean;
 	/** True once after a restart, until the next stop clears it. */
@@ -229,7 +238,10 @@ export type DebugController = {
  * expansion cache, breakpoints and data breakpoints. Async work is generation guarded so a second
  * stop or a project switch cannot land stale rows.
  */
-export function useDebugSession(root: string | null): DebugController {
+export function useDebugSession(
+	root: string | null,
+	buildProfile: BuildProfile = "debug",
+): DebugController {
 	const [presets, setPresets] = useState<LaunchPreset[]>([]);
 	const [preset, setPresetState] = useState("");
 	const [configError, setConfigError] = useState<string | null>(null);
@@ -253,6 +265,7 @@ export function useDebugSession(root: string | null): DebugController {
 	/** The configuration the last launch resolved, shown under the select. */
 	const [resolved, setResolved] = useState<LaunchConfig | null>(null);
 	const [sessionKind, setSessionKind] = useState<string | null>(null);
+	const [sessionBuildProfile, setSessionBuildProfile] = useState<BuildProfile | null>(null);
 	const [restarting, setRestarting] = useState(false);
 	const [restarted, setRestarted] = useState(false);
 	const [attachPid, setAttachPid] = useState<number | null>(null);
@@ -355,6 +368,7 @@ export function useDebugSession(root: string | null): DebugController {
 		setKind(null);
 		setResolved(null);
 		setSessionKind(null);
+		setSessionBuildProfile(null);
 		setAttachPid(null);
 		setPidInputState("");
 		setBuildNeeded(null);
@@ -1101,7 +1115,7 @@ export function useDebugSession(root: string | null): DebugController {
 	 * is a plain error line.
 	 */
 	const launch = useCallback(
-		async (offerBuild = true) => {
+		async (offerBuild = true, programOverride: string | null = null) => {
 			const rootNow = rootRef.current;
 			if (rootNow === null) {
 				setError("Open a project first");
@@ -1133,6 +1147,9 @@ export function useDebugSession(root: string | null): DebugController {
 				setError(`Launch: ${message}`);
 				return;
 			}
+			if (programOverride !== null && programOverride !== "") {
+				config = { ...config, program: programOverride };
+			}
 			setResolved(config);
 			let id: string;
 			try {
@@ -1146,6 +1163,7 @@ export function useDebugSession(root: string | null): DebugController {
 			sessionRef.current = id;
 			setSessionId(id);
 			setSessionKind("launch");
+			setSessionBuildProfile(buildProfile);
 			setRestarted(false);
 			setLaunching(false);
 			setExceptionFilters([]);
@@ -1159,7 +1177,7 @@ export function useDebugSession(root: string | null): DebugController {
 				setError(`Configuration done: ${describeError(reason)}`);
 			}
 		},
-		[syncAll, resolveConfig, loadExceptionFilters],
+		[syncAll, resolveConfig, loadExceptionFilters, buildProfile],
 	);
 
 	/** Build the project, then retry the launch once; a second failure is a plain error line. */
@@ -1172,14 +1190,21 @@ export function useDebugSession(root: string | null): DebugController {
 		setBuilding(true);
 		setBuildNeeded(null);
 		setError(null);
+		let program: string | null = null;
 		try {
-			const report = await buildProject(rootNow, "debug");
+			const report = await buildProject(rootNow, buildProfile);
 			if (!report.success) {
 				setError(`Build: ${report.summary}`);
 				/* The offer stays: only the launch retry is limited to one. */
 				setBuildNeeded(message);
 				return;
 			}
+			const target = resolveDebugArtifact(report, buildProfile);
+			if (!target.ok) {
+				setError(target.error);
+				return;
+			}
+			program = target.program;
 		} catch (reason) {
 			setError(`Build: ${describeError(reason)}`);
 			setBuildNeeded(message);
@@ -1187,8 +1212,8 @@ export function useDebugSession(root: string | null): DebugController {
 		} finally {
 			setBuilding(false);
 		}
-		await launch(false);
-	}, [buildNeeded, building, launch]);
+		await launch(false, program);
+	}, [buildNeeded, building, launch, buildProfile]);
 
 	const setPidInput = useCallback((value: string) => {
 		setPidInputState(value);
@@ -1283,6 +1308,7 @@ export function useDebugSession(root: string | null): DebugController {
 		setLaunching(false);
 		setRestarting(false);
 		setStopView(null);
+		setSessionBuildProfile(null);
 		setChildren(new Map());
 		setExpanded(new Set());
 		setSelectedVariable(null);
@@ -1375,6 +1401,7 @@ export function useDebugSession(root: string | null): DebugController {
 			setLaunching(false);
 			setRestarting(false);
 			setStopView(null);
+			setSessionBuildProfile(null);
 			setChildren(new Map());
 			setExpanded(new Set());
 			setSelectedVariable(null);
@@ -1464,6 +1491,11 @@ export function useDebugSession(root: string | null): DebugController {
 
 	const breakpointsByPath = useMemo(() => groupByPath(breakpoints), [breakpoints]);
 	const pinnedKeys = useMemo(() => new Set(pins.map(pinKey)), [pins]);
+	const profileMismatch = liveSessionProfileMismatch(
+		sessionBuildProfile,
+		buildProfile,
+		sessionId !== null,
+	);
 	void attachPid;
 
 	return {
@@ -1473,6 +1505,8 @@ export function useDebugSession(root: string | null): DebugController {
 		configError,
 		sessionId,
 		sessionKind,
+		sessionBuildProfile,
+		profileMismatch,
 		restarting,
 		restarted,
 		pidInput,

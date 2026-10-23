@@ -299,6 +299,9 @@ export default function DebugPanel({
 				{debug.sessionKind === null ? null : (
 					<span className="debug-session">
 						{debug.sessionKind}
+						{debug.sessionBuildProfile === null
+							? ""
+							: ` · ${debug.sessionBuildProfile}`}
 						{debug.restarted ? " (restarted)" : ""}
 					</span>
 				)}
@@ -307,6 +310,11 @@ export default function DebugPanel({
 			{debug.error === null ? null : (
 				<p className="debug-error" role="status">
 					{debug.error}
+				</p>
+			)}
+			{debug.profileMismatch === null ? null : (
+				<p className="debug-error" role="status">
+					{debug.profileMismatch}
 				</p>
 			)}
 			{debug.buildNeeded === null ? null : (

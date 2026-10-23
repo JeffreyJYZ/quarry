@@ -8,7 +8,6 @@ import StatusBar from "@/components/StatusBar";
 import TabStrip from "@/components/TabStrip";
 import Welcome from "@/components/Welcome";
 import { type BreakpointRow, useDebugSession } from "@/debug/session";
-
 import type { EditorHandle } from "@/editor/Editor";
 import LazyEditor from "@/editor/LazyEditor";
 import DiffView from "@/git/DiffView";
@@ -22,6 +21,7 @@ import {
 } from "@/lsp/diagnostics";
 import { useDiagnosticsFeed } from "@/lsp/feed";
 import { useDocumentSync, useLspServer } from "@/lsp/session";
+import TypeHierarchyPanel from "@/lsp/TypeHierarchyPanel";
 import Outline from "@/outline/Outline";
 import type { Command } from "@/palette/CommandPalette";
 
@@ -198,6 +198,11 @@ export default function App() {
 	const [callsCursor, setCallsCursor] = useState<{ line: number; character: number } | null>(
 		null,
 	);
+	const [typeHierarchyOpen, setTypeHierarchyOpen] = useState(false);
+	const [typeHierarchyCursor, setTypeHierarchyCursor] = useState<{
+		line: number;
+		character: number;
+	} | null>(null);
 	const [cursor, setCursor] = useState<{ line: number; character: number } | null>(null);
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [quickOpenOpen, setQuickOpenOpen] = useState(false);
@@ -690,7 +695,7 @@ export default function App() {
 
 	const reportNotice = useCallback((message: string) => setNotice(message), []);
 	const lsp = useLspServer(root, reportNotice);
-	const debug = useDebugSession(root);
+	const debug = useDebugSession(root, buildProfile);
 
 	/* Breakpoints live in the debug session, keyed by absolute path, so a tab switch or a gutter
 	 * click with no live session both render straight from that map. */
@@ -997,6 +1002,19 @@ export default function App() {
 			event.preventDefault();
 			setCallsCursor(cursor);
 			setCallsOpen(true);
+		};
+		window.addEventListener("keydown", handleKeyDown, true);
+		return () => window.removeEventListener("keydown", handleKeyDown, true);
+	}, [cursor]);
+
+	/** Shift+Alt+T opens the type hierarchy panel. */
+	useEffect(() => {
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (!event.shiftKey || !event.altKey || event.metaKey || event.ctrlKey) return;
+			if (event.key.toLowerCase() !== "t") return;
+			event.preventDefault();
+			setTypeHierarchyCursor(cursor);
+			setTypeHierarchyOpen(true);
 		};
 		window.addEventListener("keydown", handleKeyDown, true);
 		return () => window.removeEventListener("keydown", handleKeyDown, true);
@@ -1770,6 +1788,18 @@ export default function App() {
 								<p className="calls-empty">Place the caret on a symbol</p>
 							</div>
 						</section>
+					) : project &&
+						typeHierarchyOpen &&
+						root !== null &&
+						activePath !== null &&
+						typeHierarchyCursor !== null ? (
+						<TypeHierarchyPanel
+							root={root}
+							path={activePath}
+							cursor={typeHierarchyCursor}
+							onNavigate={handleNavigate}
+							onClose={() => setTypeHierarchyOpen(false)}
+						/>
 					) : project ? (
 						<TestsDock
 							tab={dockTab}

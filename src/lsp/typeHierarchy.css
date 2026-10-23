@@ -1,0 +1,200 @@
+/* Type hierarchy panel: same bottom slot as the calls panel, one column that scrolls on its own. */
+.type-hierarchy-panel {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+	min-width: 0;
+	background: var(--panel);
+	border-top: 1px solid var(--line);
+	outline: none;
+}
+
+.type-hierarchy-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	height: 32px;
+	padding: 0 12px;
+	border-bottom: 1px solid var(--line);
+}
+
+.type-hierarchy-title {
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.type-hierarchy-tools {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.type-hierarchy-action,
+.type-hierarchy-close {
+	height: 20px;
+	padding: 0 8px;
+	font: inherit;
+	font-size: 11px;
+	color: var(--muted);
+	background: transparent;
+	border: 1px solid var(--line);
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.type-hierarchy-action:hover:not(:disabled),
+.type-hierarchy-close:hover {
+	color: var(--text);
+	border-color: #2b333d;
+}
+
+.type-hierarchy-action:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+.type-hierarchy-tabs {
+	display: flex;
+	gap: 2px;
+	padding: 6px 12px 0;
+	border-bottom: 1px solid var(--line);
+}
+
+.type-hierarchy-tab {
+	height: 24px;
+	padding: 0 10px;
+	font: inherit;
+	font-size: 12px;
+	color: var(--muted);
+	background: transparent;
+	border: none;
+	border-bottom: 2px solid transparent;
+	cursor: pointer;
+}
+
+.type-hierarchy-tab:hover {
+	color: var(--text);
+}
+
+.type-hierarchy-tab.active {
+	color: var(--text);
+	border-bottom-color: var(--accent);
+}
+
+.type-hierarchy-body {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+	padding: 6px 0 10px;
+}
+
+.type-hierarchy-row {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	width: 100%;
+	padding-right: 10px;
+}
+
+.type-hierarchy-row:hover {
+	background: var(--hover);
+}
+
+.type-hierarchy-row.active {
+	background: #16202e;
+}
+
+.type-hierarchy-expand {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 20px;
+	padding: 0;
+	font: inherit;
+	font-size: 10px;
+	color: var(--muted);
+	background: transparent;
+	border: none;
+	cursor: pointer;
+}
+
+.type-hierarchy-expand:hover {
+	color: var(--text);
+}
+
+.type-hierarchy-name {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	flex: 1;
+	min-width: 0;
+	height: 22px;
+	padding: 0 4px;
+	font: inherit;
+	text-align: left;
+	color: var(--text);
+	background: transparent;
+	border: none;
+	border-radius: 3px;
+	cursor: pointer;
+}
+
+button.type-hierarchy-name:hover {
+	background: transparent;
+	text-decoration: underline;
+}
+
+.type-hierarchy-name.disabled {
+	color: var(--muted);
+	cursor: default;
+}
+
+.type-hierarchy-label {
+	font-family: var(--mono);
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.type-hierarchy-detail {
+	overflow: hidden;
+	font-size: 11px;
+	color: var(--muted);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.type-hierarchy-file {
+	margin-left: auto;
+	font-family: var(--mono);
+	font-size: 11px;
+	color: var(--muted);
+	white-space: nowrap;
+}
+
+.type-hierarchy-loading,
+.type-hierarchy-empty,
+.type-hierarchy-error,
+.type-hierarchy-note {
+	margin: 0;
+	padding: 3px 12px;
+	font-size: 12px;
+}
+
+.type-hierarchy-loading,
+.type-hierarchy-empty,
+.type-hierarchy-note {
+	color: var(--muted);
+}
+
+.type-hierarchy-error {
+	color: var(--danger);
+	font-family: var(--mono);
+	font-size: 11px;
+	white-space: pre-wrap;
+}
