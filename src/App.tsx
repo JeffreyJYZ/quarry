@@ -1791,10 +1791,10 @@ export default function App() {
 							<Terminal root={project.root} activePath={activePath} />
 						</Suspense>
 					) : project &&
-						callsOpen &&
-						root !== null &&
-						activePath !== null &&
-						callsCursor !== null ? (
+					  callsOpen &&
+					  root !== null &&
+					  activePath !== null &&
+					  callsCursor !== null ? (
 						<CallsPanel
 							root={root}
 							path={activePath}
@@ -1819,10 +1819,10 @@ export default function App() {
 							</div>
 						</section>
 					) : project &&
-						typeHierarchyOpen &&
-						root !== null &&
-						activePath !== null &&
-						typeHierarchyCursor !== null ? (
+					  typeHierarchyOpen &&
+					  root !== null &&
+					  activePath !== null &&
+					  typeHierarchyCursor !== null ? (
 						<TypeHierarchyPanel
 							root={root}
 							path={activePath}

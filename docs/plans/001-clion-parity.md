@@ -119,6 +119,7 @@ copied into this MIT repo.
 ## 6. Spike before P3 — done
 
 Run and measured: [`dap.md`](../spikes/dap.md), reproducible with `bun run scripts/dap-spike.ts`.
+
 - `readMemory`, `disassemble` and hardware data breakpoints all work against Xcode's `lldb-dap`
   (LLVM 21.0.0); `readMemory` returned exactly the planted bytes.
 - Rust pretty printing is off by default: a `Vec<u8>` arrives as `{buf, len}`. One `initCommands`

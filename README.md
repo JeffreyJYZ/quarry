@@ -13,6 +13,7 @@ exactly what this is built around. Those engines already exist; quarry is the ID
 
 Most of the daily loop runs end to end for a Cargo project. This is what the app actually does today,
 read off `src-tauri/src/lib.rs` and `src/`:
+
 - **Project and shell**: open a folder, detect `cargo` / `CMakeLists.txt` / `compile_commands.json`,
   report which toolchains were found on `PATH` or via `xcrun`, browse a lazily expanded file tree, open
   files in tabs, save, restore the last project, open tabs and layout (rail, debug panel, git panel,
@@ -108,7 +109,7 @@ read off `src-tauri/src/lib.rs` and `src/`:
 - **Tests**: `list_tests` and `run_test` feed a Tests dock with pass/fail status, filtering by
   binary and result, sorting, and run-all scoped to the filtered set
   (`src/tests/filterTests.ts`). Result filtering covers all, failed, passed and not-run; `copy
-  failures` writes one `path::test_name` line per failed test; per-test failure output is
+failures` writes one `path::test_name` line per failed test; per-test failure output is
   available on an expanded row; `rerun failed` re-runs only the failed tests. The tests dock offers
   `copy name` per row, `copy output` on an expanded failure, and `copy failures` (disabled when
   nothing failed).
@@ -140,6 +141,7 @@ read off `src-tauri/src/lib.rs` and `src/`:
   `Escape` closes it, and a server that reports no hierarchy for the symbol says so instead of erroring.
 
 Still missing, and named here so it is not mistaken for done:
+
 - **No expression evaluation, so no watch expressions from expressions** — Rust expression evaluation cannot be
   made to work through `lldb-dap` here: `evaluate` returns nothing usable across `repl`/`watch`/`hover`,
   `settings set target.language rust` changes nothing, and `setExpression` kills the adapter. A watch pane can
@@ -204,6 +206,7 @@ The formatter for TypeScript, CSS and Markdown is Biome; `bun run verify` is the
 ## Tests
 
 Rust tests live in `src-tauri` and run with `cd src-tauri && cargo test`. Frontend unit tests are `bun test` over pure helpers: ranking in `src/quickopen/rank.ts`, argument splitting in `src/run/splitArgs.ts`, hex helpers in `src/debug/memory/hex.ts`, buffer handling in `src/project/buffer.ts`, blame helpers in `src/editor/blame.ts`, the search model in `src/search/model.ts`, and test filtering in `src/tests/filterTests.ts` (covered by `src/tests/filterTests.test.ts`). The smoke scripts under `scripts/` are the only place real language servers and debuggers are exercised. The commit gate is `bun run gate` (`bun run verify` plus `bun test`). Rust changes also require `cargo check --all-targets` and `cargo clippy --all-targets -- -D warnings` to pass; clippy is clean on the current tree with no `#[allow(clippy::…)]` added. CI runs on macOS for pushes to `main` and pull requests: it runs `bun run gate`, then `bun run build`, then `cargo test`, `cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` in `src-tauri`. The smoke scripts are excluded because they need a real `rust-analyzer` and `lldb-dap`. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
 ## Smoke scripts
 
 - `scripts/lsp-smoke.ts` — initialize handshake against a language server.

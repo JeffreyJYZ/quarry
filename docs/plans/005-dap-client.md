@@ -29,6 +29,7 @@ Commands live in `src-tauri/src/dap.rs` and are registered in `lib.rs`; types (`
 Events: `dap://stopped` (`DapStoppedEvent`), `dap://terminated` (`{ session }`).
 
 Rules carried from the spike:
+
 - `dataId` arrives without `0x`; pass it through untouched, `accessType: "write"`.
 - `hitBreakpointIds` is null on a watchpoint stop — attribute by `description` and address.
 - Do not gate memory or disassembly on `supportsMemoryReferences`.

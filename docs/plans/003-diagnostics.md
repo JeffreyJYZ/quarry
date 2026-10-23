@@ -10,6 +10,7 @@ Open a project, open a file, and see real errors and warnings — underlined in 
 problems panel — sourced from rust-analyzer or clangd, plus compiler diagnostics from a build.
 
 Acceptance:
+
 1. Opening a project starts one language server for its kind (`rust-analyzer` for Cargo, `clangd` for
    CMake or `compile_commands.json`) and reports it in the status bar.
 2. Diagnostics for an open document arrive without saving and render as underline squiggles plus a

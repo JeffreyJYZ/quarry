@@ -9,6 +9,7 @@ Launch the app, pick a Rust or C/C++ folder, see its files, open one in the edit
 toolchains were detected — with the compile state green and no LSP or DAP code yet.
 
 Acceptance:
+
 1. `bun run tauri dev` opens a window with the dark shell; no white flash.
 2. "Open project" picks a directory and records root, name, kind (`cargo` / `cmake` /
    `compileCommands` / `unknown`), build root, and whether `.quarry/launch.json` exists.

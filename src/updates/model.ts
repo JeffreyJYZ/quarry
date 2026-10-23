@@ -1,6 +1,5 @@
 export type Offer =
-	| { kind: "updater"; version: string; update: unknown }
-	| { kind: "github"; version: string };
+	{ kind: "updater"; version: string; update: unknown } | { kind: "github"; version: string };
 
 const VERSION_RE = /^\d+\.\d+\.\d+(?:-([0-9A-Za-z.-]+))?$/;
 

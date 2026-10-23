@@ -150,6 +150,7 @@ Reproduce with `bun run scripts/dap-eval-probe.ts`. Throwaway cargo project, sto
 Verdict: **Rust expression evaluation cannot be made to work through lldb-dap here** — every variant either returns empty/`No value`, reports the process as running, or crashes the adapter. `settings set target.language rust` is not a usable escape hatch (adapter's own response unchanged). `setExpression` is unusable (kills the adapter).
 
 What a watch pane can do instead:
+
 - Use `variables` (default or `filter: "named"`) for locals — both return the same set here; no expression needed.
 - Render a `Vec<u8>` as bytes via `readMemory` using the pointer taken from the `raw`/`ptr` variable's value (leading `0x…` token) — measured working (`de ad be ef 00 11 22 33`).
 - Use `dataBreakpointInfo`/`setDataBreakpoints` for watchpoints instead of `evaluate`-based watches.

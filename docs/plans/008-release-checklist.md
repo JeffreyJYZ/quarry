@@ -5,6 +5,7 @@ Checklist for cutting a quarry release. Run top to bottom; do not ship on any re
 ## 1. Pre-flight gates
 
 Run from the repository root unless noted.
+
 - `bun run gate` — runs `bun run verify` then `bun test`. Proves TypeScript types (`bun check`), Biome formatting and lint (`biome check .`), and the frontend unit tests (`bun test`) over `src/quickopen/rank.ts`, `src/run/splitArgs.ts`, `src/debug/memory/hex.ts` and `src/project/buffer.ts`.
 - `bun run build` — runs `bun run typecheck` then `vite build`. Proves the frontend bundles cleanly to `dist/`.
 - `cargo test` (run in `src-tauri/`) — proves the Rust unit tests, including the build-task and diagnostic parsing tests.
@@ -17,6 +18,7 @@ Also run before committing: `cargo fmt --check` must be clean. Note `src-tauri/s
 ## 2. Smoke matrix
 
 Run the scripts under `scripts/`. Each exercises real toolchains, not mocks.
+
 - `bun run scripts/lsp-smoke.ts` — initialize handshake against a language server. Depends on `rust-analyzer` installed and on `PATH`.
 - `bun run scripts/lsp-ux-smoke.ts` — navigation response shapes (hover, completion, definition, references). Verified against rust-analyzer 1.99.0.
 - `bun run scripts/dap-spike.ts` — debugger capabilities, memory, breakpoints and formatters. Depends on `lldb-dap` reached through `xcrun`, and on the Rust pretty-printer `initCommands` loading `lldb_lookup.py`.
@@ -38,6 +40,7 @@ TAURI_SIGNING_PRIVATE_KEY="$HOME/.tauri/quarry-updater.key" bun run tauri build 
 That produces the `.app` plus the `.app.tar.gz` and its `.sig` beside it.
 
 Measured facts from a real run:
+
 - command: `bun run tauri build --bundles app`
 - artefact: `src-tauri/target/release/bundle/macos/quarry.app`
 - size: 5.42 MiB
@@ -49,9 +52,11 @@ Artefacts land under `src-tauri/target/release/bundle/` (platform bundles such a
 
 Launch smoke step (automated, run after the build):
 `bun run verify:bundle` checks the version strings agree across `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`, that `src-tauri/target/release/bundle/macos/quarry.app` exists with its size, the binary is executable, the code signature state via `codesign --verify --deep --strict` (reported, not fatal for an ad-hoc local build), and a bounded launch that must appear, stay alive and exit cleanly.
+
 ## 4. Version bumping
 
 The version lives in three places and they must agree before release. Checked against the current tree (all agree at `0.1.0`):
+
 - `package.json`: `"version": "0.1.0"`
 - `src-tauri/Cargo.toml`: `version = "0.1.0"`
 - `src-tauri/tauri.conf.json`: `"version": "0.1.0"`
@@ -63,6 +68,7 @@ Bump all three together. A mismatch between them leaves the bundle, the crate an
 ## 5. Publishing a release and the updater
 
 `.github/workflows/release.yml` builds macOS universal, Linux and Windows, one platform at a time, and attaches the signed updater artefacts plus `latest.json` to the release. Two ways in:
+
 - run the workflow by hand with a `bump` choice — it commits `chore(release): v<version>`, tags `v<version>` and pushes both;
 - push a `v*` tag yourself; the build job verifies the tag against `src-tauri/tauri.conf.json` and fails on a mismatch.
 
@@ -75,6 +81,7 @@ The updater endpoint is `https://github.com/JeffreyJYZ/quarry/releases/latest/do
 ## 6. Known gaps to state in release notes
 
 Quote only provable facts:
+
 - Rust expression evaluation is unusable: `evaluate` returns nothing usable across `repl`/`watch`/`hover`, `settings set target.language rust` changes nothing, and `setExpression` kills the adapter. No watch-expression pane ships; only variables-tree watching and memory views.
 - Remote development, embedded targets, profilers and a plugin API are absent (explicit non-goals).
 - C/C++ builds need clang or cmake; when cmake is absent the fallback is a plain clang build, and cmake and ninja are not installed on this machine.

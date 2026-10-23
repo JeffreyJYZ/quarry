@@ -1,6 +1,7 @@
 # quarry
 
 Rust and C/C++ IDE. Tauri 2 + React 19 shell; clangd, rust-analyzer and lldb-dap do the real work.
+
 - **Scope: Rust + C/C++ only**, CLion parity on the daily loop. Never a general editor.
 - **Plan is `docs/plans/001-clion-parity.md`** — parity matrix, slices, estimates, non-goals; read before feature work.
 - **Non-goals stay non-goals**: profiler, remote, embedded, DB, Docker, AI, plugin API, other languages.
@@ -9,8 +10,8 @@ Rust and C/C++ IDE. Tauri 2 + React 19 shell; clangd, rust-analyzer and lldb-dap
 - **No `cargo run` as a debug launch** — build first, pass `lldb-dap` the binary from cargo JSON.
 - **Rust module is `build_task.rs`**, never `build.rs` (Cargo's build script).
 - **`src/` only**, `@/*` maps to `./src/*`; no root-level `lib/`.
-- **Gates: `bun check` for types, `bun lint` + `bun fmt` for Biome, `bun test` for frontend units, `bun run gate` before a commit** — tabs, indentWidth 4, lineWidth 100; warnings fail, so leave zero.
-- **Biome stays the formatter even though Bun ships `bun fmt`** — `bun fmt` ignores `biome.json` and rewrites to two spaces, and `biome check` verifies formatting without writing while `bun fmt` writes.
+- **Gates: `bun check` for types, `bun fmt --check` for formatting, `biome lint` for lint, `bun test` for frontend units, `bun run gate` before a commit** — hard tabs 4 wide, print width 100; warnings fail, so leave zero.
+- **`bun fmt` is the formatter, configured in `bunfig.toml` `[fmt]` (`useTabs`, `tabWidth = 4`, `printWidth = 100`)** — Biome no longer formats; it lints only, so `biome check` would flag tab/width drift the formatter owns.
 - **No `typescript` dependency**: `bun check` is the type checker and `vite build` transpiles; verified by removing the package and passing both (2026-10-22).
 - **`bun` only** — never npm; `bun run build` keeps `run` (built-in subcommand).
 - **Full-document LSP sync only**; revisit only on a measured stall.

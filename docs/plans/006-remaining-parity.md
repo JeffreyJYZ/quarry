@@ -46,6 +46,7 @@ Each line names the command or component that proves the capability, taken from
 ## 3. Definition of done for the daily loop at parity
 
 A future agent ticks each item without judgement. All must hold on a Cargo project on this machine.
+
 - [ ] Open a folder containing `Cargo.toml`; the project kind reports `cargo` and toolchains list `cargo`, `rust-analyzer`, `rustfmt`, `lldb-dap`.
 - [ ] Open a Rust source file; hover, go-to-definition, references and completion return results from `rust-analyzer`; verified by `bun run scripts/lsp-ux-smoke.ts`.
 - [ ] `lsp_symbols` returns a document outline; the outline panel renders it.
@@ -63,6 +64,7 @@ A future agent ticks each item without judgement. All must hold on a Cargo proje
 ## 4. How to verify
 
 Smoke scripts:
+
 - `bun run scripts/lsp-smoke.ts` — initialize handshake against a language server.
 - `bun run scripts/lsp-ux-smoke.ts` — navigation response shapes (hover, completion, definition, references).
 - `bun run scripts/dap-spike.ts` — debugger capabilities, memory, breakpoints and formatters.
@@ -70,6 +72,7 @@ Smoke scripts:
 - `bun run scripts/cxx-smoke.ts` — clang diagnostic shape and the missing-cmake path.
 
 Gates:
+
 - `bun check`
 - `bunx biome check .`
 - `cd src-tauri && cargo test`

@@ -890,8 +890,7 @@ async function main() {
 		const yn = (v: boolean | undefined) => (v ? "yes" : "no");
 		const renderings = report.renderings as Record<string, string | null> | undefined;
 		const disasm = report.disassembly as
-			| Array<{ address: string; instruction: string }>
-			| undefined;
+			Array<{ address: string; instruction: string }> | undefined;
 		const dataBp = report.dataBreakpoint as { name: string; dataId: string | null } | undefined;
 		const topFrame = report.topFrame as { name: string; line: number } | undefined;
 		const lines: string[] = [];
@@ -929,12 +928,10 @@ async function main() {
 		const setBp =
 			(report.setDataBreakpoints as Array<{ verified?: boolean }> | undefined) ?? [];
 		const outcome = report.dataBreakpointOutcome as
-			| { event?: string; reason?: string | null; description?: string | null }
-			| undefined;
+			{ event?: string; reason?: string | null; description?: string | null } | undefined;
 		const stopAt = report.dataBreakpointStop as { name?: string; line?: number } | undefined;
 		const staticBp = report.staticDataBreakpoint as
-			| { name: string; dataId: string | null }
-			| undefined;
+			{ name: string; dataId: string | null } | undefined;
 		lines.push(
 			`  dataBP      local ${dataBp?.name}=${dataBp?.dataId ?? "no dataId"} · static ${staticBp ? `${staticBp.name}=${staticBp.dataId ?? "no dataId"}` : "n/a"} · set=${setBp.length ? `verified=${yn(setBp[0].verified)}` : "none"}`,
 		);
@@ -942,8 +939,7 @@ async function main() {
 			`              fired=${outcome?.event === "stopped" ? `${stopAt?.name ?? "?"}@${String(stopAt?.line ?? "?")} (${String(outcome.description ?? outcome.reason ?? "")}, watched=${String(report.counterAtWatchStop ?? "?")})` : String(outcome?.event ?? "n/a")} · exit=${String((report.finish as { event?: string })?.event ?? "?")}`,
 		);
 		const pretty = report.pretty as
-			| { vec: boolean; string: boolean; optionShowsSome: boolean }
-			| undefined;
+			{ vec: boolean; string: boolean; optionShowsSome: boolean } | undefined;
 		lines.push(
 			`  pretty      vec=${yn(pretty?.vec)} string=${yn(pretty?.string)} option=${pretty?.optionShowsSome ? "Some" : "raw"} · stock children v=[${((report.vecChildren as Array<{ name: string }> | undefined) ?? []).map((c) => c.name).join(",")}] s=[${((report.stringChildren as Array<{ name: string }> | undefined) ?? []).map((c) => c.name).join(",")}]`,
 		);

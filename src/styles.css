@@ -15,7 +15,11 @@
 	--mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
 
 	color-scheme: dark;
-	font-family: system-ui, -apple-system, "SF Pro Text", sans-serif;
+	font-family:
+		system-ui,
+		-apple-system,
+		"SF Pro Text",
+		sans-serif;
 	font-size: 13px;
 	line-height: 1.5;
 	color: var(--text);

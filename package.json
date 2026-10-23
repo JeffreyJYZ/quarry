@@ -10,8 +10,8 @@
 		"tauri": "tauri",
 		"typecheck": "bun check",
 		"lint": "biome lint --write .",
-		"fmt": "biome format --write .",
-		"verify": "bun run typecheck && biome check .",
+		"fmt": "bun fmt",
+		"verify": "bun run typecheck && bun fmt --check && biome lint .",
 		"test": "bun test",
 		"gate": "bun run verify && bun test",
 		"verify:bundle": "bun run scripts/verify-bundle.ts"
