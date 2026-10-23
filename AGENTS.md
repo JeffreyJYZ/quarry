@@ -3,6 +3,7 @@
 Rust and C/C++ IDE. Tauri 2 + React 19 shell; clangd, rust-analyzer and lldb-dap do the real work.
 
 - **Scope: Rust + C/C++ only**, CLion parity on the daily loop. Never a general editor.
+- **CLion is the reference for both UI and features** — reverse-engineer it with the `rea` MCP tools when the target behaviour is unclear, instead of guessing; screenshots live in the gitignored `docs/reference/`.
 - **Plan is `docs/plans/001-clion-parity.md`** — parity matrix, slices, estimates, non-goals; read before feature work.
 - **Non-goals stay non-goals**: profiler, remote, embedded, DB, Docker, AI, plugin API, other languages.
 - **Toolchains are detected, never bundled** — probe `PATH` then `xcrun --find`; GUI launch carries launchd's PATH.

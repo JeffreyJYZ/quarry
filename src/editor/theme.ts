@@ -150,10 +150,13 @@ export const quarryTheme: Extension = EditorView.theme(
 			lineHeight: "1.5",
 		},
 		".cm-content": {
-			caretColor: "var(--accent)",
+			caretColor: "var(--text)",
 		},
+		// The caret is the brightest thing in the editor: bracket marks stay a tint so the two can
+		// never be confused for one another.
 		".cm-cursor, .cm-dropCursor": {
-			borderLeftColor: "var(--accent)",
+			borderLeftColor: "var(--text)",
+			borderLeftWidth: "2px",
 		},
 		".cm-selectionBackground, .cm-content ::selection": {
 			backgroundColor: palette.selection,
@@ -178,12 +181,19 @@ export const quarryTheme: Extension = EditorView.theme(
 			padding: "0 10px 0 14px",
 			minWidth: "42px",
 		},
+		// A faint tint only: an outline plus a fill read as bright as the caret did.
 		"&.cm-focused .cm-matchingBracket": {
-			backgroundColor: palette.selection,
-			outline: "1px solid var(--accent)",
+			backgroundColor: "rgba(91, 141, 239, 0.16)",
+			borderRadius: "2px",
+			outline: "none",
 		},
 		".cm-matchingBracket": {
-			color: palette.identifier,
+			color: "inherit",
+		},
+		"&.cm-focused .cm-nonmatchingBracket": {
+			backgroundColor: "rgba(217, 139, 139, 0.22)",
+			borderRadius: "2px",
+			outline: "none",
 		},
 		".cm-searchMatch": {
 			backgroundColor: "rgba(229, 192, 123, 0.25)",
