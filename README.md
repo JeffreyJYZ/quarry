@@ -34,7 +34,9 @@ read off `src-tauri/src/lib.rs` and `src/`:
 - **Build**: `build_project` runs `cargo build --message-format=json` and merges its machine-readable
   diagnostics into the Problems dock. C/C++ projects without a build system compile through a plain
   clang build (`run_plain_clang_build` in `src-tauri/src/build_task.rs`), so C/C++ builds do not
-  require cmake.
+  require cmake. The toolbar's Build split control offers Debug and Release (`BUILD_PROFILES` and
+  `buildProfile` in `src/App.tsx`), remembered for the session and passed through to
+  `build_project`; the debug panel's launch-time build still hardcodes `debug`.
 - **Run**: `run_program` / `stop_program` stream `run://output` lines and one `run://exited`, with a
   run panel in `src/run/` (program, args, cwd, env vars with validation, argv preview, run/stop).
 - **Terminal**: an embedded terminal built on `portable-pty` (`pty::pty_open` / `pty_write` /
@@ -86,7 +88,9 @@ read off `src-tauri/src/lib.rs` and `src/`:
   `src/git/SourceControl.tsx`. Blame annotations render in the editor through
   `src/editor/blame.ts` (wired into `src/editor/Editor.tsx`) on top of the `git_blame` backend,
   toggled by the title-bar `Blame` button (`blameOn` in `src/App.tsx`); the Source Control
-  `Blame` tab groups the same data by commit.
+  `Blame` tab groups the same data by commit. Copy actions: `copy path` on change rows and
+  `copy hash` on history rows and blame groups, with propagation stopped so the row action does
+  not fire.
 - **Breadcrumb**: a strip showing the file path and the symbol chain containing the caret, built from
   `lsp_symbols` in `src/breadcrumb/Breadcrumb.tsx`.
 
