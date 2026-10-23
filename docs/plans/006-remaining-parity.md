@@ -40,7 +40,7 @@ Each line names the command or component that proves the capability, taken from
 3. **Embedded targets.** Explicit non-goal. Do not schedule.
 4. **Profiler.** Explicit non-goal. Do not schedule.
 5. **Plugin API.** Explicit non-goal. Do not schedule.
-6. **Watch-expression pane.** Blocked on item 1; can only offer variables-tree watching and memory views until a different adapter or toolchain is measured. Estimate: unknown.
+6. **Watch pane.** No expression evaluation, so no watch expressions from expressions; pinned in-scope variables can still be watched (re-read on each stop) plus memory views, until a different adapter or toolchain is measured. Estimate: unknown.
 
 ## 3. Definition of done for the daily loop at parity
 

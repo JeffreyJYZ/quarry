@@ -50,7 +50,10 @@ read off `src-tauri/src/lib.rs` and `src/`:
   frames (clicking a frame opens its source line), scopes, variables, hardware watchpoints, a paged
   hex memory pane and a disassembly pane. Exception breakpoints toggle from the adapter's own filter
   list through `dap::dap_exception_filters` and `dap::dap_set_exception_breakpoints`, and survive a restart.
-  Variable values can be edited via `dap::dap_set_variable` and memory cells via `dap::dap_write_memory`.
+  Variable values can be edited via `dap::dap_set_variable` and memory cells via `dap::dap_write_memory`. A
+  pinned-variable watch pane re-reads pinned in-scope variables on each stop, reporting `not in scope` when a
+  pinned variable is absent and `unavailable` when its read fails; pins survive a restart and clear when the
+  session ends.
 - **Search**: `rg`-backed palette with results grouped by file, keyboard navigation, and a visible cap
   when the result set is truncated. Case-sensitive, regex and whole-word toggles are in
   `src/search/SearchPalette.tsx`.
@@ -76,10 +79,11 @@ read off `src-tauri/src/lib.rs` and `src/`:
   `lsp_symbols` in `src/breadcrumb/Breadcrumb.tsx`.
 
 Still missing, and named here so it is not mistaken for done:
-- **No `evaluate`, so no watch expressions** — Rust expression evaluation cannot be made to work through
-  `lldb-dap` here: `evaluate` returns nothing usable across `repl`/`watch`/`hover`, `settings set target.language rust`
-  changes nothing, and `setExpression` kills the adapter. A watch pane can only offer variables-tree watching and
-  memory views until a different adapter or toolchain is measured (see `docs/spikes/dap.md`, "Evaluate probe
+- **No expression evaluation, so no watch expressions from expressions** — Rust expression evaluation cannot be
+  made to work through `lldb-dap` here: `evaluate` returns nothing usable across `repl`/`watch`/`hover`,
+  `settings set target.language rust` changes nothing, and `setExpression` kills the adapter. A watch pane can
+  still watch pinned in-scope variables (re-read on each stop) plus memory views, but not arbitrary
+  expressions, until a different adapter or toolchain is measured (see `docs/spikes/dap.md`, "Evaluate probe
   (2026-10-22)").
 - **No run panel beyond args, cwd, env and output** — `run_program` / `stop_program` stream `run://output`; `src/run/` covers program, args, cwd, environment variables and an argv preview, but there is no richer run configuration UI.
 - **No remote development, embedded targets, profilers, databases, Docker, AI assistance or plugin API.**
