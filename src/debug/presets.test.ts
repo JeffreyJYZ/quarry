@@ -3,6 +3,8 @@ import type { LaunchPreset } from "@/project/api";
 import { splitArgs as runSplitArgs } from "@/run/splitArgs";
 import {
 	joinArgs,
+	joinInitCommands,
+	splitInitCommands,
 	toDraftPreset,
 	toLaunchPreset,
 	validateLaunchFile,
@@ -45,6 +47,39 @@ describe("editor round trip", () => {
 	test("an untouched build hint survives an empty one being absent", () => {
 		const preset = { ...rustPreset(), build: null, initCommands: [] };
 		expect(toLaunchPreset(toDraftPreset(preset))).toEqual(preset);
+	});
+
+	test("multiline initCommands become one command per non-empty line", () => {
+		const draft = {
+			...toDraftPreset(rustPreset()),
+			initCommands: [
+				"command script import /opt/rust/lib/rustlib/etc/lldb_lookup.py",
+				"",
+				"   ",
+				"command source /opt/rust/lib/rustlib/etc/lldb_commands",
+			].join("\n"),
+		};
+		expect(toLaunchPreset(draft).initCommands).toEqual([
+			"command script import /opt/rust/lib/rustlib/etc/lldb_lookup.py",
+			"command source /opt/rust/lib/rustlib/etc/lldb_commands",
+		]);
+	});
+
+	test("a blank initCommands textarea saves as none", () => {
+		const draft = { ...toDraftPreset(rustPreset()), initCommands: "" };
+		expect(toLaunchPreset(draft).initCommands).toEqual([]);
+		expect(toLaunchPreset({ ...draft, initCommands: "\n  \n" }).initCommands).toEqual([]);
+	});
+
+	test("a build typed into the editor survives the save", () => {
+		const draft = { ...toDraftPreset(rustPreset()), build: "cargo build --release" };
+		expect(toLaunchPreset(draft).build).toBe("cargo build --release");
+		expect(toLaunchPreset({ ...draft, build: "  " }).build).toBeNull();
+	});
+
+	test("initCommands round trip through the textarea unchanged", () => {
+		const commands = rustPreset().initCommands;
+		expect(splitInitCommands(joinInitCommands(commands))).toEqual(commands);
 	});
 
 	test("blank program and cwd save as null", () => {

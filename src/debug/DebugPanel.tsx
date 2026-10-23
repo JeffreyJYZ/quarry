@@ -18,6 +18,10 @@ import { readLaunchConfig, writeLaunchConfig } from "@/project/api";
 /** How many characters of a program path the panel keeps when it truncates from the left. */
 const PROGRAM_CHARS = 36;
 
+/** The `initCommands` line that makes Rust `Vec`/`String` pretty-print; without it they arrive raw. */
+const RUST_PRETTY_HINT =
+	"Rust pretty printing needs: command script import <sysroot>/lib/rustlib/etc/lldb_lookup.py";
+
 /** The path tail is what identifies the binary, so the head is what goes when space runs out. */
 function truncateLeft(path: string): string {
 	if (path.length <= PROGRAM_CHARS) {
@@ -408,115 +412,150 @@ export default function DebugPanel({
 					</div>
 					{drafts.map((draft, index) => (
 						// biome-ignore lint/suspicious/noArrayIndexKey: reorderable rows
-						<div key={`${draft.name}-${index}`} className="debug-row debug-row-wrap">
-							<input
-								className="debug-input"
-								value={draft.name}
-								placeholder="name"
-								onChange={(event) => {
-									const next = [...drafts];
-									next[index] = { ...draft, name: event.target.value };
-									setDrafts(next);
-								}}
-							/>
-							<input
-								className="debug-input"
-								value={draft.program}
-								placeholder="program"
-								onChange={(event) => {
-									const next = [...drafts];
-									next[index] = { ...draft, program: event.target.value };
-									setDrafts(next);
-								}}
-							/>
-							<input
-								className="debug-input"
-								value={draft.args}
-								placeholder="args"
-								onChange={(event) => {
-									const next = [...drafts];
-									next[index] = { ...draft, args: event.target.value };
-									setDrafts(next);
-								}}
-							/>
-							<input
-								className="debug-input"
-								value={draft.cwd}
-								placeholder="cwd"
-								onChange={(event) => {
-									const next = [...drafts];
-									next[index] = { ...draft, cwd: event.target.value };
-									setDrafts(next);
-								}}
-							/>
-							<label>
+						<div key={`${draft.name}-${index}`}>
+							<div className="debug-row debug-row-wrap">
 								<input
-									type="checkbox"
-									checked={draft.stopOnEntry}
+									className="debug-input"
+									value={draft.name}
+									placeholder="name"
+									onChange={(event) => {
+										const next = [...drafts];
+										next[index] = { ...draft, name: event.target.value };
+										setDrafts(next);
+									}}
+								/>
+								<input
+									className="debug-input"
+									value={draft.program}
+									placeholder="program"
+									onChange={(event) => {
+										const next = [...drafts];
+										next[index] = { ...draft, program: event.target.value };
+										setDrafts(next);
+									}}
+								/>
+								<input
+									className="debug-input"
+									value={draft.args}
+									placeholder="args"
+									onChange={(event) => {
+										const next = [...drafts];
+										next[index] = { ...draft, args: event.target.value };
+										setDrafts(next);
+									}}
+								/>
+								<input
+									className="debug-input"
+									value={draft.cwd}
+									placeholder="cwd"
+									onChange={(event) => {
+										const next = [...drafts];
+										next[index] = { ...draft, cwd: event.target.value };
+										setDrafts(next);
+									}}
+								/>
+								<label>
+									<input
+										type="checkbox"
+										checked={draft.stopOnEntry}
+										onChange={(event) => {
+											const next = [...drafts];
+											next[index] = {
+												...draft,
+												stopOnEntry: event.target.checked,
+											};
+											setDrafts(next);
+										}}
+									/>
+									stop
+								</label>
+								<button
+									type="button"
+									className="button"
+									onClick={() => {
+										if (index > 0) {
+											const next = [...drafts];
+											[next[index - 1], next[index]] = [
+												next[index],
+												next[index - 1],
+											];
+											setDrafts(next);
+										}
+									}}
+								>
+									Up
+								</button>
+								<button
+									type="button"
+									className="button"
+									onClick={() => {
+										if (index < drafts.length - 1) {
+											const next = [...drafts];
+											[next[index], next[index + 1]] = [
+												next[index + 1],
+												next[index],
+											];
+											setDrafts(next);
+										}
+									}}
+								>
+									Down
+								</button>
+								<button
+									type="button"
+									className="button"
+									onClick={() => {
+										const next = drafts.filter((_, i) => i !== index);
+										setDrafts(next);
+									}}
+								>
+									Remove
+								</button>
+								<button
+									type="button"
+									className="button"
+									onClick={() => {
+										const next = [...drafts];
+										next.splice(index + 1, 0, { ...draft });
+										setDrafts(next);
+									}}
+								>
+									Duplicate
+								</button>
+							</div>
+							<div className="debug-row">
+								<input
+									className="debug-input"
+									style={{ flex: "1 1 100%" }}
+									value={draft.build}
+									placeholder="cargo build"
+									title="Build command run before launch; empty means none"
+									onChange={(event) => {
+										const next = [...drafts];
+										next[index] = { ...draft, build: event.target.value };
+										setDrafts(next);
+									}}
+								/>
+							</div>
+							<div className="debug-row">
+								<textarea
+									className="debug-input"
+									style={{ flex: "1 1 100%", minHeight: 44 }}
+									value={draft.initCommands}
+									placeholder="init commands, one per line"
+									title="One init command per line; empty means none"
+									rows={3}
 									onChange={(event) => {
 										const next = [...drafts];
 										next[index] = {
 											...draft,
-											stopOnEntry: event.target.checked,
+											initCommands: event.target.value,
 										};
 										setDrafts(next);
 									}}
 								/>
-								stop
-							</label>
-							<button
-								type="button"
-								className="button"
-								onClick={() => {
-									if (index > 0) {
-										const next = [...drafts];
-										[next[index - 1], next[index]] = [
-											next[index],
-											next[index - 1],
-										];
-										setDrafts(next);
-									}
-								}}
-							>
-								Up
-							</button>
-							<button
-								type="button"
-								className="button"
-								onClick={() => {
-									if (index < drafts.length - 1) {
-										const next = [...drafts];
-										[next[index], next[index + 1]] = [
-											next[index + 1],
-											next[index],
-										];
-										setDrafts(next);
-									}
-								}}
-							>
-								Down
-							</button>
-							<button
-								type="button"
-								className="button"
-								onClick={() => {
-									const next = drafts.filter((_, i) => i !== index);
-									setDrafts(next);
-								}}
-							>
-								Remove
-							</button>
-							<button
-								type="button"
-								className="button"
-								onClick={() => {
-									const next = [...drafts];
-									next.splice(index + 1, 0, { ...draft });
-									setDrafts(next);
-								}}
-							>
-								Duplicate
-							</button>
+							</div>
+							<p className="debug-note dimmed">{RUST_PRETTY_HINT}</p>
 						</div>
 					))}
 					<div className="debug-row">
@@ -531,9 +570,9 @@ export default function DebugPanel({
 										program: "",
 										args: "",
 										cwd: "",
-										build: null,
+										build: "",
 										stopOnEntry: false,
-										initCommands: [],
+										initCommands: "",
 									},
 								])
 							}
