@@ -68,6 +68,8 @@ jobs:
             # release, Windows hit the gap and failed, and the still-queued macOS job
             # was cancelled with the run, leaving a Linux-only release). Serialising
             # costs minutes and makes each job see what the previous one created.
+            # Linux and Windows bundle only what accepts a prerelease version: the deb and
+            # msi bundlers reject the hyphen in `X.Y.Z-alpha.N`, AppImage and nsis do not.
             max-parallel: 1
             matrix:
                 include:
@@ -75,10 +77,10 @@ jobs:
                       args: "--target universal-apple-darwin"
                       rustTargets: "aarch64-apple-darwin,x86_64-apple-darwin"
                     - platform: ubuntu-22.04
-                      args: ""
+                      args: "--bundles appimage"
                       rustTargets: ""
                     - platform: windows-latest
-                      args: ""
+                      args: "--bundles nsis"
                       rustTargets: ""
         runs-on: ${{ matrix.platform }}
         steps:
