@@ -80,7 +80,10 @@ read off `src-tauri/src/lib.rs` and `src/`:
 - **Quick open**: `Cmd+P` file picker over `files::list_files`, ranked in `src/quickopen/QuickOpen.tsx`
   and `src/quickopen/rank.ts`, with a recent-files list.
 - **Recent projects**: dropdown of previously opened roots backed by `settings::remember_root` and
-  `src/projects/RecentProjects.tsx`.
+  `src/projects/RecentProjects.tsx`. A row can be removed without closing the open project; removal
+  persists through `persist` in `src/projects/RecentProjects.tsx`, which reads settings, replaces
+  `recentRoots`, and writes them back via `writeSettings`. A row's path can be copied to the
+  clipboard, and removing the last entry leaves the `No recent projects` empty state.
 - **Problems quick fixes**: each Problems entry carries a `Fix` button that opens code actions from
   `lsp_code_actions` in `src/problems/ProblemsPanel.tsx`.
 - **Tests**: `list_tests` and `run_test` feed a Tests dock with pass/fail status, filtering by
