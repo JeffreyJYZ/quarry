@@ -5,6 +5,7 @@ import {
 	type Branch,
 	type GitStatus,
 	type GitStatusEntry,
+	gitAmend,
 	gitBlame,
 	gitBranches,
 	gitCheckout,
@@ -96,6 +97,10 @@ export default function SourceControl({
 	const [busy, setBusy] = useState<Set<string>>(() => new Set<string>());
 	const [selected, setSelected] = useState<string | null>(null);
 	const [message, setMessage] = useState("");
+	const [amendMode, setAmendMode] = useState(false);
+	const [amendMessage, setAmendMessage] = useState("");
+	const [amendError, setAmendError] = useState<string | null>(null);
+	const [amending, setAmending] = useState(false);
 	const [commitError, setCommitError] = useState<string | null>(null);
 	const [committed, setCommitted] = useState<string | null>(null);
 	const [committing, setCommitting] = useState(false);
@@ -466,6 +471,33 @@ export default function SourceControl({
 		return () => window.removeEventListener("keydown", handler, true);
 	}, [selected, status, stage, unstage]);
 
+	const amend = useCallback(async () => {
+		const trimmed = amendMessage.trim();
+		if (trimmed === "" || amending) return;
+		setAmending(true);
+		setAmendError(null);
+		try {
+			const hash = await gitAmend(root, trimmed);
+			setAmendMode(false);
+			setAmendMessage("");
+			setCommitted(hash);
+			if (committedTimer.current !== null) {
+				window.clearTimeout(committedTimer.current);
+			}
+			committedTimer.current = window.setTimeout(() => {
+				committedTimer.current = null;
+				setCommitted(null);
+			}, 4000);
+			await refresh();
+			await loadHistory(historyLimit);
+			onDiff(null);
+			onCommitDiff(null);
+		} catch (err) {
+			setAmendError(describeError(err));
+		} finally {
+			setAmending(false);
+		}
+	}, [amendMessage, amending, root, refresh, loadHistory, historyLimit, onDiff, onCommitDiff]);
 	const switchBranch = useCallback(
 		async (branch: string) => {
 			if (branchSwitching) return;
@@ -790,8 +822,65 @@ export default function SourceControl({
 							>
 								{committing ? "Committing…" : "Commit"}
 							</button>
+							<button
+								type="button"
+								className="git-stage-btn"
+								disabled={amending}
+								onClick={() => {
+									setAmendMode(true);
+									setAmendMessage(
+										history !== null && history.length > 0
+											? history[0].subject
+											: message,
+									);
+									setAmendError(null);
+								}}
+							>
+								Amend
+							</button>
 							<span className="git-staged-count">{stagedCount} staged</span>
 						</div>
+						{amendMode ? (
+							<div className="git-commit-row">
+								<input
+									className="git-commit-input"
+									value={amendMessage}
+									onChange={(event) => {
+										setAmendMessage(event.target.value);
+										setAmendError(null);
+									}}
+									onKeyDown={(event) => {
+										if (event.key === "Escape") {
+											setAmendMode(false);
+											return;
+										}
+										if (event.key === "Enter") {
+											event.preventDefault();
+											void amend();
+										}
+									}}
+								/>
+								<button
+									type="button"
+									className="git-commit-btn"
+									disabled={amendMessage.trim() === "" || amending}
+									onClick={() => void amend()}
+								>
+									{amending ? "Amending…" : "Amend commit"}
+								</button>
+								<button
+									type="button"
+									className="git-stage-btn"
+									disabled={amending}
+									onClick={() => setAmendMode(false)}
+								>
+									Cancel
+								</button>
+							</div>
+						) : null}
+						{amendError !== null ? (
+							<p className="git-commit-error">{amendError}</p>
+						) : null}
 						{commitError !== null ? (
 							<p className="git-commit-error">{commitError}</p>
 						) : null}
@@ -830,7 +919,7 @@ export default function SourceControl({
 											void unstage(staged.map((entry) => entry.path))
 										}
 									>
-										Unstage all
+										Unstage all ({staged.length})
 									</button>
 								</div>
 								<ul className="git-list">{staged.map(renderRow)}</ul>
@@ -861,7 +950,7 @@ export default function SourceControl({
 											void stage(changes.map((entry) => entry.path))
 										}
 									>
-										Stage all
+										Stage all ({changes.length})
 									</button>
 								</div>
 								{discardPaths !== null ? (
