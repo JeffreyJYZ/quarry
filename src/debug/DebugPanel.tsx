@@ -3,10 +3,12 @@ import BreakpointItem from "@/debug/BreakpointItem";
 import DisasmPane from "@/debug/memory/DisasmPane";
 import MemoryPane from "@/debug/memory/MemoryPane";
 import ProcessPicker from "@/debug/ProcessPicker";
+import { type DraftPreset, joinArgs, toLaunchPreset, validateLaunchFile } from "@/debug/presets";
 import type { DebugController, VariableRow } from "@/debug/session";
 import { pinKey } from "@/debug/watch";
 import { fileName } from "@/problems/model";
 import type { DapVariable } from "@/project/api";
+import { readLaunchConfig, writeLaunchConfig } from "@/project/api";
 
 /** How many characters of a program path the panel keeps when it truncates from the left. */
 const PROGRAM_CHARS = 36;
@@ -242,6 +244,50 @@ export default function DebugPanel({
 	const session = debug.sessionId;
 	const canAddBreakpoint = stopped && top !== null && top.source !== null;
 
+	const [editingPresets, setEditingPresets] = useState(false);
+	const [drafts, setDrafts] = useState<DraftPreset[]>([]);
+	const [saveError, setSaveError] = useState<string | null>(null);
+	const [discardConfirm, setDiscardConfirm] = useState(false);
+
+	function openEditor() {
+		setDrafts(
+			debug.presets.map((preset) => ({
+				name: preset.name,
+				program: preset.program ?? "",
+				args: joinArgs(preset.args),
+				cwd: preset.cwd ?? "",
+				stopOnEntry: preset.stopOnEntry,
+			})),
+		);
+		setSaveError(null);
+		setDiscardConfirm(false);
+		setEditingPresets(true);
+	}
+
+	async function saveEditor() {
+		if (debug.root === null) return;
+		const file = { configurations: drafts.map(toLaunchPreset) };
+		const validationError = validateLaunchFile(
+			file as { configurations: Array<Record<string, unknown>> },
+		);
+		if (validationError !== null) {
+			setSaveError(validationError);
+			return;
+		}
+		try {
+			await writeLaunchConfig(
+				debug.root,
+				file as { configurations: ReturnType<typeof toLaunchPreset>[] },
+			);
+			await readLaunchConfig(debug.root);
+			await debug.refreshPresets();
+			setEditingPresets(false);
+			setSaveError(null);
+		} catch (reason) {
+			setSaveError(String(reason));
+		}
+	}
+
 	return (
 		<aside className="debug" aria-label="Debugger">
 			<div className="debug-head">
@@ -311,6 +357,11 @@ export default function DebugPanel({
 						Launch
 					</button>
 				</div>
+				<div className="debug-row">
+					<button type="button" className="button" onClick={openEditor}>
+						Edit presets
+					</button>
+				</div>
 				<div className="debug-row debug-row-wrap">
 					<ProcessPicker debug={debug} />
 					<button
@@ -343,6 +394,189 @@ export default function DebugPanel({
 				)}
 			</section>
 
+			{editingPresets ? (
+				<section
+					className="debug-section"
+					role="region"
+					tabIndex={-1}
+					onKeyDown={(event) => {
+						if (event.key === "Escape") {
+							event.preventDefault();
+							setDiscardConfirm(true);
+						}
+					}}
+				>
+					<div className="debug-section-head">
+						<span className="label">presets editor</span>
+					</div>
+					{drafts.map((draft, index) => (
+						// biome-ignore lint/suspicious/noArrayIndexKey: reorderable rows
+						<div key={`${draft.name}-${index}`} className="debug-row debug-row-wrap">
+							<input
+								className="debug-input"
+								value={draft.name}
+								placeholder="name"
+								onChange={(event) => {
+									const next = [...drafts];
+									next[index] = { ...draft, name: event.target.value };
+									setDrafts(next);
+								}}
+							/>
+							<input
+								className="debug-input"
+								value={draft.program}
+								placeholder="program"
+								onChange={(event) => {
+									const next = [...drafts];
+									next[index] = { ...draft, program: event.target.value };
+									setDrafts(next);
+								}}
+							/>
+							<input
+								className="debug-input"
+								value={draft.args}
+								placeholder="args"
+								onChange={(event) => {
+									const next = [...drafts];
+									next[index] = { ...draft, args: event.target.value };
+									setDrafts(next);
+								}}
+							/>
+							<input
+								className="debug-input"
+								value={draft.cwd}
+								placeholder="cwd"
+								onChange={(event) => {
+									const next = [...drafts];
+									next[index] = { ...draft, cwd: event.target.value };
+									setDrafts(next);
+								}}
+							/>
+							<label>
+								<input
+									type="checkbox"
+									checked={draft.stopOnEntry}
+									onChange={(event) => {
+										const next = [...drafts];
+										next[index] = {
+											...draft,
+											stopOnEntry: event.target.checked,
+										};
+										setDrafts(next);
+									}}
+								/>
+								stop
+							</label>
+							<button
+								type="button"
+								className="button"
+								onClick={() => {
+									if (index > 0) {
+										const next = [...drafts];
+										[next[index - 1], next[index]] = [
+											next[index],
+											next[index - 1],
+										];
+										setDrafts(next);
+									}
+								}}
+							>
+								Up
+							</button>
+							<button
+								type="button"
+								className="button"
+								onClick={() => {
+									if (index < drafts.length - 1) {
+										const next = [...drafts];
+										[next[index], next[index + 1]] = [
+											next[index + 1],
+											next[index],
+										];
+										setDrafts(next);
+									}
+								}}
+							>
+								Down
+							</button>
+							<button
+								type="button"
+								className="button"
+								onClick={() => {
+									const next = drafts.filter((_, i) => i !== index);
+									setDrafts(next);
+								}}
+							>
+								Remove
+							</button>
+							<button
+								type="button"
+								className="button"
+								onClick={() => {
+									const next = [...drafts];
+									next.splice(index + 1, 0, { ...draft });
+									setDrafts(next);
+								}}
+							>
+								Duplicate
+							</button>
+						</div>
+					))}
+					<div className="debug-row">
+						<button
+							type="button"
+							className="button"
+							onClick={() =>
+								setDrafts([
+									...drafts,
+									{
+										name: "",
+										program: "",
+										args: "",
+										cwd: "",
+										stopOnEntry: false,
+									},
+								])
+							}
+						>
+							Add preset
+						</button>
+						<button type="button" className="button" onClick={() => void saveEditor()}>
+							Save
+						</button>
+						<button
+							type="button"
+							className="button"
+							onClick={() => setDiscardConfirm(true)}
+						>
+							Close
+						</button>
+					</div>
+					{saveError === null ? null : <p className="debug-error">{saveError}</p>}
+					{discardConfirm ? (
+						<div className="debug-row">
+							<span>Discard unsaved preset edits?</span>
+							<button
+								type="button"
+								className="button"
+								onClick={() => {
+									setEditingPresets(false);
+									setDiscardConfirm(false);
+								}}
+							>
+								Discard
+							</button>
+							<button
+								type="button"
+								className="button"
+								onClick={() => setDiscardConfirm(false)}
+							>
+								Keep editing
+							</button>
+						</div>
+					) : null}
+				</section>
+			) : null}
 			<section className="debug-section">
 				<div className="debug-section-head">
 					<span className="label">controls</span>

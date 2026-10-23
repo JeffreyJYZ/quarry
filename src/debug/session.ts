@@ -159,6 +159,8 @@ export type DebugController = {
 	restarted: boolean;
 	/** Restart the live session and re-push breakpoints. */
 	restart: () => void /** Every row the launch select renders, in order. */;
+	/** Project root, for launch-config edits. */
+	root: string | null;
 	presetEntries: PresetEntry[];
 	/** The pid the attach box holds. */
 	pidInput: string;
@@ -168,6 +170,8 @@ export type DebugController = {
 	presets: LaunchPreset[];
 	preset: string;
 	setPreset: (name: string) => void;
+	/** Re-read launch.json and replace presets; keeps selection by name. */
+	refreshPresets: () => Promise<void>;
 	launch: () => void;
 	/** The configuration the last launch resolved, for the panel's program line. */
 	resolved: LaunchConfig | null;
@@ -287,6 +291,17 @@ export function useDebugSession(root: string | null): DebugController {
 		setResolved(null);
 		setBuildNeeded(null);
 		setPresetState(name);
+	}, []);
+
+	const refreshPresets = useCallback(async () => {
+		const rootNow = rootRef.current;
+		if (rootNow === null) return;
+		try {
+			const file = await readLaunchConfig(rootNow);
+			setPresets(file.configurations);
+		} catch (reason) {
+			setConfigError(`Launch config: ${describeError(reason)}`);
+		}
 	}, []);
 
 	/** The select's rows: a Cargo project's preset-free launch first, then whatever the file defines. */
@@ -1453,6 +1468,7 @@ export function useDebugSession(root: string | null): DebugController {
 
 	return {
 		status,
+		root,
 		error,
 		configError,
 		sessionId,
@@ -1468,6 +1484,7 @@ export function useDebugSession(root: string | null): DebugController {
 		presets,
 		preset,
 		setPreset,
+		refreshPresets,
 		launch: () => {
 			void launch();
 		},
