@@ -1,0 +1,195 @@
+.settings-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 60;
+	display: grid;
+	place-items: center;
+	padding: 48px 24px;
+	background: rgb(0 0 0 / 0.55);
+}
+
+.settings-panel {
+	display: flex;
+	flex-direction: column;
+	width: min(640px, 100%);
+	max-height: min(720px, 100%);
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--panel);
+	box-shadow: 0 24px 64px rgb(0 0 0 / 0.5);
+	overflow: hidden;
+}
+
+.settings-panel:focus-visible {
+	outline: 1px solid var(--accent);
+}
+
+.settings-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	height: 36px;
+	padding: 0 14px;
+	border-bottom: 1px solid var(--line);
+}
+
+.settings-close {
+	border: 0;
+	background: none;
+	padding: 0;
+	font-family: var(--mono);
+	font-size: 11px;
+	color: var(--muted);
+	cursor: pointer;
+}
+
+.settings-close:hover {
+	color: var(--text);
+}
+
+.settings-tabs {
+	display: flex;
+	gap: 4px;
+	padding: 8px 12px 0;
+	border-bottom: 1px solid var(--line);
+}
+
+.settings-tab {
+	padding: 6px 12px;
+	border: 1px solid transparent;
+	border-bottom: 0;
+	border-radius: 6px 6px 0 0;
+	background: none;
+	font-size: 12px;
+	color: var(--muted);
+	cursor: pointer;
+}
+
+.settings-tab:hover:not(:disabled) {
+	color: var(--text);
+}
+
+.settings-tab.active {
+	border-color: var(--line);
+	background: var(--bg);
+	color: var(--text);
+}
+
+.settings-tab:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
+.settings-body {
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+	padding: 16px 18px 20px;
+	overflow-y: auto;
+}
+
+.settings-section {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.settings-heading {
+	margin: 0;
+	font-family: var(--mono);
+	font-size: 10px;
+	font-weight: 500;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.settings-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	font-size: 12px;
+	color: var(--text);
+}
+
+.settings-hint {
+	margin: 0;
+	font-size: 11px;
+	line-height: 1.5;
+	color: var(--muted);
+}
+
+.settings-mono {
+	font-family: var(--mono);
+	font-size: 11px;
+	color: var(--muted);
+}
+
+.settings-stepper {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.settings-step {
+	display: grid;
+	place-items: center;
+	width: 22px;
+	height: 22px;
+	border: 1px solid var(--line);
+	border-radius: 5px;
+	background: var(--bg);
+	color: var(--text);
+	font-size: 13px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.settings-step:hover:not(:disabled) {
+	border-color: var(--accent);
+}
+
+.settings-step:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
+.settings-stepper input {
+	width: 52px;
+	height: 22px;
+	border: 1px solid var(--line);
+	border-radius: 5px;
+	background: var(--bg);
+	color: var(--text);
+	font-family: var(--mono);
+	font-size: 11px;
+	text-align: center;
+}
+
+.settings-stepper input:focus-visible,
+.settings-step:focus-visible,
+.settings-seg:focus-visible,
+.settings-tab:focus-visible,
+.settings-close:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: 1px;
+}
+
+.settings-segmented {
+	display: inline-flex;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	overflow: hidden;
+}
+
+.settings-seg {
+	padding: 4px 10px;
+	border: 0;
+	border-right: 1px solid var(--line);
+	background: var(--bg);
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 11px;
+	cursor: pointer;
+}

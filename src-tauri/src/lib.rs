@@ -49,6 +49,7 @@ pub fn run() {
             lsp::lsp_open_document,
             lsp::lsp_change_document,
             lsp::lsp_close_document,
+            lsp::lsp_did_save,
             lsp::lsp_hover,
             lsp::lsp_definition,
             lsp::lsp_references,

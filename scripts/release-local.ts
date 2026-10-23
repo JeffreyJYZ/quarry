@@ -218,14 +218,14 @@ async function main(): Promise<number> {
 
 	if (exists) {
 		log(`release ${tag} exists, replacing assets`);
-		const upload = assets.map(([path, name]) => [`${path}#${name}`]).flat();
+		const upload = assets.flatMap(([path, name]) => [`${path}#${name}`]);
 		run("gh", ["release", "upload", tag, ...upload, "--clobber"]);
 		run("gh", ["release", "edit", tag, "--notes", latest.notes]);
 	} else {
 		log(`creating release ${tag}`);
 		const notesFile = join(latestDir, "notes.md");
 		writeFileSync(notesFile, latest.notes);
-		const upload = assets.map(([path, name]) => [`${path}#${name}`]).flat();
+		const upload = assets.flatMap(([path, name]) => [`${path}#${name}`]);
 		run("gh", [
 			"release",
 			"create",

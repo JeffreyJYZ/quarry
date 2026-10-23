@@ -9,7 +9,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 #[tauri::command]
-pub fn create_project(parent: String, name: String, kind: String) -> Result<ProjectInfo, String> {
+pub fn create_project(
+    parent: String,
+    name: String,
+    kind: String,
+    standard: String,
+) -> Result<ProjectInfo, String> {
     let trimmed_name = name.trim().to_string();
     if trimmed_name.is_empty() {
         return Err("the project name is empty.".to_string());
@@ -55,12 +60,19 @@ pub fn create_project(parent: String, name: String, kind: String) -> Result<Proj
         }
     }
 
+    // An empty standard means "the kind's default"; anything else has to belong to the language.
+    let standard = resolve_standard(&kind, standard.trim())?;
+
     fs::create_dir(&target)
         .map_err(|error| format!("cannot create {}: {error}", target.display()))?;
 
     match kind.as_str() {
         "rust-bin" => {
-            write_file(&target, "Cargo.toml", &rust_cargo_toml(&trimmed_name))?;
+            write_file(
+                &target,
+                "Cargo.toml",
+                &rust_cargo_toml(&trimmed_name, &standard),
+            )?;
             fs::create_dir_all(target.join("src"))
                 .map_err(|e| format!("cannot create src: {e}"))?;
             write_file(
@@ -71,7 +83,11 @@ pub fn create_project(parent: String, name: String, kind: String) -> Result<Proj
             write_file(&target, ".gitignore", "/target\n")?;
         }
         "rust-lib" => {
-            write_file(&target, "Cargo.toml", &rust_cargo_toml(&trimmed_name))?;
+            write_file(
+                &target,
+                "Cargo.toml",
+                &rust_cargo_toml(&trimmed_name, &standard),
+            )?;
             fs::create_dir_all(target.join("src"))
                 .map_err(|e| format!("cannot create src: {e}"))?;
             write_file(
@@ -82,7 +98,11 @@ pub fn create_project(parent: String, name: String, kind: String) -> Result<Proj
             write_file(&target, ".gitignore", "/target\n")?;
         }
         "c-cmake" => {
-            write_file(&target, "CMakeLists.txt", &c_cmake_lists(&trimmed_name))?;
+            write_file(
+                &target,
+                "CMakeLists.txt",
+                &c_cmake_lists(&trimmed_name, &standard),
+            )?;
             fs::create_dir_all(target.join("src"))
                 .map_err(|e| format!("cannot create src: {e}"))?;
             write_file(
@@ -95,7 +115,11 @@ pub fn create_project(parent: String, name: String, kind: String) -> Result<Proj
             write_file(&target, ".gitignore", "/build\n")?;
         }
         "cpp-cmake" => {
-            write_file(&target, "CMakeLists.txt", &cpp_cmake_lists(&trimmed_name))?;
+            write_file(
+                &target,
+                "CMakeLists.txt",
+                &cpp_cmake_lists(&trimmed_name, &standard),
+            )?;
             fs::create_dir_all(target.join("src"))
                 .map_err(|e| format!("cannot create src: {e}"))?;
             write_file(
@@ -122,21 +146,48 @@ fn write_file(root: &Path, rel: &str, contents: &str) -> Result<(), String> {
     fs::write(&path, contents).map_err(|e| format!("cannot write {}: {e}", path.display()))
 }
 
-fn rust_cargo_toml(name: &str) -> String {
+const RUST_EDITIONS: [&str; 2] = ["2021", "2024"];
+const C_STANDARDS: [&str; 3] = ["11", "17", "23"];
+const CPP_STANDARDS: [&str; 3] = ["17", "20", "23"];
+
+/// The standard a kind accepts, or its default when the caller passed nothing.
+///
+/// A C++ standard offered to a C project is a mistake worth naming rather than silently rewriting,
+/// so an unknown value is an error, never a fallback.
+fn resolve_standard(kind: &str, requested: &str) -> Result<String, String> {
+    let (allowed, default): (&[&str], &str) = match kind {
+        "rust-bin" | "rust-lib" => (&RUST_EDITIONS, "2024"),
+        "c-cmake" => (&C_STANDARDS, "17"),
+        "cpp-cmake" => (&CPP_STANDARDS, "20"),
+        _ => return Ok(String::new()),
+    };
+    if requested.is_empty() {
+        return Ok(default.to_string());
+    }
+    if allowed.contains(&requested) {
+        return Ok(requested.to_string());
+    }
+    Err(format!(
+        "standard \"{requested}\" is not available for {kind}; accepted values: {}",
+        allowed.join(", ")
+    ))
+}
+
+fn rust_cargo_toml(name: &str, edition: &str) -> String {
     format!(
-        "[package]\nname = \"{name}\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[dependencies]\n"
+        "[package]\nname = \"{name}\"\nversion = \"0.1.0\"\nedition = \"{edition}\"\n\n[dependencies]\n"
     )
 }
 
-fn cpp_cmake_lists(name: &str) -> String {
+fn cpp_cmake_lists(name: &str, standard: &str) -> String {
     format!(
-        "cmake_minimum_required(VERSION 3.20)\nproject({name} CXX)\n\nset(CMAKE_CXX_STANDARD 20)\nset(CMAKE_CXX_STANDARD_REQUIRED ON)\n\nadd_executable({name} src/main.cpp)\n"
+        "cmake_minimum_required(VERSION 3.20)\nproject({name} CXX)\n\nset(CMAKE_CXX_STANDARD {standard})\nset(CMAKE_CXX_STANDARD_REQUIRED ON)\n\nadd_executable({name} src/main.cpp)\n"
     )
 }
 
-fn c_cmake_lists(name: &str) -> String {
+fn c_cmake_lists(name: &str, standard: &str) -> String {
     format!(
-        "cmake_minimum_required(VERSION 3.20)\nproject({name} C)\n\nset(CMAKE_C_STANDARD 17)\nset(CMAKE_C_STANDARD_REQUIRED ON)\n\nadd_executable({name} src/main.c)\n"
+        "cmake_minimum_required(VERSION 3.20)\nproject({name} C)\n\nset(CMAKE_C_STANDARD {standard})\nset(CMAKE_C_STANDARD_REQUIRED ON)\n\nadd_executable({name} src/main.c)\n"
     )
 }
 
@@ -153,10 +204,20 @@ mod tests {
     }
 
     fn create(parent: &Path, name: &str, kind: &str) -> Result<ProjectInfo, String> {
+        create_with(parent, name, kind, "")
+    }
+
+    fn create_with(
+        parent: &Path,
+        name: &str,
+        kind: &str,
+        standard: &str,
+    ) -> Result<ProjectInfo, String> {
         create_project(
             parent.display().to_string(),
             name.to_string(),
             kind.to_string(),
+            standard.to_string(),
         )
     }
 
@@ -257,8 +318,41 @@ mod tests {
             "relative/dir".to_string(),
             "demo".to_string(),
             "rust-bin".to_string(),
+            String::new(),
         )
         .unwrap_err();
         assert!(error.contains("absolute"), "{error}");
+    }
+
+    #[test]
+    fn the_language_standard_reaches_the_generated_manifest() {
+        let parent = scratch("standards");
+        let rust = create_with(&parent, "r", "rust-bin", "2021").expect("creates rust");
+        let manifest = fs::read_to_string(Path::new(&rust.root).join("Cargo.toml")).expect("reads");
+        assert!(manifest.contains("edition = \"2021\""), "{manifest}");
+
+        let cpp = create_with(&parent, "cpp", "cpp-cmake", "23").expect("creates c++");
+        let cmake = fs::read_to_string(Path::new(&cpp.root).join("CMakeLists.txt")).expect("reads");
+        assert!(cmake.contains("CMAKE_CXX_STANDARD 23"), "{cmake}");
+
+        let c = create_with(&parent, "c", "c-cmake", "11").expect("creates c");
+        let cmake = fs::read_to_string(Path::new(&c.root).join("CMakeLists.txt")).expect("reads");
+        assert!(cmake.contains("CMAKE_C_STANDARD 11"), "{cmake}");
+
+        let _ = fs::remove_dir_all(&parent);
+    }
+
+    #[test]
+    fn an_empty_standard_falls_back_to_the_default() {
+        assert_eq!(resolve_standard("rust-bin", ""), Ok("2024".to_string()));
+        assert_eq!(resolve_standard("c-cmake", ""), Ok("17".to_string()));
+        assert_eq!(resolve_standard("cpp-cmake", ""), Ok("20".to_string()));
+    }
+
+    #[test]
+    fn a_standard_from_the_wrong_language_is_refused() {
+        let error = resolve_standard("c-cmake", "20").unwrap_err();
+        assert!(error.contains("not available"), "{error}");
+        assert!(error.contains("11, 17, 23"), "{error}");
     }
 }

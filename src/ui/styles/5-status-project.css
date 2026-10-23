@@ -1,0 +1,198 @@
+.status-project {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* middle slot, after the project line: language server, diagnostic totals, last build */
+.status-extra {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+}
+
+.status-right {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	justify-self: end;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.status-settings {
+	display: grid;
+	place-items: center;
+	width: 20px;
+	height: 18px;
+	padding: 0;
+	border: 0;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--muted);
+	font-size: 11px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.status-settings:hover {
+	background: var(--hover);
+	color: var(--text);
+}
+
+.status-settings:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: 1px;
+}
+
+.statusbar .status-save.error {
+	color: var(--danger);
+	max-width: 240px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* The caret, language and indent cluster: quiet, monospace, right-aligned like CLion's. */
+.status-caret,
+.status-language,
+.status-indent {
+	white-space: nowrap;
+}
+
+.status-language {
+	color: var(--text);
+}
+
+.statusbar .sep {
+	margin: 0 3px;
+	color: #2f363f;
+}
+
+.statusbar .tool.missing {
+	color: var(--muted);
+	opacity: 0.55;
+}
+
+/* status bar middle extras: server name, counts and build summary ride in the project slot */
+.statusbar .count {
+	white-space: nowrap;
+}
+
+.statusbar .count.error {
+	color: var(--danger);
+}
+
+.statusbar .count.warning {
+	color: var(--warn);
+}
+
+.statusbar .status-server {
+	color: var(--text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.statusbar .status-build {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* transient save line: same slot as the server and counts, cleared by its own timer */
+.statusbar .status-save {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text);
+}
+
+.statusbar .status-save.error {
+	color: var(--danger);
+}
+
+/* git segment in the status bar's middle slot */
+.statusbar .status-git {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	color: var(--muted);
+}
+
+.statusbar .status-branch {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	min-width: 0;
+	overflow: hidden;
+	color: var(--text);
+}
+
+.statusbar .branch-name {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.statusbar .branch-glyph {
+	position: relative;
+	flex: 0 0 auto;
+	width: 10px;
+	height: 10px;
+	background:
+		radial-gradient(circle at 2px 2px, currentColor 1.3px, transparent 1.6px),
+		radial-gradient(circle at 2px 8px, currentColor 1.3px, transparent 1.6px);
+}
+
+.statusbar .branch-glyph::before {
+	content: "";
+	position: absolute;
+	left: 1.5px;
+	top: 3px;
+	bottom: 3px;
+	width: 1px;
+	background: currentColor;
+}
+
+.statusbar .branch-glyph::after {
+	content: "";
+	position: absolute;
+	left: 5px;
+	top: 1px;
+	width: 1px;
+	height: 5px;
+	background: currentColor;
+	transform: rotate(36deg);
+	transform-origin: bottom center;
+}
+
+.statusbar .status-ahead,
+.statusbar .status-behind {
+	white-space: nowrap;
+}
+
+.statusbar .status-changes {
+	white-space: nowrap;
+	color: var(--accent);
+}
+
+@media (max-width: 1180px) {
+	.statusbar .status-changes {
+		display: none;
+	}
+}

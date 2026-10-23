@@ -1,0 +1,5 @@
+/* Split by section. Order matters: the cascade follows these imports. */
+
+@import "./settings/1-settings-backdrop.css";
+
+@import "./settings/2-settings-seg.css";

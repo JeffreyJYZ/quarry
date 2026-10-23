@@ -41,9 +41,8 @@ pub fn parse_process_list(output: &str) -> Vec<ProcessInfo> {
             None => continue,
         };
 
-        let pid: u32 = match pid_str.parse() {
-            Ok(value) => value,
-            Err(_) => continue,
+        let Ok(pid) = pid_str.parse::<u32>() else {
+            continue;
         };
 
         if pid == 0 {

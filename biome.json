@@ -22,11 +22,11 @@
 	"overrides": [
 		{
 			"includes": [
-				"src/layout/Splitter.tsx",
-				"src/goto/Goto.tsx",
-				"src/generate/Generate.tsx",
-				"src/settings/SettingsPage.tsx",
-				"src/projects/NewProject.tsx"
+				"src/ui/layout/Splitter.tsx",
+				"src/ui/goto/Goto.tsx",
+				"src/ui/generate/Generate.tsx",
+				"src/ui/settings/SettingsPage.tsx",
+				"src/ui/projects/NewProject.tsx"
 			],
 			"linter": {
 				"rules": {

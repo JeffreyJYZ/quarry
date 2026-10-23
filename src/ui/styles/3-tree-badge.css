@@ -1,0 +1,198 @@
+.tree-badge.renamed {
+	color: var(--muted);
+}
+
+.tree-badge.untracked {
+	color: var(--muted);
+}
+
+.tree-badge.conflicted {
+	color: var(--danger);
+	font-weight: 700;
+}
+
+.tree-dir-dot {
+	display: inline-block;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--muted);
+	opacity: 0.5;
+	margin-left: auto;
+}
+
+.tree-row .caret {
+	flex: 0 0 auto;
+	width: 0;
+	height: 0;
+	border-left: 4px solid var(--muted);
+	border-top: 3px solid transparent;
+	border-bottom: 3px solid transparent;
+	transition: transform 120ms ease;
+}
+
+.tree-row.expanded .caret {
+	transform: rotate(90deg);
+}
+
+.tree-row .spacer {
+	flex: 0 0 auto;
+	width: 4px;
+}
+
+.tree-note {
+	display: block;
+	width: 100%;
+	margin: 0;
+	padding: 2px 10px 2px 0;
+	border: 0;
+	background: none;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10.5px;
+	text-align: left;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+button.tree-note {
+	cursor: pointer;
+}
+
+.tree-note.error {
+	color: var(--danger);
+}
+
+.canvas {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	/* The shell body is a flex row now, so the canvas has to claim the leftover width itself. */
+	flex: 1 1 auto;
+	min-width: 0;
+	min-height: 0;
+	overflow: hidden;
+	background: var(--bg);
+}
+
+.tabstrip {
+	display: flex;
+	flex: 0 0 32px;
+	align-items: stretch;
+	min-width: 0;
+	border-bottom: 1px solid var(--line);
+	background: var(--panel);
+	overflow-x: auto;
+	overflow-y: hidden;
+}
+
+.tabstrip::-webkit-scrollbar {
+	height: 0;
+}
+
+.breadcrumb {
+	display: flex;
+	flex: 0 0 24px;
+	align-items: center;
+	gap: 4px;
+	min-width: 0;
+	padding: 0 10px;
+	border-bottom: 1px solid var(--line);
+	background: var(--panel);
+	overflow-x: auto;
+	overflow-y: hidden;
+	white-space: nowrap;
+	font-family: var(--mono);
+	font-size: 11px;
+	color: var(--muted);
+}
+
+.breadcrumb::-webkit-scrollbar {
+	height: 0;
+}
+
+.breadcrumb-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.breadcrumb-path {
+	color: var(--muted);
+}
+
+.breadcrumb-symbol {
+	background: none;
+	border: none;
+	padding: 0;
+	color: var(--accent);
+	cursor: pointer;
+	font: inherit;
+}
+
+.breadcrumb-sep {
+	margin: 0 2px;
+	color: var(--muted);
+}
+
+.tab {
+	display: flex;
+	align-items: center;
+	flex: 0 0 auto;
+	gap: 4px;
+	min-width: 0;
+	padding: 0 6px 0 10px;
+	border-right: 1px solid var(--line);
+	background: var(--panel);
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 11px;
+}
+
+.tab.active {
+	background: var(--bg);
+	color: var(--text);
+	box-shadow: inset 0 1px 0 0 var(--accent);
+}
+
+.tab-name {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	max-width: 200px;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font-family: inherit;
+	font-size: inherit;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.tab-name:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: 1px;
+}
+
+.tab .dirty {
+	color: var(--accent);
+}
+
+/* a write in flight: one dimmed dot, deliberately static so the row never flickers */
+.tab .tab-saving {
+	color: var(--muted);
+	font-size: 12px;
+	line-height: 1;
+	opacity: 0.7;
+}
+
+/* dirty close: the row asks inline, so no modal dialog can steal the editor */
+.tab.confirming {
+	gap: 6px;
+	background: var(--hover);
+	color: var(--text);
+}

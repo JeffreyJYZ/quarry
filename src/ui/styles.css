@@ -1,0 +1,37 @@
+/* Split by section. Order matters: the cascade follows these imports. */
+
+@import "./styles/1-root.css";
+
+@import "./styles/2-rail.css";
+
+@import "./styles/3-tree-badge.css";
+
+@import "./styles/4-tab-confirm-name.css";
+
+@import "./styles/5-status-project.css";
+
+@import "./styles/6-problems.css";
+
+@import "./styles/7-problems-body.css";
+
+@import "./styles/8-search-toggle.css";
+
+@import "./styles/9-debug-section.css";
+
+@import "./styles/10-debug-var-indent.css";
+
+@import "./styles/11-recent-trigger.css";
+
+@import "./styles/12-dock.css";
+
+@import "./styles/13-refs-row.css";
+
+@import "./styles/14-git-row.css";
+
+@import "./styles/15-git-diff-btn.css";
+
+@import "./styles/16-cm-rename-bar.css";
+
+@import "./styles/17-command-row.css";
+
+@import "./styles/18-terminal-exit.css";

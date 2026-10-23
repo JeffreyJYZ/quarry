@@ -1,0 +1,33 @@
+.settings-seg:last-child {
+	border-right: 0;
+}
+
+.settings-seg:hover {
+	color: var(--text);
+}
+
+.settings-seg.active {
+	background: var(--hover);
+	color: var(--text);
+}
+
+.settings-row input[type="checkbox"] {
+	width: 15px;
+	height: 15px;
+	accent-color: var(--accent);
+}
+
+.settings-foot {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	height: 34px;
+	padding: 0 14px;
+	border-top: 1px solid var(--line);
+	background: var(--rail);
+}
+
+.settings-actions {
+	display: inline-flex;
+	gap: 8px;
+}

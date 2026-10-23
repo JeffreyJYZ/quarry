@@ -1,0 +1,153 @@
+.terminal-exit {
+	font-family: var(--mono);
+	font-size: 10px;
+	color: var(--muted);
+}
+
+.outline-filter-wrap {
+	padding: 6px 10px;
+	border-bottom: 1px solid var(--line);
+}
+
+.outline-filter {
+	width: 100%;
+	padding: 3px 6px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: var(--bg);
+	color: var(--text);
+	font-family: var(--mono);
+	font-size: 11px;
+	outline: none;
+}
+
+.outline-filter:focus {
+	border-color: var(--accent);
+}
+
+.outline-row.outline-active {
+	background: var(--line);
+	box-shadow: inset 2px 0 0 0 var(--accent);
+}
+
+.outline-row.outline-kb {
+	outline: 1px solid var(--accent);
+	outline-offset: -1px;
+}
+
+.run-form {
+	display: grid;
+	gap: 4px;
+	padding: 6px 8px;
+	border-top: 1px solid var(--border);
+}
+
+.run-form-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.run-form-label {
+	font-size: 11px;
+	opacity: 0.7;
+	width: 60px;
+}
+
+.run-form-input {
+	flex: 1;
+	font-family: monospace;
+	font-size: 12px;
+}
+
+.run-form-error {
+	color: var(--error, #d33);
+	font-size: 11px;
+}
+
+.run-form-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.run-form-argv {
+	flex: 1;
+	font-family: monospace;
+	font-size: 11px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.git-branch-btn {
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: 0;
+}
+
+.git-branch-menu {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	z-index: 20;
+	min-width: 200px;
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	padding: 6px;
+	box-shadow: 0 10px 24px rgb(0 0 0 / 45%);
+}
+
+.git-branch-filter {
+	width: 100%;
+	box-sizing: border-box;
+	font-family: var(--mono);
+	font-size: 12px;
+	padding: 4px 6px;
+}
+
+.git-branch-list {
+	list-style: none;
+	margin: 4px 0 0;
+	padding: 0;
+	max-height: 200px;
+	overflow: auto;
+}
+
+.git-branch-list-busy {
+	opacity: 0.5;
+	pointer-events: none;
+}
+
+.git-branch-option {
+	display: flex;
+	gap: 6px;
+	width: 100%;
+	text-align: left;
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: 3px 4px;
+	font-family: var(--mono);
+	font-size: 12px;
+}
+
+.git-branch-option:disabled {
+	cursor: not-allowed;
+}
+
+.git-branch-option-active {
+	background: var(--line);
+}
+
+.git-branch-mark {
+	width: 10px;
+}
+
+.git-branch-error {
+	color: var(--error, #f66);
+	font-size: 11px;
+	margin: 4px 0 0;
+}

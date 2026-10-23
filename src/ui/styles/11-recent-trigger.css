@@ -1,0 +1,197 @@
+.recent-trigger {
+	padding: 0 8px;
+}
+
+.recent-list {
+	position: absolute;
+	top: calc(100% + 4px);
+	left: 0;
+	z-index: 40;
+	min-width: 260px;
+	max-height: 320px;
+	overflow: auto;
+	margin: 0;
+	padding: 4px;
+	list-style: none;
+	background: var(--surface, #1e1e1e);
+	border: 1px solid var(--border, #333);
+	border-radius: 6px;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.recent-item {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 12px;
+}
+
+.recent-item.highlight {
+	background: var(--hover, #2a2a2a);
+}
+
+.recent-dot {
+	color: var(--accent, #4a9eff);
+}
+
+.recent-name {
+	font-weight: 600;
+}
+
+.recent-parent {
+	color: var(--muted, #888);
+	font-size: 11px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.recent-action {
+	opacity: 0;
+	margin-left: auto;
+	padding: 0 4px;
+	border: none;
+	background: transparent;
+	color: var(--muted, #888);
+	cursor: pointer;
+	font-size: 12px;
+}
+
+.recent-item:hover .recent-action,
+.recent-item:focus-within .recent-action {
+	opacity: 1;
+}
+
+.recent-row {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.recent-row .recent-item {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.recent-row:hover .recent-action,
+.recent-row:focus-within .recent-action {
+	opacity: 1;
+}
+
+.recent-actions {
+	display: inline-flex;
+	align-items: center;
+	flex: 0 0 auto;
+}
+
+.recent-empty {
+	font-size: 12px;
+	color: var(--muted, #888);
+	padding: 4px 8px;
+}
+
+.recent-error {
+	font-size: 11px;
+	color: var(--danger, #e55);
+	padding: 4px 8px;
+}
+
+/* Build split control: the main button builds, the chevron picks debug or release. */
+.build-split {
+	position: relative;
+	display: flex;
+	align-items: center;
+	flex: 0 0 auto;
+}
+
+.build-split .build-main {
+	border-radius: 4px 0 0 4px;
+}
+
+.build-split .build-chevron {
+	margin-left: -1px;
+	padding: 0 6px;
+	border-radius: 0 4px 4px 0;
+}
+
+.build-menu {
+	position: absolute;
+	top: calc(100% + 4px);
+	left: 0;
+	z-index: 40;
+	display: flex;
+	flex-direction: column;
+	min-width: 132px;
+	padding: 4px;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: var(--panel);
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.build-menu-item {
+	padding: 5px 8px;
+	border: 0;
+	border-radius: 4px;
+	background: none;
+	color: var(--text);
+	font-family: var(--mono);
+	font-size: 10.5px;
+	letter-spacing: 0.08em;
+	text-align: left;
+	text-transform: uppercase;
+	cursor: pointer;
+}
+
+.build-menu-item:hover {
+	background: var(--hover);
+}
+
+.build-menu-item.active {
+	color: var(--accent);
+}
+
+.build-menu-item:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: -1px;
+}
+
+.crumbs {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.notice {
+	flex: 0 0 auto;
+}
+
+.statusbar {
+	flex: 0 0 auto;
+}
+
+.editor-pane {
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+/* Bottom dock: tests and problems share one region, never stacked. */
+.dock {
+	display: flex;
+	flex-direction: column;
+	flex: 0 0 auto;
+	max-height: 45%;
+	border-top: 1px solid var(--line);
+	background: var(--panel);
+}
+
+/* Expanded, the dock takes the height the splitter sets; collapsed, only its header shows. */
+.dock:not(.collapsed) {
+	height: var(--dock-height, 260px);
+	max-height: none;
+}

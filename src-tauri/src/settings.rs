@@ -311,6 +311,24 @@ pub struct Preferences {
     pub build_profile: String,
     #[serde(default, deserialize_with = "deserialize_terminal_placement")]
     pub terminal_placement: String,
+    /// Editor font family; empty means the built-in monospace stack.
+    #[serde(default)]
+    pub editor_font_family: String,
+    /// Terminal font family; empty means the built-in monospace stack.
+    #[serde(default)]
+    pub terminal_font_family: String,
+    /// Absolute path to rust-analyzer; empty means discover it.
+    #[serde(default)]
+    pub rust_analyzer_path: String,
+    /// Extra arguments for rust-analyzer, split on whitespace by the frontend.
+    #[serde(default)]
+    pub rust_analyzer_args: String,
+    /// Absolute path to clangd; empty means discover it.
+    #[serde(default)]
+    pub clangd_path: String,
+    /// Extra arguments for clangd.
+    #[serde(default)]
+    pub clangd_args: String,
     #[serde(default, deserialize_with = "deserialize_panel_sizes")]
     pub panel_sizes: PanelSizes,
 }
@@ -352,6 +370,12 @@ impl Default for Preferences {
             format_on_save: false,
             build_profile: "debug".to_string(),
             terminal_placement: "bottom".to_string(),
+            editor_font_family: String::new(),
+            terminal_font_family: String::new(),
+            rust_analyzer_path: String::new(),
+            rust_analyzer_args: String::new(),
+            clangd_path: String::new(),
+            clangd_args: String::new(),
             panel_sizes: PanelSizes::default(),
         }
     }
@@ -419,6 +443,9 @@ pub struct Settings {
     /// Files opened most recently, newest first, capped at 20.
     #[serde(default)]
     pub recent_files: Vec<String>,
+    /// Directory the New project dialog was last pointed at, so it opens there next time.
+    #[serde(default)]
+    pub new_project_parent: Option<String>,
     /// User-wide preferences: editor, terminal, build profile and panel sizes.
     #[serde(default)]
     pub preferences: Preferences,
@@ -441,6 +468,7 @@ impl Default for Settings {
             recent_roots: Vec::new(),
             run_configurations: Vec::new(),
             recent_files: Vec::new(),
+            new_project_parent: None,
             preferences: Preferences::default(),
             extra: serde_json::Map::new(),
         }
