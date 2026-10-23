@@ -63,8 +63,9 @@ async function main(): Promise<number> {
 				stdio: ["ignore", "pipe", "pipe"],
 			});
 			sigStatus = "verified";
-		} catch (e: any) {
-			const msg = `${e.stdout ?? ""} ${e.stderr ?? ""}`.trim();
+		} catch (error: unknown) {
+			const failure = error as { stdout?: string; stderr?: string; message?: string };
+			const msg = `${failure.stdout ?? ""} ${failure.stderr ?? ""}`.trim();
 			if (/not signed|adhoc|no resources but signature/i.test(msg))
 				sigStatus = "not signed (ad-hoc local build)";
 			else sigStatus = `FAILED: ${msg || failure.message || "codesign failed"}`;

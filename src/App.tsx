@@ -1292,6 +1292,13 @@ export default function App() {
 			disabled: root === null,
 			run: () => setGitRefresh((current) => current + 1),
 		},
+		{
+			id: "toggle-blame",
+			label: "Toggle blame annotations",
+			hint: "",
+			disabled: root === null || activePath === null,
+			run: () => setBlameOn((current) => !current),
+		},
 	];
 
 	const serverLabel =
