@@ -2,10 +2,11 @@ import { useEffect } from "react";
 import { setDiagnostics } from "@codemirror/lint";
 import type { EditorView } from "@codemirror/view";
 import { toLintDiagnostics, lintSignature } from "@/lib/editor/diagnostics";
+import type { Diagnostic } from "@/lib/project/api";
 
 export type DiagnosticsPublishArgs = {
 	viewRef: { current: EditorView | null };
-	diagnostics: any;
+	diagnostics: readonly Diagnostic[] | undefined;
 	publishedRef: { current: { view: EditorView | null; signature: string } };
 };
 
