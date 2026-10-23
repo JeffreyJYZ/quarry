@@ -1,0 +1,53 @@
+name: CI
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+
+jobs:
+    ci:
+        name: ci
+        runs-on: macos-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Bun
+              uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: "1"
+
+            - name: Install dependencies
+              run: bun install --frozen-lockfile
+
+            - name: Frontend gate
+              run: bun run gate
+
+            - name: Frontend build
+              run: bun run build
+
+            # Rust side: runs on macOS because the toolchains are macOS-only.
+            # Smoke scripts (scripts/*-smoke.ts) are intentionally omitted: they
+            # need rust-analyzer and lldb-dap on PATH and would be flaky in CI.
+            - name: Setup Rust
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: clippy, rustfmt
+
+            - name: Cache Rust
+              uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: src-tauri
+
+            - name: Cargo test
+              working-directory: src-tauri
+              run: cargo test
+
+            - name: Cargo clippy
+              working-directory: src-tauri
+              run: cargo clippy --all-targets -- -D warnings
+
+            - name: Cargo fmt check
+              working-directory: src-tauri
+              run: cargo fmt --check
