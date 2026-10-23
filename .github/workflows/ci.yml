@@ -18,18 +18,6 @@ jobs:
               with:
                   bun-version: "1"
 
-            - name: Install dependencies
-              run: bun install --frozen-lockfile
-
-            - name: Frontend gate
-              run: bun run gate
-
-            - name: Frontend build
-              run: bun run build
-
-            # Rust side: runs on macOS because the toolchains are macOS-only.
-            # Smoke scripts (scripts/*-smoke.ts) are intentionally omitted: they
-            # need rust-analyzer and lldb-dap on PATH and would be flaky in CI.
             - name: Setup Rust
               uses: dtolnay/rust-toolchain@stable
               with:
@@ -40,14 +28,16 @@ jobs:
               with:
                   workspaces: src-tauri
 
-            - name: Cargo test
-              working-directory: src-tauri
-              run: cargo test
+            - name: Install dependencies
+              run: bun install --frozen-lockfile
 
-            - name: Cargo clippy
-              working-directory: src-tauri
-              run: cargo clippy --all-targets -- -D warnings
+            # One script runs the whole gate: types, formatting, lint, frontend tests, then
+            # cargo fmt, check, test and clippy. Running the same command here and locally is the
+            # point — a check that only exists in CI drifts from the one that gates a commit.
+            # Smoke scripts (scripts/*-smoke.ts) are intentionally omitted: they need rust-analyzer
+            # and lldb-dap on PATH and would be flaky in CI.
+            - name: Gate
+              run: bun run gate
 
-            - name: Cargo fmt check
-              working-directory: src-tauri
-              run: cargo fmt --check
+            - name: Build
+              run: bun run build

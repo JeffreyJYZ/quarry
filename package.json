@@ -13,7 +13,7 @@
 		"fmt": "bun fmt",
 		"verify": "bun run typecheck && bun fmt --check && biome lint .",
 		"test": "bun test",
-		"gate": "bun run verify && bun test",
+		"gate": "bun run scripts/gate.ts",
 		"verify:bundle": "bun run scripts/verify-bundle.ts",
 		"release:local": "bun run scripts/release-local.ts"
 	},
