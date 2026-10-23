@@ -48,12 +48,16 @@ read off `src-tauri/src/lib.rs` and `src/`:
 - **Run**: `run_program` / `stop_program` stream `run://output` lines and one `run://exited`, with a
   run panel in `src/run/` (program, args, cwd, env vars with validation, argv preview, run/stop).
   The run log offers `Copy output` (ANSI-stripped), `Copy argv`, and `Re-run` with the same
-  program, args, cwd and env.
+  program, args, cwd and env. Named run configurations snapshot the whole form (program, args,
+  cwd, env) under a name; save, update and delete are offered in the panel, and empty or duplicate
+  names are refused (`configurationNameError` in `src/run/configurations.ts`).
 - **Terminal**: an embedded terminal built on `portable-pty` (`pty::pty_open` / `pty_write` /
   `pty_resize` / `pty_close`) with `src/terminal/Terminal.tsx`, supporting multiple sessions in tabs
   (`Cmd+T` / `Cmd+W`, close button per tab), opening in the active file's directory when one is
-  open. Not yet exercised in a real desktop window by this agent; the backend and component are
-  present.
+  open. Font size is per session (A+/A-/A0), a session restarts in place with its cwd and font
+  size preserved, `Copy all` writes the scrollback to the clipboard, and the status strip shows the
+  pid and the working directory, which is updated from the shell's OSC 7 output. Not yet exercised
+  in a real desktop window by this agent; the backend and component are present.
 - **Debug**: `lldb-dap` sessions launched from a `.quarry/launch.json` preset, composed for an
   unconfigured Cargo project (which also passes the Rust formatter `initCommands`), or attached to a
   running process by pid via `processes::list_processes` and `src/debug/ProcessPicker.tsx`. Line
@@ -84,7 +88,9 @@ read off `src-tauri/src/lib.rs` and `src/`:
   back to the first entry. `.quarry/launch.json` stays the source of truth on disk.
 - **Search**: `rg`-backed palette with results grouped by file, keyboard navigation, and a visible cap
   when the result set is truncated. Case-sensitive, regex and whole-word toggles are in
-  `src/search/SearchPalette.tsx`.
+  `src/search/SearchPalette.tsx`. Replace across files previews every change before writing, refuses
+  to run on a stale preview, applies capture groups in regex mode, and reports one summary line
+  (`files changed, replacements made`) with per-file errors collected in `errors`.
 - **Quick open**: `Cmd+P` file picker over `files::list_files`, ranked in `src/quickopen/QuickOpen.tsx`
   and `src/quickopen/rank.ts`, with a recent-files list.
 - **Recent projects**: dropdown of previously opened roots backed by `settings::remember_root` and
@@ -96,15 +102,19 @@ read off `src-tauri/src/lib.rs` and `src/`:
   `lsp_code_actions` in `src/problems/ProblemsPanel.tsx`.
 - **Tests**: `list_tests` and `run_test` feed a Tests dock with pass/fail status, filtering by
   binary and result, sorting, and run-all scoped to the filtered set
-  (`src/tests/filterTests.ts`). The tests dock offers `copy name` per row, `copy output` on an
-  expanded failure, and `copy failures` (`name: first failure line` per line, disabled when
+  (`src/tests/filterTests.ts`). Result filtering covers all, failed, passed and not-run; `copy
+  failures` writes one `path::test_name` line per failed test; per-test failure output is
+  available on an expanded row; `rerun failed` re-runs only the failed tests. The tests dock offers
+  `copy name` per row, `copy output` on an expanded failure, and `copy failures` (disabled when
   nothing failed).
 - **Source control**: a Git view with status, per-file diff, an open-in-editor flow, a commit box
   (`git_commit`), branch listing and switching (`git_branches`, `git_checkout`, dropdown in
   `src/git/SourceControl.tsx`), a History tab listing recent commits (`git_log`), and a unified
   diff for a selected commit (`git_commit_diff`), plus `git_status` and `git_file_diff` commands.
-  Discard changes run through `git_discard` with a confirmation prompt in
-  `src/git/SourceControl.tsx`. Blame annotations render in the editor through
+  Discard changes run through `git_discard` with a two-step confirmation prompt in
+  `src/git/SourceControl.tsx` (Discard / Cancel). Stage and unstage all are offered per group
+  with counts. Amend rewrites the last commit with message validation (empty or oversized
+  messages refused). Blame annotations render in the editor through
   `src/editor/blame.ts` (wired into `src/editor/Editor.tsx`) on top of the `git_blame` backend,
   toggled by the title-bar `Blame` button (`blameOn` in `src/App.tsx`); the Source Control
   `Blame` tab groups the same data by commit. Copy actions: `copy path` on change rows and
