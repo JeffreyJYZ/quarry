@@ -23,9 +23,7 @@ import {
 	bracketMatching,
 	codeFolding,
 	foldAll,
-	foldable,
 	foldCode,
-	foldEffect,
 	foldGutter,
 	indentOnInput,
 	indentUnit,
@@ -33,7 +31,7 @@ import {
 	unfoldAll,
 	unfoldCode,
 } from "@codemirror/language";
-import { lintGutter, setDiagnostics } from "@codemirror/lint";
+import { lintGutter } from "@codemirror/lint";
 import { Compartment, EditorSelection, EditorState } from "@codemirror/state";
 import {
 	drawSelection,
@@ -47,10 +45,12 @@ import {
 import { forwardRef, type JSX, useEffect, useImperativeHandle, useRef, useState } from "react";
 import "@/ui/editor/editor.css";
 import { blameField, setBlame } from "@/lib/editor/blame";
+import { useBreakpointGutter } from "@/ui/editor/useBreakpointGutter";
+import { useDiagnosticsPublish } from "@/ui/editor/useDiagnosticsPublish";
+import { useDocumentSync } from "@/ui/editor/useDocumentSync";
 import { renderMarkdown } from "@/lib/editor/markdown";
 
-import { breakpointGutter, normalizeLines, setBreakpoints } from "@/lib/editor/breakpoints";
-import { lintSignature, toLintDiagnostics } from "@/lib/editor/diagnostics";
+import { breakpointGutter } from "@/lib/editor/breakpoints";
 import { inlayHintsField, setInlayHints } from "@/lib/editor/inlayHints";
 import { languageForPath } from "@/lib/editor/languages";
 import { occurrenceStarts, occurrencesField, setOccurrences } from "@/lib/editor/occurrences";
@@ -116,138 +116,11 @@ export type EditorProps = {
 	fontFamily?: string;
 };
 
+import { expandBracketPair, foldLevel } from "@/lib/editor/commands";
+import { kindToType, splitTopLevel } from "@/lib/editor/completion";
+import { toLspPosition } from "@/lib/editor/positions";
+
 const NO_LINES: number[] = [];
-
-/** Pairs that an Enter between them splits onto their own indented lines. */
-const BRACKET_PAIRS: Record<string, string> = { "{": "}", "(": ")", "[": "]" };
-
-/**
- * Enter between a freshly typed pair expands it into three lines with the caret indented.
- *
- * `closeBrackets` leaves `{|}`, and `insertNewlineAndIndent` alone would only break the line, so the
- * closing half would sit on the caret's line. Returns false for every other position, letting the
- * ordinary newline command run.
- */
-export function expandBracketPair(view: EditorView): boolean {
-	const { state } = view;
-	const selection = state.selection.main;
-	if (!selection.empty) return false;
-	const before = state.sliceDoc(selection.from - 1, selection.from);
-	const after = state.sliceDoc(selection.to, selection.to + 1);
-	if (BRACKET_PAIRS[before] !== after) return false;
-	const line = state.doc.lineAt(selection.from);
-	const baseIndent = /^\s*/.exec(line.text)?.[0] ?? "";
-	const unit = state.facet(indentUnit);
-	const inner = baseIndent + unit;
-	view.dispatch({
-		changes: { from: selection.from, to: selection.to, insert: `\n${inner}\n${baseIndent}` },
-		selection: { anchor: selection.from + 1 + inner.length },
-		userEvent: "input",
-	});
-	return true;
-}
-
-function foldLevel(view: EditorView, level: number): boolean {
-	const state = view.state;
-	const effects: unknown[] = [];
-	let found = false;
-	for (let lineNo = 1; lineNo <= state.doc.lines; lineNo += 1) {
-		const line = state.doc.line(lineNo);
-		const info = foldable(state, line.from, line.to);
-		if (info === null) continue;
-		const indent = line.text.match(/^\\s*/)?.[0].length ?? 0;
-		const depth = Math.floor(indent / 4);
-		if (depth + 1 > level) continue;
-		effects.push(foldEffect.of({ from: info.from, to: info.to }));
-		found = true;
-	}
-	if (!found) return false;
-	view.dispatch({ effects: effects as never });
-	return true;
-}
-
-function sameLines(left: readonly number[], right: readonly number[]): boolean {
-	if (left.length !== right.length) return false;
-	for (let index = 0; index < left.length; index += 1) {
-		if (left[index] !== right[index]) return false;
-	}
-	return true;
-}
-
-function sameSet(left: ReadonlySet<number>, right: ReadonlySet<number>): boolean {
-	if (left.size !== right.size) return false;
-	for (const value of left) {
-		if (!right.has(value)) return false;
-	}
-	return true;
-}
-
-function kindToType(kind: number | null): string {
-	switch (kind) {
-		case 2:
-			return "method";
-		case 3:
-			return "function";
-		case 4:
-			return "constructor";
-		case 5:
-			return "field";
-		case 6:
-			return "variable";
-		case 7:
-			return "class";
-		case 8:
-			return "interface";
-		case 9:
-			return "namespace";
-		case 10:
-			return "property";
-		case 13:
-			return "enum";
-		case 14:
-			return "keyword";
-		case 15:
-			return "snippet";
-		case 20:
-			return "enumMember";
-		case 21:
-			return "constant";
-		case 22:
-			return "struct";
-		case 23:
-			return "event";
-		case 24:
-			return "operator";
-		case 25:
-			return "type";
-		default:
-			return "text";
-	}
-}
-
-function splitTopLevel(text: string): string[] {
-	const parts: string[] = [];
-	let depth = 0;
-	let current = "";
-	for (const ch of text) {
-		if (ch === "(" || ch === "<" || ch === "[" || ch === "{") depth += 1;
-		else if (ch === ")" || ch === ">" || ch === "]" || ch === "}")
-			depth = Math.max(0, depth - 1);
-		if (ch === "," && depth === 0) {
-			parts.push(current);
-			current = "";
-		} else {
-			current += ch;
-		}
-	}
-	parts.push(current);
-	return parts;
-}
-
-function toLspPosition(view: EditorView, pos: number): { line: number; character: number } {
-	const lineObj = view.state.doc.lineAt(pos);
-	return { line: lineObj.number - 1, character: pos - lineObj.from };
-}
 
 /**
  * CodeMirror 6 surface. One `EditorView` per mount; `value` stays caller-owned and is pushed into the
@@ -1370,54 +1243,11 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [path]);
 
-	useEffect(() => {
-		const view = viewRef.current;
-		if (view === null) return;
-		const current = view.state.doc.toString();
-		if (current === value) return;
-		view.dispatch({ changes: { from: 0, to: current.length, insert: value } });
-	}, [value]);
+	useDocumentSync({ viewRef, value });
 
-	// Markers-only transaction: an effect and no document change, so the update listener stays quiet.
-	// The trampoline reads the live callback, so a new handler identity never forces a dispatch.
-	useEffect(() => {
-		const view = viewRef.current;
-		if (view === null) return;
-		const lines = normalizeLines(breakpointLines);
-		const unverified = new Set(normalizeLines(unverifiedLines));
-		const published = markersRef.current;
-		if (
-			published.view === view &&
-			sameLines(published.lines, lines) &&
-			sameSet(published.unverified, unverified)
-		) {
-			return;
-		}
-		markersRef.current = { view, lines, unverified };
-		view.dispatch({
-			effects: setBreakpoints.of({
-				lines,
-				unverified,
-				toggle: (line) => {
-					toggleRef.current?.(line);
-				},
-			}),
-		});
-	}, [breakpointLines, unverifiedLines]);
+	useBreakpointGutter({ viewRef, breakpointLines, unverifiedLines, markersRef, toggleRef });
 
-	// Diagnostics-only transaction: it carries an effect and no document change, so the update
-	// listener above stays quiet and an edit never enters here. The guard is keyed to the view so a
-	// re-created view (StrictMode remount) still publishes.
-	useEffect(() => {
-		const view = viewRef.current;
-		if (view === null) return;
-		const mapped = toLintDiagnostics(view.state, diagnostics);
-		const signature = lintSignature(mapped);
-		const published = publishedRef.current;
-		if (published.view === view && published.signature === signature) return;
-		publishedRef.current = { view, signature };
-		view.dispatch(setDiagnostics(view.state, mapped));
-	}, [diagnostics]);
+	useDiagnosticsPublish({ viewRef, diagnostics, publishedRef });
 
 	useEffect(() => {
 		const view = viewRef.current;

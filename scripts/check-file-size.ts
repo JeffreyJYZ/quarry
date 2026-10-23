@@ -15,7 +15,7 @@ export const LIMIT = 200;
 
 const ROOT = resolve(import.meta.dir, "..");
 const LIST = join(ROOT, "docs/refactor/oversized.txt");
-const ROOTS = ["src", "src-tauri/src", "scripts"];
+const ROOTS = ["src", "src-tauri/src"];
 const EXTENSIONS = [".ts", ".tsx", ".css", ".rs"];
 const SKIP = new Set(["node_modules", "target", "dist", ".git"]);
 

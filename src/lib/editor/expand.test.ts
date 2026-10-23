@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { EditorView } from "@codemirror/view";
-import { expandBracketPair } from "@/ui/editor/Editor";
+import { expandBracketPair } from "@/lib/editor/commands";
 
 type Change = { from: number; to: number; insert: string };
 type Dispatch = { changes: Change; selection: { anchor: number } };

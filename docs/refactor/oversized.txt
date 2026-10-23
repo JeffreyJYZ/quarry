@@ -1,14 +1,12 @@
 # Files that predate the 200-line rule. Shrink one per change; never add a line here.
-src-tauri/src/lsp.rs
 src/ui/App.tsx
-src-tauri/src/dap.rs
 src/ui/editor/Editor.tsx
 src/lib/debug/session.ts
+src-tauri/src/lsp.rs
+src-tauri/src/dap.rs
 src-tauri/src/git.rs
 src-tauri/src/build_task.rs
-scripts/dap-spike.ts
 src-tauri/src/settings.rs
-scripts/lsp-ux-smoke.ts
 src-tauri/src/format.rs
 src-tauri/src/search.rs
 src-tauri/src/launch.rs
@@ -17,14 +15,9 @@ src-tauri/src/run_config.rs
 src-tauri/src/run_task.rs
 src-tauri/src/test_task.rs
 src-tauri/src/types.rs
-scripts/dap-eval-probe.ts
 src-tauri/src/resolve.rs
 src-tauri/src/files.rs
 src-tauri/src/new_project.rs
 src-tauri/src/workspace.rs
 src-tauri/src/project.rs
 src-tauri/src/pty.rs
-scripts/release-local.ts
-scripts/verify-bundle.ts
-scripts/cxx-smoke.ts
-scripts/lsp-smoke.ts

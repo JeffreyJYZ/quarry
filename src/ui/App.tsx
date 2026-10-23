@@ -9,14 +9,10 @@ import {
 	useRef,
 	useState,
 } from "react";
-import Breadcrumb from "@/ui/breadcrumb/Breadcrumb";
 import CallsPanel from "@/ui/calls/CallsPanel";
 import FileTree from "@/ui/components/FileTree";
-import TabStrip from "@/ui/components/TabStrip";
-import Welcome from "@/ui/components/Welcome";
 import { type BreakpointRow, useDebugSession } from "@/lib/debug/session";
 import type { EditorHandle } from "@/ui/editor/Editor";
-import LazyEditor from "@/ui/editor/LazyEditor";
 import SourceControl from "@/ui/git/SourceControl";
 import {
 	combineDiagnostics,
@@ -71,14 +67,14 @@ import {
 	configurationNameError,
 	snapshotConfiguration,
 } from "@/lib/run/configurations";
-import RunForm from "@/ui/run/RunForm";
-import RunLog from "@/ui/run/RunLog";
 import { splitArgs } from "@/lib/run/splitArgs";
 
 import { generateItems, type GenerateItem } from "@/lib/generate/model";
 import type { GotoMode } from "@/ui/goto/gotoModel";
 import AppOverlays from "@/ui/app/AppOverlays";
 import TopBar from "@/ui/app/TopBar";
+import EditorStage from "@/ui/app/EditorStage";
+import RunSection from "@/ui/app/RunSection";
 import ShortcutSheet from "@/ui/shortcuts/ShortcutSheet";
 import { DEFAULT_PANEL_SIZES, type PanelName, resizePanel } from "@/lib/layout/model";
 import Splitter from "@/ui/layout/Splitter";
@@ -2008,56 +2004,37 @@ export default function App() {
 						} as CSSProperties
 					}
 				>
-					{active ? (
-						<>
-							<TabStrip
-								buffers={buffers}
-								activePath={activePath}
-								saving={saving}
-								confirmClose={confirmClose}
-								onActivate={handleActivate}
-								onClose={handleClose}
-								onSaveClose={handleSaveClose}
-								onDiscardClose={handleDiscardClose}
-								onCancelClose={handleCancelClose}
-							/>
-							<Breadcrumb
-								root={root ?? ""}
-								activePath={activePath}
-								cursor={cursor}
-								onNavigate={handleNavigate}
-							/>
-							<div className="editor-pane">
-								<LazyEditor
-									ref={editorRef}
-									path={active.path}
-									value={active.text}
-									onChange={handleChange}
-									root={root}
-									onNotice={setNotice}
-									diagnostics={diagnostics.get(active.path)}
-									breakpointLines={breakpointLines}
-									unverifiedLines={unverifiedLines}
-									onToggleBreakpoint={handleToggleBreakpoint}
-									onNavigate={handleNavigate}
-									onReferences={handleReferences}
-									onCursor={setCursor}
-									onApplyEdits={handleApplyEdits}
-									tabSize={effective.editorTabSize}
-									fontSize={effective.editorFontSize}
-									fontFamily={effective.editorFontFamily}
-									blame={blameOn ? (blameByPath.get(active.path) ?? null) : null}
-									reveal={
-										revealTarget === null
-											? null
-											: { ...revealTarget, token: revealToken }
-									}
-								/>
-							</div>
-						</>
-					) : (
-						<Welcome project={project} />
-					)}
+					<EditorStage
+						project={project}
+						root={root}
+						active={active}
+						activePath={activePath}
+						buffers={buffers}
+						saving={saving}
+						confirmClose={confirmClose}
+						cursor={cursor}
+						effective={effective}
+						editorRef={editorRef}
+						diagnostics={diagnostics}
+						breakpointLines={breakpointLines}
+						unverifiedLines={unverifiedLines}
+						blameOn={blameOn}
+						blameByPath={blameByPath}
+						revealTarget={revealTarget}
+						revealToken={revealToken}
+						onActivate={handleActivate}
+						onClose={handleClose}
+						onSaveClose={handleSaveClose}
+						onDiscardClose={handleDiscardClose}
+						onCancelClose={handleCancelClose}
+						onChange={handleChange}
+						onNavigate={handleNavigate}
+						onReferences={handleReferences}
+						onCursor={setCursor}
+						onApplyEdits={handleApplyEdits}
+						onToggleBreakpoint={handleToggleBreakpoint}
+						onNotice={setNotice}
+					/>
 					{project && terminalOpen && effective.terminalPlacement === "bottom" ? (
 						<>
 							<Splitter
@@ -2150,47 +2127,34 @@ export default function App() {
 							/>
 						</>
 					) : null}
-					{root !== null && runPanelOpen ? (
-						<RunForm
-							program={runProgramState}
-							args={runArgsState}
-							cwd={runCwdState}
-							argv={[runProgramState, ...splitArgs(runArgsState)].join(" ")}
-							cwdError={
-								runCwdState !== "" && !runCwdState.startsWith("/")
-									? "cwd must be absolute"
-									: null
-							}
-							running={runId !== null}
-							env={runEnvState}
-							configurations={runConfigurations}
-							selectedConfiguration={selectedRunConfiguration}
-							onProgramChange={setRunProgramState}
-							onArgsChange={setRunArgsState}
-							onCwdChange={setRunCwdState}
-							onEnvChange={setRunEnvState}
-							onSelectConfiguration={handleSelectRunConfiguration}
-							onSaveConfiguration={handleSaveRunConfiguration}
-							onUpdateConfiguration={handleUpdateRunConfiguration}
-							onDeleteConfiguration={handleDeleteRunConfiguration}
-							onRun={() => void handleRun()}
-							onStop={() => void handleStop()}
-							onClose={() => setRunPanelOpen(false)}
-						/>
-					) : null}
-					{runId !== null || runLines.length > 0 || runExited !== null ? (
-						<RunLog
-							lines={runLines}
-							exited={runExited}
-							argv={[runProgramState, ...splitArgs(runArgsState)].join(" ")}
-							running={runId !== null}
-							onRerun={() => void handleRun()}
-							onClear={() => {
-								setRunLines([]);
-								setRunExited(null);
-							}}
-						/>
-					) : null}
+					<RunSection
+						root={root}
+						open={runPanelOpen}
+						program={runProgramState}
+						args={runArgsState}
+						cwd={runCwdState}
+						env={runEnvState}
+						configurations={runConfigurations}
+						selectedConfiguration={selectedRunConfiguration}
+						running={runId !== null}
+						lines={runLines}
+						exited={runExited}
+						onProgramChange={setRunProgramState}
+						onArgsChange={setRunArgsState}
+						onCwdChange={setRunCwdState}
+						onEnvChange={setRunEnvState}
+						onSelectConfiguration={handleSelectRunConfiguration}
+						onSaveConfiguration={handleSaveRunConfiguration}
+						onUpdateConfiguration={handleUpdateRunConfiguration}
+						onDeleteConfiguration={handleDeleteRunConfiguration}
+						onRun={() => void handleRun()}
+						onStop={() => void handleStop()}
+						onClose={() => setRunPanelOpen(false)}
+						onClearLog={() => {
+							setRunLines([]);
+							setRunExited(null);
+						}}
+					/>
 					{searchOpen && root !== null ? (
 						<Suspense fallback={null}>
 							<SearchPalette
