@@ -335,7 +335,8 @@ fn deserialize_terminal_placement<'de, D>(deserializer: D) -> Result<String, D::
 where
     D: serde::Deserializer<'de>,
 {
-    let value: String = String::deserialize(deserializer).unwrap_or_else(|_| default_terminal_placement());
+    let value: String =
+        String::deserialize(deserializer).unwrap_or_else(|_| default_terminal_placement());
     Ok(match value.as_str() {
         "right" => "right".to_string(),
         _ => default_terminal_placement(),
@@ -832,8 +833,14 @@ mod tests {
         };
         super::write_project_settings(root.clone(), settings.clone()).expect("writes");
 
-        let file = std::path::Path::new(&root).join(".quarry").join("settings.json");
-        assert!(file.is_file(), "settings file missing at {}", file.display());
+        let file = std::path::Path::new(&root)
+            .join(".quarry")
+            .join("settings.json");
+        assert!(
+            file.is_file(),
+            "settings file missing at {}",
+            file.display()
+        );
         assert_eq!(super::read_project_settings(root.clone()), settings);
 
         let _ = std::fs::remove_dir_all(&root);
@@ -888,18 +895,22 @@ mod tests {
         .expect("writes");
 
         let parsed = super::read_project_settings(root.clone());
-        assert!(parsed.editor_tab_size.is_none(), "tab size 5 is not offered");
-        assert!(parsed.build_profile.is_none(), "fast is not a build profile");
+        assert!(
+            parsed.editor_tab_size.is_none(),
+            "tab size 5 is not offered"
+        );
+        assert!(
+            parsed.build_profile.is_none(),
+            "fast is not a build profile"
+        );
 
         let _ = std::fs::remove_dir_all(&root);
     }
 
     /// A throwaway project directory named after the calling test.
     fn temp_project(label: &str) -> String {
-        let dir = std::env::temp_dir().join(format!(
-            "quarry-settings-{}-{label}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("quarry-settings-{}-{label}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("creates the temp project");
         dir.to_string_lossy().into_owned()

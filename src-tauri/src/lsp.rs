@@ -244,7 +244,10 @@ async fn start_lsp_session(
 impl LspState {
     /// Stops every language server; used on exit so no child outlives the window.
     pub fn shutdown_all(&self) {
-        let sessions: Vec<_> = lock(&self.sessions).drain().map(|(_, session)| session).collect();
+        let sessions: Vec<_> = lock(&self.sessions)
+            .drain()
+            .map(|(_, session)| session)
+            .collect();
         for session in sessions {
             lock(&session).stop();
         }
@@ -1459,12 +1462,7 @@ pub async fn lsp_workspace_symbols(
     query: String,
 ) -> Result<Vec<WorkspaceSymbol>, String> {
     let session = session_for(&state, &root)?;
-    let result = send_request(
-        &session,
-        "workspace/symbol",
-        json!({ "query": query }),
-    )
-    .await?;
+    let result = send_request(&session, "workspace/symbol", json!({ "query": query })).await?;
     Ok(parse_workspace_symbols(&result))
 }
 

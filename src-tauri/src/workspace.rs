@@ -158,7 +158,8 @@ fn fill_temp_file(temp: &Path, text: &str, mode: u32) -> Result<(), String> {
         .map_err(|error| error.to_string())?;
     file.sync_all().map_err(|error| error.to_string())?;
     #[cfg(unix)]
-    fs::set_permissions(temp, fs::Permissions::from_mode(mode)).map_err(|error| error.to_string())?;
+    fs::set_permissions(temp, fs::Permissions::from_mode(mode))
+        .map_err(|error| error.to_string())?;
     #[cfg(not(unix))]
     let _ = mode;
     Ok(())

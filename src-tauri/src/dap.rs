@@ -196,7 +196,10 @@ impl Drop for Session {
 impl DapState {
     /// Ends every debug session; used on exit so no adapter outlives the window.
     pub fn shutdown_all(&self) {
-        let sessions: Vec<_> = lock(&self.sessions).drain().map(|(_, session)| session).collect();
+        let sessions: Vec<_> = lock(&self.sessions)
+            .drain()
+            .map(|(_, session)| session)
+            .collect();
         for session in sessions {
             session.shutdown();
         }
