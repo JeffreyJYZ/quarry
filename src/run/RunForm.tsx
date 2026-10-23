@@ -25,6 +25,8 @@ export type RunFormProps = {
 	onDeleteConfiguration: () => string | null;
 	onRun: () => void;
 	onStop: () => void;
+	/** Dismisses the panel; the toolbar and the shortcut reopen it. */
+	onClose: () => void;
 };
 
 export default function RunForm({
@@ -47,6 +49,7 @@ export default function RunForm({
 	onDeleteConfiguration,
 	onRun,
 	onStop,
+	onClose,
 }: RunFormProps) {
 	const [quickAdd, setQuickAdd] = useState("");
 	const [configName, setConfigName] = useState("");
@@ -130,6 +133,12 @@ export default function RunForm({
 
 	return (
 		<div className="run-form">
+			<div className="run-form-head">
+				<span className="label">run configuration</span>
+				<button type="button" className="run-form-close" onClick={onClose}>
+					close
+				</button>
+			</div>
 			<div className="run-form-configs">
 				<div className="run-form-row">
 					<span className="run-form-label">config</span>

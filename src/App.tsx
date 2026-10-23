@@ -230,6 +230,8 @@ export default function App() {
 	const [generateOpen, setGenerateOpen] = useState(false);
 	const [recentFiles, setRecentFiles] = useState<string[]>([]);
 	const [newProjectOpen, setNewProjectOpen] = useState(false);
+	/** The run-configuration tool window; closed by default so it never sits on the editor. */
+	const [runPanelOpen, setRunPanelOpen] = useState(false);
 	const projectSettingsWrite = useRef<Promise<void>>(Promise.resolve());
 	const buildSplitRef = useRef<HTMLDivElement | null>(null);
 	const buildChevronRef = useRef<HTMLButtonElement | null>(null);
@@ -1723,6 +1725,11 @@ export default function App() {
 				organizeRef.current();
 				return;
 			}
+			if (event.ctrlKey && event.altKey && !event.metaKey && (key === "r" || key === "d")) {
+				event.preventDefault();
+				setRunPanelOpen(true);
+				return;
+			}
 			if (mod && !event.altKey && key === "1") {
 				event.preventDefault();
 				setRailCollapsed((current) => !current);
@@ -2249,7 +2256,7 @@ export default function App() {
 							/>
 						</>
 					) : null}
-					{root !== null ? (
+					{root !== null && runPanelOpen ? (
 						<RunForm
 							program={runProgramState}
 							args={runArgsState}
@@ -2274,6 +2281,7 @@ export default function App() {
 							onDeleteConfiguration={handleDeleteRunConfiguration}
 							onRun={() => void handleRun()}
 							onStop={() => void handleStop()}
+							onClose={() => setRunPanelOpen(false)}
 						/>
 					) : null}
 					{runId !== null || runLines.length > 0 || runExited !== null ? (
