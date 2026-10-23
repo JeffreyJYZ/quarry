@@ -1,6 +1,6 @@
 import type { ChangeEvent } from "react";
 import { useState } from "react";
-import type { EnvVar } from "@/project/api";
+import type { EnvVar, RunConfiguration } from "@/project/api";
 
 const NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -12,9 +12,17 @@ export type RunFormProps = {
 	cwdError: string | null;
 	running: boolean;
 	env: EnvVar[];
+	configurations: RunConfiguration[];
+	selectedConfiguration: string | null;
+	onProgramChange: (value: string) => void;
 	onArgsChange: (value: string) => void;
 	onCwdChange: (value: string) => void;
 	onEnvChange: (value: EnvVar[]) => void;
+	onSelectConfiguration: (name: string) => void;
+	/** Saves the form under a name; returns the rejection to show, or `null` when it saved. */
+	onSaveConfiguration: (name: string) => string | null;
+	onUpdateConfiguration: () => string | null;
+	onDeleteConfiguration: () => string | null;
 	onRun: () => void;
 	onStop: () => void;
 };
@@ -27,13 +35,22 @@ export default function RunForm({
 	cwdError,
 	running,
 	env,
+	configurations,
+	selectedConfiguration,
+	onProgramChange,
 	onArgsChange,
 	onCwdChange,
 	onEnvChange,
+	onSelectConfiguration,
+	onSaveConfiguration,
+	onUpdateConfiguration,
+	onDeleteConfiguration,
 	onRun,
 	onStop,
 }: RunFormProps) {
 	const [quickAdd, setQuickAdd] = useState("");
+	const [configName, setConfigName] = useState("");
+	const [configError, setConfigError] = useState<string | null>(null);
 
 	const updateRow = (index: number, field: "name" | "value", value: string) => {
 		const next = env.map((row, rowIndex) =>
@@ -69,6 +86,33 @@ export default function RunForm({
 		setQuickAdd("");
 	};
 
+	const saveConfiguration = () => {
+		const error = onSaveConfiguration(configName);
+		setConfigError(error);
+		if (error === null) {
+			setConfigName("");
+		}
+	};
+
+	const handleConfigNameKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+		if (event.key === "Enter") {
+			saveConfiguration();
+		}
+	};
+
+	const selectConfiguration = (event: ChangeEvent<HTMLSelectElement>) => {
+		setConfigError(null);
+		onSelectConfiguration(event.target.value);
+	};
+
+	const updateConfiguration = () => {
+		setConfigError(onUpdateConfiguration());
+	};
+
+	const deleteConfiguration = () => {
+		setConfigError(onDeleteConfiguration());
+	};
+
 	let problem: string | null = null;
 	const seen = new Set<string>();
 	for (const row of env) {
@@ -86,9 +130,64 @@ export default function RunForm({
 
 	return (
 		<div className="run-form">
+			<div className="run-form-configs">
+				<div className="run-form-row">
+					<span className="run-form-label">config</span>
+					<select
+						className="run-form-input"
+						value={selectedConfiguration ?? ""}
+						onChange={selectConfiguration}
+					>
+						<option value="">(unsaved)</option>
+						{configurations.map((config) => (
+							<option key={config.name} value={config.name}>
+								{config.name}
+							</option>
+						))}
+					</select>
+				</div>
+				<div className="run-form-row">
+					<span className="run-form-label">save as</span>
+					<input
+						className="run-form-input"
+						placeholder="name, Enter to save"
+						value={configName}
+						onChange={(event: ChangeEvent<HTMLInputElement>) =>
+							setConfigName(event.target.value)
+						}
+						onKeyDown={handleConfigNameKeyDown}
+					/>
+					<button type="button" className="button" onClick={saveConfiguration}>
+						Save
+					</button>
+					<button
+						type="button"
+						className="button"
+						disabled={selectedConfiguration === null}
+						onClick={updateConfiguration}
+					>
+						Update
+					</button>
+					<button
+						type="button"
+						className="button"
+						disabled={selectedConfiguration === null}
+						onClick={deleteConfiguration}
+					>
+						Delete
+					</button>
+				</div>
+				{configError === null ? null : <div className="run-form-error">{configError}</div>}
+			</div>
 			<div className="run-form-row">
 				<span className="run-form-label">program</span>
-				<input className="run-form-input" value={program} readOnly />
+				<input
+					className="run-form-input"
+					value={program}
+					onChange={(event: ChangeEvent<HTMLInputElement>) =>
+						onProgramChange(event.target.value)
+					}
+				/>
 			</div>
 			<div className="run-form-row">
 				<span className="run-form-label">args</span>

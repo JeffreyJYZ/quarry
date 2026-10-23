@@ -39,11 +39,13 @@ import {
 	onRunOutput,
 	openProject,
 	type ProjectInfo,
+	type RunConfiguration,
 	readSettings,
 	readTextFile,
 	rememberRoot,
 	runProgram,
 	type Settings,
+	settingsForWrite,
 	stopProgram,
 	type ToolchainReport,
 	toolchains,
@@ -56,6 +58,11 @@ import { type SaveOutcome, saveBuffer, saveErrorMessage, saveMessage } from "@/p
 import RecentProjects from "@/projects/RecentProjects";
 
 import { applyFileEdits } from "@/refactor/apply";
+import {
+	applyConfiguration,
+	configurationNameError,
+	snapshotConfiguration,
+} from "@/run/configurations";
 import RunForm from "@/run/RunForm";
 import RunLog from "@/run/RunLog";
 import { splitArgs } from "@/run/splitArgs";
@@ -167,6 +174,10 @@ export default function App() {
 	const [runArgsState, setRunArgsState] = useState("");
 	const [runCwdState, setRunCwdState] = useState("");
 	const [runEnvState, setRunEnvState] = useState<import("@/project/api").EnvVar[]>([]);
+	/** Saved run panels the run form offers, in save order. */
+	const [runConfigurations, setRunConfigurations] = useState<RunConfiguration[]>([]);
+	/** Name the selector shows; `null` means the form's values are unsaved. */
+	const [selectedRunConfiguration, setSelectedRunConfiguration] = useState<string | null>(null);
 	const runFormMemory = useRef<
 		Map<string, { args: string; cwd: string; env: import("@/project/api").EnvVar[] }>
 	>(new Map());
@@ -283,6 +294,8 @@ export default function App() {
 	const editorRef = useRef<EditorHandle | null>(null);
 	const saveTimer = useRef<number | null>(null);
 	const restoredRef = useRef(false);
+	/** The settings object read from disk, so a save never drops a field this build does not know. */
+	const preservedSettings = useRef<Record<string, unknown>>({});
 	const snapshotRef = useRef<{
 		project: ProjectInfo | null;
 		buffers: FileBuffer[];
@@ -292,6 +305,7 @@ export default function App() {
 		gitOpen: boolean;
 		panelOpen: boolean | null;
 		dockTab: DockTab;
+		runConfigurations: RunConfiguration[];
 	}>({
 		project: null,
 		buffers: [],
@@ -301,6 +315,7 @@ export default function App() {
 		gitOpen: false,
 		panelOpen: null,
 		dockTab: "problems",
+		runConfigurations: [],
 	});
 	snapshotRef.current = {
 		project,
@@ -311,6 +326,7 @@ export default function App() {
 		gitOpen,
 		panelOpen,
 		dockTab,
+		runConfigurations,
 	};
 
 	useEffect(() => {
@@ -333,11 +349,13 @@ export default function App() {
 			try {
 				const settings = await readSettings();
 				if (cancelled) return;
+				preservedSettings.current = settings;
 				setRailCollapsed(settings.railCollapsed ?? false);
 				setDebugOpen(settings.debugOpen ?? false);
 				setGitOpen(settings.gitOpen ?? false);
 				setPanelOpen(settings.dockExpanded ?? null);
 				setRecentRoots(settings.recentRoots ?? []);
+				setRunConfigurations(settings.runConfigurations ?? []);
 				const storedTab = settings.dockTab;
 				setDockTab(
 					storedTab === "tests" || storedTab === "problems" ? storedTab : "problems",
@@ -372,11 +390,13 @@ export default function App() {
 						}
 					} catch {
 						try {
-							await writeSettings({
-								lastRoot: null,
-								openFiles: [],
-								activeFile: null,
-							});
+							await writeSettings(
+								settingsForWrite(preservedSettings.current, {
+									lastRoot: null,
+									openFiles: [],
+									activeFile: null,
+								}),
+							);
 						} catch {
 							/* ignore */
 						}
@@ -405,11 +425,24 @@ export default function App() {
 				gitOpen,
 				dockTab,
 				dockExpanded: panelOpen,
+				runConfigurations,
 			};
-			void writeSettings(settings).catch((error) => setNotice(describeError(error)));
+			void writeSettings(settingsForWrite(preservedSettings.current, settings)).catch(
+				(error) => setNotice(describeError(error)),
+			);
 		}, 400);
 		return () => window.clearTimeout(timer);
-	}, [project, buffers, activePath, railCollapsed, debugOpen, gitOpen, dockTab, panelOpen]);
+	}, [
+		project,
+		buffers,
+		activePath,
+		railCollapsed,
+		debugOpen,
+		gitOpen,
+		dockTab,
+		panelOpen,
+		runConfigurations,
+	]);
 
 	useEffect(() => {
 		const flush = () => {
@@ -424,8 +457,11 @@ export default function App() {
 				gitOpen: snap.gitOpen,
 				dockTab: snap.dockTab as Settings["dockTab"],
 				dockExpanded: snap.panelOpen,
+				runConfigurations: snap.runConfigurations,
 			};
-			void writeSettings(settings).catch((error) => setNotice(describeError(error)));
+			void writeSettings(settingsForWrite(preservedSettings.current, settings)).catch(
+				(error) => setNotice(describeError(error)),
+			);
 		};
 		const handleVisibility = () => {
 			if (document.visibilityState === "hidden") flush();
@@ -1139,6 +1175,70 @@ export default function App() {
 		setActivePath(path);
 	}, []);
 
+	/** The form as one value, so a snapshot and a save share the same fields. */
+	const runFormSnapshot = useCallback(
+		() => ({
+			program: runProgramState,
+			args: runArgsState,
+			cwd: runCwdState,
+			env: runEnvState,
+		}),
+		[runProgramState, runArgsState, runCwdState, runEnvState],
+	);
+
+	/** Fills the form from a saved configuration; `""` is the selector's unsaved entry. */
+	const handleSelectRunConfiguration = useCallback(
+		(name: string) => {
+			setSelectedRunConfiguration(name === "" ? null : name);
+			const config = runConfigurations.find((item) => item.name === name);
+			if (config === undefined) {
+				return;
+			}
+			const form = applyConfiguration(config);
+			setRunProgramState(form.program);
+			setRunArgsState(form.args);
+			setRunCwdState(form.cwd);
+			setRunEnvState(form.env);
+		},
+		[runConfigurations],
+	);
+
+	const handleSaveRunConfiguration = useCallback(
+		(name: string) => {
+			const error = configurationNameError(name, runConfigurations);
+			if (error !== null) {
+				return error;
+			}
+			const config = snapshotConfiguration(name, runFormSnapshot());
+			setRunConfigurations((current) => [...current, config]);
+			setSelectedRunConfiguration(config.name);
+			return null;
+		},
+		[runConfigurations, runFormSnapshot],
+	);
+
+	const handleUpdateRunConfiguration = useCallback(() => {
+		if (selectedRunConfiguration === null) {
+			return "select a configuration first";
+		}
+		const config = snapshotConfiguration(selectedRunConfiguration, runFormSnapshot());
+		setRunConfigurations((current) =>
+			current.map((item) => (item.name === selectedRunConfiguration ? config : item)),
+		);
+		return null;
+	}, [selectedRunConfiguration, runFormSnapshot]);
+
+	const handleDeleteRunConfiguration = useCallback(() => {
+		if (selectedRunConfiguration === null) {
+			return "select a configuration first";
+		}
+		setRunConfigurations((current) =>
+			current.filter((item) => item.name !== selectedRunConfiguration),
+		);
+		setSelectedRunConfiguration(null);
+		return null;
+	}, [selectedRunConfiguration]);
+
 	const handleRun = useCallback(async () => {
 		if (root === null || runId !== null || runProgramState === "") {
 			return;
@@ -1702,9 +1802,16 @@ export default function App() {
 							}
 							running={runId !== null}
 							env={runEnvState}
+							configurations={runConfigurations}
+							selectedConfiguration={selectedRunConfiguration}
+							onProgramChange={setRunProgramState}
 							onArgsChange={setRunArgsState}
 							onCwdChange={setRunCwdState}
 							onEnvChange={setRunEnvState}
+							onSelectConfiguration={handleSelectRunConfiguration}
+							onSaveConfiguration={handleSaveRunConfiguration}
+							onUpdateConfiguration={handleUpdateRunConfiguration}
+							onDeleteConfiguration={handleDeleteRunConfiguration}
 							onRun={() => void handleRun()}
 							onStop={() => void handleStop()}
 						/>

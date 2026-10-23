@@ -135,6 +135,32 @@ export function searchProject(
 	});
 }
 
+export type ReplaceReport = {
+	filesChanged: number;
+	replacements: number;
+	errors: string[];
+};
+
+export function replaceProject(
+	root: string,
+	query: string,
+	replacement: string,
+	caseSensitive?: boolean,
+	fixedStrings?: boolean,
+): Promise<{
+	files_changed: number;
+	replacements: number;
+	errors: string[];
+}> {
+	return invoke("replace_project", {
+		root,
+		query,
+		replacement,
+		caseSensitive: caseSensitive ?? null,
+		fixedStrings: fixedStrings ?? null,
+	});
+}
+
 export async function onDiagnostics(
 	handler: (event: DiagnosticsEvent) => void,
 ): Promise<() => void> {
@@ -393,6 +419,21 @@ export type Settings = {
 	dockTab?: "tests" | "problems" | "refs" | "run";
 	dockExpanded?: boolean | null;
 	recentRoots?: string[];
+	runConfigurations?: RunConfiguration[];
+};
+
+/**
+ * One saved run panel: a snapshot of the form, never a hidden override.
+ *
+ * `args` is the args field verbatim so the run path splits it with the same quote-aware `splitArgs`
+ * the form uses; `env` keeps the form's row order as `[name, value]` pairs.
+ */
+export type RunConfiguration = {
+	name: string;
+	program: string;
+	args: string;
+	cwd: string;
+	env: [string, string][];
 };
 
 export function readSettings(): Promise<Settings> {
@@ -401,6 +442,17 @@ export function readSettings(): Promise<Settings> {
 
 export function writeSettings(settings: Settings): Promise<void> {
 	return invoke<void>("write_settings", { settings });
+}
+
+/**
+ * Settings as they go back to disk: what the file already held first, this build's values on top.
+ *
+ * `readSettings` returns fields this build does not know because the Rust side flattens them into
+ * its `extra` map, so spreading the value it returned keeps a newer build's settings intact instead
+ * of dropping them on our next save.
+ */
+export function settingsForWrite(preserved: Record<string, unknown>, known: Settings): Settings {
+	return { ...preserved, ...known };
 }
 
 export function rememberRoot(root: string): Promise<string[]> {
@@ -521,8 +573,9 @@ export function dapSetVariable(
 export type PtyOutputEvent = { id: string; data: string };
 export type PtyExitedEvent = { id: string; code: number | null };
 
-export function ptyOpen(cwd: string, rows: number, cols: number): Promise<string> {
-	return invoke<string>("pty_open", { cwd, rows, cols });
+export type PtyOpenResult = { id: string; pid: number | null };
+export function ptyOpen(cwd: string, rows: number, cols: number): Promise<PtyOpenResult> {
+	return invoke<PtyOpenResult>("pty_open", { cwd, rows, cols });
 }
 
 export function ptyWrite(id: string, data: string): Promise<void> {
@@ -673,4 +726,8 @@ export function dapSetExceptionBreakpoints(session: string, filters: string[]): 
 
 export function gitDiscard(root: string, paths: string[]): Promise<void> {
 	return invoke<void>("git_discard", { root, paths });
+}
+
+export function gitAmend(root: string, message: string): Promise<string> {
+	return invoke<string>("git_amend", { root, message });
 }
