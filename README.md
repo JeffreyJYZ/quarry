@@ -52,7 +52,11 @@ read off `src-tauri/src/lib.rs` and `src/`:
   breakpoints with verified and pending states, conditional and hit-count breakpoints, run to cursor
   (`Cmd+F10`, `runToCursor` in `src/debug/session.ts` with temporary breakpoint handling), threads,
   frames (clicking a frame opens its source line), scopes, variables, hardware watchpoints, a paged
-  hex memory pane and a disassembly pane. Exception breakpoints toggle from the adapter's own filter
+  hex memory pane and a disassembly pane. The memory pane copies the loaded bytes as hex text (16 per
+  line, address-prefixed, via the same formatter it renders), copies a row's address on click with a
+  two-second `Copied 0x…` flash, and steps through the last 20 visited start addresses with Back and
+  Forward, disabled at the ends; clipboard failures surface in the pane's error line. Exception
+  breakpoints toggle from the adapter's own filter
   list through `dap::dap_exception_filters` and `dap::dap_set_exception_breakpoints`, and survive a restart.
   Variable values can be edited via `dap::dap_set_variable` and memory cells via `dap::dap_write_memory`. A
   pinned-variable watch pane re-reads pinned in-scope variables on each stop, reporting `not in scope` when a
