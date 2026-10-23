@@ -670,3 +670,7 @@ export function dapExceptionFilters(session: string): Promise<ExceptionFilter[]>
 export function dapSetExceptionBreakpoints(session: string, filters: string[]): Promise<void> {
 	return invoke<void>("dap_set_exception_breakpoints", { session, filters });
 }
+
+export function gitDiscard(root: string, paths: string[]): Promise<void> {
+	return invoke<void>("git_discard", { root, paths });
+}

@@ -103,6 +103,7 @@ pub fn run() {
             git::git_log,
             git::git_commit_diff,
             git::git_blame,
+            git::git_discard,
             files::list_files,
             processes::list_processes,
             pty::pty_open,

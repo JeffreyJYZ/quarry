@@ -29,7 +29,7 @@ read off `src-tauri/src/lib.rs` and `src/`:
 - **Insight**: one language server per project root — `rust-analyzer` for Cargo, `clangd` for CMake or
   `compile_commands.json` — with full-document sync. Diagnostics stream into the editor and the Problems
   dock, grouped by file with severity, line and message. Hover, go-to-definition, references and
-  completion commands are wired; hover, completion (CompletionList with real labels), definition (LocationLink[]) and references (24) are verified against rust-analyzer 1.99.0 via `bun run scripts/lsp-ux-smoke.ts`.
+  completion commands are wired; hover, completion (CompletionList with real labels), definition (LocationLink[]) and references are verified against rust-analyzer 1.99.0 via `bun run scripts/lsp-ux-smoke.ts`.
   Document outline via `lsp_symbols` and `src/outline/Outline.tsx`.
 - **Build**: `build_project` runs `cargo build --message-format=json` and merges its machine-readable
   diagnostics into the Problems dock. C/C++ projects without a build system compile through a plain
