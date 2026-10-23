@@ -20,7 +20,8 @@ const BUNDLE = join(ROOT, "src-tauri", "target", "release", "bundle", "macos");
 const ARCHIVE = join(BUNDLE, "quarry.app.tar.gz");
 const ARCHIVE_SIG = `${ARCHIVE}.sig`;
 const DMG_DIR = join(ROOT, "src-tauri", "target", "release", "bundle", "dmg");
-const LATEST = join(ROOT, "dist-release", "latest.json");
+const RELEASE_DIR = join(ROOT, "dist-release");
+const LATEST = join(RELEASE_DIR, "latest.json");
 
 function readVersion(): string {
 	const raw = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { version: string };
@@ -258,7 +259,7 @@ async function main(): Promise<number> {
 		} catch (error) {
 			lastError = error instanceof Error ? error.message : String(error);
 		}
-		await new Promise((resolve) => setTimeout(resolve, 2000));
+		await new Promise((resolve) => setTimeout(resolve, 5000));
 	}
 
 	if (published.version !== version) {
