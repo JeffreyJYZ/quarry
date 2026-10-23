@@ -23,6 +23,8 @@
 		{
 			"includes": [
 				"src/layout/Splitter.tsx",
+				"src/goto/Goto.tsx",
+				"src/generate/Generate.tsx",
 				"src/settings/SettingsPage.tsx",
 				"src/projects/NewProject.tsx"
 			],

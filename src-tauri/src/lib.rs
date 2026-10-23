@@ -54,6 +54,7 @@ pub fn run() {
             lsp::lsp_references,
             lsp::lsp_completion,
             lsp::lsp_symbols,
+            lsp::lsp_workspace_symbols,
             lsp::lsp_rename,
             lsp::lsp_code_actions,
             lsp::lsp_signature_help,

@@ -28,6 +28,8 @@ export type SettingsPageProps = {
 	onProjectChange: (next: ProjectSettings | null) => void;
 	/** Resets every panel size to the default. */
 	onResetPanels: () => void;
+	/** Tab to show when the page opens; Cmd ; asks for the project tab. */
+	initialTab?: Tab;
 };
 
 type Tab = "user" | "project";
@@ -123,16 +125,18 @@ export default function SettingsPage({
 	onUserChange,
 	onProjectChange,
 	onResetPanels,
+	initialTab = "user",
 }: SettingsPageProps): JSX.Element | null {
-	const [tab, setTab] = useState<Tab>("user");
+	const [tab, setTab] = useState<Tab>(initialTab);
 	const panelRef = useRef<HTMLDivElement>(null);
 	const effective = effectivePreferences(user, project);
 	const projectEmpty = project === null || projectSettingsAreEmpty(project);
 
 	useEffect(() => {
 		if (!open) return;
+		setTab(initialTab);
 		panelRef.current?.focus();
-	}, [open]);
+	}, [initialTab, open]);
 
 	if (!open) return null;
 

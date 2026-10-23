@@ -432,6 +432,7 @@ export type Settings = {
 	dockTab?: "tests" | "problems" | "refs" | "run";
 	dockExpanded?: boolean | null;
 	recentRoots?: string[];
+	recentFiles?: string[];
 	runConfigurations?: RunConfiguration[];
 	/** User-wide preferences; absent in a file written before the settings page existed. */
 	preferences?: Preferences;
@@ -554,8 +555,22 @@ export function onRunExited(handler: (event: RunExitedEvent) => void): Promise<(
 
 export type Symbol = { name: string; kind: number; range: Range; depth: number };
 
+export type WorkspaceSymbol = {
+	name: string;
+	kind: number;
+	container: string;
+	path: string;
+	line: number;
+	character: number;
+};
+
 export function lspSymbols(root: string, path: string): Promise<Symbol[]> {
 	return invoke<Symbol[]>("lsp_symbols", { root, path });
+}
+
+/** Project-wide symbol search, the backend for go-to-class. */
+export function lspWorkspaceSymbols(root: string, query: string): Promise<WorkspaceSymbol[]> {
+	return invoke<WorkspaceSymbol[]>("lsp_workspace_symbols", { root, query });
 }
 
 export type TextEdit = { range: Range; newText: string };

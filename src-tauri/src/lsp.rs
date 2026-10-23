@@ -18,7 +18,7 @@ use crate::resolve;
 use crate::types::{
     CallHierarchyNode, CodeAction, CompletionItem, CompletionList, Diagnostic, DiagnosticsEvent,
     FileEdit, HoverInfo, InlayHint, Location, LspStatus, Position, ProjectKind, Range,
-    SignatureHelp, SignatureInformation, Symbol, TextEdit,
+    SignatureHelp, SignatureInformation, Symbol, TextEdit, WorkspaceSymbol,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -1441,8 +1441,71 @@ pub async fn lsp_symbols(
     Ok(parse_symbols(&result))
 }
 
-/// Read the symbols out of a `textDocument/documentSymbol` answer.
+/// Project-wide symbol search (`workspace/symbol`), the backend for "go to class".
+#[tauri::command]
+pub async fn lsp_workspace_symbols(
+    state: State<'_, LspState>,
+    root: String,
+    query: String,
+) -> Result<Vec<WorkspaceSymbol>, String> {
+    let session = session_for(&state, &root)?;
+    let result = send_request(
+        &session,
+        "workspace/symbol",
+        json!({ "query": query }),
+    )
+    .await?;
+    Ok(parse_workspace_symbols(&result))
+}
+
+/// Flattens a `workspace/symbol` answer.
 ///
+/// The server may send `SymbolInformation` (a `location` with a range) or `WorkspaceSymbol`
+/// (a `location` that is a `{ uri }` in 3.17). An entry with no range still gets a row, pointing
+/// at the top of the file, because dropping it would hide a real result.
+pub fn parse_workspace_symbols(result: &Value) -> Vec<WorkspaceSymbol> {
+    let Some(entries) = result.as_array() else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for entry in entries {
+        let Some(name) = entry.get("name").and_then(Value::as_str) else {
+            continue;
+        };
+        if name.is_empty() {
+            continue;
+        }
+        let Some(location) = entry.get("location") else {
+            continue;
+        };
+        let Some(uri) = location.get("uri").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some(path) = uri_to_path(uri) else {
+            continue;
+        };
+        let start = location.get("range").map(|range| parse_range(range).start);
+        out.push(WorkspaceSymbol {
+            name: name.to_string(),
+            kind: entry
+                .get("kind")
+                .and_then(Value::as_u64)
+                .and_then(|kind| u32::try_from(kind).ok())
+                .unwrap_or(0),
+            container: entry
+                .get("containerName")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string(),
+            path,
+            line: start.map(|position| position.line).unwrap_or(0),
+            character: start.map(|position| position.character).unwrap_or(0),
+        });
+    }
+    out
+}
+
+/// Read the symbols out of a `textDocument/documentSymbol` answer.
 /// The server may answer with `DocumentSymbol[]` (nested via `children`) or
 /// `SymbolInformation[]` (flat, with `location`). Both are flattened into one list,
 /// with `depth` reflecting the nesting level.

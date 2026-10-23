@@ -399,6 +399,21 @@ pub struct Symbol {
     pub depth: u32,
 }
 
+/// One result of a project-wide symbol search.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceSymbol {
+    pub name: String,
+    /// LSP SymbolKind, 1–26.
+    pub kind: u32,
+    /// Enclosing type or module, as the server reports it.
+    pub container: String,
+    pub path: String,
+    /// Zero-based start of the symbol.
+    pub line: u32,
+    pub character: u32,
+}
+
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TextEdit {

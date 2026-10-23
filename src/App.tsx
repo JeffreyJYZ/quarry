@@ -78,6 +78,9 @@ import RunForm from "@/run/RunForm";
 import RunLog from "@/run/RunLog";
 import { splitArgs } from "@/run/splitArgs";
 
+import Goto, { type GotoMode } from "@/goto/Goto";
+import Generate from "@/generate/Generate";
+import { generateItems, type GenerateItem } from "@/generate/model";
 import ShortcutSheet from "@/shortcuts/ShortcutSheet";
 import SettingsPage from "@/settings/SettingsPage";
 import { DEFAULT_PANEL_SIZES, type PanelName, resizePanel } from "@/layout/model";
@@ -209,6 +212,11 @@ export default function App() {
 	/** This project's overrides; null when there is no project or the file does not exist. */
 	const [projectSettings, setProjectSettings] = useState<ProjectSettings | null>(null);
 	const [settingsOpen, setSettingsOpen] = useState(false);
+	/** Which settings tab a shortcut asked for. */
+	const [settingsTab, setSettingsTab] = useState<"user" | "project">("user");
+	const [gotoMode, setGotoMode] = useState<GotoMode | null>(null);
+	const [generateOpen, setGenerateOpen] = useState(false);
+	const [recentFiles, setRecentFiles] = useState<string[]>([]);
 	const [newProjectOpen, setNewProjectOpen] = useState(false);
 	const projectSettingsWrite = useRef<Promise<void>>(Promise.resolve());
 	const buildSplitRef = useRef<HTMLDivElement | null>(null);
@@ -361,6 +369,7 @@ export default function App() {
 		dockTab: DockTab;
 		runConfigurations: RunConfiguration[];
 		preferences: Preferences;
+		recentFiles: string[];
 	}>({
 		project: null,
 		buffers: [],
@@ -372,6 +381,7 @@ export default function App() {
 		dockTab: "problems",
 		runConfigurations: [],
 		preferences: DEFAULT_PREFERENCES,
+		recentFiles: [],
 	});
 	snapshotRef.current = {
 		project,
@@ -384,6 +394,7 @@ export default function App() {
 		dockTab,
 		runConfigurations,
 		preferences,
+		recentFiles,
 	};
 
 	useEffect(() => {
@@ -406,6 +417,7 @@ export default function App() {
 				setGitOpen(settings.gitOpen ?? false);
 				setPanelOpen(settings.dockExpanded ?? null);
 				setRecentRoots(settings.recentRoots ?? []);
+				setRecentFiles(settings.recentFiles ?? []);
 				setRunConfigurations(settings.runConfigurations ?? []);
 				const storedTab = settings.dockTab;
 				setDockTab(
@@ -478,6 +490,7 @@ export default function App() {
 				dockExpanded: panelOpen,
 				runConfigurations,
 				preferences,
+				recentFiles,
 			};
 			void writeSettings(settingsForWrite(preservedSettings.current, settings)).catch(
 				(error) => setNotice(describeError(error)),
@@ -495,6 +508,7 @@ export default function App() {
 		panelOpen,
 		runConfigurations,
 		preferences,
+		recentFiles,
 	]);
 
 	useEffect(() => {
@@ -512,6 +526,7 @@ export default function App() {
 				dockExpanded: snap.panelOpen,
 				runConfigurations: snap.runConfigurations,
 				preferences: snap.preferences,
+				recentFiles: snap.recentFiles,
 			};
 			void writeSettings(settingsForWrite(preservedSettings.current, settings)).catch(
 				(error) => setNotice(describeError(error)),
@@ -1166,6 +1181,9 @@ export default function App() {
 
 	const openPath = useCallback(
 		async (path: string, name: string) => {
+			setRecentFiles((current) =>
+				[path, ...current.filter((entry) => entry !== path)].slice(0, 20),
+			);
 			if (buffers.some((buffer) => buffer.path === path)) {
 				setActivePath(path);
 				return;
@@ -1663,6 +1681,31 @@ export default function App() {
 				toggleBreakpoint(activePath, cursor.line + 1);
 				return;
 			}
+			if (mod && !event.shiftKey && !event.altKey && key === "o") {
+				event.preventDefault();
+				if (root !== null) setGotoMode("class");
+				return;
+			}
+			if (mod && event.shiftKey && !event.altKey && key === "o") {
+				event.preventDefault();
+				if (root !== null) setQuickOpenOpen(true);
+				return;
+			}
+			if (mod && event.altKey && key === "o") {
+				event.preventDefault();
+				if (activePath !== null) setGotoMode("symbol");
+				return;
+			}
+			if (ctrlOnly && key === "e") {
+				event.preventDefault();
+				setGotoMode("recent");
+				return;
+			}
+			if (mod && !event.shiftKey && !event.altKey && key === "n") {
+				event.preventDefault();
+				if (activePath !== null) setGenerateOpen(true);
+				return;
+			}
 			if (mod && !event.altKey && key === "1") {
 				event.preventDefault();
 				setRailCollapsed((current) => !current);
@@ -1680,12 +1723,35 @@ export default function App() {
 			}
 			if (mod && !event.altKey && event.key === ";") {
 				event.preventDefault();
+				setSettingsTab(root === null ? "user" : "project");
 				setSettingsOpen(true);
 			}
 		};
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
 	}, [activePath, cursor, debug, handleRun, handleStop, root, runId, toggleBreakpoint]);
+
+	/** Applies one Generate item to the active buffer; the editor syncs from its value prop. */
+	const applyGenerate = useCallback(
+		(item: GenerateItem) => {
+			const target = activePath;
+			if (target === null) return;
+			setBuffers((current) =>
+				current.map((buffer) => {
+					if (buffer.path !== target) return buffer;
+					if (item.insert === "end") {
+						const base = buffer.text.endsWith("\n") ? buffer.text : `${buffer.text}\n`;
+						return { ...buffer, text: `${base}${item.text.replace(/^\n/, "")}` };
+					}
+					const lines = buffer.text.split("\n");
+					const line = Math.min(Math.max(cursor?.line ?? 0, 0), lines.length - 1);
+					lines[line] = `${lines[line]}${item.text}`;
+					return { ...buffer, text: lines.join("\n") };
+				}),
+			);
+		},
+		[activePath, cursor],
+	);
 
 	return (
 		<div className="shell">
@@ -2271,6 +2337,24 @@ export default function App() {
 							panelSizes: DEFAULT_PANEL_SIZES,
 						}))
 					}
+					initialTab={settingsTab}
+				/>
+			) : null}
+			{gotoMode !== null && root !== null ? (
+				<Goto
+					mode={gotoMode}
+					root={root}
+					path={activePath}
+					recent={recentFiles}
+					onOpen={(target, line, character) => handleNavigate(target, line, character)}
+					onClose={() => setGotoMode(null)}
+				/>
+			) : null}
+			{generateOpen && active !== null ? (
+				<Generate
+					items={generateItems(active.path, active.text, cursor?.line ?? 0)}
+					onPick={applyGenerate}
+					onClose={() => setGenerateOpen(false)}
 				/>
 			) : null}
 			<NewProject

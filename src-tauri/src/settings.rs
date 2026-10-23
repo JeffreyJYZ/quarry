@@ -380,6 +380,9 @@ pub struct Settings {
     /// Saved run configurations for the run panel, in save order.
     #[serde(default, deserialize_with = "deserialize_run_configurations")]
     pub run_configurations: Vec<RunConfiguration>,
+    /// Files opened most recently, newest first, capped at 20.
+    #[serde(default)]
+    pub recent_files: Vec<String>,
     /// User-wide preferences: editor, terminal, build profile and panel sizes.
     #[serde(default)]
     pub preferences: Preferences,
@@ -401,6 +404,7 @@ impl Default for Settings {
             dock_expanded: None,
             recent_roots: Vec::new(),
             run_configurations: Vec::new(),
+            recent_files: Vec::new(),
             preferences: Preferences::default(),
             extra: serde_json::Map::new(),
         }

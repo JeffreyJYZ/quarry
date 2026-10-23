@@ -1,0 +1,116 @@
+.goto-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 65;
+	display: flex;
+	justify-content: center;
+	align-items: flex-start;
+	padding: 12vh 24px 24px;
+	background: rgb(0 0 0 / 0.45);
+}
+
+.goto-panel {
+	display: flex;
+	flex-direction: column;
+	width: min(620px, 100%);
+	max-height: 60vh;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--panel);
+	box-shadow: 0 24px 64px rgb(0 0 0 / 0.5);
+	overflow: hidden;
+}
+
+.goto-head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	height: 32px;
+	padding: 0 12px;
+	border-bottom: 1px solid var(--line);
+}
+
+.goto-loading {
+	font-family: var(--mono);
+	font-size: 10px;
+	color: var(--muted);
+}
+
+.goto-close {
+	margin-left: auto;
+	border: 0;
+	background: none;
+	padding: 0;
+	font-family: var(--mono);
+	font-size: 10px;
+	color: var(--muted);
+	cursor: pointer;
+}
+
+.goto-close:hover {
+	color: var(--text);
+}
+
+.goto-input {
+	height: 34px;
+	padding: 0 12px;
+	border: 0;
+	border-bottom: 1px solid var(--line);
+	background: var(--bg);
+	color: var(--text);
+	font-family: var(--mono);
+	font-size: 12px;
+}
+
+.goto-input:focus-visible {
+	outline: none;
+}
+
+.goto-list {
+	margin: 0;
+	padding: 4px;
+	list-style: none;
+	overflow-y: auto;
+}
+
+.goto-row {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	width: 100%;
+	padding: 5px 8px;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: var(--text);
+	font-size: 12px;
+	text-align: left;
+	cursor: pointer;
+}
+
+.goto-row.active {
+	background: var(--hover);
+}
+
+.goto-label {
+	font-family: var(--mono);
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.goto-detail {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: var(--mono);
+	font-size: 10px;
+	color: var(--muted);
+}
+
+.goto-empty {
+	padding: 8px;
+	font-size: 12px;
+	color: var(--muted);
+}
