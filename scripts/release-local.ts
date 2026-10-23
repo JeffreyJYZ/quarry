@@ -10,7 +10,7 @@
  * Usage: bun scripts/release-local.ts [--tag quarry-alphaN] [--skip-build] [--notes FILE]
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -19,7 +19,7 @@ const REPO = "JeffreyJYZ/quarry";
 const BUNDLE = join(ROOT, "src-tauri", "target", "release", "bundle", "macos");
 const ARCHIVE = join(BUNDLE, "quarry.app.tar.gz");
 const ARCHIVE_SIG = `${ARCHIVE}.sig`;
-const DMG = join(BUNDLE, "quarry_0.0.0_universal.dmg");
+const DMG_DIR = join(ROOT, "src-tauri", "target", "release", "bundle", "dmg");
 const LATEST = join(ROOT, "dist-release", "latest.json");
 
 function readVersion(): string {
@@ -48,8 +48,31 @@ function run(command: string, args: string[], env?: NodeJS.ProcessEnv): string {
 	});
 }
 
-function dmgPath(version: string): string {
-	return join(BUNDLE, `quarry_${version}_universal.dmg`);
+/**
+ * The dmg the bundler wrote: its name carries the bundle target, so it is found rather than guessed.
+ * Tauri mounts the image to lay out the volume, which is why the mount is detached afterwards.
+ */
+function dmgPath(version: string): string | null {
+	if (!existsSync(DMG_DIR)) return null;
+	const candidates = readdirSync(DMG_DIR).filter(
+		(name) => name.startsWith(`quarry_${version}`) && name.endsWith(".dmg"),
+	);
+	if (candidates.length === 0) return null;
+	return join(DMG_DIR, candidates.sort().at(-1) as string);
+}
+
+/** Detaches every mounted quarry volume, so a stray Finder window never survives a release. */
+function detachVolumes(): void {
+	const volumes = existsSync("/Volumes") ? readdirSync("/Volumes") : [];
+	for (const name of volumes) {
+		if (!name.toLowerCase().startsWith("quarry")) continue;
+		try {
+			execFileSync("hdiutil", ["detach", join("/Volumes", name)], { stdio: "ignore" });
+			log(`detached /Volumes/${name}`);
+		} catch {
+			/* a volume someone is using stays mounted; nothing else to do */
+		}
+	}
 }
 
 function log(line: string): void {
@@ -97,6 +120,7 @@ async function main(): Promise<number> {
 			TAURI_SIGNING_PRIVATE_KEY: join(homedir(), ".tauri", "quarry-updater.key"),
 			TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "",
 		});
+		detachVolumes();
 	}
 
 	const archive = ARCHIVE;
@@ -104,7 +128,7 @@ async function main(): Promise<number> {
 	const dmg = dmgPath(version);
 	if (!existsSync(archive)) fail(`missing updater archive: ${archive}`);
 	if (!existsSync(signatureFile)) fail(`missing updater signature: ${signatureFile}`);
-	if (!existsSync(dmg)) fail(`missing dmg: ${dmg}`);
+	if (dmg === null) fail(`missing dmg for ${version} under ${DMG_DIR}`);
 
 	const signature = readFileSync(signatureFile, "utf8").trim();
 	if (signature === "") fail("the updater signature is empty");
@@ -134,10 +158,11 @@ async function main(): Promise<number> {
 		writeFileSync(LATEST, `${JSON.stringify(latest, null, 2)}\n`);
 	}
 
+	const dmgPathValue = dmg as string;
 	const assets = [
 		[archive, "quarry.app.tar.gz"],
 		[signatureFile, "quarry.app.tar.gz.sig"],
-		[dmg, `quarry_${version}_universal.dmg`],
+		[dmgPathValue, dmgPathValue.slice(dmgPathValue.lastIndexOf("/") + 1)],
 		[LATEST, "latest.json"],
 	] as const;
 
@@ -208,10 +233,11 @@ async function main(): Promise<number> {
 		}
 	}
 
+	detachVolumes();
 	log(`published ${tag}`);
 	log(`  version    ${version}`);
 	log(`  update     ${assetUrl(tag, "quarry.app.tar.gz")}`);
-	log(`  dmg        ${assetUrl(tag, `quarry_${version}_universal.dmg`)}`);
+	log(`  dmg        ${assetUrl(tag, dmgPathValue.slice(dmgPathValue.lastIndexOf("/") + 1))}`);
 	log(`  manifest   https://github.com/${REPO}/releases/latest/download/latest.json`);
 	return 0;
 }

@@ -1,0 +1,7 @@
+- chore: release alphas locally, CI only for betas and stable
+- feat: show caret, language and indent in the bottom bar
+- chore: bump to 0.1.0-alpha.3
+- feat: organise imports on Ctrl Opt O
+- feat: go-to palettes, generate menu, and the CLion command keys
+- feat: adopt CLions macOS run and debug keybindings
+- fix: keep the caret the only bright mark in the editor
