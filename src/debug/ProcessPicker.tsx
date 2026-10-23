@@ -71,6 +71,17 @@ export default function ProcessPicker({ debug }: { debug: DebugController }) {
 		}, 0);
 	}, [debug, filtered, highlight]);
 
+	const chooseProcess = useCallback(
+		(pid: number) => {
+			debug.setPidInput(String(pid));
+			setTimeout(() => {
+				debug.attach();
+			}, 0);
+			setOpen(false);
+		},
+		[debug],
+	);
+
 	const onKeyDown = useCallback(
 		(event: React.KeyboardEvent<HTMLInputElement>) => {
 			if (event.key === "ArrowDown") {
@@ -164,11 +175,13 @@ export default function ProcessPicker({ debug }: { debug: DebugController }) {
 									}
 									onMouseDown={(event) => {
 										event.preventDefault();
-										debug.setPidInput(String(process.pid));
-										setTimeout(() => {
-											debug.attach();
-										}, 0);
-										setOpen(false);
+									}}
+									onClick={() => chooseProcess(process.pid)}
+									onKeyDown={(event) => {
+										if (event.key === "Enter" || event.key === " ") {
+											event.preventDefault();
+											chooseProcess(process.pid);
+										}
 									}}
 									onMouseEnter={() => setHighlight(index)}
 								>

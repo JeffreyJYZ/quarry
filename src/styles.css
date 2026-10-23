@@ -1967,6 +1967,28 @@ button.tree-note {
 	opacity: 1;
 }
 
+.recent-row {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.recent-row .recent-item {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.recent-row:hover .recent-action,
+.recent-row:focus-within .recent-action {
+	opacity: 1;
+}
+
+.recent-actions {
+	display: inline-flex;
+	align-items: center;
+	flex: 0 0 auto;
+}
+
 .recent-empty {
 	font-size: 12px;
 	color: var(--muted, #888);

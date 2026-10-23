@@ -144,6 +144,7 @@ export default function CallsPanel({ root, path, cursor, onNavigate, onClose }: 
 				<button
 					type="button"
 					className={direction === "incoming" ? "calls-tab active" : "calls-tab"}
+					aria-pressed={direction === "incoming"}
 					onClick={() => setDirection("incoming")}
 				>
 					Incoming
@@ -151,6 +152,7 @@ export default function CallsPanel({ root, path, cursor, onNavigate, onClose }: 
 				<button
 					type="button"
 					className={direction === "outgoing" ? "calls-tab active" : "calls-tab"}
+					aria-pressed={direction === "outgoing"}
 					onClick={() => setDirection("outgoing")}
 				>
 					Outgoing

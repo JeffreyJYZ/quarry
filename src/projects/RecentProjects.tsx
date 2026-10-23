@@ -152,40 +152,49 @@ export default function RecentProjects({ roots, current, opening, onOpen }: Prop
 						const { name, parent } = splitPath(root);
 						const isCurrent = root === current;
 						return (
-							<div
-								key={root}
-								role="option"
-								tabIndex={-1}
-								aria-selected={isCurrent}
-								className={
-									index === highlight ? "recent-item highlight" : "recent-item"
-								}
-								title={root}
-								onClick={() => openAt(index)}
-								onKeyDown={(event) => {
-									if (event.key === "Enter") openAt(index);
-								}}
-								onMouseEnter={() => setHighlight(index)}
-							>
-								{isCurrent ? <span className="recent-dot">●</span> : null}
-								<span className="recent-name">{name}</span>
-								{parent ? <span className="recent-parent">{parent}</span> : null}
-								<button
-									type="button"
-									className="recent-action"
-									title="Copy path"
-									onClick={(event) => void handleCopy(event, root)}
+							<div key={root} className="recent-row">
+								<div
+									role="option"
+									tabIndex={-1}
+									aria-selected={isCurrent}
+									className={
+										index === highlight
+											? "recent-item highlight"
+											: "recent-item"
+									}
+									title={root}
+									onClick={() => openAt(index)}
+									onKeyDown={(event) => {
+										if (event.key === "Enter") openAt(index);
+									}}
+									onMouseEnter={() => setHighlight(index)}
 								>
-									{"\u2398"}
-								</button>
-								<button
-									type="button"
-									className="recent-action"
-									title="Remove"
-									onClick={(event) => void handleRemove(event, root)}
-								>
-									{"\u00D7"}
-								</button>
+									{isCurrent ? <span className="recent-dot">●</span> : null}
+									<span className="recent-name">{name}</span>
+									{parent ? (
+										<span className="recent-parent">{parent}</span>
+									) : null}
+								</div>
+								<span className="recent-actions">
+									<button
+										type="button"
+										className="recent-action"
+										title="Copy path"
+										aria-label={`copy path of ${name}`}
+										onClick={(event) => void handleCopy(event, root)}
+									>
+										{"\u2398"}
+									</button>
+									<button
+										type="button"
+										className="recent-action"
+										title="Remove"
+										aria-label={`remove ${name} from recent projects`}
+										onClick={(event) => void handleRemove(event, root)}
+									>
+										{"\u00D7"}
+									</button>
+								</span>
 							</div>
 						);
 					})}
