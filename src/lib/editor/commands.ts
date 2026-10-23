@@ -1,4 +1,4 @@
-import { EditorView } from "@codemirror/view";
+import type { EditorView } from "@codemirror/view";
 import { foldable, foldEffect, indentUnit } from "@codemirror/language";
 
 /** Pairs that an Enter between them splits onto their own indented lines. */

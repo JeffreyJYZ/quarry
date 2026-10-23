@@ -10,10 +10,8 @@ import {
 	useState,
 } from "react";
 import CallsPanel from "@/ui/calls/CallsPanel";
-import FileTree from "@/ui/components/FileTree";
 import { type BreakpointRow, useDebugSession } from "@/lib/debug/session";
 import type { EditorHandle } from "@/ui/editor/Editor";
-import SourceControl from "@/ui/git/SourceControl";
 import {
 	combineDiagnostics,
 	countSeverities,
@@ -24,7 +22,6 @@ import {
 import { useDiagnosticsFeed } from "@/lib/lsp/feed";
 import { useDocumentSync, useLspServer } from "@/lib/lsp/session";
 import TypeHierarchyPanel from "@/ui/lsp/TypeHierarchyPanel";
-import Outline from "@/ui/outline/Outline";
 import type { Command } from "@/ui/palette/CommandPalette";
 
 import { fileName, problemFiles } from "@/lib/problems/model";
@@ -75,7 +72,9 @@ import AppOverlays from "@/ui/app/AppOverlays";
 import TopBar from "@/ui/app/TopBar";
 import EditorStage from "@/ui/app/EditorStage";
 import RunSection from "@/ui/app/RunSection";
-import ShortcutSheet from "@/ui/shortcuts/ShortcutSheet";
+import SideRail from "@/ui/app/SideRail";
+import BottomDock, { Palettes } from "@/ui/app/BottomDock";
+import type { DockTab } from "@/ui/tests/TestsDock";
 import { DEFAULT_PANEL_SIZES, type PanelName, resizePanel } from "@/lib/layout/model";
 import Splitter from "@/ui/layout/Splitter";
 import {
@@ -88,15 +87,11 @@ import {
 	type ProjectSettings,
 } from "@/lib/settings/model";
 
-import TestsDock, { type DockTab } from "@/ui/tests/TestsDock";
 import { useTests } from "@/lib/tests/useTests";
 import UpdateNotice from "@/ui/updates/UpdateNotice";
 import "@/ui/styles.css";
 
 const DebugPanel = lazy(() => import("@/ui/debug/DebugPanel"));
-const CommandPalette = lazy(() => import("@/ui/palette/CommandPalette"));
-const QuickOpen = lazy(() => import("@/ui/quickopen/QuickOpen"));
-const SearchPalette = lazy(() => import("@/ui/search/SearchPalette"));
 const Terminal = lazy(() => import("@/ui/terminal/Terminal"));
 
 const NO_BREAKPOINTS: BreakpointRow[] = [];
@@ -1901,88 +1896,46 @@ export default function App() {
 					} as CSSProperties
 				}
 			>
-				{gitOpen && root !== null ? (
-					<SourceControl
-						root={root}
-						refreshToken={gitRefresh}
-						status={gitStatusState}
-						activePath={activePath}
-						saveToken={blameSaveToken}
-						onRefresh={refreshGit}
-						onOpenFile={(path) => void openPath(path, fileName(path))}
-						onDiff={setGitDiffPath}
-						onCommitDiff={setGitCommitDiffHash}
-						onNavigate={handleNavigate}
-						diffPath={gitDiffPath}
-					/>
-				) : (
-					<aside className="rail">
-						<div className="rail-head">
-							<span className="label">explorer</span>
-							<button
-								type="button"
-								className="button"
-								disabled={root === null || activePath === null}
-								onClick={() => setFileRevealToken((current) => current + 1)}
-							>
-								Reveal
-							</button>
-						</div>
-						{project ? (
-							<>
-								<FileTree
-									key={project.root}
-									root={project.root}
-									activePath={activePath}
-									onOpenFile={handleOpenFile}
-									onFileRenamed={(oldPath, newPath) => {
-										setBuffers((current) =>
-											current.map((buffer) =>
-												buffer.path === oldPath
-													? {
-															...buffer,
-															path: newPath,
-															name: fileName(newPath),
-														}
-													: buffer,
-											),
-										);
-										if (activePath === oldPath) setActivePath(newPath);
-									}}
-									onFileDeleted={(path) => {
-										const buffer = buffers.find((b) => b.path === path);
-										if (buffer && isDirty(buffer)) {
-											setNotice(
-												`Deleted ${fileName(path)} (unsaved changes lost)`,
-											);
-										}
-										setBuffers((current) =>
-											current.filter((b) => b.path !== path),
-										);
-										if (activePath === path) {
-											setActivePath(null);
-										}
-									}}
-									revealToken={fileRevealToken}
-									changes={Object.fromEntries(
-										(gitStatusState?.entries ?? []).map((entry) => [
-											entry.path,
-											entry.status,
-										]),
-									)}
-								/>
-								<Outline
-									root={project.root}
-									activePath={activePath}
-									onNavigate={handleNavigate}
-									cursor={cursor}
-								/>
-							</>
-						) : (
-							<p className="empty">No folder open. Use Open project to choose one.</p>
-						)}
-					</aside>
-				)}
+				<SideRail
+					gitOpen={gitOpen}
+					project={project}
+					root={root}
+					activePath={activePath}
+					cursor={cursor}
+					gitStatus={gitStatusState}
+					gitRefresh={gitRefresh}
+					blameSaveToken={blameSaveToken}
+					revealToken={fileRevealToken}
+					changes={Object.fromEntries(
+						(gitStatusState?.entries ?? []).map((entry) => [entry.path, entry.status]),
+					)}
+					diffPath={gitDiffPath}
+					onOpenFile={handleOpenFile}
+					onOpenGitFile={(path) => void openPath(path, fileName(path))}
+					onFileRenamed={(oldPath, newPath) => {
+						setBuffers((current) =>
+							current.map((buffer) =>
+								buffer.path === oldPath
+									? { ...buffer, path: newPath, name: fileName(newPath) }
+									: buffer,
+							),
+						);
+						if (activePath === oldPath) setActivePath(newPath);
+					}}
+					onFileDeleted={(path) => {
+						const buffer = buffers.find((b) => b.path === path);
+						if (buffer && isDirty(buffer)) {
+							setNotice(`Deleted ${fileName(path)} (unsaved changes lost)`);
+						}
+						setBuffers((current) => current.filter((b) => b.path !== path));
+						if (activePath === path) setActivePath(null);
+					}}
+					onReveal={() => setFileRevealToken((current) => current + 1)}
+					onRefresh={refreshGit}
+					onDiff={setGitDiffPath}
+					onCommitDiff={setGitCommitDiffHash}
+					onNavigate={handleNavigate}
+				/>
 
 				{railCollapsed ? null : (
 					<Splitter
@@ -2096,36 +2049,23 @@ export default function App() {
 							onClose={() => setTypeHierarchyOpen(false)}
 						/>
 					) : project ? (
-						<>
-							{panelExpanded ? (
-								<Splitter
-									axis="y"
-									value={panels.dockHeight}
-									min={120}
-									max={900}
-									invert
-									label="Resize bottom dock"
-									onChange={(next) => handlePanelResize("dockHeight", next)}
-								/>
-							) : null}
-							<TestsDock
-								tab={dockTab}
-								expanded={panelExpanded}
-								onToggleExpanded={() => setPanelOpen(!panelExpanded)}
-								onSelectTab={setDockTab}
-								problems={{
-									files,
-									errors: counts.errors,
-									warnings: counts.warnings,
-									activePath,
-									onSelect: handleSelectProblem,
-									root,
-									buffers,
-									setBuffers,
-								}}
-								tests={tests}
-							/>
-						</>
+						<BottomDock
+							open
+							expanded={panelExpanded}
+							tab={dockTab}
+							dockHeight={panels.dockHeight}
+							problemFiles={files}
+							counts={counts}
+							root={root}
+							activePath={activePath}
+							buffers={buffers}
+							onResize={(next) => handlePanelResize("dockHeight", next)}
+							onToggleExpanded={() => setPanelOpen(!panelExpanded)}
+							onSelectTab={setDockTab}
+							onSelectProblem={handleSelectProblem}
+							onBuffersChange={setBuffers}
+							tests={tests}
+						/>
 					) : null}
 					<RunSection
 						root={root}
@@ -2155,40 +2095,24 @@ export default function App() {
 							setRunExited(null);
 						}}
 					/>
-					{searchOpen && root !== null ? (
-						<Suspense fallback={null}>
-							<SearchPalette
-								root={root}
-								onOpen={handleOpenMatch}
-								onClose={closeSearch}
-							/>
-						</Suspense>
-					) : null}
-					{quickOpenOpen && root !== null ? (
-						<Suspense fallback={null}>
-							<QuickOpen
-								root={root}
-								openPaths={new Set(buffers.map((buffer) => buffer.path))}
-								onOpen={handleOpenQuick}
-								onClose={() => setQuickOpenOpen(false)}
-							/>
-						</Suspense>
-					) : null}
-					{shortcutsOpen ? (
-						<ShortcutSheet
-							groups={SHORTCUT_GROUPS}
-							onClose={() => setShortcutsOpen(false)}
-						/>
-					) : null}
-					<Suspense fallback={null}>
-						<CommandPalette
-							open={commandPaletteOpen}
-							commands={commands}
-							recent={recentCommands}
-							onRecent={setRecentCommands}
-							onClose={() => setCommandPaletteOpen(false)}
-						/>
-					</Suspense>
+					<Palettes
+						root={root}
+						searchOpen={searchOpen}
+						quickOpenOpen={quickOpenOpen}
+						shortcutsOpen={shortcutsOpen}
+						commandOpen={commandPaletteOpen}
+						openPaths={new Set(buffers.map((buffer) => buffer.path))}
+						commands={commands}
+						recentCommands={recentCommands}
+						onRecentCommands={setRecentCommands}
+						groups={SHORTCUT_GROUPS}
+						onOpenMatch={handleOpenMatch}
+						onOpenQuick={handleOpenQuick}
+						onCloseSearch={closeSearch}
+						onCloseQuick={() => setQuickOpenOpen(false)}
+						onCloseShortcuts={() => setShortcutsOpen(false)}
+						onCloseCommands={() => setCommandPaletteOpen(false)}
+					/>
 				</main>
 
 				{project && terminalOpen && effective.terminalPlacement === "right" ? (

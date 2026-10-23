@@ -1,4 +1,4 @@
-import { EditorView } from "@codemirror/view";
+import type { EditorView } from "@codemirror/view";
 
 export function toLspPosition(view: EditorView, pos: number): { line: number; character: number } {
 	const lineObj = view.state.doc.lineAt(pos);

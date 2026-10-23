@@ -1,12 +1,12 @@
-import { type BuildProfile } from "@/lib/debug/profile";
-import { type Pin, type PinResult } from "@/lib/debug/watch";
-import {
-	type DapFrame,
-	type DapVariable,
-	type DapScope,
-	type ExceptionFilter,
-	type LaunchConfig,
-	type LaunchPreset,
+import type { BuildProfile } from "@/lib/debug/profile";
+import type { Pin, PinResult } from "@/lib/debug/watch";
+import type {
+	DapFrame,
+	DapVariable,
+	DapScope,
+	ExceptionFilter,
+	LaunchConfig,
+	LaunchPreset,
 } from "@/lib/project/api";
 
 export type DebugStatus = "idle" | "launching" | "running" | "stopped";
