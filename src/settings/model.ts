@@ -9,6 +9,7 @@
 import { clampPanelSizes, type PanelSizes } from "@/layout/model";
 
 export type BuildProfile = "debug" | "release";
+export type TerminalPlacement = "bottom" | "right";
 export type TabSize = 2 | 4 | 8;
 
 export const TAB_SIZES: TabSize[] = [2, 4, 8];
@@ -21,6 +22,7 @@ export type Preferences = {
 	terminalFontSize: number;
 	formatOnSave: boolean;
 	buildProfile: BuildProfile;
+	terminalPlacement: TerminalPlacement;
 	panelSizes: PanelSizes;
 };
 
@@ -37,6 +39,7 @@ export type EffectivePreferences = {
 	terminalFontSize: number;
 	formatOnSave: boolean;
 	buildProfile: BuildProfile;
+	terminalPlacement: TerminalPlacement;
 	panelSizes: PanelSizes;
 };
 
@@ -46,6 +49,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
 	terminalFontSize: 13,
 	formatOnSave: false,
 	buildProfile: "debug",
+	terminalPlacement: "bottom",
 	panelSizes: clampPanelSizes(null),
 };
 
@@ -62,6 +66,10 @@ export function clampFontSize(value: unknown, fallback: number): number {
 
 function readTabSize(value: unknown): TabSize | null {
 	return value === 2 || value === 4 || value === 8 ? value : null;
+}
+
+function readPlacement(value: unknown): TerminalPlacement {
+	return value === "right" ? "right" : "bottom";
 }
 
 function readBuildProfile(value: unknown): BuildProfile | null {
@@ -85,6 +93,7 @@ export function normalizePreferences(input: unknown): Preferences {
 				? source.formatOnSave
 				: DEFAULT_PREFERENCES.formatOnSave,
 		buildProfile: readBuildProfile(source.buildProfile) ?? DEFAULT_PREFERENCES.buildProfile,
+		terminalPlacement: readPlacement(source.terminalPlacement),
 		panelSizes: clampPanelSizes(source.panelSizes),
 	};
 }
@@ -112,6 +121,7 @@ export function effectivePreferences(
 		terminalFontSize: user.terminalFontSize,
 		formatOnSave: project?.formatOnSave ?? user.formatOnSave,
 		buildProfile: project?.buildProfile ?? user.buildProfile,
+		terminalPlacement: user.terminalPlacement,
 		panelSizes: user.panelSizes,
 	};
 }

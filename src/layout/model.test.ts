@@ -46,12 +46,14 @@ describe("clampPanelSizes", () => {
 			debugWidth: 1,
 			dockHeight: 5000,
 			terminalHeight: 1,
+			terminalWidth: 1,
 		});
 		expect(sizes).toEqual({
 			railWidth: PANEL_LIMITS.railWidth.max,
 			debugWidth: PANEL_LIMITS.debugWidth.min,
 			dockHeight: PANEL_LIMITS.dockHeight.max,
 			terminalHeight: PANEL_LIMITS.terminalHeight.min,
+			terminalWidth: PANEL_LIMITS.terminalWidth.min,
 		});
 	});
 });

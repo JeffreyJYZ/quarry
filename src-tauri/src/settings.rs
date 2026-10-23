@@ -179,6 +179,14 @@ where
     Ok(value.clamp(100.0, 900.0))
 }
 
+fn deserialize_panel_terminal_width<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value: f64 = f64::deserialize(deserializer).unwrap_or(380.0);
+    Ok(value.clamp(240.0, 900.0))
+}
+
 fn deserialize_project_editor_tab_size<'de, D>(deserializer: D) -> Result<Option<u32>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -231,6 +239,11 @@ pub struct PanelSizes {
         deserialize_with = "deserialize_panel_terminal_height"
     )]
     pub terminal_height: f64,
+    #[serde(
+        default = "default_terminal_width",
+        deserialize_with = "deserialize_panel_terminal_width"
+    )]
+    pub terminal_width: f64,
 }
 
 fn default_rail_width() -> f64 {
@@ -245,6 +258,9 @@ fn default_dock_height() -> f64 {
 fn default_terminal_height() -> f64 {
     180.0
 }
+fn default_terminal_width() -> f64 {
+    380.0
+}
 
 impl Default for PanelSizes {
     fn default() -> Self {
@@ -253,6 +269,7 @@ impl Default for PanelSizes {
             debug_width: 320.0,
             dock_height: 260.0,
             terminal_height: 180.0,
+            terminal_width: 380.0,
         }
     }
 }
@@ -263,6 +280,7 @@ impl PanelSizes {
         self.debug_width = self.debug_width.clamp(200.0, 640.0);
         self.dock_height = self.dock_height.clamp(120.0, 900.0);
         self.terminal_height = self.terminal_height.clamp(100.0, 900.0);
+        self.terminal_width = self.terminal_width.clamp(240.0, 900.0);
     }
 }
 
@@ -291,6 +309,8 @@ pub struct Preferences {
         deserialize_with = "deserialize_preferences_build_profile"
     )]
     pub build_profile: String,
+    #[serde(default, deserialize_with = "deserialize_terminal_placement")]
+    pub terminal_placement: String,
     #[serde(default, deserialize_with = "deserialize_panel_sizes")]
     pub panel_sizes: PanelSizes,
 }
@@ -307,6 +327,20 @@ fn default_terminal_font_size() -> f64 {
 fn default_build_profile() -> String {
     "debug".to_string()
 }
+fn default_terminal_placement() -> String {
+    "bottom".to_string()
+}
+
+fn deserialize_terminal_placement<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value: String = String::deserialize(deserializer).unwrap_or_else(|_| default_terminal_placement());
+    Ok(match value.as_str() {
+        "right" => "right".to_string(),
+        _ => default_terminal_placement(),
+    })
+}
 
 impl Default for Preferences {
     fn default() -> Self {
@@ -316,6 +350,7 @@ impl Default for Preferences {
             terminal_font_size: 13.0,
             format_on_save: false,
             build_profile: "debug".to_string(),
+            terminal_placement: "bottom".to_string(),
             panel_sizes: PanelSizes::default(),
         }
     }

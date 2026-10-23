@@ -129,6 +129,21 @@ pub fn run() {
             pty::pty_resize,
             pty::pty_close
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building the application")
+        .run(|handle, event| {
+            match event {
+                // A live shell, language server, adapter or program keeps the process group alive,
+                // which is what makes macOS say the app is "running in the background" after the
+                // window is gone. Take them down with the window.
+                tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
+                    use tauri::Manager;
+                    handle.state::<lsp::LspState>().shutdown_all();
+                    handle.state::<dap::DapState>().shutdown_all();
+                    handle.state::<pty::PtyState>().shutdown_all();
+                    handle.state::<run_task::RunState>().shutdown_all();
+                }
+                _ => {}
+            }
+        });
 }

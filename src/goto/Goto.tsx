@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { lspSymbols, lspWorkspaceSymbols, type WorkspaceSymbol } from "@/project/api";
+import { isInsideRoot } from "@/lsp/paths";
 import "@/goto/goto.css";
 
 export type GotoMode = "class" | "symbol" | "recent";
@@ -83,7 +84,9 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose }: Goto
 			try {
 				if (mode === "symbol") {
 					const symbols =
-						path === null ? [] : await lspSymbols(root, path).catch(() => []);
+						path === null || !isInsideRoot(root, path)
+							? []
+							: await lspSymbols(root, path).catch(() => []);
 					if (cancelled) return;
 					setRows(
 						symbols.map((symbol) => ({

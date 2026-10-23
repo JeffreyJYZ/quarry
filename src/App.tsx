@@ -2002,6 +2002,7 @@ export default function App() {
 					{
 						"--rail-width": `${panels.railWidth}px`,
 						"--debug-width": `${panels.debugWidth}px`,
+						"--terminal-width": `${panels.terminalWidth}px`,
 					} as CSSProperties
 				}
 			>
@@ -2157,7 +2158,7 @@ export default function App() {
 					) : (
 						<Welcome project={project} />
 					)}
-					{project && terminalOpen ? (
+					{project && terminalOpen && effective.terminalPlacement === "bottom" ? (
 						<>
 							<Splitter
 								axis="y"
@@ -2323,6 +2324,28 @@ export default function App() {
 						/>
 					</Suspense>
 				</main>
+
+				{project && terminalOpen && effective.terminalPlacement === "right" ? (
+					<>
+						<Splitter
+							axis="x"
+							value={panels.terminalWidth}
+							min={240}
+							max={900}
+							invert
+							label="Resize terminal"
+							onChange={(next) => handlePanelResize("terminalWidth", next)}
+						/>
+						<Suspense fallback={null}>
+							<Terminal
+								root={project.root}
+								activePath={activePath}
+								defaultFontSize={effective.terminalFontSize}
+								placement="right"
+							/>
+						</Suspense>
+					</>
+				) : null}
 
 				{debugOpen && root !== null ? (
 					<>

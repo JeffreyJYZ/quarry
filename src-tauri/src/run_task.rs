@@ -120,6 +120,19 @@ pub async fn run_program(
 }
 
 /// Kill a running child and reap it; an unknown id is already stopped, which is not an error.
+impl RunState {
+    /// Kills every live run; used on exit so no program outlives the window.
+    pub fn shutdown_all(&self) {
+        let runs: Vec<_> = lock(&self.runs).drain().map(|(_, entry)| entry).collect();
+        for entry in runs {
+            if let Some(mut child) = lock(&entry).take() {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn stop_program(state: State<'_, RunState>, run_id: String) -> Result<(), String> {
     let entry = lock(&state.runs).get(&run_id).cloned();

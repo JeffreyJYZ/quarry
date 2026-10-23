@@ -1,7 +1,4 @@
-- chore: release alphas locally, CI only for betas and stable
-- feat: show caret, language and indent in the bottom bar
-- chore: bump to 0.1.0-alpha.3
-- feat: organise imports on Ctrl Opt O
-- feat: go-to palettes, generate menu, and the CLion command keys
-- feat: adopt CLions macOS run and debug keybindings
-- fix: keep the caret the only bright mark in the editor
+- chore: bump to 0.1.0-alpha.5
+- fix: full-width canvas, real icons, C projects and a Rust server a GUI can find
+- fix: find the dmg where the bundler writes it and eject the mount
+- docs: alpha releases are local, CI is for betas

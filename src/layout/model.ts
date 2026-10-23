@@ -11,6 +11,7 @@ export type PanelSizes = {
 	debugWidth: number;
 	dockHeight: number;
 	terminalHeight: number;
+	terminalWidth: number;
 };
 
 export type PanelName = keyof PanelSizes;
@@ -20,6 +21,7 @@ export const DEFAULT_PANEL_SIZES: PanelSizes = {
 	debugWidth: 320,
 	dockHeight: 260,
 	terminalHeight: 180,
+	terminalWidth: 380,
 };
 
 export const PANEL_LIMITS: Record<PanelName, { min: number; max: number }> = {
@@ -27,6 +29,7 @@ export const PANEL_LIMITS: Record<PanelName, { min: number; max: number }> = {
 	debugWidth: { min: 200, max: 640 },
 	dockHeight: { min: 120, max: 900 },
 	terminalHeight: { min: 100, max: 900 },
+	terminalWidth: { min: 240, max: 900 },
 };
 
 export function clampPanel(name: PanelName, value: number): number {
@@ -50,6 +53,7 @@ export function clampPanelSizes(input: unknown): PanelSizes {
 		debugWidth: read("debugWidth"),
 		dockHeight: read("dockHeight"),
 		terminalHeight: read("terminalHeight"),
+		terminalWidth: read("terminalWidth"),
 	};
 }
 

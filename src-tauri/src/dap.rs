@@ -193,6 +193,16 @@ impl Drop for Session {
 /// Start a debug session and return once the adapter is configured and waiting for breakpoints.
 ///
 /// `configurationDone` is deliberately not sent here: the caller sets breakpoints first.
+impl DapState {
+    /// Ends every debug session; used on exit so no adapter outlives the window.
+    pub fn shutdown_all(&self) {
+        let sessions: Vec<_> = lock(&self.sessions).drain().map(|(_, session)| session).collect();
+        for session in sessions {
+            session.shutdown();
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn dap_launch(
     app: AppHandle,

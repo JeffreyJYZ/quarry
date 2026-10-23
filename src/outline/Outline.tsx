@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { type Symbol as LspSymbol, lspSymbols } from "@/project/api";
 import { describeError } from "@/project/errors";
+import { isInsideRoot, lspErrorMessage } from "@/lsp/paths";
 import { caretSymbolIndex, filterSymbolIndices } from "./model";
 
 const KIND_LABELS: Record<number, string> = {
@@ -61,7 +62,8 @@ export default function Outline({ root, activePath, onNavigate, cursor }: Outlin
 	}, [activePath]);
 
 	useEffect(() => {
-		if (activePath === null) {
+		if (activePath === null || !isInsideRoot(root, activePath)) {
+			// The server indexes one root; a tab from outside it would come back as an internal error.
 			setSymbols([]);
 			setError(null);
 			setLoading(false);
@@ -79,7 +81,7 @@ export default function Outline({ root, activePath, onNavigate, cursor }: Outlin
 					setLoading(false);
 				} catch (err) {
 					if (seqRef.current !== seq) return;
-					setError(describeError(err));
+					setError(lspErrorMessage(describeError(err)));
 					setSymbols([]);
 					setLoading(false);
 				}

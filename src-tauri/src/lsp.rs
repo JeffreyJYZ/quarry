@@ -241,6 +241,16 @@ async fn start_lsp_session(
     })
 }
 
+impl LspState {
+    /// Stops every language server; used on exit so no child outlives the window.
+    pub fn shutdown_all(&self) {
+        let sessions: Vec<_> = lock(&self.sessions).drain().map(|(_, session)| session).collect();
+        for session in sessions {
+            lock(&session).stop();
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn stop_lsp(state: State<'_, LspState>, root: String) -> Result<(), String> {
     let session = lock(&state.sessions).remove(&root);

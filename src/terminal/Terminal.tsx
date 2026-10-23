@@ -18,6 +18,7 @@ import {
 	resetFontSize,
 	scrollbackText,
 } from "./fontSize";
+import { feedChunk, parseAnsi } from "./ansi";
 
 const MAX_LINES = 4000;
 const RESIZE_DEBOUNCE_MS = 120;
@@ -27,6 +28,8 @@ export type TerminalProps = {
 	activePath?: string | null;
 	/** Font size a new session starts at; the settings page owns the default. */
 	defaultFontSize?: number;
+	/** "right" docks the terminal as a column beside the editor instead of under it. */
+	placement?: "bottom" | "right";
 };
 
 type Session = {
@@ -50,19 +53,7 @@ function describe(err: unknown): string {
 }
 
 function appendData(prev: Session, data: string): Session {
-	const next = [...prev.lines];
-	const parts = data.split("\n");
-	for (let i = 0; i < parts.length; i += 1) {
-		if (i > 0) {
-			next.push("");
-		}
-		const last = next.length - 1;
-		if (last >= 0) {
-			next[last] = (next[last] ?? "") + parts[i];
-		} else {
-			next.push(parts[i]);
-		}
-	}
+	const next = feedChunk(prev.lines, data);
 	let dropped = prev.dropped;
 	if (next.length > MAX_LINES) {
 		const overflow = next.length - MAX_LINES;
@@ -83,7 +74,12 @@ function shortCwd(cwd: string): string {
 	return `…/${tail}`;
 }
 
-export default function Terminal({ root, activePath, defaultFontSize }: TerminalProps) {
+export default function Terminal({
+	root,
+	activePath,
+	defaultFontSize,
+	placement = "bottom",
+}: TerminalProps) {
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [activeId, setActiveId] = useState<number | null>(null);
 	const nextId = useRef(1);
@@ -456,7 +452,10 @@ export default function Terminal({ root, activePath, defaultFontSize }: Terminal
 	const size = { cols: 80, rows: 24 };
 
 	return (
-		<section className="terminal" aria-label="Terminal">
+		<section
+			className={placement === "right" ? "terminal terminal-side" : "terminal"}
+			aria-label="Terminal"
+		>
 			<div className="terminal-tabs">
 				{sessions.map((s) => (
 					<div
@@ -577,7 +576,30 @@ export default function Terminal({ root, activePath, defaultFontSize }: Terminal
 				<>
 					<div ref={containerRef} className="terminal-body" onScroll={onScroll}>
 						<pre className="terminal-pre" style={{ fontSize: `${active.fontSize}px` }}>
-							{displayed.join("\n")}
+							{displayed.map((line, index) => (
+								// biome-ignore lint/suspicious/noArrayIndexKey: a scrollback line has no identity beyond its position
+								<span key={index} className="terminal-line">
+									{parseAnsi(line).map((run, runIndex) => (
+										<span
+											// biome-ignore lint/suspicious/noArrayIndexKey: runs are positional by nature
+											key={runIndex}
+											style={{
+												color: run.fg ?? undefined,
+												backgroundColor: run.bg ?? undefined,
+												fontWeight: run.bold ? 600 : undefined,
+												opacity: run.dim ? 0.7 : undefined,
+												fontStyle: run.italic ? "italic" : undefined,
+												textDecoration: run.underline
+													? "underline"
+													: undefined,
+											}}
+										>
+											{run.text}
+										</span>
+									))}
+									{"\n"}
+								</span>
+							))}
 						</pre>
 					</div>
 					<div className="terminal-status">

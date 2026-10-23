@@ -41,6 +41,20 @@ struct Session {
     child: Arc<Mutex<Option<Box<dyn portable_pty::Child + Send + Sync>>>>,
 }
 
+impl PtyState {
+    /// Kills every shell. Called when the app exits: a live PTY keeps the process group alive, and
+    /// macOS then shows the app as still running in the background after its window is gone.
+    pub fn shutdown_all(&self) {
+        let sessions = lock(&self.sessions);
+        for session in sessions.values() {
+            if let Some(mut child) = lock(&session.child).take() {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+        }
+    }
+}
+
 impl Drop for PtyState {
     fn drop(&mut self) {
         let sessions = lock(&self.sessions);

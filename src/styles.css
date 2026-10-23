@@ -3152,6 +3152,15 @@ button.tree-note {
 	background: var(--panel);
 }
 
+/* Docked right: a column beside the editor, not a strip under it. */
+.terminal.terminal-side {
+	flex: 0 0 var(--terminal-width, 380px);
+	width: var(--terminal-width, 380px);
+	height: auto;
+	border-top: 0;
+	border-left: 1px solid var(--line);
+}
+
 .terminal-head {
 	display: flex;
 	align-items: center;

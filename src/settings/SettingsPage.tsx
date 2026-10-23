@@ -13,6 +13,7 @@ import {
 	type ProjectSettings,
 	TAB_SIZES,
 	type TabSize,
+	type TerminalPlacement,
 } from "@/settings/model";
 import "@/settings/settings.css";
 
@@ -246,6 +247,20 @@ export default function SettingsPage({
 
 							<section className="settings-section">
 								<h3 className="settings-heading">Terminal</h3>
+								<div className="settings-row">
+									<span>Placement</span>
+									<Segmented<TerminalPlacement>
+										label="Terminal placement"
+										value={user.terminalPlacement}
+										options={[
+											{ value: "bottom", label: "bottom" },
+											{ value: "right", label: "right" },
+										]}
+										onChange={(next) => {
+											if (next !== null) setUser({ terminalPlacement: next });
+										}}
+									/>
+								</div>
 								<div className="settings-row">
 									<label htmlFor="settings-terminal-font">Font size</label>
 									<Stepper
