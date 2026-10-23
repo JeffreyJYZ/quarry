@@ -100,6 +100,8 @@ export default function SourceControl({
 	const [committed, setCommitted] = useState<string | null>(null);
 	const [committing, setCommitting] = useState(false);
 	const committedTimer = useRef<number | null>(null);
+	const [copied, setCopied] = useState<string | null>(null);
+	const copiedTimer = useRef<number | null>(null);
 
 	const [branches, setBranches] = useState<Branch[] | null>(null);
 	const [branchOpen, setBranchOpen] = useState(false);
@@ -239,6 +241,22 @@ export default function SourceControl({
 		[root, refresh, diffPath, onDiff],
 	);
 
+	const copyText = useCallback(async (text: string) => {
+		try {
+			await navigator.clipboard.writeText(text);
+			setCopied(text);
+			if (copiedTimer.current !== null) {
+				window.clearTimeout(copiedTimer.current);
+			}
+			copiedTimer.current = window.setTimeout(() => {
+				copiedTimer.current = null;
+				setCopied(null);
+			}, 2000);
+		} catch (err) {
+			setError(describeError(err));
+		}
+	}, []);
+
 	const loadHistory = useCallback(
 		async (limit: number) => {
 			setHistoryLoading(true);
@@ -356,6 +374,9 @@ export default function SourceControl({
 			}
 			if (switchedTimer.current !== null) {
 				window.clearTimeout(switchedTimer.current);
+			}
+			if (copiedTimer.current !== null) {
+				window.clearTimeout(copiedTimer.current);
 			}
 		};
 	}, []);
@@ -597,6 +618,18 @@ export default function SourceControl({
 				)}
 				<button
 					type="button"
+					className="git-copy-btn"
+					onClick={(event) => {
+						event.preventDefault();
+						event.stopPropagation();
+						void copyText(entry.path);
+					}}
+					aria-label={`Copy path ${entry.path}`}
+				>
+					copy path
+				</button>
+				<button
+					type="button"
 					className="git-diff-btn"
 					onClick={() => {
 						setMissingDiff(null);
@@ -779,7 +812,11 @@ export default function SourceControl({
 							Refresh
 						</button>
 					</div>
-					{error !== null ? <p className="empty error">{error}</p> : null}
+					{error !== null ? (
+						<p className="empty error">{error}</p>
+					) : copied !== null ? (
+						<p className="git-committed">Copied {copied}</p>
+					) : null}
 					<div className="tree-scroll">
 						{staged.length > 0 ? (
 							<>
@@ -880,6 +917,8 @@ export default function SourceControl({
 						<p className="empty">No file open</p>
 					) : blameError !== null ? (
 						<p className="empty error">{blameError}</p>
+					) : copied !== null ? (
+						<p className="git-committed">Copied {copied}</p>
 					) : blameLoading && !blameCache.has(activePath) ? (
 						<p className="empty">Loading…</p>
 					) : (blameCache.get(activePath) ?? []).length === 0 ? (
@@ -892,6 +931,18 @@ export default function SourceControl({
 										key={`${group.hash}-${group.startLine}`}
 										className="git-blame-group"
 									>
+										<button
+											type="button"
+											className="git-copy-btn"
+											onClick={(event) => {
+												event.preventDefault();
+												event.stopPropagation();
+												void copyText(group.hash.slice(0, 7));
+											}}
+											aria-label={`Copy hash ${group.hash.slice(0, 7)}`}
+										>
+											copy hash
+										</button>
 										<button
 											type="button"
 											className="git-blame-header"
@@ -949,7 +1000,11 @@ export default function SourceControl({
 				</div>
 			) : (
 				<div className="tree-scroll">
-					{historyError !== null ? <p className="empty error">{historyError}</p> : null}
+					{historyError !== null ? (
+						<p className="empty error">{historyError}</p>
+					) : copied !== null ? (
+						<p className="git-committed">Copied {copied}</p>
+					) : null}
 					{historyLoading && history === null ? <p className="empty">Loading…</p> : null}
 					{history !== null && history.length === 0 ? (
 						<p className="empty">No commits yet</p>
@@ -961,6 +1016,18 @@ export default function SourceControl({
 									key={entry.hash}
 									className={`git-row${historySelected === index ? " git-row-selected" : ""}`}
 								>
+									<button
+										type="button"
+										className="git-copy-btn"
+										onClick={(event) => {
+											event.preventDefault();
+											event.stopPropagation();
+											void copyText(entry.hash.slice(0, 7));
+										}}
+										aria-label={`Copy hash ${entry.hash.slice(0, 7)}`}
+									>
+										copy hash
+									</button>
 									<button
 										type="button"
 										className="git-row-main"
