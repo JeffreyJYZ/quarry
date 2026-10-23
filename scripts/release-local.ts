@@ -72,9 +72,8 @@ function makeDmg(version: string): void {
 	const app = join(BUNDLE, "quarry.app");
 	if (!existsSync(app)) fail(`missing app bundle: ${app}`);
 	execFileSync("mkdir", ["-p", DMG_DIR]);
-	const arch = execFileSync("uname", ["-m"], { encoding: "utf8" }).trim() === "arm64"
-		? "aarch64"
-		: "x64";
+	const arch =
+		execFileSync("uname", ["-m"], { encoding: "utf8" }).trim() === "arm64" ? "aarch64" : "x64";
 	const target = join(DMG_DIR, `quarry_${version}_${arch}.dmg`);
 	execFileSync(
 		"hdiutil",
