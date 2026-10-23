@@ -118,6 +118,8 @@ in [`docs/plans/README.md`](docs/plans/README.md).
 | Build      | `cargo build --message-format=json`                                           |
 | Search     | the `rg` binary                                                               |
 
+Code splitting: the editor is loaded through `src/editor/LazyEditor.tsx`, a ref-forwarding wrapper around a `lazy(() => import("@/editor/Editor"))` component, so CodeMirror 6 and its language packages stay out of the initial bundle. `DebugPanel`, `Terminal`, `SearchPalette`, `QuickOpen` and `CommandPalette` are also `lazy()`-loaded in `src/App.tsx` and rendered inside `Suspense` boundaries, so they only fetch when first opened. The Vite chunk-size warning threshold is raised to 700 kB in `vite.config.ts` because the editor chunk is CodeMirror and loads lazily; the default 500 kB limit would only restate that one dependency's size.
+
 ## Commands
 
 ```sh
