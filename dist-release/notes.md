@@ -1,4 +1,2 @@
-- chore: bump to 0.1.0-alpha.5
-- fix: full-width canvas, real icons, C projects and a Rust server a GUI can find
-- fix: find the dmg where the bundler writes it and eject the mount
-- docs: alpha releases are local, CI is for betas
+- chore: bump to 0.1.0-alpha.6
+- feat: colour the terminal, dock it on either side, and stop leaking server errors

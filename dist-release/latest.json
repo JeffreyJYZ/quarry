@@ -1,23 +1,23 @@
 {
-	"version": "0.1.0-alpha.5",
-	"notes": "- chore: bump to 0.1.0-alpha.5\n- fix: full-width canvas, real icons, C projects and a Rust server a GUI can find\n- fix: find the dmg where the bundler writes it and eject the mount\n- docs: alpha releases are local, CI is for betas",
-	"pub_date": "2026-10-23T09:00:55.304Z",
-	"platforms": {
-		"darwin-aarch64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSQjI0ZjlNYzhxb1F0VTNEZE92QWtOSWFYeEVza0xHamlwUDNBUnJyWWtJM2hsb3grL2tXU0ZWVk53RFpoMnc2cDNsdytPMS92NXRrb2J0Sk05OTNVcWlDeEFXUXhDeFF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNzQ2MDU1CWZpbGU6cXVhcnJ5LmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuMC1hbHBoYS41CjBUUVBZbmJDMTd5bUZwL1FicUg0a0pMdmxOSExIUEZPckNpcnhWcmhqWHdka0lOYTJhRjBycHpQaUR1VHNqTVFXdWtMdEdpMUZqUW1Vc3hWQU1ZM0NBPT0K",
-			"url": "https://github.com/JeffreyJYZ/quarry/releases/download/quarry-alpha5/quarry.app.tar.gz"
-		},
-		"darwin-x86_64": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSQjI0ZjlNYzhxb1F0VTNEZE92QWtOSWFYeEVza0xHamlwUDNBUnJyWWtJM2hsb3grL2tXU0ZWVk53RFpoMnc2cDNsdytPMS92NXRrb2J0Sk05OTNVcWlDeEFXUXhDeFF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNzQ2MDU1CWZpbGU6cXVhcnJ5LmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuMC1hbHBoYS41CjBUUVBZbmJDMTd5bUZwL1FicUg0a0pMdmxOSExIUEZPckNpcnhWcmhqWHdka0lOYTJhRjBycHpQaUR1VHNqTVFXdWtMdEdpMUZqUW1Vc3hWQU1ZM0NBPT0K",
-			"url": "https://github.com/JeffreyJYZ/quarry/releases/download/quarry-alpha5/quarry.app.tar.gz"
-		},
-		"darwin-aarch64-app": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSQjI0ZjlNYzhxb1F0VTNEZE92QWtOSWFYeEVza0xHamlwUDNBUnJyWWtJM2hsb3grL2tXU0ZWVk53RFpoMnc2cDNsdytPMS92NXRrb2J0Sk05OTNVcWlDeEFXUXhDeFF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNzQ2MDU1CWZpbGU6cXVhcnJ5LmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuMC1hbHBoYS41CjBUUVBZbmJDMTd5bUZwL1FicUg0a0pMdmxOSExIUEZPckNpcnhWcmhqWHdka0lOYTJhRjBycHpQaUR1VHNqTVFXdWtMdEdpMUZqUW1Vc3hWQU1ZM0NBPT0K",
-			"url": "https://github.com/JeffreyJYZ/quarry/releases/download/quarry-alpha5/quarry.app.tar.gz"
-		},
-		"darwin-x86_64-app": {
-			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSQjI0ZjlNYzhxb1F0VTNEZE92QWtOSWFYeEVza0xHamlwUDNBUnJyWWtJM2hsb3grL2tXU0ZWVk53RFpoMnc2cDNsdytPMS92NXRrb2J0Sk05OTNVcWlDeEFXUXhDeFF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNzQ2MDU1CWZpbGU6cXVhcnJ5LmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuMC1hbHBoYS41CjBUUVBZbmJDMTd5bUZwL1FicUg0a0pMdmxOSExIUEZPckNpcnhWcmhqWHdka0lOYTJhRjBycHpQaUR1VHNqTVFXdWtMdEdpMUZqUW1Vc3hWQU1ZM0NBPT0K",
-			"url": "https://github.com/JeffreyJYZ/quarry/releases/download/quarry-alpha5/quarry.app.tar.gz"
-		}
-	}
+  "version": "0.1.0-alpha.6",
+  "notes": "- chore: bump to 0.1.0-alpha.6\n- feat: colour the terminal, dock it on either side, and stop leaking server errors",
+  "pub_date": "2026-10-23T09:19:20.512Z",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSQjI0ZjlNYzhxb1F0VTNEZE92QWtOSWFYeEVza0xHamlwUDNBUnJyWWtJM2hsb3grL2tXU0ZWVk53RFpoMnc2cDNsdytPMS92NXRrb2J0Sk05OTNVcWlDeEFXUXhDeFF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNzQ2MDU1CWZpbGU6cXVhcnJ5LmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuMC1hbHBoYS41CjBUUVBZbmJDMTd5bUZwL1FicUg0a0pMdmxOSExIUEZPckNpcnhWcmhqWHdka0lOYTJhRjBycHpQaUR1VHNqTVFXdWtMdEdpMUZqUW1Vc3hWQU1ZM0NBPT0K",
+      "url": "https://github.com/JeffreyJYZ/quarry/releases/download/quarry-alpha6/quarry.app.tar.gz"
+    },
+    "darwin-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSQjI0ZjlNYzhxb1F0VTNEZE92QWtOSWFYeEVza0xHamlwUDNBUnJyWWtJM2hsb3grL2tXU0ZWVk53RFpoMnc2cDNsdytPMS92NXRrb2J0Sk05OTNVcWlDeEFXUXhDeFF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNzQ2MDU1CWZpbGU6cXVhcnJ5LmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuMC1hbHBoYS41CjBUUVBZbmJDMTd5bUZwL1FicUg0a0pMdmxOSExIUEZPckNpcnhWcmhqWHdka0lOYTJhRjBycHpQaUR1VHNqTVFXdWtMdEdpMUZqUW1Vc3hWQU1ZM0NBPT0K",
+      "url": "https://github.com/JeffreyJYZ/quarry/releases/download/quarry-alpha6/quarry.app.tar.gz"
+    },
+    "darwin-aarch64-app": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSQjI0ZjlNYzhxb1F0VTNEZE92QWtOSWFYeEVza0xHamlwUDNBUnJyWWtJM2hsb3grL2tXU0ZWVk53RFpoMnc2cDNsdytPMS92NXRrb2J0Sk05OTNVcWlDeEFXUXhDeFF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNzQ2MDU1CWZpbGU6cXVhcnJ5LmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuMC1hbHBoYS41CjBUUVBZbmJDMTd5bUZwL1FicUg0a0pMdmxOSExIUEZPckNpcnhWcmhqWHdka0lOYTJhRjBycHpQaUR1VHNqTVFXdWtMdEdpMUZqUW1Vc3hWQU1ZM0NBPT0K",
+      "url": "https://github.com/JeffreyJYZ/quarry/releases/download/quarry-alpha6/quarry.app.tar.gz"
+    },
+    "darwin-x86_64-app": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSQjI0ZjlNYzhxb1F0VTNEZE92QWtOSWFYeEVza0xHamlwUDNBUnJyWWtJM2hsb3grL2tXU0ZWVk53RFpoMnc2cDNsdytPMS92NXRrb2J0Sk05OTNVcWlDeEFXUXhDeFF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNzQ2MDU1CWZpbGU6cXVhcnJ5LmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuMC1hbHBoYS41CjBUUVBZbmJDMTd5bUZwL1FicUg0a0pMdmxOSExIUEZPckNpcnhWcmhqWHdka0lOYTJhRjBycHpQaUR1VHNqTVFXdWtMdEdpMUZqUW1Vc3hWQU1ZM0NBPT0K",
+      "url": "https://github.com/JeffreyJYZ/quarry/releases/download/quarry-alpha6/quarry.app.tar.gz"
+    }
+  }
 }
