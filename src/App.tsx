@@ -129,6 +129,15 @@ const SAVE_STATUS_MS = 4000;
 /** The transient line the save flow puts in the status bar's `extra` slot. */
 type SaveStatus = { text: string; failed: boolean };
 
+/** What `buildProject` takes; the toolbar keeps the last pick for the session. */
+type BuildProfile = "debug" | "release";
+
+/** The profiles the Build split control offers, in menu order. */
+const BUILD_PROFILES: { value: BuildProfile; label: string }[] = [
+	{ value: "debug", label: "Debug" },
+	{ value: "release", label: "Release" },
+];
+
 export default function App() {
 	const [appVersion, setAppVersion] = useState("");
 	const [project, setProject] = useState<ProjectInfo | null>(null);
@@ -143,6 +152,11 @@ export default function App() {
 	const [buildDiagnostics, setBuildDiagnostics] = useState<DiagnosticMap>(() => new Map());
 	const [buildSummary, setBuildSummary] = useState<string | null>(null);
 	const [building, setBuilding] = useState(false);
+	/** Profile the toolbar builds with; persists for the session, shown in the button's title. */
+	const [buildProfile, setBuildProfile] = useState<BuildProfile>("debug");
+	const [buildMenuOpen, setBuildMenuOpen] = useState(false);
+	const buildSplitRef = useRef<HTMLDivElement | null>(null);
+	const buildChevronRef = useRef<HTMLButtonElement | null>(null);
 	const [runId, setRunId] = useState<string | null>(null);
 	const [runLines, setRunLines] = useState<{ stream: "stdout" | "stderr"; line: string }[]>([]);
 	const [runExited, setRunExited] = useState<{ code: number | null; killed?: boolean } | null>(
@@ -238,6 +252,30 @@ export default function App() {
 			unExited?.();
 		};
 	}, []);
+	/** The build-profile menu closes on a click outside it and on Escape, like the recents menu. */
+	useEffect(() => {
+		if (!buildMenuOpen) {
+			return;
+		}
+		const handlePointer = (event: MouseEvent) => {
+			const target = event.target as Node | null;
+			if (buildSplitRef.current?.contains(target) === true) {
+				return;
+			}
+			setBuildMenuOpen(false);
+		};
+		const handleKey = (event: KeyboardEvent) => {
+			if (event.key === "Escape") {
+				setBuildMenuOpen(false);
+			}
+		};
+		document.addEventListener("mousedown", handlePointer);
+		window.addEventListener("keydown", handleKey, true);
+		return () => {
+			document.removeEventListener("mousedown", handlePointer);
+			window.removeEventListener("keydown", handleKey, true);
+		};
+	}, [buildMenuOpen]);
 	const reading = useRef<Set<string>>(new Set());
 	/** Mirrors of the live state so the global key handler and the save loop never read a stale run. */
 	const buffersRef = useRef<FileBuffer[]>([]);
@@ -1142,9 +1180,10 @@ export default function App() {
 		if (root === null || building) {
 			return;
 		}
+		setBuildMenuOpen(false);
 		setBuilding(true);
 		try {
-			const result = await buildProject(root, "debug");
+			const result = await buildProject(root, buildProfile);
 			setBuildDiagnostics(groupDiagnostics(result.diagnostics));
 			setBuildSummary(result.summary);
 		} catch (error) {
@@ -1152,7 +1191,7 @@ export default function App() {
 		} finally {
 			setBuilding(false);
 		}
-	}, [root, building]);
+	}, [root, building, buildProfile]);
 
 	const commands: Command[] = [
 		{
@@ -1336,14 +1375,68 @@ export default function App() {
 					opening={opening}
 					onOpen={(rootToOpen) => void openRoot(rootToOpen)}
 				/>
-				<button
-					type="button"
-					className="button"
-					disabled={root === null || building}
-					onClick={handleBuild}
-				>
-					{building ? "Building…" : "Build"}
-				</button>
+				<div className="build-split" ref={buildSplitRef}>
+					<button
+						type="button"
+						className="button build-main"
+						disabled={root === null || building}
+						title={`Build (${buildProfile})`}
+						onClick={() => void handleBuild()}
+					>
+						{building
+							? buildProfile === "release"
+								? "Building release…"
+								: "Building…"
+							: "Build"}
+					</button>
+					<button
+						ref={buildChevronRef}
+						type="button"
+						className="button build-chevron"
+						disabled={root === null || building}
+						aria-haspopup="menu"
+						aria-expanded={buildMenuOpen}
+						aria-label={`Build profile: ${buildProfile}`}
+						title={`Build profile: ${buildProfile}`}
+						onClick={() => setBuildMenuOpen((current) => !current)}
+						onKeyDown={(event) => {
+							if (
+								event.key === "ArrowDown" ||
+								event.key === "Enter" ||
+								event.key === " "
+							) {
+								event.preventDefault();
+								setBuildMenuOpen(true);
+							}
+						}}
+					>
+						▾
+					</button>
+					{buildMenuOpen ? (
+						<div className="build-menu" role="menu" aria-label="Build profile">
+							{BUILD_PROFILES.map((profile) => (
+								<button
+									key={profile.value}
+									type="button"
+									role="menuitemradio"
+									aria-checked={buildProfile === profile.value}
+									className={
+										buildProfile === profile.value
+											? "build-menu-item active"
+											: "build-menu-item"
+									}
+									onClick={() => {
+										setBuildProfile(profile.value);
+										setBuildMenuOpen(false);
+										buildChevronRef.current?.focus();
+									}}
+								>
+									{profile.label}
+								</button>
+							))}
+						</div>
+					) : null}
+				</div>
 				<button
 					type="button"
 					className="button"
