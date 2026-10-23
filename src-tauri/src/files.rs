@@ -74,6 +74,115 @@ fn absolute_root(root: &str) -> PathBuf {
     std::path::absolute(&path).unwrap_or(path)
 }
 
+fn resolve_root(root: &str) -> Result<PathBuf, String> {
+    let root = absolute_root(root);
+    if !root.is_dir() {
+        return Err(format!(
+            "project root is not a directory: {root}",
+            root = root.display()
+        ));
+    }
+    Ok(root)
+}
+
+fn validate_name(name: &str) -> Result<(), String> {
+    if name.is_empty() {
+        return Err("name must not be empty".to_string());
+    }
+    if name.contains('/') || name.contains("\\") {
+        return Err("name must not contain a path separator".to_string());
+    }
+    if name == "." || name == ".." {
+        return Err("name must not be '.' or '..'".to_string());
+    }
+    Ok(())
+}
+
+fn ensure_within(root: &Path, target: &Path) -> Result<PathBuf, String> {
+    let absolute = std::path::absolute(target).unwrap_or_else(|_| target.to_path_buf());
+    if !absolute.starts_with(root) {
+        return Err("path is outside the project root".to_string());
+    }
+    Ok(absolute)
+}
+
+#[tauri::command]
+pub fn create_file(root: String, parent: String, name: String) -> Result<String, String> {
+    validate_name(&name)?;
+    let root = resolve_root(&root)?;
+    let parent = ensure_within(&root, Path::new(&parent))?;
+    if !parent.is_dir() {
+        return Err(format!("not a directory: {}", parent.display()));
+    }
+    let target = parent.join(&name);
+    let target = ensure_within(&root, &target)?;
+    if target.exists() {
+        return Err(format!("already exists: {}", target.display()));
+    }
+    fs::write(&target, b"")
+        .map_err(|error| format!("cannot create {}: {error}", target.display()))?;
+    Ok(target.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+pub fn create_dir(root: String, parent: String, name: String) -> Result<String, String> {
+    validate_name(&name)?;
+    let root = resolve_root(&root)?;
+    let parent = ensure_within(&root, Path::new(&parent))?;
+    if !parent.is_dir() {
+        return Err(format!("not a directory: {}", parent.display()));
+    }
+    let target = parent.join(&name);
+    let target = ensure_within(&root, &target)?;
+    if target.exists() {
+        return Err(format!("already exists: {}", target.display()));
+    }
+    fs::create_dir(&target)
+        .map_err(|error| format!("cannot create {}: {error}", target.display()))?;
+    Ok(target.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+pub fn rename_path(root: String, old_path: String, new_name: String) -> Result<String, String> {
+    validate_name(&new_name)?;
+    let root = resolve_root(&root)?;
+    let old = ensure_within(&root, Path::new(&old_path))?;
+    if !old.exists() {
+        return Err(format!("does not exist: {}", old.display()));
+    }
+    let parent = old
+        .parent()
+        .ok_or_else(|| "no parent directory".to_string())?;
+    let target = parent.join(&new_name);
+    let target = ensure_within(&root, &target)?;
+    if target.exists() {
+        return Err(format!("already exists: {}", target.display()));
+    }
+    fs::rename(&old, &target)
+        .map_err(|error| format!("cannot rename {}: {error}", old.display()))?;
+    Ok(target.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+pub fn delete_path(root: String, path: String) -> Result<(), String> {
+    let root = resolve_root(&root)?;
+    let target = ensure_within(&root, Path::new(&path))?;
+    if target == root {
+        return Err("cannot delete the project root".to_string());
+    }
+    if !target.exists() {
+        return Err(format!("does not exist: {}", target.display()));
+    }
+    if target.is_dir() {
+        fs::remove_dir_all(&target)
+            .map_err(|error| format!("cannot delete {}: {error}", target.display()))?;
+    } else {
+        fs::remove_file(&target)
+            .map_err(|error| format!("cannot delete {}: {error}", target.display()))?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -193,5 +302,95 @@ mod tests {
         let file = fixture.path.join("file.txt");
         let error = collect(&file, MAX_FILES).expect_err("non-dir must fail");
         assert!(error.contains("not a directory"));
+    }
+}
+
+#[cfg(test)]
+mod file_ops_tests {
+    use super::*;
+    use std::env;
+    use std::fs;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    struct Fixture {
+        path: PathBuf,
+    }
+
+    impl Fixture {
+        fn new(label: &str) -> Self {
+            let unique = COUNTER.fetch_add(1, Ordering::Relaxed);
+            let path = env::temp_dir().join(format!(
+                "quarry-fileops-{label}-{}-{unique}",
+                std::process::id()
+            ));
+            let _ = fs::remove_dir_all(&path);
+            fs::create_dir_all(&path).expect("create fixture directory");
+            Self { path }
+        }
+    }
+
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
+    #[test]
+    fn separator_in_name_is_refused() {
+        let fixture = Fixture::new("sep");
+        let root = fixture.path.to_string_lossy().into_owned();
+        let err = create_file(root.clone(), root.clone(), "a/b".to_string()).unwrap_err();
+        assert!(err.contains("path separator"), "{err}");
+    }
+
+    #[test]
+    fn path_outside_root_is_refused() {
+        let fixture = Fixture::new("outside");
+        let root = fixture.path.to_string_lossy().into_owned();
+        let outside = env::temp_dir().join("elsewhere.txt");
+        let err = delete_path(root.clone(), outside.to_string_lossy().into_owned()).unwrap_err();
+        assert_eq!(err, "path is outside the project root");
+    }
+
+    #[test]
+    fn existing_target_is_refused() {
+        let fixture = Fixture::new("exists");
+        let root = fixture.path.to_string_lossy().into_owned();
+        fs::write(fixture.path.join("x.txt"), b"").unwrap();
+        let err = create_file(root.clone(), root.clone(), "x.txt".to_string()).unwrap_err();
+        assert!(err.contains("already exists"), "{err}");
+    }
+
+    #[test]
+    fn create_rename_delete_round_trip() {
+        let fixture = Fixture::new("roundtrip");
+        let root = fixture.path.to_string_lossy().into_owned();
+        let created = create_file(root.clone(), root.clone(), "a.txt".to_string()).unwrap();
+        assert!(PathBuf::from(&created).exists());
+        let renamed = rename_path(root.clone(), created.clone(), "b.txt".to_string()).unwrap();
+        assert!(!PathBuf::from(&created).exists());
+        assert!(PathBuf::from(&renamed).exists());
+        delete_path(root.clone(), renamed.clone()).unwrap();
+        assert!(!PathBuf::from(&renamed).exists());
+    }
+
+    #[test]
+    fn deleting_missing_is_refused() {
+        let fixture = Fixture::new("missing");
+        let root = fixture.path.to_string_lossy().into_owned();
+        let target = fixture.path.join("nope.txt");
+        let err = delete_path(root, target.to_string_lossy().into_owned()).unwrap_err();
+        assert!(err.contains("does not exist"), "{err}");
+    }
+
+    #[test]
+    fn deleting_root_is_refused() {
+        let fixture = Fixture::new("rootdel");
+        let root = fixture.path.to_string_lossy().into_owned();
+        let err = delete_path(root.clone(), root).unwrap_err();
+        assert_eq!(err, "cannot delete the project root");
     }
 }

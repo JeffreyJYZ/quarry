@@ -1687,6 +1687,34 @@ export default function App() {
 									root={project.root}
 									activePath={activePath}
 									onOpenFile={handleOpenFile}
+									onFileRenamed={(oldPath, newPath) => {
+										setBuffers((current) =>
+											current.map((buffer) =>
+												buffer.path === oldPath
+													? {
+															...buffer,
+															path: newPath,
+															name: fileName(newPath),
+														}
+													: buffer,
+											),
+										);
+										if (activePath === oldPath) setActivePath(newPath);
+									}}
+									onFileDeleted={(path) => {
+										const buffer = buffers.find((b) => b.path === path);
+										if (buffer && isDirty(buffer)) {
+											setNotice(
+												`Deleted ${fileName(path)} (unsaved changes lost)`,
+											);
+										}
+										setBuffers((current) =>
+											current.filter((b) => b.path !== path),
+										);
+										if (activePath === path) {
+											setActivePath(null);
+										}
+									}}
 									revealToken={fileRevealToken}
 									changes={Object.fromEntries(
 										(gitStatusState?.entries ?? []).map((entry) => [
