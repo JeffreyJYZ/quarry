@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { type Symbol as LspSymbol, lspSymbols } from "@/lib/project/api";
+import { type DocumentSymbol as LspSymbol, lspSymbols } from "@/lib/project/api";
 import { qualifiedName } from "@/lib/breadcrumb/model";
 
 export type BreadcrumbProps = {

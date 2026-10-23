@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Symbol as LspSymbol } from "@/lib/project/api";
+import type { DocumentSymbol as LspSymbol } from "@/lib/project/api";
 import { caretSymbolIndex, filterSymbolIndices } from "@/lib/outline/model";
 
 function sym(name: string, depth: number, startLine: number, endLine: number): LspSymbol {

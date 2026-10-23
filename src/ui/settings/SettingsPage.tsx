@@ -1,23 +1,17 @@
 import { type JSX, useEffect, useRef, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
-import { checkForUpdates, installNow, useUpdates } from "@/lib/updates/store";
 import {
-	BUILD_PROFILES,
-	type BuildProfile,
-	clampFontSize,
-	DEFAULT_PREFERENCES,
 	effectivePreferences,
-	FONT_SIZE_RANGE,
 	normalizePreferences,
 	normalizeProjectSettings,
 	projectSettingsAreEmpty,
 	type Preferences,
 	type ProjectSettings,
-	TAB_SIZES,
-	type TabSize,
-	type TerminalPlacement,
 } from "@/lib/settings/model";
+import { useUpdates } from "@/lib/updates/store";
 import "@/ui/settings/settings.css";
+import { ProjectTab } from "./ProjectTab";
+import { UserTab } from "./UserTab";
 
 export type SettingsPageProps = {
 	open: boolean;
@@ -36,82 +30,6 @@ export type SettingsPageProps = {
 };
 
 type Tab = "user" | "project";
-
-function Stepper(props: {
-	id: string;
-	label: string;
-	value: number;
-	min: number;
-	max: number;
-	onChange: (next: number) => void;
-}): JSX.Element {
-	const { id, label, value, min, max, onChange } = props;
-	return (
-		<div className="settings-stepper">
-			<button
-				type="button"
-				className="settings-step"
-				aria-label={`Decrease ${label}`}
-				disabled={value <= min}
-				onClick={() => onChange(clampFontSize(value - 1, min))}
-			>
-				−
-			</button>
-			<input
-				id={id}
-				type="number"
-				min={min}
-				max={max}
-				value={value}
-				onChange={(event) => onChange(clampFontSize(Number(event.target.value), value))}
-			/>
-			<button
-				type="button"
-				className="settings-step"
-				aria-label={`Increase ${label}`}
-				disabled={value >= max}
-				onClick={() => onChange(clampFontSize(value + 1, max))}
-			>
-				+
-			</button>
-		</div>
-	);
-}
-
-function Segmented<T extends string | number>(props: {
-	label: string;
-	value: T | null;
-	options: { value: T; label: string }[];
-	allowInherit?: boolean;
-	onChange: (next: T | null) => void;
-}): JSX.Element {
-	const { label, value, options, allowInherit = false, onChange } = props;
-	return (
-		<div className="settings-segmented" role="group" aria-label={label}>
-			{allowInherit ? (
-				<button
-					type="button"
-					className={value === null ? "settings-seg active" : "settings-seg"}
-					aria-pressed={value === null}
-					onClick={() => onChange(null)}
-				>
-					Inherit
-				</button>
-			) : null}
-			{options.map((option) => (
-				<button
-					key={String(option.value)}
-					type="button"
-					className={value === option.value ? "settings-seg active" : "settings-seg"}
-					aria-pressed={value === option.value}
-					onClick={() => onChange(option.value)}
-				>
-					{option.label}
-				</button>
-			))}
-		</div>
-	);
-}
 
 /**
  * The settings page: a user-wide tab and a per-project tab that can only narrow the user's values.
@@ -212,331 +130,22 @@ export default function SettingsPage({
 
 				<div className="settings-body">
 					{tab === "user" ? (
-						<>
-							<section className="settings-section">
-								<h3 className="settings-heading">Editor</h3>
-								<div className="settings-row">
-									<label htmlFor="settings-editor-font">Font size</label>
-									<Stepper
-										id="settings-editor-font"
-										label="editor font size"
-										value={user.editorFontSize}
-										min={FONT_SIZE_RANGE.min}
-										max={FONT_SIZE_RANGE.max}
-										onChange={(next) => setUser({ editorFontSize: next })}
-									/>
-								</div>
-								<div className="settings-row">
-									<label htmlFor="settings-editor-family">Font family</label>
-									<input
-										id="settings-editor-family"
-										type="text"
-										className="settings-text"
-										value={user.editorFontFamily}
-										placeholder="empty: built-in monospace"
-										spellCheck={false}
-										onChange={(event) =>
-											setUser({ editorFontFamily: event.target.value })
-										}
-									/>
-								</div>
-								<div className="settings-row">
-									<span>Tab size</span>
-									<Segmented<TabSize>
-										label="Tab size"
-										value={user.editorTabSize}
-										options={TAB_SIZES.map((size) => ({
-											value: size,
-											label: String(size),
-										}))}
-										onChange={(next) => {
-											if (next !== null) setUser({ editorTabSize: next });
-										}}
-									/>
-								</div>
-								<div className="settings-row">
-									<label htmlFor="settings-format-save">Format on save</label>
-									<input
-										id="settings-format-save"
-										type="checkbox"
-										checked={user.formatOnSave}
-										onChange={(event) =>
-											setUser({ formatOnSave: event.target.checked })
-										}
-									/>
-								</div>
-							</section>
-
-							<section className="settings-section">
-								<h3 className="settings-heading">Terminal</h3>
-								<div className="settings-row">
-									<span>Placement</span>
-									<Segmented<TerminalPlacement>
-										label="Terminal placement"
-										value={user.terminalPlacement}
-										options={[
-											{ value: "bottom", label: "bottom" },
-											{ value: "right", label: "right" },
-										]}
-										onChange={(next) => {
-											if (next !== null) setUser({ terminalPlacement: next });
-										}}
-									/>
-								</div>
-								<div className="settings-row">
-									<label htmlFor="settings-terminal-font">Font size</label>
-									<Stepper
-										id="settings-terminal-font"
-										label="terminal font size"
-										value={user.terminalFontSize}
-										min={FONT_SIZE_RANGE.min}
-										max={FONT_SIZE_RANGE.max}
-										onChange={(next) => setUser({ terminalFontSize: next })}
-									/>
-								</div>
-								<div className="settings-row">
-									<label htmlFor="settings-terminal-family">Font family</label>
-									<input
-										id="settings-terminal-family"
-										type="text"
-										className="settings-text"
-										value={user.terminalFontFamily}
-										placeholder="empty: built-in monospace"
-										spellCheck={false}
-										onChange={(event) =>
-											setUser({ terminalFontFamily: event.target.value })
-										}
-									/>
-								</div>
-							</section>
-
-							<section className="settings-section">
-								<h3 className="settings-heading">Language servers</h3>
-								<div className="settings-row">
-									<label htmlFor="settings-ra-path">rust-analyzer path</label>
-									<input
-										id="settings-ra-path"
-										type="text"
-										className="settings-text"
-										value={user.rustAnalyzerPath}
-										placeholder="empty: found on PATH"
-										spellCheck={false}
-										onChange={(event) =>
-											setUser({ rustAnalyzerPath: event.target.value })
-										}
-									/>
-								</div>
-								<div className="settings-row">
-									<label htmlFor="settings-ra-args">rust-analyzer args</label>
-									<input
-										id="settings-ra-args"
-										type="text"
-										className="settings-text"
-										value={user.rustAnalyzerArgs}
-										placeholder="empty: none"
-										spellCheck={false}
-										onChange={(event) =>
-											setUser({ rustAnalyzerArgs: event.target.value })
-										}
-									/>
-								</div>
-								<div className="settings-row">
-									<label htmlFor="settings-clangd-path">clangd path</label>
-									<input
-										id="settings-clangd-path"
-										type="text"
-										className="settings-text"
-										value={user.clangdPath}
-										placeholder="empty: found on PATH"
-										spellCheck={false}
-										onChange={(event) =>
-											setUser({ clangdPath: event.target.value })
-										}
-									/>
-								</div>
-								<div className="settings-row">
-									<label htmlFor="settings-clangd-args">clangd args</label>
-									<input
-										id="settings-clangd-args"
-										type="text"
-										className="settings-text"
-										value={user.clangdArgs}
-										placeholder="empty: none"
-										spellCheck={false}
-										onChange={(event) =>
-											setUser({ clangdArgs: event.target.value })
-										}
-									/>
-								</div>
-								<p className="settings-hint">
-									Restart a server by closing and reopening the project.
-								</p>
-							</section>
-
-							<section className="settings-section">
-								<h3 className="settings-heading">Build</h3>
-								<div className="settings-row">
-									<span>Default profile</span>
-									<Segmented<BuildProfile>
-										label="Default build profile"
-										value={user.buildProfile}
-										options={BUILD_PROFILES.map((profile) => ({
-											value: profile,
-											label: profile,
-										}))}
-										onChange={(next) => {
-											if (next !== null) setUser({ buildProfile: next });
-										}}
-									/>
-								</div>
-							</section>
-
-							<section className="settings-section">
-								<h3 className="settings-heading">Updates</h3>
-								<div className="settings-row">
-									<span>
-										{version === "" ? "Version unknown" : `Version ${version}`}
-									</span>
-									<div className="settings-actions">
-										{updates.offer?.kind === "updater" ? (
-											<button
-												type="button"
-												className="button"
-												disabled={updates.phase === "downloading"}
-												onClick={() => void installNow()}
-											>
-												{updates.phase === "downloading"
-													? `Installing ${updates.progress ?? 0}%`
-													: `Install ${updates.offer.version}`}
-											</button>
-										) : null}
-										<button
-											type="button"
-											className="button"
-											disabled={updates.phase === "checking"}
-											onClick={() => void checkForUpdates()}
-										>
-											{updates.phase === "checking"
-												? "Checking…"
-												: "Check for updates"}
-										</button>
-									</div>
-								</div>
-								<p className="settings-hint">
-									{updates.phase === "failed" && updates.message !== null
-										? `Update check failed: ${updates.message}`
-										: updates.phase === "current"
-											? "This build is the latest published version."
-											: updates.offer !== null
-												? `${updates.offer.version} is available.`
-												: "Checks run at launch; this button checks now."}
-								</p>
-							</section>
-							<section className="settings-section">
-								<h3 className="settings-heading">Panels</h3>
-								<div className="settings-row">
-									<span className="settings-mono">
-										{user.panelSizes.railWidth} · {user.panelSizes.debugWidth} ·{" "}
-										{user.panelSizes.dockHeight} ·{" "}
-										{user.panelSizes.terminalHeight}
-									</span>
-									<button
-										type="button"
-										className="button"
-										onClick={onResetPanels}
-									>
-										Reset panel sizes
-									</button>
-								</div>
-								<p className="settings-hint">
-									Explorer width · debug width · dock height · terminal height.
-									Defaults are {DEFAULT_PREFERENCES.panelSizes.railWidth} ·{" "}
-									{DEFAULT_PREFERENCES.panelSizes.debugWidth} ·{" "}
-									{DEFAULT_PREFERENCES.panelSizes.dockHeight} ·{" "}
-									{DEFAULT_PREFERENCES.panelSizes.terminalHeight}.
-								</p>
-							</section>
-						</>
+						<UserTab
+							user={user}
+							onChange={setUser}
+							onResetPanels={onResetPanels}
+							updates={updates}
+							version={version}
+						/>
 					) : (
-						<>
-							<p className="settings-hint">
-								Overrides for {projectRoot ?? "this project"}. An inherited value
-								follows the user tab; nothing is written until you change one.
-							</p>
-							<section className="settings-section">
-								<h3 className="settings-heading">Editor</h3>
-								<div className="settings-row">
-									<span>Tab size</span>
-									<Segmented<TabSize>
-										label="Project tab size"
-										value={project?.editorTabSize ?? null}
-										allowInherit
-										options={TAB_SIZES.map((size) => ({
-											value: size,
-											label: String(size),
-										}))}
-										onChange={(next) => setProject({ editorTabSize: next })}
-									/>
-								</div>
-								<div className="settings-row">
-									<span>Format on save</span>
-									<Segmented<"on" | "off">
-										label="Project format on save"
-										value={
-											project?.formatOnSave === null ||
-											project?.formatOnSave === undefined
-												? null
-												: project.formatOnSave
-													? "on"
-													: "off"
-										}
-										allowInherit
-										options={[
-											{ value: "on", label: "on" },
-											{ value: "off", label: "off" },
-										]}
-										onChange={(next) =>
-											setProject({
-												formatOnSave: next === null ? null : next === "on",
-											})
-										}
-									/>
-								</div>
-							</section>
-							<section className="settings-section">
-								<h3 className="settings-heading">Build</h3>
-								<div className="settings-row">
-									<span>Profile</span>
-									<Segmented<BuildProfile>
-										label="Project build profile"
-										value={project?.buildProfile ?? null}
-										allowInherit
-										options={BUILD_PROFILES.map((profile) => ({
-											value: profile,
-											label: profile,
-										}))}
-										onChange={(next) => setProject({ buildProfile: next })}
-									/>
-								</div>
-							</section>
-							<section className="settings-section">
-								<div className="settings-row">
-									<span className="settings-hint">
-										Effective: tab {effective.editorTabSize} · format{" "}
-										{effective.formatOnSave ? "on save" : "manual"} ·{" "}
-										{effective.buildProfile}
-									</span>
-									<button
-										type="button"
-										className="button"
-										disabled={projectEmpty}
-										onClick={() => onProjectChange(null)}
-									>
-										Clear project settings
-									</button>
-								</div>
-							</section>
-						</>
+						<ProjectTab
+							project={project}
+							projectRoot={projectRoot}
+							effective={effective}
+							projectEmpty={projectEmpty}
+							onChange={setProject}
+							onClear={() => onProjectChange(null)}
+						/>
 					)}
 				</div>
 

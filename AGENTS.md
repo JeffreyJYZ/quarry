@@ -11,6 +11,10 @@ Rust and C/C++ IDE. Tauri 2 + React 19 shell; clangd, rust-analyzer and lldb-dap
 - **No `cargo run` as a debug launch** — build first, pass `lldb-dap` the binary from cargo JSON.
 - **Rust module is `build_task.rs`**, never `build.rs` (Cargo's build script).
 - **`src/` only**, `@/*` maps to `./src/*`; no root-level `lib/`.
+- **Logic is `src/lib`, rendering is `src/ui`** — the feature directory name is kept on both sides (`lib/editor/theme.ts`, `ui/editor/Editor.tsx`); `@/` for cross-tree imports, relative only inside one directory; consts in `src/lib/consts`.
+- **No file over 200 lines** — `scripts/check-file-size.ts` runs as the gate's first step and fails on a new offender or on a stale entry in `docs/refactor/oversized.txt`, which may only shrink.
+- **Split Rust by module directories** (`foo.rs` → `foo/mod.rs` + `mod bar;` + `pub use`), so `lib.rs` needs no edit; **never `include!("partN.rs")`**, which keeps one scope and is not a module split at all (measured 2026-10-23: 195 compile errors).
+- **Stylesheets split with `bun scripts/split-css.ts <file>`** — section files under `<name>/` plus an `@import` index, so cascade order survives.
 - **Gates: `bun check` for types, `bun fmt --check` for formatting, `biome lint` for lint, `bun test` for frontend units, `bun run gate` before a commit** — hard tabs 4 wide, print width 100; warnings fail, so leave zero.
 - **C/C++ formatting always expands every brace pair** — `clang-format` gets the nearest `.clang-format` plus `AllowShort*: Never|None|false`, so a one-line body never survives a format.
 - **`bun fmt` is the formatter, configured in `bunfig.toml` `[fmt]` (`useTabs`, `tabWidth = 4`, `printWidth = 100`)** — Biome no longer formats; it lints only, so `biome check` would flag tab/width drift the formatter owns.

@@ -5,82 +5,9 @@
  * `[32m` noise next to a prompt; the run parser turns them into styles and drops every other control
  * sequence, and the feeder gives `\r` its real meaning (return to column zero, overwrite).
  */
+import { BLANK, type Run, applySgr } from "@/lib/terminal/sgr";
 
-export type Run = {
-	text: string;
-	fg: string | null;
-	bg: string | null;
-	bold: boolean;
-	dim: boolean;
-	italic: boolean;
-	underline: boolean;
-};
-
-const BLANK: Omit<Run, "text"> = {
-	fg: null,
-	bg: null,
-	bold: false,
-	dim: false,
-	italic: false,
-	underline: false,
-};
-
-/** The sixteen ANSI colours, in the theme's own palette. */
-const BASIC = [
-	"#3b4048",
-	"#e06c75",
-	"#7fc98f",
-	"#d9b26a",
-	"#5b8def",
-	"#c678dd",
-	"#56b6c2",
-	"#d7dbe0",
-	"#5c6370",
-	"#ef8790",
-	"#a3d9ad",
-	"#e8c98d",
-	"#7ea6f2",
-	"#d79ce8",
-	"#7fd0d9",
-	"#ffffff",
-];
-
-function basicColour(index: number): string | null {
-	if (index < 0 || index > 15) return null;
-	return BASIC[index] ?? null;
-}
-
-/** `38;5;N` and `38;2;R;G;B` share a shape, so one reader handles both plus the plain `3x` forms. */
-function readColour(params: number[], start: number): { colour: string | null; next: number } {
-	const mode = params[start];
-	if (mode === 5) {
-		const index = params[start + 1];
-		if (index === undefined || index < 0 || index > 255) {
-			return { colour: null, next: start + 2 };
-		}
-		if (index < 16) return { colour: basicColour(index), next: start + 2 };
-		if (index >= 232) {
-			// The 24-step grey ramp.
-			const level = 8 + (index - 232) * 10;
-			return { colour: `rgb(${level} ${level} ${level})`, next: start + 2 };
-		}
-		const n = index - 16;
-		const r = Math.floor(n / 36);
-		const g = Math.floor((n % 36) / 6);
-		const b = n % 6;
-		const step = (value: number) => (value === 0 ? 0 : 55 + value * 40);
-		return { colour: `rgb(${step(r)} ${step(g)} ${step(b)})`, next: start + 2 };
-	}
-	if (mode === 2) {
-		const [r, g, b] = [params[start + 1], params[start + 2], params[start + 3]];
-		if (r === undefined || g === undefined || b === undefined) {
-			return { colour: null, next: start + 4 };
-		}
-		const clamp = (value: number) => Math.max(0, Math.min(255, value));
-		return { colour: `rgb(${clamp(r)} ${clamp(g)} ${clamp(b)})`, next: start + 4 };
-	}
-	return { colour: null, next: start + 1 };
-}
+export type { Run } from "@/lib/terminal/sgr";
 
 /**
  * One line of terminal text split into styled runs.
@@ -143,39 +70,6 @@ export function parseAnsi(line: string): Run[] {
 	}
 	pushText();
 	return runs.length === 0 ? [{ ...BLANK, text: "" }] : runs;
-}
-
-function applySgr(style: Omit<Run, "text">, params: number[]): Omit<Run, "text"> {
-	let out = { ...style };
-	for (let index = 0; index < params.length; index += 1) {
-		const param = params[index];
-		if (param === 0) {
-			out = { ...BLANK };
-			continue;
-		}
-		if (param === 1) out.bold = true;
-		else if (param === 2) out.dim = true;
-		else if (param === 3) out.italic = true;
-		else if (param === 4) out.underline = true;
-		else if (param === 22) {
-			out.bold = false;
-			out.dim = false;
-		} else if (param === 23) out.italic = false;
-		else if (param === 24) out.underline = false;
-		else if (param >= 30 && param <= 37) out.fg = basicColour(param - 30);
-		else if (param >= 90 && param <= 97) out.fg = basicColour(param - 90 + 8);
-		else if (param === 39) out.fg = null;
-		else if (param >= 40 && param <= 47) out.bg = basicColour(param - 40);
-		else if (param >= 100 && param <= 107) out.bg = basicColour(param - 100 + 8);
-		else if (param === 49) out.bg = null;
-		else if (param === 38 || param === 48) {
-			const { colour, next } = readColour(params, index + 1);
-			if (param === 38) out.fg = colour;
-			else out.bg = colour;
-			index = next - 1;
-		}
-	}
-	return out;
 }
 
 /**

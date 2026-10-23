@@ -2,8 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { lspSymbols, lspWorkspaceSymbols, type WorkspaceSymbol } from "@/lib/project/api";
 import { isInsideRoot } from "@/lib/lsp/paths";
 import "@/ui/goto/goto.css";
+import { type GotoMode, type Row, TITLES, fileNameOf, filterRows } from "./gotoModel";
 
-export type GotoMode = "class" | "symbol" | "recent";
+export type { GotoMode } from "./gotoModel";
+export { filterRows } from "./gotoModel";
 
 export type GotoProps = {
 	mode: GotoMode;
@@ -15,36 +17,6 @@ export type GotoProps = {
 	onOpen: (path: string, line: number, character: number) => void;
 	onClose: () => void;
 };
-
-type Row = {
-	key: string;
-	label: string;
-	detail: string;
-	path: string;
-	line: number;
-	character: number;
-};
-
-const TITLES: Record<GotoMode, string> = {
-	class: "Go to class",
-	symbol: "Go to symbol in file",
-	recent: "Recent files",
-};
-
-function fileNameOf(path: string): string {
-	const cut = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-	return cut === -1 ? path : path.slice(cut + 1);
-}
-
-/** Files whose name or directory contains every whitespace-separated term of the query. */
-export function filterRows(rows: Row[], query: string): Row[] {
-	const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-	if (terms.length === 0) return rows;
-	return rows.filter((row) => {
-		const haystack = `${row.label} ${row.detail}`.toLowerCase();
-		return terms.every((term) => haystack.includes(term));
-	});
-}
 
 /**
  * One palette for the three "go to" gestures.

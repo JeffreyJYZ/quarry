@@ -1,96 +1,12 @@
-import { getVersion } from "@tauri-apps/api/app";
-import { relaunch } from "@tauri-apps/plugin-process";
-import { check as checkUpdater, type Update } from "@tauri-apps/plugin-updater";
-import { useSyncExternalStore } from "react";
-import type { Offer } from "@/lib/updates/model";
-import { isNewer, progressPercent } from "@/lib/updates/model";
+import type { Update } from "@tauri-apps/plugin-updater";
+import { getDeps } from "@/lib/updates/deps";
+import { type Offer, isNewer, progressPercent } from "@/lib/updates/model";
+import { getState, setState } from "@/lib/updates/state";
 
-export type { Offer } from "@/lib/updates/model";
+export type { Offer, Phase, State } from "@/lib/updates/state";
 export { isNewer, offerClause, offerHeadline, progressPercent } from "@/lib/updates/model";
-
-export type Phase = "idle" | "checking" | "current" | "available" | "downloading" | "failed";
-
-export type State = {
-	phase: Phase;
-	offer: Offer | null;
-	message: string | null;
-	progress: number | null;
-	dismissed: boolean;
-};
-
-type Deps = {
-	checkUpdater: () => Promise<Update | null>;
-	fetchGithub: () => Promise<{ version: string } | null>;
-	currentVersion: () => Promise<string>;
-	relaunch: () => Promise<void>;
-};
-
-const defaultDeps: Deps = {
-	checkUpdater: () => checkUpdater(),
-	fetchGithub: async () => {
-		const response = await fetch(
-			"https://api.github.com/repos/JeffreyJYZ/quarry/releases/latest",
-		);
-		if (!response.ok) return null;
-		const body = (await response.json()) as { tag_name?: unknown; name?: unknown };
-		const raw =
-			typeof body.tag_name === "string"
-				? body.tag_name
-				: typeof body.name === "string"
-					? body.name
-					: null;
-		if (raw === null) return null;
-		const version = raw.replace(/^v/, "");
-		return { version };
-	},
-	currentVersion: () => getVersion(),
-	relaunch: () => relaunch(),
-};
-
-let deps: Deps = { ...defaultDeps };
-
-export function setUpdateDeps(next: Partial<Deps>): void {
-	deps = { ...deps, ...next };
-}
-
-export function resetUpdateDeps(): void {
-	deps = { ...defaultDeps };
-}
-
-let state: State = {
-	phase: "idle",
-	offer: null,
-	message: null,
-	progress: null,
-	dismissed: false,
-};
-
-const listeners = new Set<() => void>();
-
-function emit(): void {
-	for (const listener of listeners) listener();
-}
-
-function setState(next: State): void {
-	state = next;
-	emit();
-}
-
-export function getState(): State {
-	return state;
-}
-
-export function subscribe(listener: () => void): () => void {
-	listeners.add(listener);
-	return () => {
-		listeners.delete(listener);
-	};
-}
-
-export function useUpdates(): State {
-	return useSyncExternalStore(subscribe, getState, getState);
-}
-
+export { resetUpdateDeps, setUpdateDeps } from "@/lib/updates/deps";
+export { getState, subscribe, useUpdates } from "@/lib/updates/state";
 let currentHandle: Update | null = null;
 
 async function closeHandle(): Promise<void> {
@@ -105,6 +21,7 @@ async function closeHandle(): Promise<void> {
 }
 
 export async function checkForUpdates(): Promise<void> {
+	const state = getState();
 	if (state.phase === "checking" || state.phase === "downloading") {
 		return;
 	}
@@ -118,6 +35,7 @@ export async function checkForUpdates(): Promise<void> {
 	});
 	let offer: Offer | null = null;
 	try {
+		const deps = getDeps();
 		const current = await deps.currentVersion();
 		let updater: Update | null = null;
 		try {
@@ -162,6 +80,7 @@ export async function checkForUpdates(): Promise<void> {
 }
 
 export async function installNow(): Promise<void> {
+	const state = getState();
 	const offer = state.offer;
 	if (offer === null || offer.kind !== "updater") {
 		return;
@@ -181,7 +100,7 @@ export async function installNow(): Promise<void> {
 				setState({ ...getState(), progress: progressPercent(downloaded, total) });
 			}
 		});
-		await deps.relaunch();
+		await getDeps().relaunch();
 	} catch (error) {
 		setState({
 			...getState(),

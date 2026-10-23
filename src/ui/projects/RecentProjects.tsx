@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readSettings, writeSettings } from "@/lib/project/api";
 import { removeRecentRoot } from "@/lib/projects/recent";
+import { splitPath } from "./recentPaths";
 
 type Props = {
 	roots: string[];
@@ -8,15 +9,6 @@ type Props = {
 	opening: boolean;
 	onOpen: (root: string) => void;
 };
-
-function splitPath(path: string): { name: string; parent: string } {
-	const trimmed = path.replace(/\/+$/, "");
-	const index = trimmed.lastIndexOf("/");
-	if (index <= 0) {
-		return { name: trimmed, parent: "" };
-	}
-	return { name: trimmed.slice(index + 1), parent: trimmed.slice(0, index) };
-}
 
 export default function RecentProjects({ roots, current, opening, onOpen }: Props) {
 	const [items, setItems] = useState<string[]>(roots);

@@ -1,8 +1,8 @@
-import { type JSX, useEffect, useRef, useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
-import { createProject } from "@/lib/project/api";
-import { describeError } from "@/lib/project/errors";
+import type { JSX } from "react";
 import "@/ui/projects/newProject.css";
+import { KindPicker } from "./KindPicker";
+import { StandardPicker } from "./StandardPicker";
+import { useScaffold } from "./useScaffold";
 
 export type NewProjectProps = {
 	open: boolean;
@@ -13,51 +13,6 @@ export type NewProjectProps = {
 	/** Called with the new project's root once the scaffold exists on disk. */
 	onCreated: (root: string) => void;
 };
-
-type Kind = "rust-bin" | "rust-lib" | "c-cmake" | "cpp-cmake";
-
-const KINDS: { value: Kind; label: string; hint: string }[] = [
-	{ value: "rust-bin", label: "Rust binary", hint: "cargo run prints a greeting" },
-	{ value: "rust-lib", label: "Rust library", hint: "one function and one passing test" },
-	{ value: "c-cmake", label: "C (CMake)", hint: "CMakeLists plus src/main.c" },
-	{ value: "cpp-cmake", label: "C++ (CMake)", hint: "CMakeLists plus src/main.cpp" },
-];
-
-/** The language standards each kind offers, in the order CLion lists them. */
-const STANDARDS: Record<Kind, { value: string; label: string }[]> = {
-	"rust-bin": [
-		{ value: "2024", label: "Edition 2024" },
-		{ value: "2021", label: "Edition 2021" },
-	],
-	"rust-lib": [
-		{ value: "2024", label: "Edition 2024" },
-		{ value: "2021", label: "Edition 2021" },
-	],
-	"c-cmake": [
-		{ value: "17", label: "C17" },
-		{ value: "11", label: "C11" },
-		{ value: "23", label: "C23" },
-	],
-	"cpp-cmake": [
-		{ value: "20", label: "C++20" },
-		{ value: "17", label: "C++17" },
-		{ value: "23", label: "C++23" },
-	],
-};
-
-function defaultStandard(kind: Kind): string {
-	return STANDARDS[kind][0].value;
-}
-
-/** The directory a new project is created in, with a trailing separator removed. */
-function parentOf(path: string): string {
-	return path.replace(/[\\/]+$/, "");
-}
-
-function joinPath(parent: string, name: string): string {
-	const separator = parent.includes("\\") && !parent.includes("/") ? "\\" : "/";
-	return `${parentOf(parent)}${separator}${name.trim()}`;
-}
 
 /**
  * New project dialog: pick a parent directory, a name and a kind, then let the backend scaffold it.
@@ -72,46 +27,10 @@ export default function NewProject({
 	onClose,
 	onCreated,
 }: NewProjectProps): JSX.Element | null {
-	const [parent, setParent] = useState(initialParent);
-	const [name, setName] = useState("");
-	const [kind, setKind] = useState<Kind>("rust-bin");
-	const [standard, setStandard] = useState(defaultStandard("rust-bin"));
-	const [creating, setCreating] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const nameRef = useRef<HTMLInputElement>(null);
-	const parentRef = useRef<HTMLInputElement>(null);
-
-	useEffect(() => {
-		if (!isOpen) return;
-		setError(null);
-		setParent(initialParent);
-		(parent === "" ? parentRef : nameRef).current?.focus();
-	}, [initialParent, isOpen, parent]);
+	const scaffold = useScaffold({ open: isOpen, initialParent, onParentChange, onCreated });
+	const { parent, name, kind, standard, creating, error, target, canCreate } = scaffold;
 
 	if (!isOpen) return null;
-
-	const target = parent !== "" && name.trim() !== "" ? joinPath(parent, name) : null;
-	const canCreate = target !== null && !creating;
-
-	const chooseParent = (next: string) => {
-		setParent(next);
-		onParentChange(next);
-	};
-
-	const submit = async () => {
-		if (!canCreate || target === null) return;
-		setCreating(true);
-		setError(null);
-		try {
-			const info = await createProject(parentOf(parent), name.trim(), kind, standard);
-			setName("");
-			onCreated(info.root);
-		} catch (cause) {
-			setError(describeError(cause));
-		} finally {
-			setCreating(false);
-		}
-	};
 
 	return (
 		<div
@@ -148,30 +67,17 @@ export default function NewProject({
 						<div className="newproject-location">
 							<input
 								id="newproject-parent"
-								ref={parentRef}
+								ref={scaffold.parentRef}
 								type="text"
 								value={parent}
 								placeholder="/path/to/parent"
 								spellCheck={false}
-								onChange={(event) => chooseParent(event.target.value)}
+								onChange={(event) => scaffold.chooseParent(event.target.value)}
 							/>
 							<button
 								type="button"
 								className="button"
-								onClick={() => {
-									void (async () => {
-										try {
-											const picked = await open({
-												directory: true,
-												multiple: false,
-												title: "Choose a parent folder",
-											});
-											if (typeof picked === "string") chooseParent(picked);
-										} catch (cause) {
-											setError(describeError(cause));
-										}
-									})();
-								}}
+								onClick={() => void scaffold.browse()}
 							>
 								Browse
 							</button>
@@ -182,62 +88,25 @@ export default function NewProject({
 						<label htmlFor="newproject-name">Name</label>
 						<input
 							id="newproject-name"
-							ref={nameRef}
+							ref={scaffold.nameRef}
 							type="text"
 							value={name}
 							placeholder="my-project"
 							spellCheck={false}
-							onChange={(event) => setName(event.target.value)}
+							onChange={(event) => scaffold.setName(event.target.value)}
 							onKeyDown={(event) => {
-								if (event.key === "Enter") void submit();
+								if (event.key === "Enter") void scaffold.submit();
 							}}
 						/>
 					</div>
 
-					<fieldset className="newproject-kinds">
-						<legend className="label">Kind</legend>
-						{KINDS.map((option) => (
-							<label key={option.value} className="newproject-kind">
-								<input
-									type="radio"
-									name="newproject-kind"
-									value={option.value}
-									checked={kind === option.value}
-									onChange={() => {
-										setKind(option.value);
-										setStandard(defaultStandard(option.value));
-									}}
-								/>
-								<span className="newproject-kind-label">{option.label}</span>
-								<span className="newproject-kind-hint">{option.hint}</span>
-							</label>
-						))}
-					</fieldset>
+					<KindPicker kind={kind} onSelect={scaffold.selectKind} />
 
-					<div className="newproject-row">
-						<span className="label">Language standard</span>
-						<div
-							className="newproject-standards"
-							role="group"
-							aria-label="Language standard"
-						>
-							{STANDARDS[kind].map((option) => (
-								<button
-									key={option.value}
-									type="button"
-									className={
-										standard === option.value
-											? "newproject-standard active"
-											: "newproject-standard"
-									}
-									aria-pressed={standard === option.value}
-									onClick={() => setStandard(option.value)}
-								>
-									{option.label}
-								</button>
-							))}
-						</div>
-					</div>
+					<StandardPicker
+						kind={kind}
+						standard={standard}
+						onSelect={scaffold.setStandard}
+					/>
 
 					<p className="newproject-target">{target ?? "Choose a location and a name"}</p>
 					{error === null ? null : (
@@ -259,7 +128,7 @@ export default function NewProject({
 							type="button"
 							className="button newproject-create"
 							disabled={!canCreate}
-							onClick={() => void submit()}
+							onClick={() => void scaffold.submit()}
 						>
 							{creating ? "Creating…" : "Create project"}
 						</button>

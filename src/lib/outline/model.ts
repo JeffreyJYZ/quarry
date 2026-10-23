@@ -1,4 +1,4 @@
-import type { Symbol as LspSymbol } from "@/lib/project/api";
+import type { DocumentSymbol as LspSymbol } from "@/lib/project/api";
 
 export function containsRange(
 	symbol: LspSymbol,
