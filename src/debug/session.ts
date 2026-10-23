@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { dapContinueOn, dapStepOn } from "@/debug/dap";
+import { type Pin, type PinResult, pinKey } from "@/debug/watch";
 import { fileName } from "@/problems/model";
 import {
 	buildProject,
@@ -66,6 +67,10 @@ export type VariableRow = {
 	key: string;
 	/** Reference of the container the adapter reports this name against. */
 	containerRef: number;
+	/** Reference of the scope this variable belongs to (for pinning). */
+	scopeReference: number;
+	/** Ancestor variable names from the scope to this row's parent. */
+	path: string[];
 	depth: number;
 	name: string;
 	value: string;
@@ -186,6 +191,13 @@ export type DebugController = {
 	watchPoints: WatchRow[];
 	addWatchPoint: (containerRef: number, name: string) => void;
 	removeWatchPoint: (dataId: string) => void;
+	pins: Pin[];
+	pinResults: Map<string, PinResult>;
+	pinVariable: (row: VariableRow) => void;
+	unpinVariable: (pin: Pin) => void;
+	togglePin: (row: VariableRow) => void;
+	isPinned: (row: VariableRow) => boolean;
+	pinnedKeys: Set<string>;
 	exceptionFilters: ExceptionFilter[];
 	exceptionChecked: Set<string>;
 	toggleExceptionFilter: (filter: string, checked: boolean) => void;
@@ -225,6 +237,8 @@ export function useDebugSession(root: string | null): DebugController {
 	const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 	const [selectedVariable, setSelectedVariable] = useState<VariableRow | null>(null);
 	const [watchPoints, setWatchPoints] = useState<WatchRow[]>([]);
+	const [pins, setPins] = useState<Pin[]>([]);
+	const [pinResults, setPinResults] = useState<Map<string, PinResult>>(() => new Map());
 	const [exceptionFilters, setExceptionFilters] = useState<ExceptionFilter[]>([]);
 	const [exceptionChecked, setExceptionChecked] = useState<Set<string>>(() => new Set());
 	const [breakpointMap, setBreakpointMap] = useState<Map<string, Map<number, BreakpointEntry>>>(
@@ -249,6 +263,8 @@ export function useDebugSession(root: string | null): DebugController {
 	const presetRef = useRef("");
 	const stopRef = useRef<StopView | null>(null);
 	const watchRef = useRef<WatchRow[]>([]);
+	const pinsRef = useRef<Pin[]>(pins);
+	const pinResultsRef = useRef<Map<string, PinResult>>(pinResults);
 	const breakpointMapRef = useRef<Map<string, Map<number, BreakpointEntry>>>(breakpointMap);
 	const childrenRef = useRef<Map<number, DapVariable[]>>(children);
 	const exceptionCheckedRef = useRef<Set<string>>(exceptionChecked);
@@ -259,6 +275,8 @@ export function useDebugSession(root: string | null): DebugController {
 	presetRef.current = preset;
 	stopRef.current = stopView;
 	watchRef.current = watchPoints;
+	pinsRef.current = pins;
+	pinResultsRef.current = pinResults;
 	breakpointMapRef.current = breakpointMap;
 	childrenRef.current = children;
 	expandedRef.current = expanded;
@@ -310,6 +328,8 @@ export function useDebugSession(root: string | null): DebugController {
 		setExpanded(new Set());
 		setSelectedVariable(null);
 		setWatchPoints([]);
+		setPins([]);
+		setPinResults(new Map());
 		setExceptionFilters([]);
 		setExceptionChecked(new Set());
 		setBreakpointMap(new Map());
@@ -474,6 +494,7 @@ export function useDebugSession(root: string | null): DebugController {
 				return;
 			}
 			await loadFrame(session, top.id);
+			await refreshPins(session);
 		} catch (reason) {
 			if (generation === generationRef.current) {
 				setError(`Stack: ${describeError(reason)}`);
@@ -623,6 +644,130 @@ export function useDebugSession(root: string | null): DebugController {
 			() => undefined,
 			(reason) => setError(`Watch: ${describeError(reason)}`),
 		);
+	}, []);
+
+	const readPin = useCallback(async (session: string, pin: Pin) => {
+		const names = [...pin.path, pin.name];
+		let reference = pin.scopeReference;
+		let list = await dapVariables(session, reference);
+		let found: DapVariable | null = null;
+		for (let index = 0; index < names.length; index += 1) {
+			const name = names[index];
+			found = list.find((variable) => variable.name === name) ?? null;
+			if (found === null) return null;
+			if (index < names.length - 1) {
+				if (found.variablesReference === 0) return null;
+				reference = found.variablesReference;
+				list = await dapVariables(session, reference);
+			}
+		}
+		return found;
+	}, []);
+
+	const refreshPins = useCallback(
+		async (session: string) => {
+			const current = pinsRef.current;
+			if (current.length === 0) {
+				setPinResults(new Map());
+				return;
+			}
+			const next = new Map<string, PinResult>();
+			let firstError: string | null = null;
+			for (const pin of current) {
+				try {
+					const variable = await readPin(session, pin);
+					if (variable === null) {
+						next.set(pinKey(pin), {
+							value: "",
+							typeName: null,
+							missing: true,
+							unavailable: false,
+						});
+					} else {
+						next.set(pinKey(pin), {
+							value: variable.value,
+							typeName: variable.typeName,
+							missing: false,
+							unavailable: false,
+						});
+					}
+				} catch (reason) {
+					next.set(pinKey(pin), {
+						value: "unavailable",
+						typeName: null,
+						missing: false,
+						unavailable: true,
+					});
+					if (firstError === null) {
+						firstError = `Watch: ${describeError(reason)}`;
+					}
+				}
+			}
+			if (sessionRef.current === session) {
+				setPinResults(next);
+				if (firstError !== null) setError(firstError);
+			}
+		},
+		[readPin],
+	);
+
+	const pinVariable = useCallback(
+		(row: VariableRow) => {
+			const pin: Pin = {
+				scopeReference: row.scopeReference,
+				name: row.name,
+				path: [...row.path],
+			};
+			setPins((current) => {
+				if (current.some((entry) => pinKey(entry) === pinKey(pin))) return current;
+				const next = [...current, pin];
+				pinsRef.current = next;
+				return next;
+			});
+			const session = sessionRef.current;
+			if (session !== null && stopRef.current !== null) {
+				void refreshPins(session);
+			}
+		},
+		[refreshPins],
+	);
+
+	const unpinVariable = useCallback((pin: Pin) => {
+		setPins((current) => {
+			const next = current.filter((entry) => pinKey(entry) !== pinKey(pin));
+			pinsRef.current = next;
+			return next;
+		});
+		setPinResults((current) => {
+			const next = new Map(current);
+			next.delete(pinKey(pin));
+			return next;
+		});
+	}, []);
+
+	const togglePin = useCallback(
+		(row: VariableRow) => {
+			const pin: Pin = {
+				scopeReference: row.scopeReference,
+				name: row.name,
+				path: [...row.path],
+			};
+			if (pinsRef.current.some((entry) => pinKey(entry) === pinKey(pin))) {
+				unpinVariable(pin);
+			} else {
+				pinVariable(row);
+			}
+		},
+		[pinVariable, unpinVariable],
+	);
+
+	const isPinned = useCallback((row: VariableRow) => {
+		const pin: Pin = {
+			scopeReference: row.scopeReference,
+			name: row.name,
+			path: [...row.path],
+		};
+		return pinsRef.current.some((entry) => pinKey(entry) === pinKey(pin));
 	}, []);
 
 	/**
@@ -1128,6 +1273,8 @@ export function useDebugSession(root: string | null): DebugController {
 		setSelectedVariable(null);
 		watchRef.current = [];
 		setWatchPoints([]);
+		setPins([]);
+		setPinResults(new Map());
 		setExceptionFilters([]);
 		setExceptionChecked(new Set());
 	}, []);
@@ -1218,6 +1365,8 @@ export function useDebugSession(root: string | null): DebugController {
 			setSelectedVariable(null);
 			watchRef.current = [];
 			setWatchPoints([]);
+			setPins([]);
+			setPinResults(new Map());
 		},
 		[commitMap],
 	);
@@ -1299,6 +1448,7 @@ export function useDebugSession(root: string | null): DebugController {
 	}, [breakpointMap]);
 
 	const breakpointsByPath = useMemo(() => groupByPath(breakpoints), [breakpoints]);
+	const pinnedKeys = useMemo(() => new Set(pins.map(pinKey)), [pins]);
 	void attachPid;
 
 	return {
@@ -1357,6 +1507,13 @@ export function useDebugSession(root: string | null): DebugController {
 		toggleExceptionFilter,
 		breakpoints,
 		breakpointsByPath,
+		pins,
+		pinResults,
+		pinVariable,
+		unpinVariable,
+		togglePin,
+		isPinned,
+		pinnedKeys,
 		setBreakpointField,
 		toggleBreakpoint,
 		addBreakpoint,

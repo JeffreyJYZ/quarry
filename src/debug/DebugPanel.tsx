@@ -4,6 +4,7 @@ import DisasmPane from "@/debug/memory/DisasmPane";
 import MemoryPane from "@/debug/memory/MemoryPane";
 import ProcessPicker from "@/debug/ProcessPicker";
 import type { DebugController, VariableRow } from "@/debug/session";
+import { pinKey } from "@/debug/watch";
 import { fileName } from "@/problems/model";
 import type { DapVariable } from "@/project/api";
 
@@ -24,16 +25,28 @@ type VariableListProps = {
 	prefix: string;
 	depth: number;
 	debug: DebugController;
+	pathNames: string[];
+	scopeRef: number;
 };
 
 /** One container's rows; recursion only happens through an expanded parent row. */
-function VariableList({ variables, containerRef, prefix, depth, debug }: VariableListProps) {
+function VariableList({
+	variables,
+	containerRef,
+	prefix,
+	depth,
+	debug,
+	pathNames,
+	scopeRef,
+}: VariableListProps) {
 	return (
 		<>
 			{variables.map((variable, index) => {
 				const row: VariableRow = {
 					key: `${prefix}/${index}`,
 					containerRef,
+					scopeReference: scopeRef,
+					path: pathNames,
 					depth,
 					name: variable.name,
 					value: variable.value,
@@ -168,6 +181,15 @@ function VariableBranch({ row, debug }: { row: VariableRow; debug: DebugControll
 				>
 					watch
 				</button>
+				<button
+					type="button"
+					className="debug-pin"
+					disabled={!watching}
+					title={`Pin ${row.name}`}
+					onClick={() => debug.togglePin(row)}
+				>
+					{debug.isPinned(row) ? "•" : "pin"}
+				</button>
 			</div>
 			{open && children !== null ? (
 				<VariableList
@@ -176,6 +198,8 @@ function VariableBranch({ row, debug }: { row: VariableRow; debug: DebugControll
 					prefix={row.key}
 					depth={row.depth + 1}
 					debug={debug}
+					pathNames={[...row.path, row.name]}
+					scopeRef={row.scopeReference}
 				/>
 			) : null}
 		</>
@@ -482,11 +506,63 @@ export default function DebugPanel({
 									prefix={`s${scope.variablesReference}`}
 									depth={0}
 									debug={debug}
+									pathNames={[]}
+									scopeRef={scope.variablesReference}
 								/>
 							</div>
 						))
 					)}
 				</div>
+			</section>
+
+			<section className="debug-section debug-pins">
+				<div className="debug-section-head">
+					<span className="label">watch</span>
+					<span className="debug-count">{debug.pins.length}</span>
+				</div>
+				<div className="debug-scroll">
+					{debug.pins.length === 0 ? (
+						<p className="debug-note">None. Stop, then press pin on a variable.</p>
+					) : (
+						<ul className="debug-list">
+							{debug.pins.map((pin) => {
+								const result = debug.pinResults.get(pinKey(pin));
+								const value =
+									result === undefined
+										? "…"
+										: result.missing
+											? "not in scope"
+											: result.unavailable
+												? "unavailable"
+												: result.value;
+								return (
+									<li key={pinKey(pin)} className="debug-item">
+										<span className="debug-var-name">{pin.name}</span>
+										<span> = </span>
+										<span className="debug-var-value">{value}</span>
+										{result !== undefined && result.typeName !== null ? (
+											<span className="debug-var-type dimmed">
+												{result.typeName}
+											</span>
+										) : null}
+										<button
+											type="button"
+											className="debug-remove"
+											aria-label={`Unpin ${pin.name}`}
+											onClick={() => debug.unpinVariable(pin)}
+										>
+											×
+										</button>
+									</li>
+								);
+							})}
+						</ul>
+					)}
+				</div>
+				<p className="debug-note dimmed">
+					Expression evaluation is unavailable for Rust, so only pinned in-scope variables
+					can be watched.
+				</p>
 			</section>
 
 			<section className="debug-section debug-watchpoints">
