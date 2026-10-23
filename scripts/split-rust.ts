@@ -338,12 +338,6 @@ function blockBounds(lines: string[]): { open: number; close: number } | null {
 	return null;
 }
 
-function chunk<T>(items: T[], size: number): T[][] {
-	const groups: T[][] = [];
-	for (let i = 0; i < items.length; i += size) groups.push(items.slice(i, i + size));
-	return groups;
-}
-
 /** Groups member items into bundles that fit the target, without cutting any member. */
 function packMembers(members: Item[]): Item[][] {
 	const groups: Item[][] = [];

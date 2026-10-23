@@ -14,7 +14,7 @@ export type TreeLevelProps = {
 	onToggle: (path: string) => void;
 	onRetry: (path: string) => void;
 	onOpenFile: (entry: FileEntry) => void;
-	onAction: (entry: FileEntry, action: "new-file" | "new-folder" | "rename" | "delete") => void;
+	onMenu: (entry: FileEntry, x: number, y: number) => void;
 	onCommitEdit: (parent: string, name: string, kind: EditState["kind"]) => void;
 	onCancelEdit: () => void;
 	editing: EditState | null;
@@ -34,7 +34,7 @@ export function TreeLevel({
 	onToggle,
 	onRetry,
 	onOpenFile,
-	onAction,
+	onMenu,
 	onCommitEdit,
 	onCancelEdit,
 	editing,
@@ -136,7 +136,7 @@ export function TreeLevel({
 								hasChangeUnder={hasChangeUnder(entry.path)}
 								onToggle={onToggle}
 								onOpenFile={onOpenFile}
-								onAction={onAction}
+								onMenu={onMenu}
 							/>
 						)}
 						{isOpen ? (
@@ -150,7 +150,7 @@ export function TreeLevel({
 								onToggle={onToggle}
 								onRetry={onRetry}
 								onOpenFile={onOpenFile}
-								onAction={onAction}
+								onMenu={onMenu}
 								onCommitEdit={onCommitEdit}
 								onCancelEdit={onCancelEdit}
 								editing={editing}

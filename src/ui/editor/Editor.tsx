@@ -1,138 +1,31 @@
-import {
-	acceptCompletion,
-	autocompletion,
-	closeBrackets,
-	closeCompletion,
-	completionStatus,
-	moveCompletionSelection,
-	startCompletion,
-} from "@codemirror/autocomplete";
-import {
-	cursorMatchingBracket,
-	defaultKeymap,
-	deleteLine,
-	history,
-	historyKeymap,
-	indentLess,
-	indentSelection,
-	indentWithTab,
-	insertNewlineAndIndent,
-	toggleLineComment,
-} from "@codemirror/commands";
-import {
-	bracketMatching,
-	codeFolding,
-	foldAll,
-	foldCode,
-	foldGutter,
-	indentOnInput,
-	indentUnit,
-	syntaxHighlighting,
-	unfoldAll,
-	unfoldCode,
-} from "@codemirror/language";
-import { lintGutter } from "@codemirror/lint";
-import { Compartment, EditorSelection, EditorState } from "@codemirror/state";
-import {
-	drawSelection,
-	EditorView,
-	highlightActiveLine,
-	highlightActiveLineGutter,
-	hoverTooltip,
-	keymap,
-	lineNumbers,
-} from "@codemirror/view";
-import { forwardRef, type JSX, useEffect, useImperativeHandle, useRef, useState } from "react";
+import type { EditorSelection } from "@codemirror/state";
+import { forwardRef, type JSX, useRef } from "react";
 import "@/ui/editor/editor.css";
-import { blameField, setBlame } from "@/lib/editor/blame";
 import { useBreakpointGutter } from "@/ui/editor/useBreakpointGutter";
+import { useCodeActionMenu } from "@/ui/editor/useCodeActionMenu";
 import { useDiagnosticsPublish } from "@/ui/editor/useDiagnosticsPublish";
 import { useDocumentSync } from "@/ui/editor/useDocumentSync";
-import { renderMarkdown } from "@/lib/editor/markdown";
+import { useEditorSearch } from "@/ui/editor/useEditorSearch";
+import { useEditorRefs } from "@/ui/editor/useEditorRefs";
+import { useEditorMount } from "@/ui/editor/useEditorMount";
+import { useEditorBindings } from "@/ui/editor/useEditorBindings";
+import { useEditorEffects } from "@/ui/editor/useEditorEffects";
+import { useEditorHandle } from "@/ui/editor/useEditorHandle";
+import { useFormatDocument } from "@/ui/editor/useFormatDocument";
+import { useInlayHints } from "@/ui/editor/useInlayHints";
+import { useOccurrenceHighlights } from "@/ui/editor/useOccurrenceHighlights";
+import { useRenamePanel } from "@/ui/editor/useRenamePanel";
+import { useSignatureHelp } from "@/ui/editor/useSignatureHelp";
+import CodeActionMenu from "@/ui/editor/surface/CodeActionMenu";
+import RenameBar from "@/ui/editor/surface/RenameBar";
+import SearchBar from "@/ui/editor/surface/SearchBar";
+import SignatureHelpView from "@/ui/editor/surface/SignatureHelp";
 
-import { breakpointGutter } from "@/lib/editor/breakpoints";
-import { inlayHintsField, setInlayHints } from "@/lib/editor/inlayHints";
-import { languageForPath } from "@/lib/editor/languages";
-import { occurrenceStarts, occurrencesField, setOccurrences } from "@/lib/editor/occurrences";
-import {
-	emptySearchState,
-	type SearchMatch,
-	searchDecorations,
-	searchField,
-	setSearchMatches,
-} from "@/lib/editor/search";
-import { quarryHighlightStyle, quarryTheme } from "@/lib/editor/theme";
-import type { CodeAction, Diagnostic, FileEdit, InlayHint, SignatureHelp } from "@/lib/project/api";
-import {
-	formatDocument,
-	formatterFor,
-	type Location,
-	lspCodeActions,
-	lspCompletion,
-	lspDefinition,
-	lspDocumentHighlights,
-	lspHover,
-	lspInlayHints,
-	lspReferences,
-	lspRename,
-	lspSignatureHelp,
-} from "@/lib/project/api";
-import { describeError } from "@/lib/project/errors";
-
-export type EditorProps = {
-	/** Absolute path of the open file, or null for an empty buffer. */
-	path: string | null;
-	value: string;
-	onChange: (value: string) => void;
-	/** Diagnostics for this document only. The editor renders them; it never fetches them. */
-	diagnostics?: Diagnostic[];
-	/** 1-based lines carrying a breakpoint. Rendered as a filled dot in the breakpoint gutter. */
-	breakpointLines?: number[];
-	/** Subset of `breakpointLines` the adapter has not confirmed. Rendered hollow and dimmed. */
-	unverifiedLines?: number[];
-	/** Clicking the breakpoint gutter reports a 1-based line; the caller owns the set. */
-	onToggleBreakpoint?: (line: number) => void;
-	/** Open project root; null disables all LSP requests. */
-	root?: string | null;
-	/** Navigate to a definition location. */
-	onNavigate?: (path: string, line: number, character: number) => void;
-	/** Receive reference locations. */
-	onReferences?: (locations: Location[]) => void;
-	/** Move the caret to a zero-based position and scroll it into view. */
-	reveal?: { line: number; character: number; token: number } | null;
-	/** Report a one-line status to the host (no formatter / formatter failure). */
-	onNotice?: (message: string | null) => void;
-	/** Report caret position changes. */
-	onCursor?: (position: { line: number; character: number }) => void;
-	/** Per-line blame annotations; null/undefined clears them. */
-	blame?: { line: number; label: string }[] | null;
-	/** Apply a batch of file edits produced by rename or code actions. */
-	onApplyEdits?: (edits: FileEdit[]) => void;
-	/** Indent width in spaces; 4 when absent. */
-	tabSize?: number;
-	/** Editor font size in px; 13 when absent. */
-	fontSize?: number;
-	/** Editor font family; empty keeps the built-in monospace stack. */
-	fontFamily?: string;
-};
-
-import { expandBracketPair, foldLevel } from "@/lib/editor/commands";
-import { kindToType, splitTopLevel } from "@/lib/editor/completion";
-import { toLspPosition } from "@/lib/editor/positions";
-
+import type { EditorHandle, EditorProps } from "@/ui/editor/editorTypes";
+export type { EditorHandle, EditorProps } from "@/ui/editor/editorTypes";
 const NO_LINES: number[] = [];
 
-/**
- * CodeMirror 6 surface. One `EditorView` per mount; `value` stays caller-owned and is pushed into the
- * document only when it actually differs, so local edits keep their selection and scroll position.
- * Breakpoints arrive as props and reach the gutter through a state field, never a rebuilt view.
- */
-export type EditorHandle = {
-	format: () => Promise<void>;
-	/** The formatted text without touching the document; null when no formatter is available. */
-	formatText: () => Promise<string | null>;
-};
-
+/** CodeMirror 6 surface: one view per mount, with `value` pushed in only when it really differs. */
 const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 	{
 		path,
@@ -156,1282 +49,149 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 	}: EditorProps,
 	ref,
 ): JSX.Element {
-	const hostRef = useRef<HTMLDivElement | null>(null);
-	const viewRef = useRef<EditorView | null>(null);
-	const [searchOpen, setSearchOpen] = useState(false);
-	const [replaceMode, setReplaceMode] = useState(false);
-	const [query, setQuery] = useState("");
-	const [replacement, setReplacement] = useState("");
-	const [caseSensitive, setCaseSensitive] = useState(false);
-	const [useRegex, setUseRegex] = useState(false);
-	const [matches, setMatches] = useState<SearchMatch[]>([]);
-	const [active, setActive] = useState(0);
-	const [error, setError] = useState<string | null>(null);
-	const [renameOpen, setRenameOpen] = useState(false);
-	const [renameValue, setRenameValue] = useState("");
-	const [codeActions, setCodeActions] = useState<CodeAction[]>([]);
-	const [codeMenuOpen, setCodeMenuOpen] = useState(false);
-	const [sigHelp, setSigHelp] = useState<SignatureHelp | null>(null);
-	const [sigCoords, setSigCoords] = useState<{ top: number; left: number } | null>(null);
-	const searchOpenRef = useRef(searchOpen);
-	searchOpenRef.current = searchOpen;
-	const queryRef = useRef(query);
-	queryRef.current = query;
-	const caseRef = useRef(caseSensitive);
-	caseRef.current = caseSensitive;
-	const regexRef = useRef(useRegex);
-	regexRef.current = useRegex;
-	const replacementRef = useRef(replacement);
-	replacementRef.current = replacement;
-	const matchesRef = useRef(matches);
-	matchesRef.current = matches;
-	const activeRef = useRef(active);
-	activeRef.current = active;
+	const refs = useEditorRefs({
+		path,
+		value,
+		onChange,
+		onToggleBreakpoint,
+		root,
+		onNavigate,
+		onReferences,
+		onNotice,
+		onCursor,
+		onApplyEdits,
+		tabSize,
+	});
+	const {
+		hostRef,
+		viewRef,
+		publishedRef,
+		markersRef,
+		pathRef,
+		latestRef,
+		rootRef,
+		onNoticeRef,
+		onCursorRef,
+		onApplyEditsRef,
+		lastCursorRef,
+	} = refs;
+	const search = useEditorSearch(viewRef);
+	const { searchOpen, open: openSearch, close: closeSearch, step: stepMatch } = search;
+	const searchOpenRef = search.searchOpenRef;
+	const recompute = search.recompute;
 	const openSearchRef = useRef<(replace: boolean) => void>(() => undefined);
 	const closeSearchRef = useRef<() => void>(() => undefined);
 	const stepRef = useRef<(delta: number) => void>(() => undefined);
 	const recomputeRef = useRef<() => void>(() => undefined);
-	const languageRef = useRef<Compartment | null>(null);
-	const indentRef = useRef<Compartment | null>(null);
-	/** Read while building the editor and again when the setting changes; a ref keeps it out of deps. */
-	const tabSizeRef = useRef(tabSize);
-	tabSizeRef.current = tabSize;
-	const publishedRef = useRef<{ view: EditorView | null; signature: string }>({
-		view: null,
-		signature: "",
-	});
-	const markersRef = useRef<{
-		view: EditorView | null;
-		lines: number[];
-		unverified: Set<number>;
-	}>({ view: null, lines: [], unverified: new Set() });
-	const latestRef = useRef({ path, value, onChange });
-	latestRef.current = { path, value, onChange };
-	const toggleRef = useRef<((line: number) => void) | null>(onToggleBreakpoint ?? null);
-	toggleRef.current = onToggleBreakpoint ?? null;
-	const rootRef = useRef<string | null>(root);
-	rootRef.current = root;
-	const navigateRef = useRef<((path: string, line: number, character: number) => void) | null>(
-		onNavigate ?? null,
-	);
-	navigateRef.current = onNavigate ?? null;
-	const referencesRef = useRef<((locations: Location[]) => void) | null>(onReferences ?? null);
-	referencesRef.current = onReferences ?? null;
-	const onNoticeRef = useRef<((message: string | null) => void) | null>(onNotice ?? null);
-	onNoticeRef.current = onNotice ?? null;
-	const onCursorRef = useRef<((position: { line: number; character: number }) => void) | null>(
-		onCursor ?? null,
-	);
-	onCursorRef.current = onCursor ?? null;
-	const onApplyEditsRef = useRef<((edits: FileEdit[]) => void) | null>(onApplyEdits ?? null);
-	onApplyEditsRef.current = onApplyEdits ?? null;
-	const lastCursorRef = useRef<{ line: number; character: number } | null>(null);
-	const revealTokenRef = useRef<number | null>(null);
-	const sigSeqRef = useRef(0);
-	const sigTimerRef = useRef<number | null>(null);
-	const sigHideTimerRef = useRef<number | null>(null);
-	const [hintsVisible, setHintsVisible] = useState(true);
-	const hintsVisibleRef = useRef(hintsVisible);
-	hintsVisibleRef.current = hintsVisible;
-	const inlaySeqRef = useRef(0);
-	const inlayTimerRef = useRef<number | null>(null);
-	const inlayHintsRef = useRef<InlayHint[]>([]);
-	const occSeqRef = useRef(0);
-	const occTimerRef = useRef<number | null>(null);
-	const occPosRef = useRef<number | null>(null);
-	const occurrenceHistoryRef = useRef<EditorSelection[]>([]);
-
-	const recompute = () => {
-		const view = viewRef.current;
-		if (view === null) return;
-		const q = queryRef.current;
-		if (!searchOpenRef.current || q === "") {
-			setMatches([]);
-			setActive(0);
-			setError(null);
-			view.dispatch({ effects: setSearchMatches.of(emptySearchState) });
-			return;
-		}
-		let source = q;
-		if (!regexRef.current) {
-			source = q.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&");
-		}
-		let re: RegExp;
-		try {
-			const flags = caseRef.current ? "g" : "gi";
-			re = new RegExp(source, flags);
-		} catch {
-			setMatches([]);
-			setActive(0);
-			setError("invalid regex");
-			view.dispatch({ effects: setSearchMatches.of(emptySearchState) });
-			return;
-		}
-		setError(null);
-		const text = view.state.doc.toString();
-		const found: SearchMatch[] = [];
-		re.lastIndex = 0;
-		let match: RegExpExecArray | null = re.exec(text);
-		while (match !== null) {
-			if (match[0].length === 0) {
-				re.lastIndex += 1;
-				match = re.exec(text);
-				continue;
-			}
-			found.push({ from: match.index, to: match.index + match[0].length });
-			if (found.length > 10000) break;
-			match = re.exec(text);
-		}
-		setMatches(found);
-		const nextActive = found.length > 0 ? 0 : -1;
-		setActive(Math.max(nextActive, 0));
-		view.dispatch({
-			effects: setSearchMatches.of({
-				matches: found,
-				active: nextActive >= 0 ? nextActive : -1,
-			}),
-		});
-		if (found.length > 0) {
-			const first = found[0];
-			view.dispatch({ selection: { anchor: first.from, head: first.to } });
-		}
-	};
-
-	const openSearch = (replace: boolean) => {
-		setReplaceMode(replace);
-		setSearchOpen(true);
-		searchOpenRef.current = true;
-	};
-
-	const closeSearch = () => {
-		setSearchOpen(false);
-		searchOpenRef.current = false;
-		setMatches([]);
-		setActive(0);
-		setError(null);
-		const view = viewRef.current;
-		if (view !== null) {
-			view.dispatch({ effects: setSearchMatches.of(emptySearchState) });
-			view.focus();
-		}
-	};
-
-	const stepMatch = (delta: number) => {
-		const current = matchesRef.current;
-		if (current.length === 0) return;
-		const next = (activeRef.current + delta + current.length) % current.length;
-		setActive(next);
-		activeRef.current = next;
-		const view = viewRef.current;
-		if (view !== null) {
-			view.dispatch({
-				effects: setSearchMatches.of({ matches: current, active: next }),
-			});
-			const m = current[next];
-			view.dispatch({ selection: { anchor: m.from, head: m.to } });
-		}
-	};
-
-	const replaceOne = () => {
-		const view = viewRef.current;
-		const current = matchesRef.current;
-		if (view === null || current.length === 0) return;
-		const m = current[activeRef.current];
-		view.dispatch({
-			changes: { from: m.from, to: m.to, insert: replacementRef.current },
-		});
-	};
-
-	const replaceAll = () => {
-		const view = viewRef.current;
-		const current = matchesRef.current;
-		if (view === null || current.length === 0) return;
-		const changes = [...current].reverse().map((m) => ({
-			from: m.from,
-			to: m.to,
-			insert: replacementRef.current,
-		}));
-		view.dispatch({ changes });
-	};
-	const submitRename = () => {
-		const view = viewRef.current;
-		const currentRoot = rootRef.current;
-		const currentPath = latestRef.current.path;
-		if (view === null || currentRoot === null || currentPath === null) {
-			setRenameOpen(false);
-			return;
-		}
-		const name = renameValue.trim();
-		setRenameOpen(false);
-		if (name === "") return;
-		const { line, character } = toLspPosition(view, view.state.selection.main.head);
-		void (async () => {
-			let result: FileEdit[] = [];
-			try {
-				result = await lspRename(currentRoot, currentPath, line, character, name);
-			} catch {
-				result = [];
-			}
-			if (result.length === 0) {
-				onNoticeRef.current?.("Rename unavailable here");
-				return;
-			}
-			onApplyEditsRef.current?.(result);
-		})();
-	};
-
-	const applyCodeAction = (action: CodeAction) => {
-		setCodeMenuOpen(false);
-		if (action.edits.length > 0) {
-			onApplyEditsRef.current?.(action.edits);
-		}
-	};
-
-	const hideSig = () => {
-		setSigHelp(null);
-		setSigCoords(null);
-		if (sigHideTimerRef.current !== null) {
-			window.clearTimeout(sigHideTimerRef.current);
-			sigHideTimerRef.current = null;
-		}
-	};
-
-	const runSig = async () => {
-		const view = viewRef.current;
-		const currentRoot = rootRef.current;
-		const currentPath = latestRef.current.path;
-		if (view === null || currentRoot === null || currentPath === null) {
-			hideSig();
-			return;
-		}
-		const pos = view.state.selection.main.head;
-		const { line, character } = toLspPosition(view, pos);
-		const mySeq = ++sigSeqRef.current;
-		let result: SignatureHelp | null = null;
-		try {
-			result = await lspSignatureHelp(currentRoot, currentPath, line, character);
-		} catch {
-			result = null;
-		}
-		if (mySeq !== sigSeqRef.current) return;
-		if (result === null || result.signatures.length === 0) {
-			hideSig();
-			return;
-		}
-		setSigHelp(result);
-		const host = hostRef.current;
-		const coords = view.coordsAtPos(pos);
-		if (coords !== null && host !== null) {
-			const rect = host.getBoundingClientRect();
-			setSigCoords({ top: coords.bottom - rect.top, left: coords.left - rect.left });
-		}
-		if (sigHideTimerRef.current !== null) window.clearTimeout(sigHideTimerRef.current);
-		sigHideTimerRef.current = window.setTimeout(() => {
-			setSigHelp(null);
-			setSigCoords(null);
-		}, 10000);
-	};
-
-	const scheduleSig = () => {
-		if (sigTimerRef.current !== null) window.clearTimeout(sigTimerRef.current);
-		sigTimerRef.current = window.setTimeout(() => {
-			sigTimerRef.current = null;
-			void runSig();
-		}, 150);
-	};
-
-	const applyInlay = (hints: InlayHint[] | null) => {
-		const view = viewRef.current;
-		if (view === null) return;
-		view.dispatch({ effects: setInlayHints.of(hintsVisibleRef.current ? hints : []) });
-	};
-
-	const runInlay = async () => {
-		const view = viewRef.current;
-		const currentRoot = rootRef.current;
-		const currentPath = latestRef.current.path;
-		if (view === null || currentRoot === null || currentPath === null) {
-			applyInlay(null);
-			return;
-		}
-		const mySeq = ++inlaySeqRef.current;
-		let result: InlayHint[] = [];
-		try {
-			result = await lspInlayHints(currentRoot, currentPath);
-		} catch {
-			result = [];
-			if (mySeq !== inlaySeqRef.current) return;
-			applyInlay(null);
-			return;
-		}
-		if (mySeq !== inlaySeqRef.current) return;
-		inlayHintsRef.current = result;
-		applyInlay(result);
-	};
-
-	const clearOccurrences = () => {
-		const view = viewRef.current;
-		if (view !== null) view.dispatch({ effects: setOccurrences.of(null) });
-	};
-
-	const runOccurrences = async () => {
-		const view = viewRef.current;
-		const currentRoot = rootRef.current;
-		const currentPath = latestRef.current.path;
-		if (view === null || currentRoot === null || currentPath === null) {
-			clearOccurrences();
-			return;
-		}
-		if (!view.hasFocus) {
-			clearOccurrences();
-			return;
-		}
-		const pos = view.state.selection.main.head;
-		occPosRef.current = pos;
-		const mySeq = occSeqRef.current;
-		const { line, character } = toLspPosition(view, pos);
-		let ranges: Awaited<ReturnType<typeof lspDocumentHighlights>> = [];
-		try {
-			ranges = await lspDocumentHighlights(currentRoot, currentPath, line, character);
-		} catch {
-			ranges = [];
-		}
-		if (mySeq !== occSeqRef.current) return;
-		const liveView = viewRef.current;
-		if (liveView === null || liveView.state.selection.main.head !== pos) {
-			clearOccurrences();
-			return;
-		}
-		const items = ranges
-			.map((range) => {
-				const startLine = liveView.state.doc.line(
-					Math.min(Math.max(range.start.line + 1, 1), liveView.state.doc.lines),
-				);
-				const endLine = liveView.state.doc.line(
-					Math.min(Math.max(range.end.line + 1, 1), liveView.state.doc.lines),
-				);
-				const from = startLine.from + range.start.character;
-				const to = endLine.from + range.end.character;
-				const strong = from <= pos && pos <= to;
-				return { from, to, strong };
-			})
-			.filter((item) => item.to > item.from);
-		liveView.dispatch({ effects: setOccurrences.of(items) });
-	};
-
-	const scheduleOccurrences = () => {
-		occSeqRef.current += 1;
-		if (occTimerRef.current !== null) {
-			window.clearTimeout(occTimerRef.current);
-			occTimerRef.current = null;
-		}
-		occTimerRef.current = window.setTimeout(() => {
-			occTimerRef.current = null;
-			void runOccurrences();
-		}, 250);
-	};
-
 	openSearchRef.current = openSearch;
 	closeSearchRef.current = closeSearch;
 	stepRef.current = stepMatch;
 	recomputeRef.current = recompute;
+	const rename = useRenamePanel({
+		viewRef,
+		rootRef,
+		pathRef,
+		onNotice: onNoticeRef,
+		onApplyEdits: onApplyEditsRef,
+	});
+	const { renameOpen, setRenameOpen, renameValue, setRenameValue, submit: submitRename } = rename;
+	const {
+		codeActions,
+		setCodeActions,
+		codeMenuOpen,
+		setCodeMenuOpen,
+		apply: applyCodeAction,
+	} = useCodeActionMenu({ onApplyEdits: onApplyEditsRef });
+	const sig = useSignatureHelp({ viewRef, rootRef, pathRef });
+	const { sigHelp, sigCoords, hideSig, runSig, scheduleSig } = sig;
+	const inlay = useInlayHints({ viewRef, rootRef, pathRef });
+	const { hintsVisibleRef, inlayHintsRef, inlayTimerRef, inlaySeqRef, applyInlay, runInlay } =
+		inlay;
+	const occ = useOccurrenceHighlights({ viewRef, rootRef, pathRef });
+	const { occSeqRef, occTimerRef, clearOccurrences, scheduleOccurrences } = occ;
+	const occurrenceHistoryRef = useRef<EditorSelection[]>([]);
 
-	const runFormatText = async (): Promise<string | null> => {
-		const view = viewRef.current;
-		const currentRoot = rootRef.current;
-		const currentPath = latestRef.current.path;
-		if (view === null || currentRoot === null || currentPath === null) return null;
-		const notify = onNoticeRef.current;
-		let formatter = "";
-		try {
-			formatter = await formatterFor(currentPath);
-		} catch (error) {
-			notify?.(describeError(error));
-			return null;
-		}
-		if (formatter === "") {
-			const ext = currentPath.includes(".")
-				? currentPath.slice(currentPath.lastIndexOf(".") + 1)
-				: "";
-			notify?.(`No formatter for ${ext}`);
-			return null;
-		}
-		try {
-			return await formatDocument(currentRoot, currentPath, view.state.doc.toString());
-		} catch (error) {
-			notify?.(describeError(error));
-			return null;
-		}
-	};
+	const runFormatText = useFormatDocument({ viewRef, rootRef, pathRef, onNotice: onNoticeRef });
+	useEditorHandle({ ref, viewRef, latestRef, runFormatText });
 
-	useImperativeHandle(ref, () => ({
-		formatText: runFormatText,
-		format: async () => {
-			const view = viewRef.current;
-			if (view === null) return;
-			const head = view.state.selection.main.head;
-			const lineObj = view.state.doc.lineAt(head);
-			const originalLine = lineObj.number;
-			const originalCol = head - lineObj.from;
-			const formatted = await runFormatText();
-			if (formatted === null) return;
-			latestRef.current.onChange(formatted);
-			window.setTimeout(() => {
-				const v = viewRef.current;
-				if (v === null) return;
-				const doc = v.state.doc;
-				const targetLine = Math.min(originalLine, doc.lines);
-				const newLine = doc.line(targetLine);
-				const col = Math.min(originalCol, newLine.length);
-				const pos = newLine.from + col;
-				v.dispatch({ selection: { anchor: pos } });
-			}, 0);
+	const { deps, behaviour } = useEditorBindings({
+		refs,
+		search: {
+			searchOpenRef,
+			openSearchRef,
+			closeSearchRef,
+			stepRef,
+			recomputeRef,
+			occurrenceHistoryRef,
+			hintsVisibleRef,
+			inlayHintsRef,
+			occSeqRef,
+			occTimerRef,
+			onCursorRef,
+			lastCursorRef,
 		},
-	}));
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: keymap reads state via closure
-	useEffect(() => {
-		const host = hostRef.current;
-		if (host === null) return;
-
-		const language = new Compartment();
-		languageRef.current = language;
-		const indentation = new Compartment();
-		indentRef.current = indentation;
-
-		let completionSeq = 0;
-		let hoverSeq = 0;
-		let navSeq = 0;
-
-		const view = new EditorView({
-			parent: host,
-			state: EditorState.create({
-				doc: latestRef.current.value,
-				extensions: [
-					breakpointGutter,
-					searchField,
-					searchDecorations,
-					inlayHintsField,
-					occurrencesField,
-					blameField,
-					lineNumbers(),
-					lintGutter(),
-					highlightActiveLineGutter(),
-					highlightActiveLine(),
-					drawSelection(),
-					history(),
-					bracketMatching(),
-					closeBrackets(),
-					indentOnInput(),
-					codeFolding(),
-					foldGutter(),
-					indentation.of([
-						indentUnit.of(" ".repeat(tabSizeRef.current)),
-						EditorState.tabSize.of(tabSizeRef.current),
-					]),
-					keymap.of([
-						{
-							key: "Enter",
-							run: (currentView) =>
-								expandBracketPair(currentView) ||
-								insertNewlineAndIndent(currentView),
-						},
-						{
-							key: "Tab",
-							run: (currentView) =>
-								completionStatus(currentView.state) === "active" &&
-								acceptCompletion(currentView),
-						},
-						{
-							key: "Escape",
-							run: (currentView) =>
-								completionStatus(currentView.state) === "active" &&
-								closeCompletion(currentView),
-						},
-						{
-							key: "Mod-Space",
-							run: (currentView) => startCompletion(currentView),
-						},
-						{
-							key: "ArrowDown",
-							run: (currentView) =>
-								completionStatus(currentView.state) === "active" &&
-								moveCompletionSelection(true)(currentView),
-						},
-						{
-							key: "ArrowUp",
-							run: (currentView) =>
-								completionStatus(currentView.state) === "active" &&
-								moveCompletionSelection(false)(currentView),
-						},
-						...defaultKeymap,
-						...historyKeymap,
-						indentWithTab,
-						{
-							key: "F12",
-							run: () => {
-								const currentView = viewRef.current;
-								if (currentView === null) return false;
-								const currentRoot = rootRef.current;
-								const currentPath = latestRef.current.path;
-								if (currentRoot === null || currentPath === null) return false;
-								const callback = navigateRef.current;
-								if (callback === null) return false;
-								const pos = currentView.state.selection.main.head;
-								const { line, character } = toLspPosition(currentView, pos);
-								const mySeq = ++navSeq;
-								void (async () => {
-									let locations: Location[] = [];
-									try {
-										locations = await lspDefinition(
-											currentRoot,
-											currentPath,
-											line,
-											character,
-										);
-									} catch {
-										locations = [];
-									}
-									if (mySeq !== navSeq) return;
-									if (locations.length === 0) return;
-									const first = locations[0];
-									callback(
-										first.path,
-										first.range.start.line,
-										first.range.start.character,
-									);
-								})();
-								return true;
-							},
-						},
-						{
-							key: "Shift-F12",
-							run: () => {
-								const currentView = viewRef.current;
-								if (currentView === null) return false;
-								const currentRoot = rootRef.current;
-								const currentPath = latestRef.current.path;
-								if (currentRoot === null || currentPath === null) return false;
-								const callback = referencesRef.current;
-								if (callback === null) return false;
-								const pos = currentView.state.selection.main.head;
-								const { line, character } = toLspPosition(currentView, pos);
-								const mySeq = ++navSeq;
-								void (async () => {
-									let locations: Location[] = [];
-									try {
-										locations = await lspReferences(
-											currentRoot,
-											currentPath,
-											line,
-											character,
-										);
-									} catch {
-										locations = [];
-									}
-									if (mySeq !== navSeq) return;
-									callback(locations);
-								})();
-								return true;
-							},
-						},
-						{
-							key: "Mod-f",
-							run: () => {
-								openSearchRef.current(false);
-								return true;
-							},
-						},
-						{
-							key: "Mod-Alt-f",
-							run: () => {
-								openSearchRef.current(true);
-								return true;
-							},
-						},
-						{
-							key: "Mod-g",
-							run: () => {
-								if (!searchOpenRef.current) return false;
-								stepRef.current(1);
-								return true;
-							},
-						},
-						{
-							key: "F2",
-							run: () => {
-								const view = viewRef.current;
-								if (view === null) return false;
-								const pos = view.state.selection.main.head;
-								let ident = "";
-								// find identifier containing pos
-								const line = view.state.doc.lineAt(pos);
-								const rel = pos - line.from;
-								const before =
-									line.text.slice(0, rel).match(/[A-Za-z0-9_]*$/)?.[0] ?? "";
-								const after =
-									line.text.slice(rel).match(/^[A-Za-z0-9_]*/)?.[0] ?? "";
-								ident = before + after;
-								setRenameValue(ident);
-								setRenameOpen(true);
-								return true;
-							},
-						},
-						{
-							key: "Alt-Enter",
-							run: () => {
-								const view = viewRef.current;
-								if (view === null) return false;
-								const currentRoot = rootRef.current;
-								const currentPath = latestRef.current.path;
-								if (currentRoot === null || currentPath === null) return false;
-								const { line, character } = toLspPosition(
-									view,
-									view.state.selection.main.head,
-								);
-								void (async () => {
-									let actions: CodeAction[] = [];
-									try {
-										actions = await lspCodeActions(
-											currentRoot,
-											currentPath,
-											line,
-											character,
-										);
-									} catch {
-										actions = [];
-									}
-									if (actions.length === 0) {
-										setCodeMenuOpen(false);
-										setCodeActions([]);
-										return;
-									}
-									setCodeActions(actions);
-									setCodeMenuOpen(true);
-								})();
-								return true;
-							},
-						},
-						{
-							key: "Mod-Shift-Space",
-							run: () => {
-								void runSig();
-								return true;
-							},
-						},
-						{
-							key: "Mod-Alt-i",
-							run: () => {
-								setHintsVisible((v) => {
-									const next = !v;
-									hintsVisibleRef.current = next;
-									if (next) {
-										applyInlay(inlayHintsRef.current);
-									} else {
-										applyInlay([]);
-									}
-									return next;
-								});
-								return true;
-							},
-						},
-						{
-							key: "Escape",
-							run: () => {
-								if (renameOpen) {
-									setRenameOpen(false);
-									return true;
-								}
-								if (codeMenuOpen) {
-									setCodeMenuOpen(false);
-									return true;
-								}
-								hideSig();
-								occSeqRef.current += 1;
-								if (occTimerRef.current !== null) {
-									window.clearTimeout(occTimerRef.current);
-									occTimerRef.current = null;
-								}
-								clearOccurrences();
-								if (!searchOpenRef.current) return false;
-								closeSearchRef.current();
-								return true;
-							},
-						},
-						{
-							key: "Mod-]",
-							run: (view) => {
-								indentSelection(view);
-								return true;
-							},
-						},
-						{
-							key: "Mod-[",
-							run: (view) => {
-								indentLess(view);
-								return true;
-							},
-						},
-						{
-							key: "Mod-/",
-							run: toggleLineComment,
-						},
-						{
-							key: "Mod-d",
-							run: (view) => {
-								const state = view.state;
-								const sel = state.selection;
-								const main = sel.main;
-								let word = "";
-								let from = main.from;
-								let to = main.to;
-								if (main.empty) {
-									const line = state.doc.lineAt(main.head);
-									const text = line.text;
-									const rel = main.head - line.from;
-									let start = rel;
-									let end = rel;
-									while (start > 0 && /[A-Za-z0-9_]/.test(text[start - 1]))
-										start -= 1;
-									while (end < text.length && /[A-Za-z0-9_]/.test(text[end]))
-										end += 1;
-									from = line.from + start;
-									to = line.from + end;
-									if (from === to) return false;
-									occurrenceHistoryRef.current.push(sel);
-									view.dispatch({ selection: { anchor: from, head: to } });
-									return true;
-								}
-								word = state.doc.sliceString(from, to);
-								if (word === "") return false;
-								const doc = state.doc.toString();
-								const selected = new Set(sel.ranges.map((r) => r.from));
-								const searchStart = Math.max(...sel.ranges.map((r) => r.to));
-								let pos = doc.indexOf(word, searchStart);
-								if (pos === -1) pos = doc.indexOf(word, 0);
-								while (pos !== -1 && selected.has(pos)) {
-									const next = doc.indexOf(word, pos + 1);
-									if (next === -1 || next === pos) {
-										pos = doc.indexOf(word, 0);
-										if (selected.has(pos)) pos = -1;
-										break;
-									}
-									pos = next;
-								}
-								if (pos === -1 || selected.has(pos)) return false;
-								occurrenceHistoryRef.current.push(sel);
-								const ranges = [
-									...sel.ranges,
-									EditorSelection.range(pos, pos + word.length),
-								];
-								view.dispatch({
-									selection: EditorSelection.create(ranges, sel.mainIndex),
-								});
-								return true;
-							},
-						},
-						{
-							key: "Mod-Shift-l",
-							run: (view) => {
-								const state = view.state;
-								const sel = state.selection;
-								const main = sel.main;
-								let from = main.from;
-								let to = main.to;
-								let word = "";
-								if (main.empty) {
-									const line = state.doc.lineAt(main.head);
-									const text = line.text;
-									const rel = main.head - line.from;
-									let start = rel;
-									let end = rel;
-									while (start > 0 && /[A-Za-z0-9_]/.test(text[start - 1]))
-										start -= 1;
-									while (end < text.length && /[A-Za-z0-9_]/.test(text[end]))
-										end += 1;
-									from = line.from + start;
-									to = line.from + end;
-									if (from === to) return false;
-									word = state.doc.sliceString(from, to);
-								} else {
-									word = state.doc.sliceString(from, to);
-								}
-								if (word === "") return false;
-								const doc = state.doc.toString();
-								const positions = occurrenceStarts(doc, word);
-								if (positions.length === 0) return false;
-								occurrenceHistoryRef.current.push(sel);
-								const ranges = positions.map((p) =>
-									EditorSelection.range(p, p + word.length),
-								);
-								view.dispatch({ selection: EditorSelection.create(ranges, 0) });
-								return true;
-							},
-						},
-						{
-							key: "Mod-u",
-							run: (view) => {
-								const stack = occurrenceHistoryRef.current;
-								const previous = stack.pop();
-								if (previous === undefined) return false;
-								view.dispatch({ selection: previous });
-								return true;
-							},
-						},
-						{
-							key: "Mod-Shift-k",
-							run: deleteLine,
-						},
-						{
-							key: "Mod-Shift-[",
-							run: foldCode,
-						},
-						{
-							key: "Mod-Shift-]",
-							run: unfoldCode,
-						},
-						{
-							key: "Mod-Alt-[",
-							run: foldAll,
-						},
-						{
-							key: "Mod-Alt-]",
-							run: unfoldAll,
-						},
-						{
-							key: "Mod-Alt-1",
-							run: (view) => foldLevel(view, 1),
-						},
-						{
-							key: "Mod-Alt-2",
-							run: (view) => foldLevel(view, 2),
-						},
-						{
-							key: "Mod-Alt-3",
-							run: (view) => foldLevel(view, 3),
-						},
-						{
-							key: "Mod-Shift-\\\\",
-							run: cursorMatchingBracket,
-						},
-					]),
-					language.of(languageForPath(latestRef.current.path)),
-					quarryTheme,
-					syntaxHighlighting(quarryHighlightStyle),
-					EditorView.contentAttributes.of({
-						"aria-label": "Editor",
-						spellcheck: "false",
-					}),
-					EditorView.updateListener.of((update) => {
-						if (update.docChanged) {
-							let typed = false;
-							update.changes.iterChanges((_from, _to, inserted) => {
-								const text = inserted.toString();
-								if (text === "(" || text === ",") typed = true;
-							});
-							const next = update.state.doc.toString();
-							if (next !== latestRef.current.value) {
-								latestRef.current.onChange(next);
-								if (searchOpenRef.current) {
-									window.setTimeout(() => recomputeRef.current(), 0);
-								}
-							}
-							if (typed) scheduleSig();
-							if (inlayTimerRef.current !== null)
-								window.clearTimeout(inlayTimerRef.current);
-							inlayTimerRef.current = window.setTimeout(() => {
-								inlayTimerRef.current = null;
-								void runInlay();
-							}, 600);
-							occSeqRef.current += 1;
-							if (occTimerRef.current !== null) {
-								window.clearTimeout(occTimerRef.current);
-								occTimerRef.current = null;
-							}
-							clearOccurrences();
-						}
-						if (update.selectionSet) {
-							scheduleSig();
-							scheduleOccurrences();
-							const pos = update.state.selection.main.head;
-							const { line, character } = toLspPosition(update.view, pos);
-							const last = lastCursorRef.current;
-							if (
-								last === null ||
-								last.line !== line ||
-								last.character !== character
-							) {
-								lastCursorRef.current = { line, character };
-								onCursorRef.current?.({ line, character });
-							}
-						}
-					}),
-					EditorView.domEventHandlers({
-						blur: () => {
-							hideSig();
-							occSeqRef.current += 1;
-							if (occTimerRef.current !== null) {
-								window.clearTimeout(occTimerRef.current);
-								occTimerRef.current = null;
-							}
-							clearOccurrences();
-							return false;
-						},
-						mousedown: (event, view) => {
-							if (!(event.metaKey || event.ctrlKey)) return false;
-							const currentRoot = rootRef.current;
-							const currentPath = latestRef.current.path;
-							const callback = navigateRef.current;
-							if (currentRoot === null || currentPath === null || callback === null)
-								return false;
-							const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
-							if (pos === null) return false;
-							const { line, character } = toLspPosition(view, pos);
-							const mySeq = ++navSeq;
-							void (async () => {
-								let locations: Location[] = [];
-								try {
-									locations = await lspDefinition(
-										currentRoot,
-										currentPath,
-										line,
-										character,
-									);
-								} catch {
-									locations = [];
-								}
-								if (mySeq !== navSeq) return;
-								if (locations.length === 0) return;
-								const first = locations[0];
-								callback(
-									first.path,
-									first.range.start.line,
-									first.range.start.character,
-								);
-							})();
-							return false;
-						},
-					}),
-					autocompletion({
-						defaultKeymap: false,
-						override: [
-							async (context) => {
-								const currentRoot = rootRef.current;
-								const currentPath = latestRef.current.path;
-								if (currentRoot === null || currentPath === null) return null;
-								if (!context.explicit && context.matchBefore(/[\w:.]+/) === null) {
-									return null;
-								}
-								const mySeq = ++completionSeq;
-								const completionView = context.view;
-								if (completionView === undefined) return null;
-								const { line, character } = toLspPosition(
-									completionView,
-									context.pos,
-								);
-								let result: Awaited<ReturnType<typeof lspCompletion>>;
-								try {
-									result = await lspCompletion(
-										currentRoot,
-										currentPath,
-										line,
-										character,
-									);
-								} catch {
-									return null;
-								}
-								if (mySeq !== completionSeq) return null;
-								if (result === null) return null;
-								const word = context.matchBefore(/\w*/);
-								const from = word === null ? context.pos : word.from;
-								const options = result.items.map((item) => ({
-									label: item.label,
-									detail: item.detail ?? undefined,
-									type: kindToType(item.kind),
-									apply: item.insertText ?? item.label,
-								}));
-								return { from, options };
-							},
-						],
-					}),
-					hoverTooltip(async (view, pos) => {
-						const currentRoot = rootRef.current;
-						const currentPath = latestRef.current.path;
-						if (currentRoot === null || currentPath === null) return null;
-						const mySeq = ++hoverSeq;
-						const { line, character } = toLspPosition(view, pos);
-						let info: Awaited<ReturnType<typeof lspHover>>;
-						try {
-							info = await lspHover(currentRoot, currentPath, line, character);
-						} catch {
-							return null;
-						}
-						if (mySeq !== hoverSeq) return null;
-						if (info === null) return null;
-						let tooltipPos = pos;
-						let tooltipEnd: number | undefined;
-						if (info.range !== null) {
-							const startLine = view.state.doc.line(info.range.start.line + 1);
-							const endLine = view.state.doc.line(info.range.end.line + 1);
-							tooltipPos = startLine.from + info.range.start.character;
-							tooltipEnd = endLine.from + info.range.end.character;
-						}
-						const text = info.contents;
-						return {
-							pos: tooltipPos,
-							end: tooltipEnd,
-							create: () => ({ dom: renderMarkdown(text) }),
-						};
-					}),
-				],
-			}),
-		});
-
-		viewRef.current = view;
-
-		return () => {
-			viewRef.current = null;
-			languageRef.current = null;
-			markersRef.current = { view: null, lines: [], unverified: new Set() };
-			view.destroy();
-		};
-	}, []);
-
-	useEffect(() => {
-		const view = viewRef.current;
-		const language = languageRef.current;
-		if (view === null || language === null) return;
-		view.dispatch({ effects: language.reconfigure(languageForPath(path)) });
-	}, [path]);
-
-	useEffect(() => {
-		const view = viewRef.current;
-		const indentation = indentRef.current;
-		if (view === null || indentation === null) return;
-		view.dispatch({
-			effects: indentation.reconfigure([
-				indentUnit.of(" ".repeat(tabSize)),
-				EditorState.tabSize.of(tabSize),
-			]),
-		});
-	}, [tabSize]);
-
-	useEffect(() => {
-		const host = hostRef.current;
-		if (host === null) return;
-		host.style.setProperty("--editor-font-size", `${fontSize}px`);
-		if (fontFamily === "") {
-			host.style.removeProperty("--editor-font-family");
-		} else {
-			host.style.setProperty("--editor-font-family", fontFamily);
-		}
-	}, [fontFamily, fontSize]);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: reads refs
-	useEffect(() => {
-		inlayHintsRef.current = [];
-		if (inlayTimerRef.current !== null) {
-			window.clearTimeout(inlayTimerRef.current);
-			inlayTimerRef.current = null;
-		}
-		inlaySeqRef.current += 1;
-		if (path === null) {
-			applyInlay(null);
-			return;
-		}
-		void runInlay();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [path]);
+		actions: {
+			applyInlay,
+			hideSig,
+			runSig,
+			clearOccurrences,
+			scheduleSig,
+			scheduleOccurrences,
+			runInlay,
+			toggleHints: inlay.toggle,
+			renameOpen,
+			codeMenuOpen,
+			setRenameValue,
+			setRenameOpen,
+			setCodeActions,
+			setCodeMenuOpen,
+			inlayTimerRef,
+		},
+	});
+	useEditorMount({ refs, deps, behaviour });
 
 	useDocumentSync({ viewRef, value });
-
-	useBreakpointGutter({ viewRef, breakpointLines, unverifiedLines, markersRef, toggleRef });
-
+	useBreakpointGutter({
+		viewRef,
+		breakpointLines,
+		unverifiedLines,
+		markersRef,
+		toggleRef: refs.toggleRef,
+	});
 	useDiagnosticsPublish({ viewRef, diagnostics, publishedRef });
 
-	useEffect(() => {
-		const view = viewRef.current;
-		if (view === null) return;
-		view.dispatch({ effects: setBlame.of(blame ?? null) });
-	}, [blame]);
-
-	// Reveal-only transaction: moves the caret, scrolls it into view and focuses. Keyed on the
-	// token so a repeated target still re-dispatches, while a same-token value does nothing.
-	useEffect(() => {
-		const view = viewRef.current;
-		if (view === null || reveal === null) return;
-		if (revealTokenRef.current === reveal.token) return;
-		revealTokenRef.current = reveal.token;
-		const doc = view.state.doc;
-		const lineCount = doc.lines;
-		const requestedLine = Math.trunc(reveal.line);
-		const clampedLine = Math.min(Math.max(requestedLine, 0), Math.max(lineCount - 1, 0));
-		const lineObj = doc.line(clampedLine + 1);
-		const requestedChar = Math.trunc(reveal.character);
-		const clampedChar = Math.min(Math.max(requestedChar, 0), lineObj.length);
-		const pos = lineObj.from + clampedChar;
-		view.dispatch({
-			selection: { anchor: pos },
-			effects: EditorView.scrollIntoView(pos),
-		});
-		view.focus();
-	}, [reveal]);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: recompute reads refs
-	useEffect(() => {
-		if (!searchOpen) return;
-		recompute();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [searchOpen, query, caseSensitive, useRegex]);
+	useEditorEffects({
+		refs,
+		path,
+		tabSize,
+		fontSize,
+		fontFamily,
+		blame,
+		reveal,
+		applyInlay,
+		runInlay,
+		inlayTimerRef,
+		inlaySeqRef,
+		inlayHintsRef,
+	});
 
 	return (
 		<div className="editor-host" ref={hostRef} style={{ position: "relative" }}>
-			{searchOpen ? (
-				<div className="cm-search-bar">
-					<input
-						className="search-input"
-						value={query}
-						onChange={(e) => {
-							setQuery(e.target.value);
-							queryRef.current = e.target.value;
-						}}
-						onKeyDown={(e) => {
-							if (e.key === "Enter") {
-								e.preventDefault();
-								if (e.shiftKey) stepRef.current(-1);
-								else stepRef.current(1);
-							}
-							if (e.key === "Escape") {
-								e.preventDefault();
-								closeSearchRef.current();
-							}
-						}}
-					/>
-					<span className="search-count">
-						{matches.length === 0
-							? error !== null
-								? ""
-								: "0 of 0"
-							: `${active + 1} of ${matches.length}`}
-					</span>
-					{error !== null ? <span className="search-error">{error}</span> : null}
-					<button type="button" onClick={() => stepRef.current(-1)} aria-label="previous">
-						Prev
-					</button>
-					<button type="button" onClick={() => stepRef.current(1)} aria-label="next">
-						Next
-					</button>
-					<button
-						type="button"
-						className={caseSensitive ? "active" : ""}
-						onClick={() => {
-							setCaseSensitive((v) => !v);
-							caseRef.current = !caseSensitive;
-						}}
-						aria-label="case sensitive"
-					>
-						Aa
-					</button>
-					<button
-						type="button"
-						className={useRegex ? "active" : ""}
-						onClick={() => {
-							setUseRegex((v) => !v);
-							regexRef.current = !useRegex;
-						}}
-						aria-label="regex"
-					>
-						.*
-					</button>
-					{replaceMode ? (
-						<>
-							<input
-								className="replace-input"
-								value={replacement}
-								onChange={(e) => {
-									setReplacement(e.target.value);
-									replacementRef.current = e.target.value;
-								}}
-							/>
-							<button type="button" onClick={replaceOne}>
-								Replace
-							</button>
-							<button type="button" onClick={replaceAll}>
-								Replace all
-							</button>
-						</>
-					) : null}
-					<button type="button" onClick={closeSearchRef.current} aria-label="close">
-						Close
-					</button>
-				</div>
-			) : null}
+			{searchOpen ? <SearchBar search={search} /> : null}
 			{renameOpen ? (
-				<div className="cm-rename-bar">
-					<input
-						className="rename-input"
-						value={renameValue}
-						onChange={(e) => setRenameValue(e.target.value)}
-						onKeyDown={(e) => {
-							if (e.key === "Enter") {
-								e.preventDefault();
-								submitRename();
-							}
-							if (e.key === "Escape") {
-								e.preventDefault();
-								setRenameOpen(false);
-							}
-						}}
-					/>
-				</div>
+				<RenameBar
+					value={renameValue}
+					onChange={setRenameValue}
+					onSubmit={submitRename}
+					onCancel={() => setRenameOpen(false)}
+				/>
 			) : null}
 			{codeMenuOpen && codeActions.length > 0 ? (
-				<ul className="cm-codeactions">
-					{codeActions.map((action) => (
-						<li key={action.title}>
-							<button type="button" onClick={() => applyCodeAction(action)}>
-								{action.title}
-							</button>
-						</li>
-					))}
-				</ul>
+				<CodeActionMenu actions={codeActions} onPick={applyCodeAction} />
 			) : null}
-			{sigHelp !== null && sigCoords !== null
-				? (() => {
-						const activeSig = sigHelp.activeSignature ?? 0;
-						const sig = sigHelp.signatures[activeSig] ?? sigHelp.signatures[0];
-						const label = sig.label;
-						const activeParam = sigHelp.activeParameter ?? 0;
-						const parts = splitTopLevel(label);
-						const doc = (sig.documentation ?? "").slice(0, 200);
-						return (
-							<div
-								className="cm-sig-help"
-								style={{ top: sigCoords.top + 4, left: sigCoords.left }}
-							>
-								<div className="cm-sig-label">
-									{parts.length > 1 &&
-									activeParam >= 0 &&
-									activeParam < parts.length
-										? parts.map((part, i) => (
-												<span key={part}>
-													{i > 0 ? ", " : ""}
-													{i === activeParam ? (
-														<span className="cm-sig-active">
-															{part}
-														</span>
-													) : (
-														part
-													)}
-												</span>
-											))
-										: label}
-								</div>
-								{doc ? <div className="cm-sig-doc">{doc}</div> : null}
-							</div>
-						);
-					})()
-				: null}
+			{sigHelp !== null && sigCoords !== null ? (
+				<SignatureHelpView help={sigHelp} coords={sigCoords} />
+			) : null}
 		</div>
 	);
 });

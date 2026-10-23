@@ -1,4 +1,1 @@
 # Files that predate the 200-line rule. Shrink one per change; never add a line here.
-src/ui/App.tsx
-src/ui/editor/Editor.tsx
-src/lib/debug/session.ts
