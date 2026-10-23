@@ -55,15 +55,17 @@ read off `src-tauri/src/lib.rs` and `src/`:
   pinned variable is absent and `unavailable` when its read fails; pins survive a restart and clear when the
   session ends.
 - **Launch presets**: the debug panel's `Edit presets` editor adds, duplicates, removes and reorders
-  presets, edits name, program, args, cwd and stop-on-entry, and writes them through
-  `write_launch_config`, which rejects empty and duplicate names. Args are typed as one string and
-  parsed with the run form's own `splitArgs` (`src/debug/presets.ts` over `src/run/splitArgs.ts`),
-  rendered back for display by `joinArgs`, so `a "b c" d` keeps `b c` as one argument; the one gap
-  is a literal `"` inside an argument, which cannot round trip. The panel validates the whole file
-  before the write. The selection is held by preset name, so it survives a save, and renaming the
-  selected preset falls back to the first entry. `.quarry/launch.json` stays the source of truth on
-  disk; `build` and `initCommands` have no editor here, but a save carries both through from the
-  loaded preset unchanged, so editing another field cannot clear the Rust formatter import.
+  presets, and edits every field a preset holds: name, program, args, cwd, stop-on-entry, `build` and
+  `initCommands`. `build` is a single-line field (placeholder `cargo build`) holding the preset's build
+  command. `initCommands` is a textarea holding one command per non-empty line, with an inline
+  hint spelling out the `command script import <sysroot>/lib/rustlib/etc/lldb_lookup.py` line that
+  makes Rust `Vec` and `String` pretty-print. Saves go through `write_launch_config`, which rejects
+  empty and duplicate names. Args are typed as one string and parsed with the run form's own
+  `splitArgs` (`src/debug/presets.ts` over `src/run/splitArgs.ts`), rendered back for display by
+  `joinArgs`, so `a "b c" d` keeps `b c` as one argument; the one gap is a literal `"` inside an
+  argument, which cannot round trip. The panel validates the whole file before the write. The
+  selection is held by preset name, so it survives a save, and renaming the selected preset falls
+  back to the first entry. `.quarry/launch.json` stays the source of truth on disk.
 - **Search**: `rg`-backed palette with results grouped by file, keyboard navigation, and a visible cap
   when the result set is truncated. Case-sensitive, regex and whole-word toggles are in
   `src/search/SearchPalette.tsx`.
