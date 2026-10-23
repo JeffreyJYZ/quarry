@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Breadcrumb from "@/breadcrumb/Breadcrumb";
 import CallsPanel from "@/calls/CallsPanel";
 import FileTree from "@/components/FileTree";
@@ -7,9 +7,10 @@ import RefsPanel from "@/components/RefsPanel";
 import StatusBar from "@/components/StatusBar";
 import TabStrip from "@/components/TabStrip";
 import Welcome from "@/components/Welcome";
-import DebugPanel from "@/debug/DebugPanel";
 import { type BreakpointRow, useDebugSession } from "@/debug/session";
-import Editor, { type EditorHandle } from "@/editor/Editor";
+
+import type { EditorHandle } from "@/editor/Editor";
+import LazyEditor from "@/editor/LazyEditor";
 import DiffView from "@/git/DiffView";
 import SourceControl from "@/git/SourceControl";
 import {
@@ -22,7 +23,8 @@ import {
 import { useDiagnosticsFeed } from "@/lsp/feed";
 import { useDocumentSync, useLspServer } from "@/lsp/session";
 import Outline from "@/outline/Outline";
-import CommandPalette, { type Command } from "@/palette/CommandPalette";
+import type { Command } from "@/palette/CommandPalette";
+
 import { fileName, plural, problemFiles } from "@/problems/model";
 import {
 	buildProject,
@@ -52,17 +54,23 @@ import { type FileBuffer, isDirty } from "@/project/buffer";
 import { describeError } from "@/project/errors";
 import { type SaveOutcome, saveBuffer, saveErrorMessage, saveMessage } from "@/project/save";
 import RecentProjects from "@/projects/RecentProjects";
-import QuickOpen from "@/quickopen/QuickOpen";
+
 import { applyFileEdits } from "@/refactor/apply";
 import RunForm from "@/run/RunForm";
 import RunLog from "@/run/RunLog";
 import { splitArgs } from "@/run/splitArgs";
-import SearchPalette from "@/search/SearchPalette";
+
 import ShortcutSheet from "@/shortcuts/ShortcutSheet";
-import Terminal from "@/terminal/Terminal";
+
 import TestsDock, { type DockTab } from "@/tests/TestsDock";
 import { useTests } from "@/tests/useTests";
 import "./styles.css";
+
+const DebugPanel = lazy(() => import("@/debug/DebugPanel"));
+const CommandPalette = lazy(() => import("@/palette/CommandPalette"));
+const QuickOpen = lazy(() => import("@/quickopen/QuickOpen"));
+const SearchPalette = lazy(() => import("@/search/SearchPalette"));
+const Terminal = lazy(() => import("@/terminal/Terminal"));
 
 const NO_BREAKPOINTS: BreakpointRow[] = [];
 
@@ -1510,7 +1518,7 @@ export default function App() {
 								onNavigate={handleNavigate}
 							/>
 							<div className="editor-pane">
-								<Editor
+								<LazyEditor
 									ref={editorRef}
 									path={active.path}
 									value={active.text}
@@ -1538,7 +1546,9 @@ export default function App() {
 						<Welcome project={project} />
 					)}
 					{project && terminalOpen ? (
-						<Terminal root={project.root} activePath={activePath} />
+						<Suspense fallback={null}>
+							<Terminal root={project.root} activePath={activePath} />
+						</Suspense>
 					) : project &&
 						callsOpen &&
 						root !== null &&
@@ -1617,15 +1627,23 @@ export default function App() {
 						/>
 					) : null}
 					{searchOpen && root !== null ? (
-						<SearchPalette root={root} onOpen={handleOpenMatch} onClose={closeSearch} />
+						<Suspense fallback={null}>
+							<SearchPalette
+								root={root}
+								onOpen={handleOpenMatch}
+								onClose={closeSearch}
+							/>
+						</Suspense>
 					) : null}
 					{quickOpenOpen && root !== null ? (
-						<QuickOpen
-							root={root}
-							openPaths={new Set(buffers.map((buffer) => buffer.path))}
-							onOpen={handleOpenQuick}
-							onClose={() => setQuickOpenOpen(false)}
-						/>
+						<Suspense fallback={null}>
+							<QuickOpen
+								root={root}
+								openPaths={new Set(buffers.map((buffer) => buffer.path))}
+								onOpen={handleOpenQuick}
+								onClose={() => setQuickOpenOpen(false)}
+							/>
+						</Suspense>
 					) : null}
 					{shortcutsOpen ? (
 						<ShortcutSheet
@@ -1633,22 +1651,26 @@ export default function App() {
 							onClose={() => setShortcutsOpen(false)}
 						/>
 					) : null}
-					<CommandPalette
-						open={commandPaletteOpen}
-						commands={commands}
-						recent={recentCommands}
-						onRecent={setRecentCommands}
-						onClose={() => setCommandPaletteOpen(false)}
-					/>
+					<Suspense fallback={null}>
+						<CommandPalette
+							open={commandPaletteOpen}
+							commands={commands}
+							recent={recentCommands}
+							onRecent={setRecentCommands}
+							onClose={() => setCommandPaletteOpen(false)}
+						/>
+					</Suspense>
 				</main>
 
 				{debugOpen && root !== null ? (
-					<DebugPanel
-						debug={debug}
-						activePath={activePath}
-						cursor={cursor}
-						onNavigate={handleNavigate}
-					/>
+					<Suspense fallback={null}>
+						<DebugPanel
+							debug={debug}
+							activePath={activePath}
+							cursor={cursor}
+							onNavigate={handleNavigate}
+						/>
+					</Suspense>
 				) : null}
 			</div>
 

@@ -8,6 +8,11 @@ const sourceDir = new URL("./src", import.meta.url).pathname;
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
+	build: {
+		// The editor chunk is CodeMirror's language packages and is loaded lazily; the default 500 kB
+		// warning would only restate that one dependency's size.
+		chunkSizeWarningLimit: 700,
+	},
 	plugins: [react()],
 
 	resolve: {
