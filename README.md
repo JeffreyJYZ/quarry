@@ -23,9 +23,13 @@ read off `src-tauri/src/lib.rs` and `src/`:
   code actions (`lsp_code_actions`) are wired through the editor, signature help renders as a tooltip,
   and inlay hints are rendered in the editor (backend `lsp_inlay_hints` plus `src/editor/inlayHints.ts`).
   Occurrences of the symbol under the caret are highlighted via `lsp_document_highlights` and
-  `src/editor/occurrences.ts`. Shortcuts: `Cmd+S` save, `Cmd+Alt+S` save all, `Cmd+Alt+L` format,
-  `Cmd+F` in-file search, `Cmd+Alt+F` project search, `F12` / `Shift+F12` / `Cmd+Click` for definition
-  and references, `Cmd+K` for the shortcut sheet.
+  `src/editor/occurrences.ts`. Occurrence selection: `Cmd+D` selects the word under the caret on first
+  press, then adds the next unselected occurrence each press, wrapping and stopping once all are
+  selected; `Cmd+Shift+L` selects every occurrence; `Cmd+U` drops only the last added occurrence. All
+  selected ranges are real editor ranges, so a single edit replaces them all in one undo step.
+  Shortcuts: `Cmd+S` save, `Cmd+Alt+S` save all, `Cmd+Alt+L` format, `Cmd+F` in-file search,
+  `Cmd+Alt+F` project search, `F12` / `Shift+F12` / `Cmd+Click` for definition and references,
+  `Cmd+K` for the shortcut sheet.
 - **Insight**: one language server per project root — `rust-analyzer` for Cargo, `clangd` for CMake or
   `compile_commands.json` — with full-document sync. Diagnostics stream into the editor and the Problems
   dock, grouped by file with severity, line and message. The dock's severity counts in the header are
