@@ -1,5 +1,6 @@
 import { autocompletion, closeBrackets } from "@codemirror/autocomplete";
 import {
+	cursorMatchingBracket,
 	defaultKeymap,
 	deleteLine,
 	history,
@@ -12,10 +13,16 @@ import {
 import {
 	bracketMatching,
 	codeFolding,
+	foldAll,
+	foldable,
+	foldCode,
+	foldEffect,
 	foldGutter,
 	indentOnInput,
 	indentUnit,
 	syntaxHighlighting,
+	unfoldAll,
+	unfoldCode,
 } from "@codemirror/language";
 import { lintGutter, setDiagnostics } from "@codemirror/lint";
 import { Compartment, EditorSelection, EditorState } from "@codemirror/state";
@@ -94,6 +101,25 @@ export type EditorProps = {
 };
 
 const NO_LINES: number[] = [];
+
+function foldLevel(view: EditorView, level: number): boolean {
+	const state = view.state;
+	const effects: unknown[] = [];
+	let found = false;
+	for (let lineNo = 1; lineNo <= state.doc.lines; lineNo += 1) {
+		const line = state.doc.line(lineNo);
+		const info = foldable(state, line.from, line.to);
+		if (info === null) continue;
+		const indent = line.text.match(/^\\s*/)?.[0].length ?? 0;
+		const depth = Math.floor(indent / 4);
+		if (depth + 1 > level) continue;
+		effects.push(foldEffect.of({ from: info.from, to: info.to }));
+		found = true;
+	}
+	if (!found) return false;
+	view.dispatch({ effects: effects as never });
+	return true;
+}
 
 function sameLines(left: readonly number[], right: readonly number[]): boolean {
 	if (left.length !== right.length) return false;
@@ -980,6 +1006,38 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 						{
 							key: "Mod-Shift-k",
 							run: deleteLine,
+						},
+						{
+							key: "Mod-Shift-[",
+							run: foldCode,
+						},
+						{
+							key: "Mod-Shift-]",
+							run: unfoldCode,
+						},
+						{
+							key: "Mod-Alt-[",
+							run: foldAll,
+						},
+						{
+							key: "Mod-Alt-]",
+							run: unfoldAll,
+						},
+						{
+							key: "Mod-Alt-1",
+							run: (view) => foldLevel(view, 1),
+						},
+						{
+							key: "Mod-Alt-2",
+							run: (view) => foldLevel(view, 2),
+						},
+						{
+							key: "Mod-Alt-3",
+							run: (view) => foldLevel(view, 3),
+						},
+						{
+							key: "Mod-Shift-\\\\",
+							run: cursorMatchingBracket,
 						},
 					]),
 					language.of(languageForPath(latestRef.current.path)),

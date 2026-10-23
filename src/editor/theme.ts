@@ -89,6 +89,9 @@ const foldStyles = {
 			padding: "0",
 			textAlign: "center",
 		},
+		"& .cm-gutterElement:empty": {
+			display: "none",
+		},
 	},
 	".cm-foldMarker": {
 		color: "var(--muted)",
