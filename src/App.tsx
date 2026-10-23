@@ -111,6 +111,8 @@ const SHORTCUT_GROUPS = [
 		entries: [
 			{ keys: ["Cmd", "K"], action: "Toggle shortcut sheet" },
 			{ keys: ["Cmd", "Shift", "P"], action: "Open command palette" },
+			{ keys: ["Cmd", ","], action: "Open settings" },
+			{ keys: ["Cmd", ";"], action: "Open settings (same page)" },
 			{ keys: ["?"], action: "Open shortcut sheet (outside editor)" },
 		],
 	},
@@ -123,6 +125,7 @@ const SHORTCUT_GROUPS = [
 			{ keys: ["Cmd", "Alt", "F"], action: "Find in project" },
 			{ keys: ["Cmd", "G"], action: "Next match" },
 			{ keys: ["Cmd", "Alt", "L"], action: "Format active file" },
+			{ keys: ["Alt", "Enter"], action: "Code actions at the caret" },
 		],
 	},
 	{
@@ -136,12 +139,32 @@ const SHORTCUT_GROUPS = [
 		],
 	},
 	{
+		title: "Build and run",
+		entries: [
+			{ keys: ["Ctrl", "R"], action: "Run" },
+			{ keys: ["Ctrl", "D"], action: "Debug" },
+			{ keys: ["Cmd", "R"], action: "Rerun" },
+		],
+	},
+	{
 		title: "Debug",
-		entries: [{ keys: ["Cmd", "F10"], action: "Run to cursor" }],
+		entries: [
+			{ keys: ["Cmd", "F10"], action: "Run to cursor" },
+			{ keys: ["Cmd", "F8"], action: "Toggle breakpoint on the caret line" },
+			{ keys: ["F7"], action: "Step into" },
+			{ keys: ["F8"], action: "Step over" },
+			{ keys: ["Shift", "F8"], action: "Step out" },
+			{ keys: ["F9"], action: "Resume" },
+		],
 	},
 	{
 		title: "Panels",
-		entries: [{ keys: ["Esc"], action: "Close in-file search / sheet" }],
+		entries: [
+			{ keys: ["Esc"], action: "Close in-file search / sheet" },
+			{ keys: ["Cmd", "1"], action: "Toggle project rail" },
+			{ keys: ["Cmd", "5"], action: "Toggle debug panel" },
+			{ keys: ["Alt", "F12"], action: "Toggle terminal" },
+		],
 	},
 	{
 		title: "View",
@@ -1586,6 +1609,83 @@ export default function App() {
 			run: () => setBlameOn((current) => !current),
 		},
 	];
+
+	/**
+	 * CLion's macOS map, for the actions quarry already has.
+	 *
+	 * IntelliJ keeps Cmd for navigation and hands the run actions to Control (⌃R run, ⌃D debug),
+	 * so that is what these are. Step keys only act while a session is live, which keeps F7/F8 free
+	 * for anything else when nothing is being debugged.
+	 */
+	useEffect(() => {
+		const onKeyDown = (event: KeyboardEvent) => {
+			const mod = event.metaKey || event.ctrlKey;
+			const ctrlOnly = event.ctrlKey && !event.metaKey && !event.altKey;
+			const key = event.key.toLowerCase();
+			const live = debug.status === "running" || debug.status === "stopped";
+
+			if (ctrlOnly && key === "r") {
+				event.preventDefault();
+				void handleRun();
+				return;
+			}
+			if (ctrlOnly && key === "d") {
+				event.preventDefault();
+				setDebugOpen(true);
+				debug.launch();
+				return;
+			}
+			if (mod && !event.altKey && key === "r") {
+				event.preventDefault();
+				void (async () => {
+					if (runId !== null) await handleStop();
+					await handleRun();
+				})();
+				return;
+			}
+			if (live && event.key === "F7") {
+				event.preventDefault();
+				debug.step("stepIn");
+				return;
+			}
+			if (live && event.key === "F8") {
+				event.preventDefault();
+				debug.step(event.shiftKey ? "stepOut" : "next");
+				return;
+			}
+			if (live && event.key === "F9") {
+				event.preventDefault();
+				debug.continueRun();
+				return;
+			}
+			if (mod && !event.altKey && key === "f8" && activePath !== null && cursor !== null) {
+				event.preventDefault();
+				toggleBreakpoint(activePath, cursor.line + 1);
+				return;
+			}
+			if (mod && !event.altKey && key === "1") {
+				event.preventDefault();
+				setRailCollapsed((current) => !current);
+				return;
+			}
+			if (mod && !event.altKey && key === "5") {
+				event.preventDefault();
+				if (root !== null) setDebugOpen((current) => !current);
+				return;
+			}
+			if (event.altKey && event.key === "F12") {
+				event.preventDefault();
+				setTerminalOpen((current) => !current);
+				return;
+			}
+			if (mod && !event.altKey && event.key === ";") {
+				event.preventDefault();
+				setSettingsOpen(true);
+			}
+		};
+		window.addEventListener("keydown", onKeyDown);
+		return () => window.removeEventListener("keydown", onKeyDown);
+	}, [activePath, cursor, debug, handleRun, handleStop, root, runId, toggleBreakpoint]);
 
 	return (
 		<div className="shell">
