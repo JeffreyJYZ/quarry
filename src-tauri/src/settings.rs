@@ -51,6 +51,53 @@ where
     }
 }
 
+/// Drop configurations a selector could not tell apart: an unnamed entry and every repeat of a name
+/// keep the first one, so a hand-edited file still loads instead of failing the whole settings read.
+fn deserialize_run_configurations<'de, D>(
+    deserializer: D,
+) -> Result<Vec<RunConfiguration>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let values: Vec<RunConfiguration> = Vec::deserialize(deserializer).unwrap_or_default();
+    let mut out: Vec<RunConfiguration> = Vec::new();
+    for mut config in values {
+        config.name = config.name.trim().to_string();
+        if config.name.is_empty() {
+            continue;
+        }
+        if out.iter().any(|other| other.name == config.name) {
+            continue;
+        }
+        out.push(config);
+    }
+    Ok(out)
+}
+
+/// One saved run panel, stored as a snapshot of the form rather than as an override.
+///
+/// `args` stays the raw args field so the frontend splits it with the same quote-aware `splitArgs`
+/// it uses for an unsaved run; `env` keeps the form's row order as `[name, value]` pairs.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RunConfiguration {
+    /// Unique name the selector shows; empty names are dropped on read.
+    #[serde(default)]
+    pub name: String,
+    /// Program path exactly as the form showed it.
+    #[serde(default)]
+    pub program: String,
+    /// The args field verbatim, still split by the frontend at run time.
+    #[serde(default)]
+    pub args: String,
+    /// Working directory exactly as the form showed it.
+    #[serde(default)]
+    pub cwd: String,
+    /// Environment rows in form order, as `[name, value]` pairs.
+    #[serde(default)]
+    pub env: Vec<(String, String)>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
@@ -82,6 +129,12 @@ pub struct Settings {
     /// Recently opened project roots, most-recent-first, deduplicated, capped at 10.
     #[serde(default, deserialize_with = "deserialize_recent_roots")]
     pub recent_roots: Vec<String>,
+    /// Saved run configurations for the run panel, in save order.
+    #[serde(default, deserialize_with = "deserialize_run_configurations")]
+    pub run_configurations: Vec<RunConfiguration>,
+    /// Fields written by another build, kept verbatim so a save from this build never drops them.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 impl Default for Settings {
@@ -96,6 +149,8 @@ impl Default for Settings {
             dock_tab: dock_tab_default(),
             dock_expanded: None,
             recent_roots: Vec::new(),
+            run_configurations: Vec::new(),
+            extra: serde_json::Map::new(),
         }
     }
 }
@@ -157,7 +212,7 @@ pub fn remember_root(app: AppHandle, root: String) -> Result<Vec<String>, String
 
 #[cfg(test)]
 mod tests {
-    use super::Settings;
+    use super::{RunConfiguration, Settings};
 
     #[test]
     fn missing_fields_default_to_empty() {
@@ -170,6 +225,8 @@ mod tests {
         assert!(!parsed.git_open);
         assert_eq!(parsed.dock_tab, "problems");
         assert!(parsed.dock_expanded.is_none());
+        assert!(parsed.run_configurations.is_empty());
+        assert!(parsed.extra.is_empty());
     }
 
     #[test]
@@ -190,6 +247,7 @@ mod tests {
             dock_tab: "run".to_string(),
             dock_expanded: Some(true),
             recent_roots: vec!["/tmp".to_string()],
+            ..Default::default()
         };
         let text = serde_json::to_string_pretty(&settings).expect("serializes");
         let back: Settings = serde_json::from_str(&text).expect("parses");
@@ -202,6 +260,104 @@ mod tests {
         assert_eq!(back.dock_tab, settings.dock_tab);
         assert_eq!(back.dock_expanded, settings.dock_expanded);
         assert_eq!(back.recent_roots, settings.recent_roots);
+    }
+
+    #[test]
+    fn run_configuration_round_trips() {
+        let configuration = RunConfiguration {
+            name: "debug server".to_string(),
+            program: "/tmp/project/target/debug/app".to_string(),
+            args: "--port 8080 --name \"two words\"".to_string(),
+            cwd: "/tmp/project".to_string(),
+            env: vec![
+                ("RUST_LOG".to_string(), "debug".to_string()),
+                ("EMPTY".to_string(), String::new()),
+            ],
+        };
+        let settings = Settings {
+            run_configurations: vec![configuration.clone()],
+            ..Default::default()
+        };
+
+        let text = serde_json::to_string_pretty(&settings).expect("serializes");
+        let back: Settings = serde_json::from_str(&text).expect("parses");
+
+        assert_eq!(back.run_configurations, vec![configuration]);
+        let compact = serde_json::to_string(&settings).expect("serializes");
+        assert!(
+            compact.contains(r#""env":[["RUST_LOG","debug"],["EMPTY",""]]"#),
+            "env is not written as name/value pairs: {compact}"
+        );
+    }
+
+    #[test]
+    fn a_legacy_file_without_run_configurations_still_loads() {
+        let parsed: Settings = serde_json::from_str(
+            r#"{"lastRoot":"/tmp/p","openFiles":["/tmp/p/src/main.rs"],"activeFile":null,"railCollapsed":true,"dockTab":"run"}"#,
+        )
+        .expect("a settings file written before run configurations parses");
+
+        assert_eq!(parsed.last_root.as_deref(), Some("/tmp/p"));
+        assert_eq!(parsed.dock_tab, "run");
+        assert!(parsed.run_configurations.is_empty());
+    }
+
+    #[test]
+    fn empty_run_configuration_names_are_dropped_on_read() {
+        let parsed: Settings = serde_json::from_str(
+            r#"{"runConfigurations":[{"name":"  ","program":"a"},{"name":" run ","program":"b"}]}"#,
+        )
+        .expect("parses");
+
+        assert_eq!(parsed.run_configurations.len(), 1);
+        assert_eq!(parsed.run_configurations[0].name, "run");
+        assert_eq!(parsed.run_configurations[0].program, "b");
+    }
+
+    #[test]
+    fn duplicate_run_configuration_names_keep_the_first_on_read() {
+        let parsed: Settings = serde_json::from_str(
+            r#"{"runConfigurations":[{"name":"run","program":"a"},{"name":" run","program":"b"}]}"#,
+        )
+        .expect("parses");
+
+        assert_eq!(parsed.run_configurations.len(), 1);
+        assert_eq!(parsed.run_configurations[0].program, "a");
+    }
+
+    #[test]
+    fn a_configuration_without_optional_fields_parses() {
+        let parsed: Settings =
+            serde_json::from_str(r#"{"runConfigurations":[{"name":"bare"}]}"#).expect("parses");
+
+        let config = &parsed.run_configurations[0];
+        assert_eq!(config.name, "bare");
+        assert!(config.program.is_empty());
+        assert!(config.args.is_empty());
+        assert!(config.cwd.is_empty());
+        assert!(config.env.is_empty());
+    }
+
+    #[test]
+    fn fields_from_a_newer_build_survive_a_rewrite() {
+        let parsed: Settings =
+            serde_json::from_str(r#"{"lastRoot":null,"futureFlag":true,"futureList":[1,2]}"#)
+                .expect("parses");
+
+        let text = serde_json::to_string_pretty(&parsed).expect("serializes");
+        let back: Settings = serde_json::from_str(&text).expect("parses");
+
+        assert_eq!(
+            back.extra.get("futureFlag"),
+            Some(&serde_json::Value::Bool(true))
+        );
+        assert_eq!(
+            back.extra
+                .get("futureList")
+                .and_then(|v| v.as_array())
+                .map(Vec::len),
+            Some(2)
+        );
     }
 
     #[test]
@@ -268,6 +424,7 @@ mod tests {
             dock_tab: "run".to_string(),
             dock_expanded: Some(true),
             recent_roots: vec![],
+            ..Default::default()
         };
         let before_last = settings.last_root.clone();
         let before_open = settings.open_files.clone();
