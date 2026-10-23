@@ -29,3 +29,6 @@ src-tauri/target
 # macOS
 .AppleDouble
 .LSOverride
+
+# Local reference material (screenshots of other IDEs), never shipped
+docs/reference/

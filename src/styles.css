@@ -180,32 +180,29 @@ body {
 
 .body {
 	position: relative;
-	display: grid;
-	grid-template-columns: 240px minmax(0, 1fr);
+	display: flex;
+	flex-direction: row;
 	flex: 1 1 auto;
 	min-width: 0;
 	min-height: 0;
 }
 
-.body.debug-open {
-	grid-template-columns: 240px minmax(0, 1fr) 320px;
-}
-
-.body.rail-collapsed {
-	grid-template-columns: 0 minmax(0, 1fr);
-}
-
-.body.rail-collapsed.debug-open {
-	grid-template-columns: 0 minmax(0, 1fr) 320px;
-}
-
 .rail {
+	flex: 0 0 var(--rail-width, 240px);
+	width: var(--rail-width, 240px);
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
 	min-height: 0;
 	border-right: 1px solid var(--line);
 	background: var(--rail);
+}
+
+.body.rail-collapsed .rail {
+	flex-basis: 0;
+	width: 0;
+	border-right: 0;
+	overflow: hidden;
 }
 
 .rail-head {
@@ -798,11 +795,46 @@ button.tree-note {
 }
 
 .status-right {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
 	justify-self: end;
 	max-width: 100%;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.status-settings {
+	display: grid;
+	place-items: center;
+	width: 20px;
+	height: 18px;
+	padding: 0;
+	border: 0;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--muted);
+	font-size: 11px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.status-settings:hover {
+	background: var(--hover);
+	color: var(--text);
+}
+
+.status-settings:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: 1px;
+}
+
+.statusbar .status-save.error {
+	color: var(--danger);
+	max-width: 240px;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .statusbar .sep {
@@ -1451,11 +1483,12 @@ button.tree-note {
 	color: var(--muted);
 }
 
-/* debugger column: fixed 320px on the right, hairline seam, one scroll per section */
+/* debugger column: resizable width from settings, hairline seam, one scroll per section */
 .debug {
 	display: flex;
 	flex-direction: column;
-	width: 320px;
+	flex: 0 0 var(--debug-width, 320px);
+	width: var(--debug-width, 320px);
 	min-width: 0;
 	min-height: 0;
 	overflow-x: hidden;
@@ -1875,15 +1908,12 @@ button.tree-note {
 
 /* below this width the panel would push the editor under 480px, so it floats instead */
 @media (max-width: 1040px) {
-	.body.debug-open {
-		grid-template-columns: 240px minmax(0, 1fr);
-	}
-
 	.debug {
 		position: absolute;
 		top: 0;
 		right: 0;
 		bottom: 0;
+		width: min(var(--debug-width, 320px), 60vw);
 		z-index: 30;
 		box-shadow: -10px 0 24px rgba(0, 0, 0, 0.45);
 	}
@@ -2094,6 +2124,12 @@ button.tree-note {
 	max-height: 45%;
 	border-top: 1px solid var(--line);
 	background: var(--panel);
+}
+
+/* Expanded, the dock takes the height the splitter sets; collapsed, only its header shows. */
+.dock:not(.collapsed) {
+	height: var(--dock-height, 260px);
+	max-height: none;
 }
 
 .dock.collapsed {
@@ -2803,10 +2839,6 @@ button.tree-note {
 	color: var(--text);
 }
 
-.body.rail-collapsed .rail {
-	display: none;
-}
-
 .cm-rename-bar {
 	position: absolute;
 	top: 4px;
@@ -3101,7 +3133,7 @@ button.tree-note {
 	display: flex;
 	flex-direction: column;
 	flex: 0 0 auto;
-	height: 180px;
+	height: var(--terminal-height, 180px);
 	min-height: 0;
 	border-top: 1px solid var(--line);
 	background: var(--panel);

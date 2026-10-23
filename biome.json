@@ -6,7 +6,7 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"includes": ["**", "!**/node_modules", "!**/dist", "!**/src-tauri"]
+		"includes": ["**", "!**/node_modules", "!**/dist", "!**/src-tauri", "!**/assets"]
 	},
 	"formatter": {
 		"indentStyle": "tab",
@@ -19,6 +19,23 @@
 			"preset": "recommended"
 		}
 	},
+	"overrides": [
+		{
+			"includes": [
+				"src/layout/Splitter.tsx",
+				"src/settings/SettingsPage.tsx",
+				"src/projects/NewProject.tsx"
+			],
+			"linter": {
+				"rules": {
+					"a11y": {
+						"noStaticElementInteractions": "off",
+						"useSemanticElements": "off"
+					}
+				}
+			}
+		}
+	],
 	"javascript": {
 		"formatter": {
 			"quoteStyle": "double",

@@ -1,4 +1,12 @@
-import { autocompletion, closeBrackets } from "@codemirror/autocomplete";
+import {
+	acceptCompletion,
+	autocompletion,
+	closeBrackets,
+	closeCompletion,
+	completionStatus,
+	moveCompletionSelection,
+	startCompletion,
+} from "@codemirror/autocomplete";
 import {
 	cursorMatchingBracket,
 	defaultKeymap,
@@ -8,6 +16,7 @@ import {
 	indentLess,
 	indentSelection,
 	indentWithTab,
+	insertNewlineAndIndent,
 	toggleLineComment,
 } from "@codemirror/commands";
 import {
@@ -98,9 +107,42 @@ export type EditorProps = {
 	blame?: { line: number; label: string }[] | null;
 	/** Apply a batch of file edits produced by rename or code actions. */
 	onApplyEdits?: (edits: FileEdit[]) => void;
+	/** Indent width in spaces; 4 when absent. */
+	tabSize?: number;
+	/** Editor font size in px; 13 when absent. */
+	fontSize?: number;
 };
 
 const NO_LINES: number[] = [];
+
+/** Pairs that an Enter between them splits onto their own indented lines. */
+const BRACKET_PAIRS: Record<string, string> = { "{": "}", "(": ")", "[": "]" };
+
+/**
+ * Enter between a freshly typed pair expands it into three lines with the caret indented.
+ *
+ * `closeBrackets` leaves `{|}`, and `insertNewlineAndIndent` alone would only break the line, so the
+ * closing half would sit on the caret's line. Returns false for every other position, letting the
+ * ordinary newline command run.
+ */
+export function expandBracketPair(view: EditorView): boolean {
+	const { state } = view;
+	const selection = state.selection.main;
+	if (!selection.empty) return false;
+	const before = state.sliceDoc(selection.from - 1, selection.from);
+	const after = state.sliceDoc(selection.to, selection.to + 1);
+	if (BRACKET_PAIRS[before] !== after) return false;
+	const line = state.doc.lineAt(selection.from);
+	const baseIndent = /^\s*/.exec(line.text)?.[0] ?? "";
+	const unit = state.facet(indentUnit);
+	const inner = baseIndent + unit;
+	view.dispatch({
+		changes: { from: selection.from, to: selection.to, insert: `\n${inner}\n${baseIndent}` },
+		selection: { anchor: selection.from + 1 + inner.length },
+		userEvent: "input",
+	});
+	return true;
+}
 
 function foldLevel(view: EditorView, level: number): boolean {
 	const state = view.state;
@@ -209,7 +251,11 @@ function toLspPosition(view: EditorView, pos: number): { line: number; character
  * document only when it actually differs, so local edits keep their selection and scroll position.
  * Breakpoints arrive as props and reach the gutter through a state field, never a rebuilt view.
  */
-export type EditorHandle = { format: () => Promise<void> };
+export type EditorHandle = {
+	format: () => Promise<void>;
+	/** The formatted text without touching the document; null when no formatter is available. */
+	formatText: () => Promise<string | null>;
+};
 
 const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 	{
@@ -228,6 +274,8 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		onCursor,
 		onApplyEdits,
 		blame = null,
+		tabSize = 4,
+		fontSize = 13,
 	}: EditorProps,
 	ref,
 ): JSX.Element {
@@ -267,6 +315,10 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 	const stepRef = useRef<(delta: number) => void>(() => undefined);
 	const recomputeRef = useRef<() => void>(() => undefined);
 	const languageRef = useRef<Compartment | null>(null);
+	const indentRef = useRef<Compartment | null>(null);
+	/** Read while building the editor and again when the setting changes; a ref keeps it out of deps. */
+	const tabSizeRef = useRef(tabSize);
+	tabSizeRef.current = tabSize;
 	const publishedRef = useRef<{ view: EditorView | null; signature: string }>({
 		view: null,
 		signature: "",
@@ -607,48 +659,56 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 	stepRef.current = stepMatch;
 	recomputeRef.current = recompute;
 
+	const runFormatText = async (): Promise<string | null> => {
+		const view = viewRef.current;
+		const currentRoot = rootRef.current;
+		const currentPath = latestRef.current.path;
+		if (view === null || currentRoot === null || currentPath === null) return null;
+		const notify = onNoticeRef.current;
+		let formatter = "";
+		try {
+			formatter = await formatterFor(currentPath);
+		} catch (error) {
+			notify?.(describeError(error));
+			return null;
+		}
+		if (formatter === "") {
+			const ext = currentPath.includes(".")
+				? currentPath.slice(currentPath.lastIndexOf(".") + 1)
+				: "";
+			notify?.(`No formatter for ${ext}`);
+			return null;
+		}
+		try {
+			return await formatDocument(currentRoot, currentPath, view.state.doc.toString());
+		} catch (error) {
+			notify?.(describeError(error));
+			return null;
+		}
+	};
+
 	useImperativeHandle(ref, () => ({
+		formatText: runFormatText,
 		format: async () => {
 			const view = viewRef.current;
-			const currentRoot = rootRef.current;
-			const currentPath = latestRef.current.path;
-			if (view === null || currentRoot === null || currentPath === null) return;
-			const notify = onNoticeRef.current;
-			let formatter = "";
-			try {
-				formatter = await formatterFor(currentPath);
-			} catch (error) {
-				notify?.(describeError(error));
-				return;
-			}
-			if (formatter === "") {
-				const ext = currentPath.includes(".")
-					? currentPath.slice(currentPath.lastIndexOf(".") + 1)
-					: "";
-				notify?.(`No formatter for ${ext}`);
-				return;
-			}
-			const text = view.state.doc.toString();
+			if (view === null) return;
 			const head = view.state.selection.main.head;
 			const lineObj = view.state.doc.lineAt(head);
 			const originalLine = lineObj.number;
 			const originalCol = head - lineObj.from;
-			try {
-				const formatted = await formatDocument(currentRoot, currentPath, text);
-				latestRef.current.onChange(formatted);
-				window.setTimeout(() => {
-					const v = viewRef.current;
-					if (v === null) return;
-					const doc = v.state.doc;
-					const targetLine = Math.min(originalLine, doc.lines);
-					const newLine = doc.line(targetLine);
-					const col = Math.min(originalCol, newLine.length);
-					const pos = newLine.from + col;
-					v.dispatch({ selection: { anchor: pos } });
-				}, 0);
-			} catch (error) {
-				notify?.(describeError(error));
-			}
+			const formatted = await runFormatText();
+			if (formatted === null) return;
+			latestRef.current.onChange(formatted);
+			window.setTimeout(() => {
+				const v = viewRef.current;
+				if (v === null) return;
+				const doc = v.state.doc;
+				const targetLine = Math.min(originalLine, doc.lines);
+				const newLine = doc.line(targetLine);
+				const col = Math.min(originalCol, newLine.length);
+				const pos = newLine.from + col;
+				v.dispatch({ selection: { anchor: pos } });
+			}, 0);
 		},
 	}));
 
@@ -659,6 +719,8 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 
 		const language = new Compartment();
 		languageRef.current = language;
+		const indentation = new Compartment();
+		indentRef.current = indentation;
 
 		let completionSeq = 0;
 		let hoverSeq = 0;
@@ -686,9 +748,45 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 					indentOnInput(),
 					codeFolding(),
 					foldGutter(),
-					indentUnit.of("    "),
-					EditorState.tabSize.of(4),
+					indentation.of([
+						indentUnit.of(" ".repeat(tabSizeRef.current)),
+						EditorState.tabSize.of(tabSizeRef.current),
+					]),
 					keymap.of([
+						{
+							key: "Enter",
+							run: (currentView) =>
+								expandBracketPair(currentView) ||
+								insertNewlineAndIndent(currentView),
+						},
+						{
+							key: "Tab",
+							run: (currentView) =>
+								completionStatus(currentView.state) === "active" &&
+								acceptCompletion(currentView),
+						},
+						{
+							key: "Escape",
+							run: (currentView) =>
+								completionStatus(currentView.state) === "active" &&
+								closeCompletion(currentView),
+						},
+						{
+							key: "Mod-Space",
+							run: (currentView) => startCompletion(currentView),
+						},
+						{
+							key: "ArrowDown",
+							run: (currentView) =>
+								completionStatus(currentView.state) === "active" &&
+								moveCompletionSelection(true)(currentView),
+						},
+						{
+							key: "ArrowUp",
+							run: (currentView) =>
+								completionStatus(currentView.state) === "active" &&
+								moveCompletionSelection(false)(currentView),
+						},
 						...defaultKeymap,
 						...historyKeymap,
 						indentWithTab,
@@ -1138,11 +1236,15 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 						},
 					}),
 					autocompletion({
+						defaultKeymap: false,
 						override: [
 							async (context) => {
 								const currentRoot = rootRef.current;
 								const currentPath = latestRef.current.path;
 								if (currentRoot === null || currentPath === null) return null;
+								if (!context.explicit && context.matchBefore(/[\w:.]+/) === null) {
+									return null;
+								}
 								const mySeq = ++completionSeq;
 								const completionView = context.view;
 								if (completionView === undefined) return null;
@@ -1232,6 +1334,24 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		if (view === null || language === null) return;
 		view.dispatch({ effects: language.reconfigure(languageForPath(path)) });
 	}, [path]);
+
+	useEffect(() => {
+		const view = viewRef.current;
+		const indentation = indentRef.current;
+		if (view === null || indentation === null) return;
+		view.dispatch({
+			effects: indentation.reconfigure([
+				indentUnit.of(" ".repeat(tabSize)),
+				EditorState.tabSize.of(tabSize),
+			]),
+		});
+	}, [tabSize]);
+
+	useEffect(() => {
+		const host = hostRef.current;
+		if (host === null) return;
+		host.style.setProperty("--editor-font-size", `${fontSize}px`);
+	}, [fontSize]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: reads refs
 	useEffect(() => {

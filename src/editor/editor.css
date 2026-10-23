@@ -4,6 +4,7 @@
 	min-width: 0;
 	overflow: hidden;
 	font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+	font-size: var(--editor-font-size, 13px);
 }
 
 .editor-host .cm-editor {

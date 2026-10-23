@@ -1,30 +1,35 @@
-import { Fragment, type ReactNode } from "react";
 import { plural } from "@/problems/model";
-import type { GitStatus, ProjectInfo, ToolchainReport } from "@/project/api";
+import type { GitStatus, ProjectInfo } from "@/project/api";
 import { kindLabel } from "@/project/kind";
 
 export type StatusBarProps = {
-	version: string;
 	project: ProjectInfo | null;
-	report: ToolchainReport | null;
-	reportFailed: boolean;
 	git?: GitStatus | null;
-	/** Middle slot, after the project line: language server, diagnostic totals, last build. */
-	extra?: ReactNode;
+	errors: number;
+	warnings: number;
+	/** Toolchain count that could not be resolved; hidden when zero. */
+	missingTools: number;
+	/** A failed save's message; success is not news and never lands here. */
+	saveError?: string | null;
+	onOpenSettings: () => void;
 };
 
+/**
+ * The bottom bar.
+ *
+ * It carries four facts and one control: where you are, what git says, what the diagnostics count,
+ * and the settings button. Everything else — the version, the language-server name, the toolchain
+ * list, the last save message — lives somewhere the eye is already going, so it does not sit here.
+ */
 export default function StatusBar({
-	version,
 	project,
-	report,
-	reportFailed,
 	git = null,
-	extra,
+	errors,
+	warnings,
+	missingTools,
+	saveError = null,
+	onOpenSettings,
 }: StatusBarProps) {
-	const missing = report ? report.tools.filter((tool) => tool.source === "missing").length : 0;
-	const middle = project
-		? `${project.name} · ${kindLabel(project.kind)} · ${project.buildRoot}`
-		: "no project";
 	const gitSegment =
 		project !== null && git !== null && git.branch !== null ? (
 			<span
@@ -45,33 +50,44 @@ export default function StatusBar({
 
 	return (
 		<footer className="statusbar">
-			<span className="status-left">quarry {version || "0.1.0"}</span>
-			<span className="status-middle" title={middle}>
-				<span className="status-project">{middle}</span>
+			<span className="status-left" title={project?.root}>
+				{project === null ? "no project" : `${project.name} · ${kindLabel(project.kind)}`}
+			</span>
+			<span className="status-middle">
 				{gitSegment}
-				{extra ? <span className="status-extra">{extra}</span> : null}
+				{errors > 0 || warnings > 0 ? (
+					<>
+						<span className="sep">·</span>
+						<span className={errors > 0 ? "count error" : "count"}>
+							{plural(errors, "error")}
+						</span>
+						<span className="sep">·</span>
+						<span className={warnings > 0 ? "count warning" : "count"}>
+							{plural(warnings, "warning")}
+						</span>
+					</>
+				) : null}
 			</span>
 			<span className="status-right">
-				{report ? (
-					<>
-						{report.tools.map((tool, index) => (
-							<Fragment key={tool.name}>
-								{index > 0 ? <span className="sep">·</span> : null}
-								{tool.source === "missing" ? (
-									<span className="tool missing">{tool.name}?</span>
-								) : (
-									<span className="tool">{tool.name}</span>
-								)}
-							</Fragment>
-						))}
-						{report.tools.length > 0 ? <span className="sep">·</span> : null}
-						<span className="tool-count">{missing} missing</span>
-					</>
-				) : (
-					<span className="tool-count">
-						{reportFailed ? "toolchains unavailable" : "probing toolchains..."}
+				{missingTools > 0 ? (
+					<span className="tool missing" title="Install the missing toolchains">
+						{missingTools} missing
+					</span>
+				) : null}
+				{saveError === null ? null : (
+					<span className="status-save error" title={saveError}>
+						{saveError}
 					</span>
 				)}
+				<button
+					type="button"
+					className="status-settings"
+					aria-label="Settings"
+					title="Settings (⌘,)"
+					onClick={onOpenSettings}
+				>
+					⚙
+				</button>
 			</span>
 		</footer>
 	);

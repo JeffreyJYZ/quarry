@@ -1,0 +1,177 @@
+.newproject-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 60;
+	display: grid;
+	place-items: center;
+	padding: 48px 24px;
+	background: rgb(0 0 0 / 0.55);
+}
+
+.newproject-panel {
+	display: flex;
+	flex-direction: column;
+	width: min(560px, 100%);
+	max-height: 100%;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--panel);
+	box-shadow: 0 24px 64px rgb(0 0 0 / 0.5);
+	overflow: hidden;
+}
+
+.newproject-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	height: 36px;
+	padding: 0 14px;
+	border-bottom: 1px solid var(--line);
+}
+
+.newproject-close {
+	border: 0;
+	background: none;
+	padding: 0;
+	font-family: var(--mono);
+	font-size: 11px;
+	color: var(--muted);
+	cursor: pointer;
+}
+
+.newproject-close:hover {
+	color: var(--text);
+}
+
+.newproject-body {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	padding: 16px 18px;
+	overflow-y: auto;
+}
+
+.newproject-row {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	font-size: 12px;
+	color: var(--text);
+}
+
+.newproject-row > label {
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.newproject-row input[type="text"] {
+	width: 100%;
+	height: 28px;
+	padding: 0 8px;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: var(--bg);
+	color: var(--text);
+	font-family: var(--mono);
+	font-size: 12px;
+}
+
+.newproject-row input[type="text"]:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: 1px;
+}
+
+.newproject-location {
+	display: flex;
+	gap: 8px;
+}
+
+.newproject-location input {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.newproject-kinds {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+.newproject-kind {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	column-gap: 8px;
+	padding: 6px 8px;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	cursor: pointer;
+}
+
+.newproject-kind:has(input:checked) {
+	border-color: var(--accent);
+	background: var(--hover);
+}
+
+.newproject-kind input {
+	grid-row: 1 / span 2;
+	align-self: center;
+	accent-color: var(--accent);
+}
+
+.newproject-kind-label {
+	grid-column: 2;
+	font-size: 12px;
+	color: var(--text);
+}
+
+.newproject-kind-hint {
+	grid-column: 2;
+	font-size: 11px;
+	color: var(--muted);
+}
+
+.newproject-target {
+	margin: 0;
+	font-family: var(--mono);
+	font-size: 11px;
+	color: var(--muted);
+	overflow-wrap: anywhere;
+}
+
+.newproject-error {
+	margin: 0;
+	font-size: 12px;
+	color: var(--danger);
+	overflow-wrap: anywhere;
+}
+
+.newproject-foot {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 10px 14px;
+	border-top: 1px solid var(--line);
+	background: var(--rail);
+}
+
+.newproject-hint {
+	font-size: 11px;
+	color: var(--muted);
+}
+
+.newproject-actions {
+	display: flex;
+	gap: 8px;
+}
+
+.newproject-create {
+	border-color: var(--accent);
+	color: var(--text);
+}

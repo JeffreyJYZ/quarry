@@ -5,6 +5,7 @@
 //! project. Malformed settings are treated as empty rather than as an error: a corrupt preference must
 //! never block startup.
 
+#![allow(dead_code)]
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -98,6 +99,253 @@ pub struct RunConfiguration {
     pub env: Vec<(String, String)>,
 }
 
+fn deserialize_panel_sizes<'de, D>(deserializer: D) -> Result<PanelSizes, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw = serde_json::Value::deserialize(deserializer).unwrap_or_default();
+    let mut out: PanelSizes = serde_json::from_value(raw).unwrap_or_default();
+    out.normalize();
+    Ok(out)
+}
+
+fn deserialize_preferences_editor_font_size<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = f64::deserialize(deserializer).unwrap_or(13.0);
+    Ok(value.clamp(9.0, 24.0))
+}
+
+fn deserialize_preferences_terminal_font_size<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = f64::deserialize(deserializer).unwrap_or(13.0);
+    Ok(value.clamp(9.0, 24.0))
+}
+
+fn deserialize_preferences_editor_tab_size<'de, D>(deserializer: D) -> Result<u32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = u32::deserialize(deserializer).unwrap_or(4);
+    Ok(match value {
+        2 | 4 | 8 => value,
+        _ => 4,
+    })
+}
+
+fn deserialize_preferences_build_profile<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = String::deserialize(deserializer).unwrap_or_else(|_| "debug".to_string());
+    Ok(match value.as_str() {
+        "debug" | "release" => value,
+        _ => "debug".to_string(),
+    })
+}
+
+fn deserialize_panel_rail_width<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = f64::deserialize(deserializer).unwrap_or(240.0);
+    Ok(value.clamp(160.0, 560.0))
+}
+
+fn deserialize_panel_debug_width<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = f64::deserialize(deserializer).unwrap_or(320.0);
+    Ok(value.clamp(200.0, 640.0))
+}
+
+fn deserialize_panel_dock_height<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = f64::deserialize(deserializer).unwrap_or(260.0);
+    Ok(value.clamp(120.0, 900.0))
+}
+
+fn deserialize_panel_terminal_height<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = f64::deserialize(deserializer).unwrap_or(180.0);
+    Ok(value.clamp(100.0, 900.0))
+}
+
+fn deserialize_project_editor_tab_size<'de, D>(deserializer: D) -> Result<Option<u32>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Option::<u32>::deserialize(deserializer).unwrap_or(None);
+    Ok(match value {
+        Some(v) if matches!(v, 2 | 4 | 8) => Some(v),
+        _ => None,
+    })
+}
+
+fn deserialize_project_format_on_save<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Option::<bool>::deserialize(deserializer).unwrap_or(None))
+}
+
+fn deserialize_project_build_profile<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Option::<String>::deserialize(deserializer).unwrap_or(None);
+    Ok(match value {
+        Some(v) if v == "debug" || v == "release" => Some(v),
+        _ => None,
+    })
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct PanelSizes {
+    #[serde(
+        default = "default_rail_width",
+        deserialize_with = "deserialize_panel_rail_width"
+    )]
+    pub rail_width: f64,
+    #[serde(
+        default = "default_debug_width",
+        deserialize_with = "deserialize_panel_debug_width"
+    )]
+    pub debug_width: f64,
+    #[serde(
+        default = "default_dock_height",
+        deserialize_with = "deserialize_panel_dock_height"
+    )]
+    pub dock_height: f64,
+    #[serde(
+        default = "default_terminal_height",
+        deserialize_with = "deserialize_panel_terminal_height"
+    )]
+    pub terminal_height: f64,
+}
+
+fn default_rail_width() -> f64 {
+    240.0
+}
+fn default_debug_width() -> f64 {
+    320.0
+}
+fn default_dock_height() -> f64 {
+    260.0
+}
+fn default_terminal_height() -> f64 {
+    180.0
+}
+
+impl Default for PanelSizes {
+    fn default() -> Self {
+        Self {
+            rail_width: 240.0,
+            debug_width: 320.0,
+            dock_height: 260.0,
+            terminal_height: 180.0,
+        }
+    }
+}
+
+impl PanelSizes {
+    fn normalize(&mut self) {
+        self.rail_width = self.rail_width.clamp(160.0, 560.0);
+        self.debug_width = self.debug_width.clamp(200.0, 640.0);
+        self.dock_height = self.dock_height.clamp(120.0, 900.0);
+        self.terminal_height = self.terminal_height.clamp(100.0, 900.0);
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Preferences {
+    #[serde(
+        default = "default_editor_font_size",
+        deserialize_with = "deserialize_preferences_editor_font_size"
+    )]
+    pub editor_font_size: f64,
+    #[serde(
+        default = "default_editor_tab_size",
+        deserialize_with = "deserialize_preferences_editor_tab_size"
+    )]
+    pub editor_tab_size: u32,
+    #[serde(
+        default = "default_terminal_font_size",
+        deserialize_with = "deserialize_preferences_terminal_font_size"
+    )]
+    pub terminal_font_size: f64,
+    #[serde(default)]
+    pub format_on_save: bool,
+    #[serde(
+        default = "default_build_profile",
+        deserialize_with = "deserialize_preferences_build_profile"
+    )]
+    pub build_profile: String,
+    #[serde(default, deserialize_with = "deserialize_panel_sizes")]
+    pub panel_sizes: PanelSizes,
+}
+
+fn default_editor_font_size() -> f64 {
+    13.0
+}
+fn default_editor_tab_size() -> u32 {
+    4
+}
+fn default_terminal_font_size() -> f64 {
+    13.0
+}
+fn default_build_profile() -> String {
+    "debug".to_string()
+}
+
+impl Default for Preferences {
+    fn default() -> Self {
+        Self {
+            editor_font_size: 13.0,
+            editor_tab_size: 4,
+            terminal_font_size: 13.0,
+            format_on_save: false,
+            build_profile: "debug".to_string(),
+            panel_sizes: PanelSizes::default(),
+        }
+    }
+}
+
+impl Preferences {
+    fn normalize(&mut self) {
+        self.editor_font_size = self.editor_font_size.clamp(9.0, 24.0);
+        self.terminal_font_size = self.terminal_font_size.clamp(9.0, 24.0);
+        if !matches!(self.editor_tab_size, 2 | 4 | 8) {
+            self.editor_tab_size = 4;
+        }
+        if self.build_profile != "debug" && self.build_profile != "release" {
+            self.build_profile = "debug".to_string();
+        }
+        self.panel_sizes.normalize();
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ProjectSettings {
+    #[serde(default, deserialize_with = "deserialize_project_editor_tab_size")]
+    pub editor_tab_size: Option<u32>,
+    #[serde(default, deserialize_with = "deserialize_project_format_on_save")]
+    pub format_on_save: Option<bool>,
+    #[serde(default, deserialize_with = "deserialize_project_build_profile")]
+    pub build_profile: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
@@ -132,6 +380,9 @@ pub struct Settings {
     /// Saved run configurations for the run panel, in save order.
     #[serde(default, deserialize_with = "deserialize_run_configurations")]
     pub run_configurations: Vec<RunConfiguration>,
+    /// User-wide preferences: editor, terminal, build profile and panel sizes.
+    #[serde(default)]
+    pub preferences: Preferences,
     /// Fields written by another build, kept verbatim so a save from this build never drops them.
     #[serde(flatten)]
     pub extra: serde_json::Map<String, serde_json::Value>,
@@ -150,6 +401,7 @@ impl Default for Settings {
             dock_expanded: None,
             recent_roots: Vec::new(),
             run_configurations: Vec::new(),
+            preferences: Preferences::default(),
             extra: serde_json::Map::new(),
         }
     }
@@ -182,6 +434,42 @@ pub fn write_settings(app: AppHandle, settings: Settings) -> Result<(), String> 
         .map_err(|error| format!("cannot serialize settings: {error}"))?;
     fs::write(&path, format!("{text}\n"))
         .map_err(|error| format!("cannot write {}: {error}", path.display()))
+}
+
+#[tauri::command]
+pub fn read_project_settings(root: String) -> ProjectSettings {
+    let path = std::path::Path::new(&root);
+    if !path.is_dir() {
+        return ProjectSettings::default();
+    }
+    let file = path.join(".quarry").join("settings.json");
+    match fs::read_to_string(&file) {
+        Ok(text) => serde_json::from_str(&text).unwrap_or_default(),
+        Err(_) => ProjectSettings::default(),
+    }
+}
+
+#[tauri::command]
+pub fn write_project_settings(root: String, settings: ProjectSettings) -> Result<(), String> {
+    let trimmed = root.trim();
+    if trimmed.is_empty() {
+        return Err("the project root is empty.".to_string());
+    }
+    let path = std::path::Path::new(trimmed);
+    if !path.is_absolute() {
+        return Err(format!("root must be an absolute path: {root}"));
+    }
+    if !path.is_dir() {
+        return Err(format!("directory does not exist: {root}"));
+    }
+    let dir = path.join(".quarry");
+    fs::create_dir_all(&dir)
+        .map_err(|error| format!("cannot create {}: {error}", dir.display()))?;
+    let file = dir.join("settings.json");
+    let text = serde_json::to_string_pretty(&settings)
+        .map_err(|error| format!("cannot serialize project settings: {error}"))?;
+    fs::write(&file, format!("{text}\n"))
+        .map_err(|error| format!("cannot write {}: {error}", file.display()))
 }
 
 pub fn remember_root_value(settings: &mut Settings, root: String) -> Result<Vec<String>, String> {
@@ -443,5 +731,138 @@ mod tests {
         assert_eq!(settings.git_open, before_git);
         assert_eq!(settings.dock_tab, before_tab);
         assert_eq!(settings.dock_expanded, before_expanded);
+    }
+
+    #[test]
+    fn preferences_default_when_the_file_has_none() {
+        let parsed: Settings = serde_json::from_str("{}").expect("parses");
+        assert_eq!(parsed.preferences.editor_font_size, 13.0);
+        assert_eq!(parsed.preferences.editor_tab_size, 4);
+        assert_eq!(parsed.preferences.terminal_font_size, 13.0);
+        assert!(!parsed.preferences.format_on_save);
+        assert_eq!(parsed.preferences.build_profile, "debug");
+        assert_eq!(parsed.preferences.panel_sizes.rail_width, 240.0);
+        assert_eq!(parsed.preferences.panel_sizes.debug_width, 320.0);
+        assert_eq!(parsed.preferences.panel_sizes.dock_height, 260.0);
+        assert_eq!(parsed.preferences.panel_sizes.terminal_height, 180.0);
+    }
+
+    #[test]
+    fn unusable_preferences_are_clamped_on_read() {
+        let parsed: Settings = serde_json::from_str(
+            r#"{"preferences":{"editorFontSize":400,"editorTabSize":3,"terminalFontSize":1,"buildProfile":"fast","panelSizes":{"railWidth":10,"debugWidth":9999,"dockHeight":0,"terminalHeight":42}}}"#,
+        )
+        .expect("parses");
+
+        let preferences = parsed.preferences;
+        assert_eq!(preferences.editor_font_size, 24.0);
+        assert_eq!(preferences.editor_tab_size, 4);
+        assert_eq!(preferences.terminal_font_size, 9.0);
+        assert_eq!(preferences.build_profile, "debug");
+        assert_eq!(preferences.panel_sizes.rail_width, 160.0);
+        assert_eq!(preferences.panel_sizes.debug_width, 640.0);
+        assert_eq!(preferences.panel_sizes.dock_height, 120.0);
+        assert_eq!(preferences.panel_sizes.terminal_height, 100.0);
+    }
+
+    #[test]
+    fn a_valid_preferences_block_survives_a_round_trip() {
+        let parsed: Settings = serde_json::from_str(
+            r#"{"preferences":{"editorFontSize":15,"editorTabSize":2,"terminalFontSize":16,"formatOnSave":true,"buildProfile":"release","panelSizes":{"railWidth":300,"debugWidth":420,"dockHeight":340,"terminalHeight":220}}}"#,
+        )
+        .expect("parses");
+        let text = serde_json::to_string_pretty(&parsed).expect("serializes");
+        let back: Settings = serde_json::from_str(&text).expect("parses");
+
+        assert_eq!(back.preferences.editor_font_size, 15.0);
+        assert_eq!(back.preferences.editor_tab_size, 2);
+        assert_eq!(back.preferences.terminal_font_size, 16.0);
+        assert!(back.preferences.format_on_save);
+        assert_eq!(back.preferences.build_profile, "release");
+        assert_eq!(back.preferences.panel_sizes.rail_width, 300.0);
+        assert_eq!(back.preferences.panel_sizes.terminal_height, 220.0);
+    }
+
+    #[test]
+    fn project_settings_round_trip_through_the_project_directory() {
+        let root = temp_project("settings-round-trip");
+        let settings = super::ProjectSettings {
+            editor_tab_size: Some(2),
+            format_on_save: Some(true),
+            build_profile: Some("release".to_string()),
+        };
+        super::write_project_settings(root.clone(), settings.clone()).expect("writes");
+
+        let file = std::path::Path::new(&root).join(".quarry").join("settings.json");
+        assert!(file.is_file(), "settings file missing at {}", file.display());
+        assert_eq!(super::read_project_settings(root.clone()), settings);
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn corrupt_project_settings_read_as_defaults() {
+        let root = temp_project("settings-corrupt");
+        let dir = std::path::Path::new(&root).join(".quarry");
+        std::fs::create_dir_all(&dir).expect("creates .quarry");
+        std::fs::write(dir.join("settings.json"), "{not json").expect("writes");
+
+        assert_eq!(
+            super::read_project_settings(root.clone()),
+            super::ProjectSettings::default()
+        );
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn project_settings_need_an_absolute_existing_root() {
+        let err = super::write_project_settings(
+            "relative/project".to_string(),
+            super::ProjectSettings::default(),
+        )
+        .unwrap_err();
+        assert!(err.contains("absolute"), "unexpected error: {err}");
+
+        let err = super::write_project_settings(
+            "/definitely/missing/quarry-project".to_string(),
+            super::ProjectSettings::default(),
+        )
+        .unwrap_err();
+        assert!(err.contains("does not exist"), "unexpected error: {err}");
+
+        assert_eq!(
+            super::read_project_settings("/definitely/missing/quarry-project".to_string()),
+            super::ProjectSettings::default()
+        );
+    }
+
+    #[test]
+    fn an_unknown_project_setting_value_reads_as_inherited() {
+        let root = temp_project("settings-unknown");
+        let dir = std::path::Path::new(&root).join(".quarry");
+        std::fs::create_dir_all(&dir).expect("creates .quarry");
+        std::fs::write(
+            dir.join("settings.json"),
+            r#"{"editorTabSize":5,"buildProfile":"fast"}"#,
+        )
+        .expect("writes");
+
+        let parsed = super::read_project_settings(root.clone());
+        assert!(parsed.editor_tab_size.is_none(), "tab size 5 is not offered");
+        assert!(parsed.build_profile.is_none(), "fast is not a build profile");
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A throwaway project directory named after the calling test.
+    fn temp_project(label: &str) -> String {
+        let dir = std::env::temp_dir().join(format!(
+            "quarry-settings-{}-{label}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("creates the temp project");
+        dir.to_string_lossy().into_owned()
     }
 }

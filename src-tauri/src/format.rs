@@ -177,9 +177,82 @@ fn argv(formatter: Formatter, path: &str) -> Vec<String> {
                 "stdout".to_string(),
             ]
         }
-        Formatter::ClangFormat => vec![format!("-assume-filename={path}")],
+        Formatter::ClangFormat => vec![
+            format!("-assume-filename={path}"),
+            format!("-style={}", clang_style(path)),
+        ],
         Formatter::None => Vec::new(),
     }
+}
+
+/// Settings that make clang-format expand every brace pair onto its own lines.
+///
+/// LLVM's default style keeps a short function, block, `if` or loop body on one line, which the
+/// editor's format command must never do: `int add(int x, int y) { return x + y; }` is one edit away
+/// from a multi-line body, and a collapsed body hides breakpoints. Only the single-line allowances
+/// are overridden, so the brace stays on the declaration line and a project's own `.clang-format`
+/// keeps every other choice. A key the project already sets is left alone, so no duplicate key ever
+/// reaches the YAML parser.
+const CLANG_EXPANSION: [(&str, &str); 6] = [
+    (
+        "AllowShortBlocksOnASingleLine",
+        "AllowShortBlocksOnASingleLine: Never",
+    ),
+    (
+        "AllowShortFunctionsOnASingleLine",
+        "AllowShortFunctionsOnASingleLine: None",
+    ),
+    (
+        "AllowShortIfStatementsOnASingleLine",
+        "AllowShortIfStatementsOnASingleLine: Never",
+    ),
+    (
+        "AllowShortLoopsOnASingleLine",
+        "AllowShortLoopsOnASingleLine: false",
+    ),
+    (
+        "AllowShortLambdasOnASingleLine",
+        "AllowShortLambdasOnASingleLine: None",
+    ),
+    (
+        "AllowShortCaseLabelsOnASingleLine",
+        "AllowShortCaseLabelsOnASingleLine: false",
+    ),
+];
+
+/// The `-style` value for a document: the nearest `.clang-format`, or LLVM's defaults at 4/100, plus
+/// the expansion keys the file does not set itself.
+fn clang_style(path: &str) -> String {
+    let mut lines: Vec<String> = match nearest_clang_format(path) {
+        Some(text) => vec![text.trim_end().to_string()],
+        None => vec![
+            "BasedOnStyle: LLVM".to_string(),
+            "IndentWidth: 4".to_string(),
+            "ColumnLimit: 100".to_string(),
+        ],
+    };
+    let project = lines.join("\n");
+    for (key, setting) in CLANG_EXPANSION {
+        if project.contains(key) {
+            continue;
+        }
+        lines.push(setting.to_string());
+    }
+    lines.join("\n")
+}
+
+/// The nearest `.clang-format` above a file, following the loader clang-format itself uses.
+fn nearest_clang_format(path: &str) -> Option<String> {
+    let file = Path::new(path);
+    let mut current = file.parent();
+    while let Some(dir) = current {
+        let candidate = dir.join(".clang-format");
+        if let Ok(text) = fs::read_to_string(&candidate) {
+            return Some(text);
+        }
+        current = dir.parent();
+    }
+    None
 }
 
 /// Runs the formatter over stdin and returns stdout. Called on a blocking thread.
@@ -330,6 +403,63 @@ mod tests {
     const SNIPPET: &str = "fn main(){println!(\"x\");}\n";
 
     #[test]
+    fn clang_style_forbids_every_single_line_body() {
+        let style = clang_style("/projects/demo/src/main.cpp");
+        for (key, _) in CLANG_EXPANSION {
+            assert!(style.contains(key), "missing {key} in:\n{style}");
+        }
+        assert!(
+            style.contains("BasedOnStyle: LLVM"),
+            "no base style:\n{style}"
+        );
+        assert_eq!(
+            style.matches("AllowShortFunctionsOnASingleLine").count(),
+            1,
+            "a key is written twice:\n{style}"
+        );
+    }
+
+    #[test]
+    fn a_project_clang_format_keeps_its_own_answer() {
+        let dir = std::env::temp_dir().join(format!("quarry-clang-style-{}", std::process::id()));
+        let src = dir.join("src");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&src).expect("creates the fixture");
+        std::fs::write(
+            dir.join(".clang-format"),
+            "BasedOnStyle: Google\nAllowShortFunctionsOnASingleLine: Inline\n",
+        )
+        .expect("writes the project style");
+
+        let style = clang_style(src.join("main.cpp").to_str().expect("utf-8 path"));
+        assert_eq!(
+            style.matches("AllowShortFunctionsOnASingleLine").count(),
+            1,
+            "the project key was duplicated:\n{style}"
+        );
+        assert!(
+            style.contains("AllowShortFunctionsOnASingleLine: Inline"),
+            "the project value was dropped:\n{style}"
+        );
+        assert!(
+            style.contains("AllowShortBlocksOnASingleLine: Never"),
+            "a key the project did not set was not added:\n{style}"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn clang_argv_carries_the_style() {
+        let args = argv(Formatter::ClangFormat, "/projects/demo/main.cpp");
+        assert!(args.iter().any(|arg| arg.starts_with("-style=")));
+        assert!(
+            args.iter()
+                .any(|arg| arg == "-assume-filename=/projects/demo/main.cpp")
+        );
+    }
+
+    #[test]
     fn rust_extension_maps_to_rustfmt() {
         assert_eq!(
             formatter_for_path("/projects/demo/src/main.rs"),
@@ -423,15 +553,12 @@ mod tests {
 
     #[test]
     fn clang_format_argv_assumes_the_document_path() {
-        assert_eq!(
-            argv(Formatter::ClangFormat, "/projects/demo/src/main.cpp"),
-            vec!["-assume-filename=/projects/demo/src/main.cpp"]
-        );
+        let args = argv(Formatter::ClangFormat, "/projects/demo/src/main.cpp");
+        assert_eq!(args[0], "-assume-filename=/projects/demo/src/main.cpp");
+        assert!(args[1].starts_with("-style="), "no style argument: {args:?}");
         // A space in the path stays inside one argument: no shell ever splits it.
-        assert_eq!(
-            argv(Formatter::ClangFormat, "/projects/my demo/main.c"),
-            vec!["-assume-filename=/projects/my demo/main.c"]
-        );
+        let spaced = argv(Formatter::ClangFormat, "/projects/my demo/main.c");
+        assert_eq!(spaced[0], "-assume-filename=/projects/my demo/main.c");
     }
 
     #[test]

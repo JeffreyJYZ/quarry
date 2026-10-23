@@ -11,6 +11,7 @@ Rust and C/C++ IDE. Tauri 2 + React 19 shell; clangd, rust-analyzer and lldb-dap
 - **Rust module is `build_task.rs`**, never `build.rs` (Cargo's build script).
 - **`src/` only**, `@/*` maps to `./src/*`; no root-level `lib/`.
 - **Gates: `bun check` for types, `bun fmt --check` for formatting, `biome lint` for lint, `bun test` for frontend units, `bun run gate` before a commit** — hard tabs 4 wide, print width 100; warnings fail, so leave zero.
+- **C/C++ formatting always expands every brace pair** — `clang-format` gets the nearest `.clang-format` plus `AllowShort*: Never|None|false`, so a one-line body never survives a format.
 - **`bun fmt` is the formatter, configured in `bunfig.toml` `[fmt]` (`useTabs`, `tabWidth = 4`, `printWidth = 100`)** — Biome no longer formats; it lints only, so `biome check` would flag tab/width drift the formatter owns.
 - **No `typescript` dependency**: `bun check` is the type checker and `vite build` transpiles; verified by removing the package and passing both (2026-10-22).
 - **`bun` only** — never npm; `bun run build` keeps `run` (built-in subcommand).

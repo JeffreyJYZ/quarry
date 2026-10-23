@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import type { Preferences, ProjectSettings } from "@/settings/model";
 
 export type ToolSource = "path" | "xcrun" | "missing";
 
@@ -35,6 +36,16 @@ export function toolchains(): Promise<ToolchainReport> {
 
 export function openProject(root: string): Promise<ProjectInfo> {
 	return invoke<ProjectInfo>("open_project", { root });
+}
+
+/**
+ * Scaffolds a new project directory and returns it already inspected.
+ *
+ * `kind` is one of `rust-bin`, `rust-lib` or `cpp-cmake`; the backend rejects anything else, a
+ * relative parent, a name that is not a single path segment and a target that already exists.
+ */
+export function createProject(parent: string, name: string, kind: string): Promise<ProjectInfo> {
+	return invoke<ProjectInfo>("create_project", { parent, name, kind });
 }
 
 export function listDir(path: string): Promise<FileEntry[]> {
@@ -422,6 +433,8 @@ export type Settings = {
 	dockExpanded?: boolean | null;
 	recentRoots?: string[];
 	runConfigurations?: RunConfiguration[];
+	/** User-wide preferences; absent in a file written before the settings page existed. */
+	preferences?: Preferences;
 };
 
 /**
@@ -459,6 +472,15 @@ export function settingsForWrite(preserved: Record<string, unknown>, known: Sett
 
 export function rememberRoot(root: string): Promise<string[]> {
 	return invoke<string[]>("remember_root", { root });
+}
+
+/** Per-project overrides from `<root>/.quarry/settings.json`; defaults when the file is absent. */
+export function readProjectSettings(root: string): Promise<ProjectSettings> {
+	return invoke<ProjectSettings>("read_project_settings", { root });
+}
+
+export function writeProjectSettings(root: string, settings: ProjectSettings): Promise<void> {
+	return invoke<void>("write_project_settings", { root, settings });
 }
 
 export type BreakpointSpec = {

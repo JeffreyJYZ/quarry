@@ -25,6 +25,8 @@ const RESIZE_DEBOUNCE_MS = 120;
 export type TerminalProps = {
 	root: string;
 	activePath?: string | null;
+	/** Font size a new session starts at; the settings page owns the default. */
+	defaultFontSize?: number;
 };
 
 type Session = {
@@ -81,7 +83,7 @@ function shortCwd(cwd: string): string {
 	return `…/${tail}`;
 }
 
-export default function Terminal({ root, activePath }: TerminalProps) {
+export default function Terminal({ root, activePath, defaultFontSize }: TerminalProps) {
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [activeId, setActiveId] = useState<number | null>(null);
 	const nextId = useRef(1);
@@ -118,7 +120,7 @@ export default function Terminal({ root, activePath }: TerminalProps) {
 			error: null,
 			opening: true,
 			stick: true,
-			fontSize: DEFAULT_FONT_SIZE,
+			fontSize: defaultFontSize ?? DEFAULT_FONT_SIZE,
 		};
 		setSessions((current) => [...current, session]);
 		setActiveId(id);
@@ -141,7 +143,7 @@ export default function Terminal({ root, activePath }: TerminalProps) {
 				opening: false,
 			}));
 		}
-	}, [root, activePath, updateSession]);
+	}, [root, activePath, updateSession, defaultFontSize]);
 
 	const closeSession = useCallback((id: number) => {
 		const session = sessionsRef.current.find((s) => s.id === id);

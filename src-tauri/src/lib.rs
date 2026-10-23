@@ -5,6 +5,7 @@ mod format;
 mod git;
 mod ignore;
 mod launch;
+mod new_project;
 mod lsp;
 mod processes;
 mod project;
@@ -99,6 +100,9 @@ pub fn run() {
             settings::read_settings,
             settings::write_settings,
             settings::remember_root,
+            settings::read_project_settings,
+            settings::write_project_settings,
+            new_project::create_project,
             git::git_status,
             git::git_file_diff,
             git::git_stage,

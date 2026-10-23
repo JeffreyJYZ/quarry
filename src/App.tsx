@@ -1,5 +1,14 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	type CSSProperties,
+	lazy,
+	Suspense,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import Breadcrumb from "@/breadcrumb/Breadcrumb";
 import CallsPanel from "@/calls/CallsPanel";
 import FileTree from "@/components/FileTree";
@@ -25,7 +34,7 @@ import TypeHierarchyPanel from "@/lsp/TypeHierarchyPanel";
 import Outline from "@/outline/Outline";
 import type { Command } from "@/palette/CommandPalette";
 
-import { fileName, plural, problemFiles } from "@/problems/model";
+import { fileName, problemFiles } from "@/problems/model";
 import {
 	buildProject,
 	type Diagnostic,
@@ -41,6 +50,7 @@ import {
 	type ProjectInfo,
 	type RunConfiguration,
 	readSettings,
+	readProjectSettings,
 	readTextFile,
 	rememberRoot,
 	runProgram,
@@ -49,12 +59,13 @@ import {
 	stopProgram,
 	type ToolchainReport,
 	toolchains,
-	version,
+	writeProjectSettings,
 	writeSettings,
 } from "@/project/api";
 import { type FileBuffer, isDirty } from "@/project/buffer";
 import { describeError } from "@/project/errors";
 import { type SaveOutcome, saveBuffer, saveErrorMessage, saveMessage } from "@/project/save";
+import NewProject from "@/projects/NewProject";
 import RecentProjects from "@/projects/RecentProjects";
 
 import { applyFileEdits } from "@/refactor/apply";
@@ -68,6 +79,18 @@ import RunLog from "@/run/RunLog";
 import { splitArgs } from "@/run/splitArgs";
 
 import ShortcutSheet from "@/shortcuts/ShortcutSheet";
+import SettingsPage from "@/settings/SettingsPage";
+import { DEFAULT_PANEL_SIZES, type PanelName, resizePanel } from "@/layout/model";
+import Splitter from "@/layout/Splitter";
+import {
+	DEFAULT_PREFERENCES,
+	DEFAULT_PROJECT_SETTINGS,
+	effectivePreferences,
+	normalizePreferences,
+	normalizeProjectSettings,
+	type Preferences,
+	type ProjectSettings,
+} from "@/settings/model";
 
 import TestsDock, { type DockTab } from "@/tests/TestsDock";
 import { useTests } from "@/tests/useTests";
@@ -147,22 +170,24 @@ const BUILD_PROFILES: { value: BuildProfile; label: string }[] = [
 ];
 
 export default function App() {
-	const [appVersion, setAppVersion] = useState("");
 	const [project, setProject] = useState<ProjectInfo | null>(null);
 	const [gitStatusState, setGitStatusState] = useState<GitStatus | null>(null);
 	const [report, setReport] = useState<ToolchainReport | null>(null);
-	const [reportFailed, setReportFailed] = useState(false);
 	const [buffers, setBuffers] = useState<FileBuffer[]>([]);
 	const [activePath, setActivePath] = useState<string | null>(null);
 	const [notice, setNotice] = useState<string | null>(null);
 	const [opening, setOpening] = useState(false);
 	const [serverDiagnostics, setServerDiagnostics] = useState<DiagnosticMap>(() => new Map());
 	const [buildDiagnostics, setBuildDiagnostics] = useState<DiagnosticMap>(() => new Map());
-	const [buildSummary, setBuildSummary] = useState<string | null>(null);
 	const [building, setBuilding] = useState(false);
-	/** Profile the toolbar builds with; persists for the session, shown in the button's title. */
-	const [buildProfile, setBuildProfile] = useState<BuildProfile>("debug");
 	const [buildMenuOpen, setBuildMenuOpen] = useState(false);
+	/** User-wide preferences, saved with the rest of the settings file. */
+	const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
+	/** This project's overrides; null when there is no project or the file does not exist. */
+	const [projectSettings, setProjectSettings] = useState<ProjectSettings | null>(null);
+	const [settingsOpen, setSettingsOpen] = useState(false);
+	const [newProjectOpen, setNewProjectOpen] = useState(false);
+	const projectSettingsWrite = useRef<Promise<void>>(Promise.resolve());
 	const buildSplitRef = useRef<HTMLDivElement | null>(null);
 	const buildChevronRef = useRef<HTMLButtonElement | null>(null);
 	const [runId, setRunId] = useState<string | null>(null);
@@ -312,6 +337,7 @@ export default function App() {
 		panelOpen: boolean | null;
 		dockTab: DockTab;
 		runConfigurations: RunConfiguration[];
+		preferences: Preferences;
 	}>({
 		project: null,
 		buffers: [],
@@ -322,6 +348,7 @@ export default function App() {
 		panelOpen: null,
 		dockTab: "problems",
 		runConfigurations: [],
+		preferences: DEFAULT_PREFERENCES,
 	});
 	snapshotRef.current = {
 		project,
@@ -333,19 +360,13 @@ export default function App() {
 		panelOpen,
 		dockTab,
 		runConfigurations,
+		preferences,
 	};
 
 	useEffect(() => {
-		version().then(setAppVersion, () => setAppVersion(""));
 		toolchains().then(
-			(next) => {
-				setReport(next);
-				setReportFailed(false);
-			},
-			() => {
-				setReport(null);
-				setReportFailed(true);
-			},
+			(next) => setReport(next),
+			() => setReport(null),
 		);
 	}, []);
 
@@ -356,6 +377,7 @@ export default function App() {
 				const settings = await readSettings();
 				if (cancelled) return;
 				preservedSettings.current = settings;
+				setPreferences(normalizePreferences(settings.preferences));
 				setRailCollapsed(settings.railCollapsed ?? false);
 				setDebugOpen(settings.debugOpen ?? false);
 				setGitOpen(settings.gitOpen ?? false);
@@ -432,6 +454,7 @@ export default function App() {
 				dockTab,
 				dockExpanded: panelOpen,
 				runConfigurations,
+				preferences,
 			};
 			void writeSettings(settingsForWrite(preservedSettings.current, settings)).catch(
 				(error) => setNotice(describeError(error)),
@@ -448,6 +471,7 @@ export default function App() {
 		dockTab,
 		panelOpen,
 		runConfigurations,
+		preferences,
 	]);
 
 	useEffect(() => {
@@ -464,6 +488,7 @@ export default function App() {
 				dockTab: snap.dockTab as Settings["dockTab"],
 				dockExpanded: snap.panelOpen,
 				runConfigurations: snap.runConfigurations,
+				preferences: snap.preferences,
 			};
 			void writeSettings(settingsForWrite(preservedSettings.current, settings)).catch(
 				(error) => setNotice(describeError(error)),
@@ -477,6 +502,76 @@ export default function App() {
 	}, []);
 
 	const root = project?.root ?? null;
+
+	/** What the editor, build and formatter actually use: this project's overrides, else the user's. */
+	const effective = effectivePreferences(preferences, projectSettings);
+	const buildProfile = effective.buildProfile;
+	const panels = effective.panelSizes;
+
+	useEffect(() => {
+		if (root === null) {
+			setProjectSettings(null);
+			return;
+		}
+		let cancelled = false;
+		void readProjectSettings(root).then(
+			(next) => {
+				if (!cancelled) setProjectSettings(normalizeProjectSettings(next));
+			},
+			() => {
+				if (!cancelled) setProjectSettings(null);
+			},
+		);
+		return () => {
+			cancelled = true;
+		};
+	}, [root]);
+
+	/** Writes run one after another so a burst of clicks cannot land out of order. */
+	const handleProjectSettingsChange = useCallback(
+		(next: ProjectSettings | null) => {
+			const currentRoot = project?.root ?? null;
+			setProjectSettings(next);
+			if (currentRoot === null) return;
+			projectSettingsWrite.current = projectSettingsWrite.current
+				.then(() => writeProjectSettings(currentRoot, next ?? DEFAULT_PROJECT_SETTINGS))
+				.catch((error: unknown) => setNotice(describeError(error)));
+		},
+		[project],
+	);
+
+	/** A profile picked in the toolbar lands in the project's overrides when one is open. */
+	const applyBuildProfile = useCallback(
+		(profile: BuildProfile) => {
+			if (project === null) {
+				setPreferences((current) => ({ ...current, buildProfile: profile }));
+				return;
+			}
+			handleProjectSettingsChange({
+				...(projectSettings ?? DEFAULT_PROJECT_SETTINGS),
+				buildProfile: profile,
+			});
+		},
+		[handleProjectSettingsChange, project, projectSettings],
+	);
+
+	const handlePanelResize = useCallback((name: PanelName, px: number) => {
+		setPreferences((current) => ({
+			...current,
+			panelSizes: resizePanel(current.panelSizes, name, px),
+		}));
+	}, []);
+
+	useEffect(() => {
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+			if (event.key !== ",") return;
+			event.preventDefault();
+			setSettingsOpen(true);
+		};
+		window.addEventListener("keydown", handleKeyDown);
+		return () => window.removeEventListener("keydown", handleKeyDown);
+	}, []);
 
 	useEffect(() => {
 		if (root === null) {
@@ -616,9 +711,26 @@ export default function App() {
 			let saved = 0;
 			let warned = false;
 			for (const path of paths) {
-				const buffer = buffersRef.current.find((entry) => entry.path === path);
-				if (!buffer) {
+				const found = buffersRef.current.find((entry) => entry.path === path);
+				if (!found) {
 					continue;
+				}
+				let buffer = found;
+				// Format-on-save rewrites the text before the write, so the file on disk is the
+				// formatted one and a second save is never needed to land the formatter's edits.
+				if (formatOnSaveRef.current && path === activePathRef.current) {
+					const formatted = await editorRef.current?.formatText();
+					if (
+						formatted !== null &&
+						formatted !== undefined &&
+						formatted !== buffer.text
+					) {
+						buffer = { ...buffer, text: formatted };
+						const next: FileBuffer = buffer;
+						setBuffers((current) =>
+							current.map((entry) => (entry.path === path ? next : entry)),
+						);
+					}
 				}
 				setSaving((current) => new Set(current).add(path));
 				try {
@@ -695,7 +807,8 @@ export default function App() {
 	}, [root, activePath, formatting]);
 
 	const reportNotice = useCallback((message: string) => setNotice(message), []);
-	const lsp = useLspServer(root, reportNotice);
+	// The hook owns the server lifecycle and reports its own failures; the bar no longer shows it.
+	useLspServer(root, reportNotice);
 	const debug = useDebugSession(root, buildProfile);
 
 	/* Breakpoints live in the debug session, keyed by absolute path, so a tab switch or a gutter
@@ -743,6 +856,14 @@ export default function App() {
 	const counts = useMemo(() => countSeverities(diagnostics), [diagnostics]);
 	const files = useMemo(() => problemFiles(diagnostics), [diagnostics]);
 	const panelExpanded = panelOpen ?? counts.errors > 0;
+	const missingTools =
+		report === null ? 0 : report.tools.filter((tool) => tool.source === "missing").length;
+	/** Only a failed save earns a slot in the bar; a successful one is not news. */
+	const saveError = saveStatus?.failed === true ? saveStatus.text : null;
+
+	/** Read inside save callbacks, so a settings change never rebuilds the save path. */
+	const formatOnSaveRef = useRef(effective.formatOnSave);
+	formatOnSaveRef.current = effective.formatOnSave;
 
 	const previousErrors = useRef(counts.errors);
 	useEffect(() => {
@@ -767,7 +888,6 @@ export default function App() {
 			setSaveStatus(null);
 			setServerDiagnostics(new Map());
 			setBuildDiagnostics(new Map());
-			setBuildSummary(null);
 			setPanelOpen(null);
 			setSearchOpen(false);
 			setShortcutsOpen(false);
@@ -1304,7 +1424,7 @@ export default function App() {
 		try {
 			const result = await buildProject(root, buildProfile);
 			setBuildDiagnostics(groupDiagnostics(result.diagnostics));
-			setBuildSummary(result.summary);
+			if (result.diagnostics.length === 0) setNotice(result.summary);
 		} catch (error) {
 			setNotice(`Build failed: ${describeError(error)}`);
 		} finally {
@@ -1467,15 +1587,6 @@ export default function App() {
 		},
 	];
 
-	const serverLabel =
-		lsp === null
-			? root === null
-				? "no project"
-				: "starting"
-			: lsp.version === null
-				? lsp.server
-				: `${lsp.server} ${lsp.version}`;
-
 	return (
 		<div className="shell">
 			<UpdateNotice />
@@ -1546,7 +1657,7 @@ export default function App() {
 											: "build-menu-item"
 									}
 									onClick={() => {
-										setBuildProfile(profile.value);
+										applyBuildProfile(profile.value);
 										setBuildMenuOpen(false);
 										buildChevronRef.current?.focus();
 									}}
@@ -1633,6 +1744,23 @@ export default function App() {
 				<span className="crumbs" title={project ? project.root : undefined}>
 					{project ? project.root : "no project open"}
 				</span>
+				<button
+					type="button"
+					className="button"
+					disabled={opening}
+					onClick={() => setNewProjectOpen(true)}
+				>
+					New project
+				</button>
+				<button
+					type="button"
+					className="button button-icon"
+					aria-label="Settings"
+					title="Settings (⌘,)"
+					onClick={() => setSettingsOpen(true)}
+				>
+					⚙
+				</button>
 			</header>
 
 			{notice ? (
@@ -1654,6 +1782,12 @@ export default function App() {
 				]
 					.filter(Boolean)
 					.join(" ")}
+				style={
+					{
+						"--rail-width": `${panels.railWidth}px`,
+						"--debug-width": `${panels.debugWidth}px`,
+					} as CSSProperties
+				}
 			>
 				{gitOpen && root !== null ? (
 					<SourceControl
@@ -1738,7 +1872,26 @@ export default function App() {
 					</aside>
 				)}
 
-				<main className="canvas">
+				{railCollapsed ? null : (
+					<Splitter
+						axis="x"
+						value={panels.railWidth}
+						min={160}
+						max={560}
+						label="Resize explorer"
+						onChange={(next) => handlePanelResize("railWidth", next)}
+					/>
+				)}
+
+				<main
+					className="canvas"
+					style={
+						{
+							"--dock-height": `${panels.dockHeight}px`,
+							"--terminal-height": `${panels.terminalHeight}px`,
+						} as CSSProperties
+					}
+				>
 					{active ? (
 						<>
 							<TabStrip
@@ -1774,6 +1927,8 @@ export default function App() {
 									onReferences={handleReferences}
 									onCursor={setCursor}
 									onApplyEdits={handleApplyEdits}
+									tabSize={effective.editorTabSize}
+									fontSize={effective.editorFontSize}
 									blame={blameOn ? (blameByPath.get(active.path) ?? null) : null}
 									reveal={
 										revealTarget === null
@@ -1787,9 +1942,24 @@ export default function App() {
 						<Welcome project={project} />
 					)}
 					{project && terminalOpen ? (
-						<Suspense fallback={null}>
-							<Terminal root={project.root} activePath={activePath} />
-						</Suspense>
+						<>
+							<Splitter
+								axis="y"
+								value={panels.terminalHeight}
+								min={100}
+								max={900}
+								invert
+								label="Resize terminal"
+								onChange={(next) => handlePanelResize("terminalHeight", next)}
+							/>
+							<Suspense fallback={null}>
+								<Terminal
+									root={project.root}
+									activePath={activePath}
+									defaultFontSize={effective.terminalFontSize}
+								/>
+							</Suspense>
+						</>
 					) : project &&
 					  callsOpen &&
 					  root !== null &&
@@ -1831,23 +2001,36 @@ export default function App() {
 							onClose={() => setTypeHierarchyOpen(false)}
 						/>
 					) : project ? (
-						<TestsDock
-							tab={dockTab}
-							expanded={panelExpanded}
-							onToggleExpanded={() => setPanelOpen(!panelExpanded)}
-							onSelectTab={setDockTab}
-							problems={{
-								files,
-								errors: counts.errors,
-								warnings: counts.warnings,
-								activePath,
-								onSelect: handleSelectProblem,
-								root,
-								buffers,
-								setBuffers,
-							}}
-							tests={tests}
-						/>
+						<>
+							{panelExpanded ? (
+								<Splitter
+									axis="y"
+									value={panels.dockHeight}
+									min={120}
+									max={900}
+									invert
+									label="Resize bottom dock"
+									onChange={(next) => handlePanelResize("dockHeight", next)}
+								/>
+							) : null}
+							<TestsDock
+								tab={dockTab}
+								expanded={panelExpanded}
+								onToggleExpanded={() => setPanelOpen(!panelExpanded)}
+								onSelectTab={setDockTab}
+								problems={{
+									files,
+									errors: counts.errors,
+									warnings: counts.warnings,
+									activePath,
+									onSelect: handleSelectProblem,
+									root,
+									buffers,
+									setBuffers,
+								}}
+								tests={tests}
+							/>
+						</>
 					) : null}
 					{root !== null ? (
 						<RunForm
@@ -1926,14 +2109,25 @@ export default function App() {
 				</main>
 
 				{debugOpen && root !== null ? (
-					<Suspense fallback={null}>
-						<DebugPanel
-							debug={debug}
-							activePath={activePath}
-							cursor={cursor}
-							onNavigate={handleNavigate}
+					<>
+						<Splitter
+							axis="x"
+							value={panels.debugWidth}
+							min={200}
+							max={640}
+							invert
+							label="Resize debug panel"
+							onChange={(next) => handlePanelResize("debugWidth", next)}
 						/>
-					</Suspense>
+						<Suspense fallback={null}>
+							<DebugPanel
+								debug={debug}
+								activePath={activePath}
+								cursor={cursor}
+								onNavigate={handleNavigate}
+							/>
+						</Suspense>
+					</>
 				) : null}
 			</div>
 
@@ -1954,48 +2148,38 @@ export default function App() {
 				/>
 			) : null}
 			<StatusBar
-				version={appVersion}
 				project={project}
-				report={report}
-				reportFailed={reportFailed}
 				git={gitStatusState}
-				extra={
-					<>
-						{saveStatus === null ? null : (
-							<>
-								<span
-									className={
-										saveStatus.failed ? "status-save error" : "status-save"
-									}
-									title={saveStatus.text}
-								>
-									{saveStatus.text}
-								</span>
-								<span className="sep">·</span>
-							</>
-						)}
-						<span className="label">lsp</span>
-						<span className="status-server" title={lsp?.root}>
-							{serverLabel}
-						</span>
-						<span className="sep">·</span>
-						<span className={counts.errors > 0 ? "count error" : "count"}>
-							{plural(counts.errors, "error")}
-						</span>
-						<span className="sep">·</span>
-						<span className={counts.warnings > 0 ? "count warning" : "count"}>
-							{plural(counts.warnings, "warning")}
-						</span>
-						{buildSummary === null ? null : (
-							<>
-								<span className="sep">·</span>
-								<span className="status-build" title={buildSummary}>
-									{buildSummary}
-								</span>
-							</>
-						)}
-					</>
-				}
+				errors={counts.errors}
+				warnings={counts.warnings}
+				missingTools={missingTools}
+				saveError={saveError}
+				onOpenSettings={() => setSettingsOpen(true)}
+			/>
+			{settingsOpen ? (
+				<SettingsPage
+					open
+					user={preferences}
+					project={projectSettings}
+					projectRoot={root}
+					onClose={() => setSettingsOpen(false)}
+					onUserChange={setPreferences}
+					onProjectChange={handleProjectSettingsChange}
+					onResetPanels={() =>
+						setPreferences((current) => ({
+							...current,
+							panelSizes: DEFAULT_PANEL_SIZES,
+						}))
+					}
+				/>
+			) : null}
+			<NewProject
+				open={newProjectOpen}
+				onClose={() => setNewProjectOpen(false)}
+				onCreated={(nextRoot) => {
+					setNewProjectOpen(false);
+					void openRoot(nextRoot);
+				}}
 			/>
 		</div>
 	);
