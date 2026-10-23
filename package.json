@@ -1,7 +1,7 @@
 {
 	"name": "quarry",
 	"private": true,
-	"version": "0.1.0-alpha.3",
+	"version": "0.1.0-alpha.4",
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
@@ -14,7 +14,8 @@
 		"verify": "bun run typecheck && bun fmt --check && biome lint .",
 		"test": "bun test",
 		"gate": "bun run verify && bun test",
-		"verify:bundle": "bun run scripts/verify-bundle.ts"
+		"verify:bundle": "bun run scripts/verify-bundle.ts",
+		"release:local": "bun run scripts/release-local.ts"
 	},
 	"dependencies": {
 		"@codemirror/autocomplete": "^6.20.1",

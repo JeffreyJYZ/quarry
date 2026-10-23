@@ -13,7 +13,8 @@ on:
                 default: patch
     push:
         tags:
-            - "quarry-alpha*"
+            # Alphas ship from scripts/release-local.ts on the Mac; the full matrix is for betas.
+            - "quarry-beta*"
             - "v*"
 
 permissions:
