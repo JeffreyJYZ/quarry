@@ -128,6 +128,12 @@ read off `src-tauri/src/lib.rs` and `src/`:
 - **Breadcrumb**: a strip showing the file path and the symbol chain containing the caret, built from
   `lsp_symbols` in `src/breadcrumb/Breadcrumb.tsx`. Each segment copies its qualified name
   (`a::b::c`), and the whole chain copies from one action.
+- **Updates**: the app checks for a newer release on start through `tauri-plugin-updater`
+  (`src/updates/store.ts`), falling back to the GitHub releases API when the updater has no answer.
+  An installable offer shows a dismissible strip with `Update now`, which downloads with progress and
+  relaunches into the new version; a release this build cannot install is named as published but not
+  installable, and never offers a button that would do nothing. Releases are signed, and the public
+  key baked into the app is what verifies a download.
 - **Type hierarchy**: `Shift+Alt+T` opens `src/lsp/TypeHierarchyPanel.tsx` over
   `lsp::lsp_prepare_type_hierarchy` and `lsp::lsp_type_hierarchy`. Supertypes and subtypes are separate
   views, each level is fetched only when a node is expanded, arrow keys and `Enter` work the tree,

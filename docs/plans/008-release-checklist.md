@@ -29,6 +29,14 @@ Environment facts that must hold: rust-analyzer component installed; `cmake` and
 
 Verified command (measured): `bun run tauri build --bundles app`. The `beforeBuildCommand` in `src-tauri/tauri.conf.json` runs `bun run build` first, so the frontend is rebuilt into `dist/` before bundling. The `--bundles app` flag restricts the build to the macOS `.app` bundle and skips the `.dmg` (and other targets) to save time.
 
+`bundle.createUpdaterArtifacts` is on, so a local build also needs the signing key or the bundler refuses to emit updater artefacts:
+
+```sh
+TAURI_SIGNING_PRIVATE_KEY="$HOME/.tauri/quarry-updater.key" bun run tauri build --bundles app
+```
+
+That produces the `.app` plus the `.app.tar.gz` and its `.sig` beside it.
+
 Measured facts from a real run:
 - command: `bun run tauri build --bundles app`
 - artefact: `src-tauri/target/release/bundle/macos/quarry.app`
@@ -50,7 +58,21 @@ The version lives in three places and they must agree before release. Checked ag
 
 Bump all three together. A mismatch between them leaves the bundle, the crate and the npm metadata disagreeing. Run `bun run verify:bundle` afterwards to confirm all three agree.
 
-## 5. Known gaps to state in release notes
+`bun scripts/bump-version.ts <patch|minor|major>` does the three files in lockstep, refreshes `src-tauri/Cargo.lock`, refuses to run when the sources already disagree, and prints the new version as its last line.
+
+## 5. Publishing a release and the updater
+
+`.github/workflows/release.yml` builds macOS universal, Linux and Windows, one platform at a time, and attaches the signed updater artefacts plus `latest.json` to the release. Two ways in:
+- run the workflow by hand with a `bump` choice — it commits `chore(release): v<version>`, tags `v<version>` and pushes both;
+- push a `v*` tag yourself; the build job verifies the tag against `src-tauri/tauri.conf.json` and fails on a mismatch.
+
+Signing needs two repository secrets: `TAURI_SIGNING_PRIVATE_KEY` (the key content) and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Without them the bundler emits no updater artefacts, and installed apps have nothing to update from.
+
+The public key in `src-tauri/tauri.conf.json` (`plugins.updater.pubkey`) is what verifies a download. **Never rotate the keypair after the first release**: every installed app trusts the key it was built with, so a new key orphans them all. `bundle.createUpdaterArtifacts` must stay on for the same reason.
+
+The updater endpoint is `https://github.com/JeffreyJYZ/quarry/releases/latest/download/latest.json`. After publishing, check that URL answers and that `latest.json` carries a `darwin-aarch64` entry before telling anyone to update.
+
+## 6. Known gaps to state in release notes
 
 Quote only provable facts:
 - Rust expression evaluation is unusable: `evaluate` returns nothing usable across `repl`/`watch`/`hover`, `settings set target.language rust` changes nothing, and `setExpression` kills the adapter. No watch-expression pane ships; only variables-tree watching and memory views.
@@ -58,7 +80,7 @@ Quote only provable facts:
 - C/C++ builds need clang or cmake; when cmake is absent the fallback is a plain clang build, and cmake and ninja are not installed on this machine.
 - The embedded terminal and the debugger were not exercised in a real desktop window by any automated test; the backend and components are present but window-level verification is manual.
 
-## 6. Do not ship if
+## 7. Do not ship if
 
 - Any pre-flight gate fails.
 - Any smoke script fails (except the expected failures of `dap-eval-probe.ts`).
