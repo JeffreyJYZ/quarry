@@ -12,14 +12,11 @@ import {
 import Breadcrumb from "@/ui/breadcrumb/Breadcrumb";
 import CallsPanel from "@/ui/calls/CallsPanel";
 import FileTree from "@/ui/components/FileTree";
-import RefsPanel from "@/ui/components/RefsPanel";
-import StatusBar from "@/ui/components/StatusBar";
 import TabStrip from "@/ui/components/TabStrip";
 import Welcome from "@/ui/components/Welcome";
 import { type BreakpointRow, useDebugSession } from "@/lib/debug/session";
 import type { EditorHandle } from "@/ui/editor/Editor";
 import LazyEditor from "@/ui/editor/LazyEditor";
-import DiffView from "@/ui/git/DiffView";
 import SourceControl from "@/ui/git/SourceControl";
 import {
 	combineDiagnostics,
@@ -67,8 +64,6 @@ import {
 import { type FileBuffer, isDirty } from "@/lib/project/buffer";
 import { describeError } from "@/lib/project/errors";
 import { type SaveOutcome, saveBuffer, saveErrorMessage, saveMessage } from "@/lib/project/save";
-import NewProject from "@/ui/projects/NewProject";
-import RecentProjects from "@/ui/projects/RecentProjects";
 
 import { applyFileEdits } from "@/lib/refactor/apply";
 import {
@@ -80,11 +75,11 @@ import RunForm from "@/ui/run/RunForm";
 import RunLog from "@/ui/run/RunLog";
 import { splitArgs } from "@/lib/run/splitArgs";
 
-import Goto, { type GotoMode } from "@/ui/goto/Goto";
-import Generate from "@/ui/generate/Generate";
 import { generateItems, type GenerateItem } from "@/lib/generate/model";
+import type { GotoMode } from "@/ui/goto/gotoModel";
+import AppOverlays from "@/ui/app/AppOverlays";
+import TopBar from "@/ui/app/TopBar";
 import ShortcutSheet from "@/ui/shortcuts/ShortcutSheet";
-import SettingsPage from "@/ui/settings/SettingsPage";
 import { DEFAULT_PANEL_SIZES, type PanelName, resizePanel } from "@/lib/layout/model";
 import Splitter from "@/ui/layout/Splitter";
 import {
@@ -203,10 +198,6 @@ type SaveStatus = { text: string; failed: boolean };
 type BuildProfile = "debug" | "release";
 
 /** The profiles the Build split control offers, in menu order. */
-const BUILD_PROFILES: { value: BuildProfile; label: string }[] = [
-	{ value: "debug", label: "Debug" },
-	{ value: "release", label: "Release" },
-];
 
 export default function App() {
 	const [project, setProject] = useState<ProjectInfo | null>(null);
@@ -1841,169 +1832,51 @@ export default function App() {
 	return (
 		<div className="shell">
 			<UpdateNotice />
-			<header className="titlebar" data-tauri-drag-region="">
-				<span className="wordmark">quarry</span>
-				<button
-					type="button"
-					className="button"
-					disabled={opening}
-					onClick={handleOpenProject}
-				>
-					{opening ? "Opening" : "Open project"}
-				</button>
-				<RecentProjects
-					roots={recentRoots}
-					current={root}
-					opening={opening}
-					onOpen={(rootToOpen) => void openRoot(rootToOpen)}
-				/>
-				<div className="build-split" ref={buildSplitRef}>
-					<button
-						type="button"
-						className="button build-main"
-						disabled={root === null || building}
-						title={`Build (${buildProfile})`}
-						onClick={() => void handleBuild()}
-					>
-						{building
-							? buildProfile === "release"
-								? "Building release…"
-								: "Building…"
-							: "Build"}
-					</button>
-					<button
-						ref={buildChevronRef}
-						type="button"
-						className="button build-chevron"
-						disabled={root === null || building}
-						aria-haspopup="menu"
-						aria-expanded={buildMenuOpen}
-						aria-label={`Build profile: ${buildProfile}`}
-						title={`Build profile: ${buildProfile}`}
-						onClick={() => setBuildMenuOpen((current) => !current)}
-						onKeyDown={(event) => {
-							if (
-								event.key === "ArrowDown" ||
-								event.key === "Enter" ||
-								event.key === " "
-							) {
-								event.preventDefault();
-								setBuildMenuOpen(true);
-							}
-						}}
-					>
-						▾
-					</button>
-					{buildMenuOpen ? (
-						<div className="build-menu" role="menu" aria-label="Build profile">
-							{BUILD_PROFILES.map((profile) => (
-								<button
-									key={profile.value}
-									type="button"
-									role="menuitemradio"
-									aria-checked={buildProfile === profile.value}
-									className={
-										buildProfile === profile.value
-											? "build-menu-item active"
-											: "build-menu-item"
-									}
-									onClick={() => {
-										applyBuildProfile(profile.value);
-										setBuildMenuOpen(false);
-										buildChevronRef.current?.focus();
-									}}
-								>
-									{profile.label}
-								</button>
-							))}
-						</div>
-					) : null}
-				</div>
-				<button
-					type="button"
-					className="button"
-					disabled={root === null}
-					onClick={() => {
-						if (runId !== null) {
-							void handleStop();
-						} else {
-							void handleRun();
-						}
-					}}
-				>
-					{runId !== null ? "Stop" : "Run"}
-				</button>
-				<button
-					type="button"
-					className="button"
-					disabled={root === null || activePath === null || formatting}
-					onClick={() => void formatActive()}
-				>
-					{formatting ? "Formatting…" : "Format"}
-				</button>
-				<button
-					type="button"
-					className="button"
-					disabled={root === null}
-					aria-pressed={gitOpen}
-					onClick={() => setGitOpen((current) => !current)}
-				>
-					Git
-				</button>
-				<button
-					type="button"
-					className="button"
-					disabled={root === null}
-					aria-pressed={debugOpen && root !== null}
-					onClick={() => setDebugOpen((current) => !current)}
-				>
-					Debug
-				</button>
-				<button
-					type="button"
-					className="button"
-					disabled={root === null}
-					aria-pressed={panelExpanded && dockTab === "tests"}
-					onClick={() => {
-						setDockTab("tests");
-						setPanelOpen(true);
-					}}
-				>
-					Tests
-				</button>
-				<button
-					type="button"
-					className="button"
-					disabled={root === null || activePath === null}
-					aria-pressed={blameOn}
-					onClick={() => setBlameOn((current) => !current)}
-				>
-					Blame
-				</button>
-				<button
-					type="button"
-					className="button"
-					disabled={root === null}
-					aria-pressed={terminalOpen}
-					onClick={() => {
-						setTerminalOpen((current) => !current);
-						if (!terminalOpen) setPanelOpen(true);
-					}}
-				>
-					Terminal
-				</button>
-				<span className="crumbs" title={project ? project.root : undefined}>
-					{project ? project.root : "no project open"}
-				</span>
-				<button
-					type="button"
-					className="button"
-					disabled={opening}
-					onClick={() => setNewProjectOpen(true)}
-				>
-					New project
-				</button>
-			</header>
+			<TopBar
+				root={root}
+				project={project}
+				opening={opening}
+				onOpenProject={() => void handleOpenProject()}
+				recentRoots={recentRoots}
+				onOpenRoot={(nextRoot) => void openRoot(nextRoot)}
+				buildSplitRef={buildSplitRef}
+				buildChevronRef={buildChevronRef}
+				building={building}
+				buildProfile={buildProfile}
+				buildMenuOpen={buildMenuOpen}
+				onToggleBuildMenu={() => setBuildMenuOpen((current) => !current)}
+				onOpenBuildMenu={() => setBuildMenuOpen(true)}
+				onPickBuildProfile={(profile) => {
+					applyBuildProfile(profile);
+					setBuildMenuOpen(false);
+					buildChevronRef.current?.focus();
+				}}
+				onBuild={() => void handleBuild()}
+				runId={runId}
+				onRun={() => void handleRun()}
+				onStop={() => void handleStop()}
+				formatting={formatting}
+				activePath={activePath}
+				onFormat={() => void formatActive()}
+				gitOpen={gitOpen}
+				onToggleGit={() => setGitOpen((current) => !current)}
+				debugOpen={debugOpen}
+				onToggleDebug={() => setDebugOpen((current) => !current)}
+				panelExpanded={panelExpanded}
+				dockTab={dockTab}
+				onShowTests={() => {
+					setDockTab("tests");
+					setPanelOpen(true);
+				}}
+				blameOn={blameOn}
+				onToggleBlame={() => setBlameOn((current) => !current)}
+				terminalOpen={terminalOpen}
+				onToggleTerminal={() => {
+					setTerminalOpen((current) => !current);
+					if (!terminalOpen) setPanelOpen(true);
+				}}
+				onNewProject={() => setNewProjectOpen(true)}
+			/>
 
 			{notice ? (
 				<div className="notice" role="status">
@@ -2400,27 +2273,12 @@ export default function App() {
 				) : null}
 			</div>
 
-			{refsOpen ? (
-				<RefsPanel
-					locations={references}
-					onNavigate={handleNavigate}
-					onClose={() => setRefsOpen(false)}
-				/>
-			) : null}
-			{gitDiffPath !== null && root !== null ? (
-				<DiffView root={root} path={gitDiffPath} onClose={() => setGitDiffPath(null)} />
-			) : gitCommitDiffHash !== null && root !== null ? (
-				<DiffView
-					root={root}
-					commit={gitCommitDiffHash}
-					onClose={() => setGitCommitDiffHash(null)}
-				/>
-			) : null}
-			<StatusBar
+			<AppOverlays
+				root={root}
 				project={project}
-				git={gitStatusState}
-				errors={counts.errors}
-				warnings={counts.warnings}
+				activePath={activePath}
+				counts={counts}
+				gitStatus={gitStatusState}
 				missingTools={missingTools}
 				saveError={saveError}
 				caret={
@@ -2436,48 +2294,43 @@ export default function App() {
 							: lspStatus.server
 				}
 				onOpenSettings={() => setSettingsOpen(true)}
-			/>
-			{settingsOpen ? (
-				<SettingsPage
-					open
-					user={preferences}
-					project={projectSettings}
-					projectRoot={root}
-					onClose={() => setSettingsOpen(false)}
-					onUserChange={setPreferences}
-					onProjectChange={handleProjectSettingsChange}
-					onResetPanels={() =>
-						setPreferences((current) => ({
-							...current,
-							panelSizes: DEFAULT_PANEL_SIZES,
-						}))
-					}
-					initialTab={settingsTab}
-				/>
-			) : null}
-			{gotoMode !== null && root !== null ? (
-				<Goto
-					mode={gotoMode}
-					root={root}
-					path={activePath}
-					recent={recentFiles}
-					onOpen={(target, line, character) => handleNavigate(target, line, character)}
-					onClose={() => setGotoMode(null)}
-				/>
-			) : null}
-			{generateOpen && active !== null ? (
-				<Generate
-					items={generateItems(active.path, active.text, cursor?.line ?? 0)}
-					onPick={applyGenerate}
-					onClose={() => setGenerateOpen(false)}
-				/>
-			) : null}
-			<NewProject
-				open={newProjectOpen}
-				initialParent={newProjectParent}
-				onParentChange={setNewProjectParent}
-				onClose={() => setNewProjectOpen(false)}
-				onCreated={(nextRoot) => {
+				references={references}
+				refsOpen={refsOpen}
+				onCloseRefs={() => setRefsOpen(false)}
+				onNavigate={handleNavigate}
+				gitDiffPath={gitDiffPath}
+				onCloseGitDiff={() => setGitDiffPath(null)}
+				gitCommitDiffHash={gitCommitDiffHash}
+				onCloseCommitDiff={() => setGitCommitDiffHash(null)}
+				settingsOpen={settingsOpen}
+				settingsTab={settingsTab}
+				preferences={preferences}
+				projectSettings={projectSettings ?? DEFAULT_PROJECT_SETTINGS}
+				onCloseSettings={() => setSettingsOpen(false)}
+				onPreferencesChange={setPreferences}
+				onProjectSettingsChange={handleProjectSettingsChange}
+				onResetPanels={() =>
+					setPreferences((current) => ({
+						...current,
+						panelSizes: DEFAULT_PANEL_SIZES,
+					}))
+				}
+				gotoMode={gotoMode}
+				gotoRecent={recentFiles}
+				onCloseGoto={() => setGotoMode(null)}
+				generateOpen={generateOpen && active !== null}
+				generateItems={
+					active === null
+						? []
+						: generateItems(active.path, active.text, cursor?.line ?? 0)
+				}
+				onPickGenerate={applyGenerate}
+				onCloseGenerate={() => setGenerateOpen(false)}
+				newProjectOpen={newProjectOpen}
+				newProjectParent={newProjectParent}
+				onNewProjectParentChange={setNewProjectParent}
+				onCloseNewProject={() => setNewProjectOpen(false)}
+				onProjectCreated={(nextRoot) => {
 					setNewProjectOpen(false);
 					void openRoot(nextRoot);
 				}}
