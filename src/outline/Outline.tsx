@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { type Symbol as LspSymbol, lspSymbols } from "@/project/api";
 import { describeError } from "@/project/errors";
+import { caretSymbolIndex, filterSymbolIndices } from "./model";
 
 const KIND_LABELS: Record<number, string> = {
 	1: "file",
@@ -43,19 +44,6 @@ export type OutlineProps = {
 	onNavigate: (path: string, line: number, character: number) => void;
 	cursor?: { line: number; character: number } | null;
 };
-
-function containsRange(symbol: LspSymbol, cursor: { line: number; character: number }): boolean {
-	const r = symbol.range;
-	if (cursor.line < r.start.line || cursor.line > r.end.line) return false;
-	if (cursor.line === r.start.line && cursor.character < r.start.character) return false;
-	if (cursor.line === r.end.line && cursor.character > r.end.character) return false;
-	return true;
-}
-
-function rangeSize(symbol: LspSymbol): number {
-	const r = symbol.range;
-	return (r.end.line - r.start.line) * 1000000 + (r.end.character - r.start.character);
-}
 
 export default function Outline({ root, activePath, onNavigate, cursor }: OutlineProps) {
 	const [symbols, setSymbols] = useState<LspSymbol[]>([]);
@@ -102,53 +90,17 @@ export default function Outline({ root, activePath, onNavigate, cursor }: Outlin
 		};
 	}, [root, activePath]);
 
-	const visibleIndices = (() => {
-		if (filter.trim() === "") {
-			return symbols.map((_, i) => i).slice(0, CAP);
-		}
-		const needle = filter.toLowerCase();
-		const matching = new Set<number>();
-		symbols.forEach((s, i) => {
-			if (s.name.toLowerCase().includes(needle)) matching.add(i);
-		});
-		const keep = new Set<number>();
-		for (const idx of matching) {
-			keep.add(idx);
-			let depth = symbols[idx].depth;
-			for (let i = idx - 1; i >= 0; i -= 1) {
-				if (symbols[i].depth < depth) {
-					keep.add(i);
-					depth = symbols[i].depth;
-					if (depth <= 0) break;
-				}
-			}
-		}
-		const out: number[] = [];
-		for (let i = 0; i < symbols.length; i += 1) {
-			if (keep.has(i)) out.push(i);
-			if (out.length >= CAP) break;
-		}
-		return out;
-	})();
+	const visibleIndices = filterSymbolIndices(symbols, filter);
 
 	const shownSymbols = visibleIndices.map((i) => symbols[i]);
 
-	let caretIndex = -1;
-	if (cursor !== null && cursor !== undefined) {
-		let best = -1;
-		let bestSize = Infinity;
-		let bestDepth = -1;
-		symbols.forEach((s, i) => {
-			if (!containsRange(s, cursor)) return;
-			const size = rangeSize(s);
-			if (size < bestSize || (size === bestSize && s.depth > bestDepth)) {
-				bestSize = size;
-				bestDepth = s.depth;
-				best = i;
-			}
-		});
-		caretIndex = best;
-	}
+	useEffect(() => {
+		setKbIndex((current) =>
+			shownSymbols.length === 0 ? 0 : Math.min(current, shownSymbols.length - 1),
+		);
+	}, [shownSymbols.length]);
+
+	const caretIndex = caretSymbolIndex(symbols, cursor ?? null);
 	const caretVisibleIndex = caretIndex >= 0 ? visibleIndices.indexOf(caretIndex) : -1;
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: the scroll target depends on the visible set

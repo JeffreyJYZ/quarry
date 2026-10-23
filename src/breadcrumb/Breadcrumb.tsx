@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { type Symbol as LspSymbol, lspSymbols } from "@/project/api";
+import { qualifiedName } from "./model";
 
 export type BreadcrumbProps = {
 	root: string;
@@ -23,8 +24,18 @@ function rangeSize(symbol: LspSymbol): number {
 
 export default function Breadcrumb({ root, activePath, cursor, onNavigate }: BreadcrumbProps) {
 	const [symbols, setSymbols] = useState<LspSymbol[]>([]);
+	const [copyError, setCopyError] = useState<string | null>(null);
 	const cacheRef = useRef<Map<string, LspSymbol[]>>(new Map());
 	const seqRef = useRef(0);
+
+	const copyText = async (text: string) => {
+		try {
+			await navigator.clipboard.writeText(text);
+			setCopyError(null);
+		} catch (err) {
+			setCopyError(err instanceof Error ? err.message : "copy failed");
+		}
+	};
 
 	useEffect(() => {
 		if (activePath === null) {
@@ -71,9 +82,16 @@ export default function Breadcrumb({ root, activePath, cursor, onNavigate }: Bre
 		chain.push(...containing);
 	}
 
-	const items: { label: string; symbol: LspSymbol | null }[] = [
-		...displaySegments.map((seg) => ({ label: seg, symbol: null })),
-		...chain.map((sym) => ({ label: sym.name, symbol: sym })),
+	const chainNames = chain.map((s) => s.name);
+	const wholeQualified = qualifiedName(chainNames);
+
+	const items: { label: string; symbol: LspSymbol | null; qualified: string | null }[] = [
+		...displaySegments.map((seg) => ({ label: seg, symbol: null, qualified: null })),
+		...chain.map((sym, idx) => ({
+			label: sym.name,
+			symbol: sym,
+			qualified: qualifiedName(chainNames.slice(0, idx + 1)),
+		})),
 	];
 
 	return (
@@ -87,22 +105,43 @@ export default function Breadcrumb({ root, activePath, cursor, onNavigate }: Bre
 					{item.symbol === null ? (
 						<span className="breadcrumb-path">{item.label}</span>
 					) : (
-						<button
-							type="button"
-							className="breadcrumb-symbol"
-							onClick={() =>
-								onNavigate(
-									activePath,
-									item.symbol?.range.start.line ?? 0,
-									item.symbol?.range.start.character ?? 0,
-								)
-							}
-						>
-							{item.label}
-						</button>
+						<>
+							<button
+								type="button"
+								className="breadcrumb-symbol"
+								onClick={() =>
+									onNavigate(
+										activePath,
+										item.symbol?.range.start.line ?? 0,
+										item.symbol?.range.start.character ?? 0,
+									)
+								}
+							>
+								{item.label}
+							</button>
+							<button
+								type="button"
+								className="breadcrumb-copy"
+								title={`Copy ${item.qualified}`}
+								onClick={() => void copyText(item.qualified ?? item.label)}
+							>
+								{"\u2398"}
+							</button>
+						</>
 					)}
 				</span>
 			))}
+			{chain.length > 0 ? (
+				<button
+					type="button"
+					className="breadcrumb-copy-all"
+					title={`Copy ${wholeQualified}`}
+					onClick={() => void copyText(wholeQualified)}
+				>
+					copy chain
+				</button>
+			) : null}
+			{copyError !== null ? <span className="breadcrumb-error">{copyError}</span> : null}
 		</nav>
 	);
 }
