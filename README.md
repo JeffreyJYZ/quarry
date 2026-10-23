@@ -39,6 +39,8 @@ read off `src-tauri/src/lib.rs` and `src/`:
   `build_project`; the debug panel's launch-time build still hardcodes `debug`.
 - **Run**: `run_program` / `stop_program` stream `run://output` lines and one `run://exited`, with a
   run panel in `src/run/` (program, args, cwd, env vars with validation, argv preview, run/stop).
+  The run log offers `Copy output` (ANSI-stripped), `Copy argv`, and `Re-run` with the same
+  program, args, cwd and env.
 - **Terminal**: an embedded terminal built on `portable-pty` (`pty::pty_open` / `pty_write` /
   `pty_resize` / `pty_close`) with `src/terminal/Terminal.tsx`, supporting multiple sessions in tabs
   (`Cmd+T` / `Cmd+W`, close button per tab), opening in the active file's directory when one is
@@ -79,7 +81,9 @@ read off `src-tauri/src/lib.rs` and `src/`:
   `lsp_code_actions` in `src/problems/ProblemsPanel.tsx`.
 - **Tests**: `list_tests` and `run_test` feed a Tests dock with pass/fail status, filtering by
   binary and result, sorting, and run-all scoped to the filtered set
-  (`src/tests/filterTests.ts`).
+  (`src/tests/filterTests.ts`). The tests dock offers `copy name` per row, `copy output` on an
+  expanded failure, and `copy failures` (`name: first failure line` per line, disabled when
+  nothing failed).
 - **Source control**: a Git view with status, per-file diff, an open-in-editor flow, a commit box
   (`git_commit`), branch listing and switching (`git_branches`, `git_checkout`, dropdown in
   `src/git/SourceControl.tsx`), a History tab listing recent commits (`git_log`), and a unified
