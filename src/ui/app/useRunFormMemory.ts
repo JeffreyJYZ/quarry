@@ -12,7 +12,12 @@ export type RunFormState = {
  * Remembers the run form per project root.
  *
  * Switching projects restores what was typed last time for that root, or the backend's default
- * launch configuration when the root is new.
+ * launch configuration when the root is new: the built binary of a Cargo project, or the
+ * conventional build output of a C/C++ one, which the backend names even before the first build.
+ *
+ * The restore runs once per root. The handler arrives as an inline closure, so keeping it in a ref
+ * is what stops an identity change on every render from refetching the configuration and rewriting
+ * the form.
  */
 export function useRunFormMemory(options: {
 	root: string | null;
@@ -21,32 +26,39 @@ export function useRunFormMemory(options: {
 }): void {
 	const { root, form, onRestore } = options;
 	const memory = useRef<Map<string, { args: string; cwd: string; env: EnvVar[] }>>(new Map());
+	const restoreRef = useRef(onRestore);
+	restoreRef.current = onRestore;
 
 	useEffect(() => {
 		if (root === null) return;
 		const saved = memory.current.get(root);
+		let cancelled = false;
 		void defaultLaunchConfig(root, false)
 			.then((config) => {
-				if (saved === undefined) {
-					onRestore({
-						program: config.program,
-						args: config.args.join(" "),
-						cwd: config.cwd,
-						env: [],
-					});
-				} else {
-					onRestore({
-						program: config.program,
-						args: saved.args,
-						cwd: saved.cwd,
-						env: saved.env ?? [],
-					});
-				}
+				if (cancelled) return;
+				restoreRef.current(
+					saved === undefined
+						? {
+								program: config.program,
+								args: config.args.join(" "),
+								cwd: config.cwd,
+								env: [],
+							}
+						: {
+								program: config.program,
+								args: saved.args,
+								cwd: saved.cwd,
+								env: saved.env ?? [],
+							},
+				);
 			})
 			.catch(() => {
-				/* a project without a launchable artefact keeps the form empty */
+				/* a root with nothing to prefill keeps what the form already holds */
 			});
-	}, [root, onRestore]);
+		return () => {
+			cancelled = true;
+		};
+	}, [root]);
 
 	useEffect(() => {
 		if (root === null) return;

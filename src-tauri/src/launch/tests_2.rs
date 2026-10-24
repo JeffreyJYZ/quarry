@@ -91,22 +91,26 @@ pub mod tests_group_2 {
     }
 
     #[test]
-    pub fn a_non_cargo_project_asks_for_a_preset() {
+    pub fn a_non_cargo_project_is_refused_by_the_cargo_launcher() {
         for kind in [
             ProjectKind::Cmake,
             ProjectKind::CompileCommands,
             ProjectKind::Unknown,
         ] {
-            let error = require_cargo(kind).expect_err("only Cargo resolves a binary");
+            let error = require_cargo(kind).expect_err("the Cargo branch is Cargo only");
             assert!(
-                error.contains(".quarry/launch.json"),
-                "{kind:?} error names no preset file: {error}"
+                error.contains("Cargo projects only"),
+                "{kind:?} error does not name the gate: {error}"
+            );
+            assert!(
+                !error.contains(".quarry/launch.json"),
+                "{kind:?} error still asks for a preset: {error}"
             );
         }
     }
 
     #[test]
-    pub fn a_preset_is_not_needed_for_cargo() {
+    pub fn a_cargo_project_passes_the_gate() {
         assert!(require_cargo(ProjectKind::Cargo).is_ok());
     }
 

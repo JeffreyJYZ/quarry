@@ -48,6 +48,9 @@ read off `src-tauri/src/lib.rs` and `src/`:
   `build_project`; the debug panel's launch-time build still hardcodes `debug`.
 - **Run**: `run_program` / `stop_program` stream `run://output` lines and one `run://exited`, with a
   run panel in `src/run/` (program, args, cwd, env vars with validation, argv preview, run/stop).
+  Opening a project prefills the form: `cargo metadata` names the Cargo binary, and a C/C++ project
+  gets its conventional build output (the root `CMakeLists.txt` target when there is one), naming
+  the expected path even before the first build.
   The run log offers `Copy output` (ANSI-stripped), `Copy argv`, and `Re-run` with the same
   program, args, cwd and env. Named run configurations snapshot the whole form (program, args,
   cwd, env) under a name; save, update and delete are offered in the panel, and empty or duplicate

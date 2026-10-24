@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 
 pub(crate) use crate::project;
-pub(crate) use crate::types::{LaunchConfig, ProjectKind};
+pub(crate) use crate::types::{LaunchConfig, ProjectInfo, ProjectKind};
 pub use serde_json::Value;
 pub use std::env;
 pub use std::fs;
@@ -48,10 +48,11 @@ pub async fn default_launch_config(
         .map_err(|error| format!("launch task failed: {error}"))?
 }
 
+/// The Cargo composition: `cargo metadata` names the binary, which must already be built.
+///
 /// Detection, `cargo metadata` and `rustc --print sysroot` all touch the filesystem or spawn, so the
 /// whole composition runs off the async runtime.
-pub fn compose(root: &str, stop_on_entry: bool) -> Result<LaunchConfig, String> {
-    let info = project::inspect(root)?;
+pub fn compose_cargo(info: &ProjectInfo, stop_on_entry: bool) -> Result<LaunchConfig, String> {
     require_cargo(info.kind)?;
 
     let cargo = cargo_program()?;
@@ -69,32 +70,23 @@ pub fn compose(root: &str, stop_on_entry: bool) -> Result<LaunchConfig, String> 
     Ok(LaunchConfig {
         program,
         args: Vec::new(),
-        cwd: info.root,
+        cwd: info.root.clone(),
         stop_on_entry,
         init_commands: init_commands(&sysroot),
     })
 }
 
-/// Only Cargo projects can be launched without a preset; the other kinds must say so.
+/// The Cargo branch accepts Cargo projects only.
+///
+/// [`compose`] dispatches every other kind to [`compose_cpp`], so reaching this gate with one means
+/// a mis-dispatch; it still refuses them rather than guessing a command.
 pub fn require_cargo(kind: ProjectKind) -> Result<(), String> {
     match kind {
         ProjectKind::Cargo => Ok(()),
-        ProjectKind::Cmake => Err(preset_needed("CMake")),
-        ProjectKind::CompileCommands => Err(preset_needed("compile_commands.json")),
-        ProjectKind::Unknown => Err(
-            "no Cargo project detected in this directory, so there is no binary to launch; \
-             add a preset in .quarry/launch.json naming the program to debug."
-                .to_string(),
-        ),
+        other => Err(format!(
+            "the Cargo launcher composes Cargo projects only, not {other:?}"
+        )),
     }
-}
-
-pub fn preset_needed(marker: &str) -> String {
-    format!(
-        "launching a {marker} project without a preset is not supported: only Cargo projects can \
-         resolve a binary from the manifest, so add a preset in .quarry/launch.json naming the \
-         program to debug."
-    )
 }
 
 /// `CARGO` from the environment when set, else the shim on `PATH` or through `xcrun`.
