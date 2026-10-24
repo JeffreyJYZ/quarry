@@ -67,7 +67,8 @@
 	color: var(--muted);
 }
 
-.newproject-row input[type="text"] {
+.newproject-row input[type="text"],
+.newproject-row select {
 	width: 100%;
 	height: 28px;
 	padding: 0 8px;
@@ -79,7 +80,8 @@
 	font-size: 12px;
 }
 
-.newproject-row input[type="text"]:focus-visible {
+.newproject-row input[type="text"]:focus-visible,
+.newproject-row select:focus-visible {
 	outline: 1px solid var(--accent);
 	outline-offset: 1px;
 }

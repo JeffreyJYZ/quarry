@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 import { type Kind, STANDARDS } from "./kinds";
 
-/** The language-standard buttons the selected kind offers. */
+/** The language standard the selected kind offers: a Rust edition or a C/C++ standard. */
 export function StandardPicker(props: {
 	kind: Kind;
 	standard: string;
@@ -10,25 +10,18 @@ export function StandardPicker(props: {
 	const { kind, standard, onSelect } = props;
 	return (
 		<div className="newproject-row">
-			<span className="label">Language standard</span>
-			{/* biome-ignore lint/a11y/useSemanticElements: a fieldset would restyle the row; the group role carries the label */}
-			<div className="newproject-standards" role="group" aria-label="Language standard">
+			<label htmlFor="newproject-standard">Language standard</label>
+			<select
+				id="newproject-standard"
+				value={standard}
+				onChange={(event) => onSelect(event.target.value)}
+			>
 				{STANDARDS[kind].map((option) => (
-					<button
-						key={option.value}
-						type="button"
-						className={
-							standard === option.value
-								? "newproject-standard active"
-								: "newproject-standard"
-						}
-						aria-pressed={standard === option.value}
-						onClick={() => onSelect(option.value)}
-					>
+					<option key={option.value} value={option.value}>
 						{option.label}
-					</button>
+					</option>
 				))}
-			</div>
+			</select>
 		</div>
 	);
 }
