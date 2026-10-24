@@ -28,9 +28,15 @@ export type DraftPreset = {
 	initCommands: string;
 };
 
-/** Quote only what would otherwise split or vanish, so the display round trips through `splitArgs`. */
+/**
+ * Quote only what would otherwise split or vanish, so the display round trips through `splitArgs`.
+ * A quoted element escapes `"` as `\"` and `\` as `\\`, the two escapes `splitArgs` honours inside
+ * quotes, so an argument holding either survives an edit unchanged.
+ */
 function quoteArg(arg: string): string {
-	return arg === "" || /\s/.test(arg) ? `"${arg}"` : arg;
+	if (arg === "") return '""';
+	if (!/[\s"\\]/.test(arg)) return arg;
+	return `"${arg.replace(/[\\"]/g, (char) => `\\${char}`)}"`;
 }
 
 /** The display inverse of `splitArgs`: an argv array as the editor's single args line. */

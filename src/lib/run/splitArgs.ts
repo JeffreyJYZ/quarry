@@ -3,8 +3,11 @@
  *
  * Rules:
  * - Whitespace outside quotes separates arguments.
- * - A run of double quotes toggles quoting; quoted content (including spaces)
+ * - A double quote toggles quoting; quoted content (including spaces)
  *   becomes part of the current argument.
+ * - Inside quotes `\"` is a literal quote and `\\` a literal backslash; a
+ *   backslash before anything else stays literal, so `"C:\temp"` keeps its slash.
+ * - Outside quotes a backslash is literal, so a hand-written `C:\temp` survives.
  * - Trailing whitespace never produces an empty argument.
  * - An explicitly quoted empty string ("") yields one empty argument.
  */
@@ -15,6 +18,13 @@ export function splitArgs(input: string): string[] {
 	let hasToken = false;
 	for (let index = 0; index < input.length; index += 1) {
 		const char = input[index];
+		const next = input[index + 1];
+		if (inQuote && char === "\\" && (next === '"' || next === "\\")) {
+			current += next;
+			hasToken = true;
+			index += 1;
+			continue;
+		}
 		if (char === '"') {
 			inQuote = !inQuote;
 			hasToken = true;

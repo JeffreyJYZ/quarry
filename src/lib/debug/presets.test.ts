@@ -109,9 +109,25 @@ describe("editor args", () => {
 		expect(joinArgs(["a", "", "b"])).toBe('a "" b');
 	});
 
+	test("joinArgs escapes a quote or backslash inside the quotes", () => {
+		expect(joinArgs(['say "hi"'])).toBe('"say \\"hi\\""');
+		expect(joinArgs(["a\\b"])).toBe('"a\\\\b"');
+	});
+
 	test("round trips quoted and empty arguments", () => {
 		const args = ["a b", "", "c"];
 		expect(runSplitArgs(joinArgs(args))).toEqual(args);
+	});
+
+	test("round trips an argument holding a literal quote or backslash", () => {
+		const args = ['say "hi"', "C:\\temp\\bin", 'mixed "quote" and \\slash', "plain"];
+		expect(runSplitArgs(joinArgs(args))).toEqual(args);
+	});
+
+	test("a preset holding a quoted argument survives an editor round trip", () => {
+		const preset = { ...rustPreset(), args: ['say "hi"', "a b"] };
+		const saved = toLaunchPreset(toDraftPreset(preset));
+		expect(saved.args).toEqual(preset.args);
 	});
 });
 
