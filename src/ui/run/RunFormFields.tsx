@@ -41,6 +41,7 @@ export function RunFormFields({
 				<span className="run-form-label">cwd</span>
 				<input
 					className="run-form-input"
+					placeholder="project root when empty"
 					value={cwd}
 					onChange={(event: ChangeEvent<HTMLInputElement>) =>
 						onCwdChange(event.target.value)

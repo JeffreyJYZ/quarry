@@ -7,6 +7,7 @@ import {
 	runProgram,
 	stopProgram,
 } from "@/lib/project/api";
+import { isAbsoluteRunPath, runCwd } from "@/lib/run/cwd";
 import { splitArgs } from "@/lib/run/splitArgs";
 import type { RunLine } from "@/ui/run/RunLog";
 import { useRunConfigurations } from "@/ui/app/useRunConfigurations";
@@ -119,7 +120,10 @@ export function useRunControls(options: {
 			onNotice("No program to run yet: set one in the Run panel");
 			return;
 		}
-		if (!cwd.startsWith("/")) {
+		// An empty field means the project root, so a configuration saved before the form was
+		// prefilled still runs instead of failing on a path it never showed.
+		const directory = runCwd(cwd, root);
+		if (!isAbsoluteRunPath(directory)) {
 			setPanelOpen(true);
 			onNotice("Working directory must be an absolute path");
 			return;
@@ -130,7 +134,7 @@ export function useRunControls(options: {
 			const id = await runProgram(
 				program,
 				splitArgs(args),
-				cwd,
+				directory,
 				env.length === 0 ? undefined : env,
 			);
 			setRunning(id);

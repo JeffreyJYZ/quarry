@@ -1,5 +1,6 @@
 import type { RunConfiguration } from "@/lib/project/api";
 import type { EnvVar } from "@/lib/project/api";
+import { isAbsoluteRunPath } from "@/lib/run/cwd";
 import { splitArgs } from "@/lib/run/splitArgs";
 import RunForm from "@/ui/run/RunForm";
 import RunLog from "@/ui/run/RunLog";
@@ -47,7 +48,7 @@ export default function RunSection(props: RunSectionProps) {
 					cwd={props.cwd}
 					argv={argv}
 					cwdError={
-						props.cwd !== "" && !props.cwd.startsWith("/")
+						props.cwd !== "" && !isAbsoluteRunPath(props.cwd)
 							? "cwd must be absolute"
 							: null
 					}
