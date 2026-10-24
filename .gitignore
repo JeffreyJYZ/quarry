@@ -15,6 +15,9 @@ dist-ssr
 # Rust
 src-tauri/target
 
+# Backups `scripts/split-rust.ts` renames a file to before splitting it
+*.splitting
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
