@@ -130,7 +130,6 @@ export default function Terminal({
 			aria-label="Terminal"
 		>
 			<TerminalHeader
-				root={root}
 				sessions={sessions}
 				active={active}
 				activeId={activeId}

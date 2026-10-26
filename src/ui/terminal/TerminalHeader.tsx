@@ -1,13 +1,17 @@
-import {
-	decreaseFontSize,
-	increaseFontSize,
-	resetFontSize,
-	scrollbackText,
-} from "@/lib/terminal/fontSize";
+import type { ReactNode } from "react";
+import { decreaseFontSize, increaseFontSize, scrollbackText } from "@/lib/terminal/fontSize";
 import { describe, type Session, shortCwd } from "@/lib/terminal/sessions";
+import {
+	CopyIcon,
+	FontDownIcon,
+	FontUpIcon,
+	PlusIcon,
+	RestartIcon,
+	TerminalIcon,
+	TrashIcon,
+} from "@/ui/terminal/TerminalIcons";
 
 type HeaderProps = {
-	root: string;
 	sessions: Session[];
 	active: Session | null;
 	activeId: number | null;
@@ -18,9 +22,28 @@ type HeaderProps = {
 	updateSession: (id: number, updater: (s: Session) => Session) => void;
 };
 
-/** Tabs and the session toolbar. The grid size is fixed here because the PTY owns the real one. */
+/** Icon-only action button: the label lives in `title` and `aria-label`, never on screen. */
+function IconButton(props: {
+	label: string;
+	title: string;
+	onClick: () => void;
+	children: ReactNode;
+}) {
+	return (
+		<button
+			type="button"
+			className="terminal-icon-btn"
+			title={props.title}
+			aria-label={props.label}
+			onClick={props.onClick}
+		>
+			{props.children}
+		</button>
+	);
+}
+
+/** One header row: session tabs on the left, terminal actions on the right. */
 export default function TerminalHeader({
-	root,
 	sessions,
 	active,
 	activeId,
@@ -30,87 +53,51 @@ export default function TerminalHeader({
 	onRestart,
 	updateSession,
 }: HeaderProps) {
-	const size = { cols: 80, rows: 24 };
-
 	return (
-		<>
-			<div className="terminal-tabs">
-				{sessions.map((s) => (
-					<div
-						key={s.id}
-						className={`terminal-tab${s.id === activeId ? " active" : ""}${s.exited !== null ? " exited" : ""}`}
-						title={s.cwd}
-					>
-						<button
-							type="button"
-							className="terminal-tab-label"
-							onClick={() => onSelect(s.id)}
+		<div className="terminal-chrome">
+			<div className="terminal-tabs" role="tablist" aria-label="Terminal sessions">
+				{sessions.map((s) => {
+					const label = shortCwd(s.cwd);
+					return (
+						<div
+							key={s.id}
+							className={`terminal-tab${s.id === activeId ? " active" : ""}${s.exited !== null ? " exited" : ""}`}
+							role="tab"
+							aria-selected={s.id === activeId}
+							tabIndex={-1}
+							title={`${s.cwd} · pid ${s.pid ?? "—"}`}
 						>
-							<span>{shortCwd(s.cwd)}</span>
-						</button>
-						<button
-							type="button"
-							className="terminal-tab-close"
-							aria-label={`close ${shortCwd(s.cwd)}`}
-							onClick={() => onClose(s.id)}
-						>
-							×
-						</button>
-					</div>
-				))}
-				<button type="button" className="terminal-tab terminal-tab-add" onClick={onOpen}>
-					+
-				</button>
+							<span className="terminal-tab-glyph">
+								<TerminalIcon />
+							</span>
+							<button
+								type="button"
+								className="terminal-tab-label"
+								onClick={() => onSelect(s.id)}
+							>
+								{label}
+							</button>
+							<button
+								type="button"
+								className="terminal-tab-close"
+								aria-label={`Close ${label}`}
+								onClick={() => onClose(s.id)}
+							>
+								×
+							</button>
+						</div>
+					);
+				})}
 			</div>
-			<div className="terminal-head">
-				<span className="label">terminal</span>
-				<span className="terminal-cwd" title={active !== null ? active.cwd : root}>
-					{active !== null ? active.cwd : root}
-				</span>
-				{active !== null ? (
+			<div className="terminal-actions" role="toolbar" aria-label="Terminal actions">
+				<IconButton label="New terminal" title="New terminal (⌘T)" onClick={onOpen}>
+					<PlusIcon />
+				</IconButton>
+				{active === null ? null : (
 					<>
-						<span className="terminal-size">
-							{size.cols}x{size.rows}
-						</span>
-						<button
-							type="button"
-							className="terminal-btn"
-							onClick={() =>
-								updateSession(active.id, (s) => ({
-									...s,
-									fontSize: increaseFontSize(s.fontSize),
-								}))
-							}
-						>
-							A+
-						</button>
-						<button
-							type="button"
-							className="terminal-btn"
-							onClick={() =>
-								updateSession(active.id, (s) => ({
-									...s,
-									fontSize: decreaseFontSize(s.fontSize),
-								}))
-							}
-						>
-							A-
-						</button>
-						<button
-							type="button"
-							className="terminal-btn"
-							onClick={() =>
-								updateSession(active.id, (s) => ({
-									...s,
-									fontSize: resetFontSize(),
-								}))
-							}
-						>
-							A0
-						</button>
-						<button
-							type="button"
-							className="terminal-btn"
+						<IconButton
+							label="Copy all scrollback"
+							title="Copy all scrollback"
 							onClick={() => {
 								void navigator.clipboard
 									.writeText(scrollbackText(active.lines))
@@ -122,17 +109,49 @@ export default function TerminalHeader({
 									});
 							}}
 						>
-							Copy all
-						</button>
-						<button type="button" className="terminal-restart" onClick={onRestart}>
-							Restart
-						</button>
-						{active.exited !== null ? (
-							<span className="terminal-exit">exited {active.exited}</span>
-						) : null}
+							<CopyIcon />
+						</IconButton>
+						<IconButton
+							label="Restart terminal"
+							title="Restart terminal"
+							onClick={onRestart}
+						>
+							<RestartIcon />
+						</IconButton>
+						<IconButton
+							label="Decrease font size"
+							title={`Decrease font size (${active.fontSize}px)`}
+							onClick={() =>
+								updateSession(active.id, (s) => ({
+									...s,
+									fontSize: decreaseFontSize(s.fontSize),
+								}))
+							}
+						>
+							<FontDownIcon />
+						</IconButton>
+						<IconButton
+							label="Increase font size"
+							title={`Increase font size (${active.fontSize}px)`}
+							onClick={() =>
+								updateSession(active.id, (s) => ({
+									...s,
+									fontSize: increaseFontSize(s.fontSize),
+								}))
+							}
+						>
+							<FontUpIcon />
+						</IconButton>
+						<IconButton
+							label={`Close ${shortCwd(active.cwd)}`}
+							title="Close terminal (⌘W)"
+							onClick={() => onClose(active.id)}
+						>
+							<TrashIcon />
+						</IconButton>
 					</>
-				) : null}
+				)}
 			</div>
-		</>
+		</div>
 	);
 }

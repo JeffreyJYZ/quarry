@@ -24,6 +24,22 @@ export type OverlaysProps = {
 	server: string | null;
 	onOpenSettings: () => void;
 
+	railCollapsed: boolean;
+	terminalOpen: boolean;
+	panelExpanded: boolean;
+	gitOpen: boolean;
+	debugOpen: boolean;
+	building: boolean;
+	running: boolean;
+	onToggleRail: () => void;
+	onToggleTerminal: () => void;
+	onTogglePanel: () => void;
+	onToggleGit: () => void;
+	onToggleDebug: () => void;
+	onBuild: () => void;
+	onRun: () => void;
+	onStop: () => void;
+
 	references: Location[];
 	refsOpen: boolean;
 	onCloseRefs: () => void;
@@ -99,6 +115,21 @@ export default function AppOverlays(props: OverlaysProps) {
 				tabSize={props.tabSize}
 				server={props.server}
 				onOpenSettings={props.onOpenSettings}
+				railCollapsed={props.railCollapsed}
+				terminalOpen={props.terminalOpen}
+				panelExpanded={props.panelExpanded}
+				gitOpen={props.gitOpen}
+				debugOpen={props.debugOpen}
+				building={props.building}
+				running={props.running}
+				onToggleRail={props.onToggleRail}
+				onToggleTerminal={props.onToggleTerminal}
+				onTogglePanel={props.onTogglePanel}
+				onToggleGit={props.onToggleGit}
+				onToggleDebug={props.onToggleDebug}
+				onBuild={props.onBuild}
+				onRun={props.onRun}
+				onStop={props.onStop}
 			/>
 			{props.settingsOpen ? (
 				<SettingsPage

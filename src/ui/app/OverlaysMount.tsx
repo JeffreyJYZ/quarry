@@ -6,7 +6,7 @@ import type { ShellModel } from "@/ui/app/useShell";
 
 /** Everything modal or floating: settings, diffs, references, goto, generate, new project. */
 export default function OverlaysMount({ model }: { model: ShellModel }) {
-	const { workspace, overlays, panels, settings, git, diagnostics } = model;
+	const { workspace, overlays, panels, settings, git, diagnostics, build, runs } = model;
 	const cursor = overlays.cursor;
 	const active = model.active;
 
@@ -30,6 +30,21 @@ export default function OverlaysMount({ model }: { model: ShellModel }) {
 						: model.lspStatus.server
 			}
 			onOpenSettings={() => panels.setSettingsOpen(true)}
+			railCollapsed={panels.railCollapsed}
+			terminalOpen={panels.terminalOpen}
+			panelExpanded={model.panelExpanded}
+			gitOpen={panels.gitOpen}
+			debugOpen={panels.debugOpen}
+			building={build.building}
+			running={runs.running !== null}
+			onToggleRail={() => panels.setRailCollapsed((collapsed) => !collapsed)}
+			onToggleTerminal={() => panels.setTerminalOpen((open) => !open)}
+			onTogglePanel={() => panels.setPanelOpen(!model.panelExpanded)}
+			onToggleGit={() => panels.setGitOpen((open) => !open)}
+			onToggleDebug={() => panels.setDebugOpen((open) => !open)}
+			onBuild={() => void build.build()}
+			onRun={() => void runs.run()}
+			onStop={() => void runs.stop()}
 			references={overlays.references}
 			refsOpen={overlays.refsOpen}
 			onCloseRefs={() => overlays.setRefsOpen(false)}

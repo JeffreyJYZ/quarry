@@ -1,20 +1,163 @@
-.terminal-btn {
+/* Terminal chrome: one quiet header row — tabs as labels, actions as icon buttons. */
+
+.terminal-chrome {
+	display: flex;
+	align-items: center;
+	gap: 8px;
 	flex: 0 0 auto;
-	padding: 2px 6px;
-	border: 1px solid var(--line);
-	border-radius: 3px;
+	height: 30px;
+	padding: 0 6px 0 8px;
+	border-bottom: 1px solid var(--line);
+	background: var(--panel);
+}
+
+.terminal-chrome .terminal-tabs {
+	display: flex;
+	align-items: stretch;
+	gap: 2px;
+	flex: 1 1 auto;
+	min-width: 0;
+	height: 100%;
+	padding: 0;
+	border-bottom: 0;
+	border-radius: 0;
+	background: transparent;
+	overflow-x: auto;
+	overflow-y: hidden;
+	scrollbar-width: none;
+}
+
+.terminal-chrome .terminal-tab {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	flex: 0 0 auto;
+	max-width: 220px;
+	padding: 0 4px 0 6px;
+	border: 0;
+	border-bottom: 1px solid transparent;
+	border-radius: 0;
 	background: transparent;
 	color: var(--muted);
 	font-family: var(--mono);
-	font-size: 10px;
+	font-size: 12px;
 	cursor: pointer;
+}
+
+.terminal-chrome .terminal-tab:hover {
+	color: var(--text);
+}
+
+.terminal-chrome .terminal-tab.active {
+	color: var(--text);
+	border-bottom-color: var(--accent);
+}
+
+.terminal-chrome .terminal-tab.exited {
+	opacity: 0.55;
+}
+
+.terminal-tab-glyph {
+	display: inline-flex;
+	align-items: center;
+	flex: 0 0 auto;
+	opacity: 0.85;
+}
+
+.terminal-tab-label {
+	display: inline-flex;
+	align-items: center;
+	min-width: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	letter-spacing: inherit;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	cursor: pointer;
+}
+
+.terminal-tab-close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 14px;
+	height: 14px;
+	padding: 0;
+	border: 0;
+	border-radius: 3px;
+	background: none;
+	color: inherit;
+	font-size: 12px;
+	line-height: 1;
+	opacity: 0;
+	cursor: pointer;
+}
+
+.terminal-tab-close:hover {
+	background: var(--hover);
+	color: var(--text);
+}
+
+.terminal-chrome .terminal-tab:hover .terminal-tab-close,
+.terminal-chrome .terminal-tab.active .terminal-tab-close,
+.terminal-chrome .terminal-tab:focus-within .terminal-tab-close {
+	opacity: 1;
+}
+
+.terminal-tab-label:focus-visible,
+.terminal-tab-close:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: -1px;
+}
+
+.terminal-actions {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	flex: 0 0 auto;
+	margin-left: auto;
+}
+
+.terminal-icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	border: 0;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--muted);
+	cursor: pointer;
+}
+
+.terminal-icon-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.terminal-icon-btn:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: 1px;
+}
+
+.terminal-icon-btn:hover:not(:disabled) {
+	background: var(--hover);
+	color: var(--text);
 }
 
 .terminal-status {
 	flex: 0 0 auto;
 	display: flex;
-	gap: 12px;
-	padding: 2px 12px;
+	gap: 6px;
+	padding: 1px 8px;
 	border-top: 1px solid var(--line);
 	font-family: var(--mono);
 	font-size: 10px;
@@ -22,25 +165,8 @@
 }
 
 .terminal-status-cwd {
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-}
-
-.terminal-tab-label {
-	display: inline-flex;
-	align-items: center;
-	padding: 0;
-	border: 0;
-	background: none;
-	color: inherit;
-	font: inherit;
-	letter-spacing: inherit;
-	cursor: pointer;
-}
-
-.terminal-tab-label:focus-visible,
-.terminal-tab-close:focus-visible {
-	outline: 1px solid var(--accent);
-	outline-offset: 1px;
 }

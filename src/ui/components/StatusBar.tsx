@@ -1,6 +1,7 @@
 import { plural } from "@/lib/problems/model";
 import type { GitStatus, ProjectInfo } from "@/lib/project/api";
 import { kindLabel } from "@/lib/project/kind";
+import { StatusTools } from "@/ui/components/StatusBarIcons";
 
 export type StatusBarProps = {
 	project: ProjectInfo | null;
@@ -20,14 +21,31 @@ export type StatusBarProps = {
 	/** Language server name once it is up, "starting" while it comes up, "unavailable" when it failed. */
 	server?: string | null;
 	onOpenSettings: () => void;
+	/** Which regions the icon row reports as open. */
+	railCollapsed: boolean;
+	terminalOpen: boolean;
+	panelExpanded: boolean;
+	gitOpen: boolean;
+	debugOpen: boolean;
+	building: boolean;
+	running: boolean;
+	onToggleRail: () => void;
+	onToggleTerminal: () => void;
+	onTogglePanel: () => void;
+	onToggleGit: () => void;
+	onToggleDebug: () => void;
+	onBuild: () => void;
+	onRun: () => void;
+	onStop: () => void;
 };
 
 /**
  * The bottom bar.
  *
- * It carries four facts and one control: where you are, what git says, what the diagnostics count,
- * and the settings button. Everything else — the version, the language-server name, the toolchain
- * list, the last save message — lives somewhere the eye is already going, so it does not sit here.
+ * It carries four facts and two controls: where you are, what git says, what the diagnostics count,
+ * the icon row for the panels, Build/Run, and the settings button. Everything else — the version, the
+ * language-server name, the toolchain list, the last save message — lives somewhere the eye is
+ * already going, so it does not sit here.
  */
 export default function StatusBar({
 	project,
@@ -41,6 +59,21 @@ export default function StatusBar({
 	tabSize = 4,
 	server = null,
 	onOpenSettings,
+	railCollapsed,
+	terminalOpen,
+	panelExpanded,
+	gitOpen,
+	debugOpen,
+	building,
+	running,
+	onToggleRail,
+	onToggleTerminal,
+	onTogglePanel,
+	onToggleGit,
+	onToggleDebug,
+	onBuild,
+	onRun,
+	onStop,
 }: StatusBarProps) {
 	const gitSegment =
 		project !== null && git !== null && git.branch !== null ? (
@@ -62,8 +95,30 @@ export default function StatusBar({
 
 	return (
 		<footer className="statusbar">
-			<span className="status-left" title={project?.root}>
-				{project === null ? "no project" : `${project.name} · ${kindLabel(project.kind)}`}
+			<span className="status-left-group">
+				<StatusTools
+					railCollapsed={railCollapsed}
+					terminalOpen={terminalOpen}
+					panelExpanded={panelExpanded}
+					gitOpen={gitOpen}
+					debugOpen={debugOpen}
+					building={building}
+					running={running}
+					hasProject={project !== null}
+					onToggleRail={onToggleRail}
+					onToggleTerminal={onToggleTerminal}
+					onTogglePanel={onTogglePanel}
+					onToggleGit={onToggleGit}
+					onToggleDebug={onToggleDebug}
+					onBuild={onBuild}
+					onRun={onRun}
+					onStop={onStop}
+				/>
+				<span className="status-left" title={project?.root}>
+					{project === null
+						? "no project"
+						: `${project.name} · ${kindLabel(project.kind)}`}
+				</span>
 			</span>
 			<span className="status-middle">
 				{gitSegment}
@@ -111,7 +166,7 @@ export default function StatusBar({
 				)}
 				<button
 					type="button"
-					className="status-settings"
+					className="status-settings status-icon"
 					aria-label="Settings"
 					title="Settings (⌘,)"
 					onClick={onOpenSettings}
