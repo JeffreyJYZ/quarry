@@ -4,6 +4,7 @@ import {
 	servedExtensions,
 	servedByRunningServer,
 	sessionForPath,
+	isSessionId,
 } from "@/lib/lsp/served";
 
 const RUST_TABLE = [".rs"];
@@ -91,5 +92,19 @@ describe("sessionForPath", () => {
 		const rust = sessionForPath("/p/src/main.rs", new Set(["rust-analyzer"]), "/root");
 		const c = sessionForPath("/p/src/main.c", new Set(["clangd"]), "/root");
 		expect(rust).not.toBe(c);
+	});
+});
+
+describe("isSessionId", () => {
+	test("composed id is a session id", () => {
+		expect(isSessionId("rust-analyzer::/root")).toBe(true);
+		expect(isSessionId("clangd::/root")).toBe(true);
+	});
+	test("bare path is not", () => {
+		expect(isSessionId("/Users/jyz/dev/langs/rust/hi")).toBe(false);
+		expect(isSessionId("/root")).toBe(false);
+	});
+	test("null session short-circuits feature", () => {
+		expect(sessionForPath("/p/src/main.rs", new Set(), "/root")).toBeNull();
 	});
 });

@@ -24,12 +24,19 @@ export type TypeHierarchyDirection = "supertypes" | "subtypes";
 export type Cursor = { line: number; character: number };
 
 /** `textDocument/prepareTypeHierarchy`: the types at one position, as hierarchy roots. */
+function requireSessionId(wrapper: string, root: string): void {
+	if (import.meta.env.DEV && !root.includes("::")) {
+		throw new Error(`${wrapper} expects a session id, got a path`);
+	}
+}
+
 export function lspPrepareTypeHierarchy(
 	root: string,
 	path: string,
 	line: number,
 	character: number,
 ): Promise<TypeHierarchyNode[]> {
+	requireSessionId("lsp_prepare_type_hierarchy", root);
 	return invoke<TypeHierarchyNode[]>("lsp_prepare_type_hierarchy", {
 		projectRoot: root,
 		path,
@@ -43,6 +50,7 @@ export function lspTypeHierarchy(
 	root: string,
 	item: TypeHierarchyNode,
 ): Promise<TypeHierarchyAnswer> {
+	requireSessionId("lsp_type_hierarchy", root);
 	return invoke<TypeHierarchyAnswer>("lsp_type_hierarchy", { projectRoot: root, item });
 }
 

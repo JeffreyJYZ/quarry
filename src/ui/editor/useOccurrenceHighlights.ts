@@ -1,6 +1,8 @@
 import { useRef } from "react";
 import type { EditorView } from "@codemirror/view";
 import { lspDocumentHighlights } from "@/lib/project/api";
+import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
+import type { ServerKind } from "@/lib/lsp/served";
 import { toLspPosition } from "@/lib/editor/positions";
 import { setOccurrences } from "@/lib/editor/occurrences";
 
@@ -9,8 +11,12 @@ export function useOccurrenceHighlights(options: {
 	viewRef: { current: EditorView | null };
 	rootRef: { current: string | null };
 	pathRef: { current: string | null };
+	runningRef?: { current: ReadonlySet<ServerKind> };
 }) {
 	const { viewRef, rootRef, pathRef } = options;
+	const runningRef = options.runningRef ?? {
+		current: new Set<ServerKind>(["rust-analyzer", "clangd"]),
+	};
 	const occSeqRef = useRef(0);
 	const occTimerRef = useRef<number | null>(null);
 	const occPosRef = useRef<number | null>(null);
@@ -36,9 +42,15 @@ export function useOccurrenceHighlights(options: {
 		occPosRef.current = pos;
 		const mySeq = occSeqRef.current;
 		const { line, character } = toLspPosition(view, pos);
+		const kind = servedByRunningServer(currentPath, runningRef.current);
+		if (kind === null) {
+			clearOccurrences();
+			return;
+		}
+		const sid = sessionId(kind, currentRoot);
 		let ranges: Awaited<ReturnType<typeof lspDocumentHighlights>> = [];
 		try {
-			ranges = await lspDocumentHighlights(currentRoot, currentPath, line, character);
+			ranges = await lspDocumentHighlights(sid, currentPath, line, character);
 		} catch {
 			ranges = [];
 		}

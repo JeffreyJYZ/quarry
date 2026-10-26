@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { type DocumentSymbol as LspSymbol, lspSymbols } from "@/lib/project/api";
+import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
+import type { ServerKind } from "@/lib/lsp/served";
 import { qualifiedName } from "@/lib/breadcrumb/model";
 
 export type BreadcrumbProps = {
@@ -48,9 +50,16 @@ export default function Breadcrumb({ root, activePath, cursor, onNavigate }: Bre
 			return;
 		}
 		const seq = ++seqRef.current;
+		const running = new Set<ServerKind>(["rust-analyzer", "clangd"]);
+		const kind = servedByRunningServer(activePath, running);
+		if (kind === null) {
+			setSymbols([]);
+			return;
+		}
+		const sid = sessionId(kind, root);
 		void (async () => {
 			try {
-				const result = await lspSymbols(root, activePath);
+				const result = await lspSymbols(sid, activePath);
 				if (seqRef.current !== seq) return;
 				cacheRef.current.set(activePath, result);
 				setSymbols(result);

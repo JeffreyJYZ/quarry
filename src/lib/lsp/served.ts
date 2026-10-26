@@ -38,6 +38,11 @@ export function sessionId(kind: ServerKind, root: string): string {
 	return `${kind}::${root}`;
 }
 
+/** Whether a string is a composed session id (`{kind}::{root}`), not a bare path. */
+export function isSessionId(value: string): boolean {
+	return value.includes("::");
+}
+
 /** Which servers should run for a root, from what is actually there. */
 export type RootSignals = {
 	hasCargoToml: boolean;

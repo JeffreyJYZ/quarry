@@ -4,7 +4,8 @@ import {
 	lspCallHierarchyCalls,
 	lspCallHierarchyPrepare,
 } from "@/lib/project/api";
-
+import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
+import type { ServerKind } from "@/lib/lsp/served";
 export type CallsPanelProps = {
 	root: string;
 	path: string;
@@ -34,7 +35,15 @@ export default function CallsPanel({ root, path, cursor, onNavigate, onClose }: 
 		setChildren(new Map());
 		setExpanded(new Set());
 		setLoadingNodes(new Set());
-		void lspCallHierarchyPrepare(root, path, cursor.line, cursor.character)
+		const running = new Set<ServerKind>(["rust-analyzer", "clangd"]);
+		const kind = servedByRunningServer(path, running);
+		if (kind === null) {
+			setPrepared([]);
+			setLoading(false);
+			return;
+		}
+		const sid = sessionId(kind, root);
+		void lspCallHierarchyPrepare(sid, path, cursor.line, cursor.character)
 			.then((nodes) => {
 				if (cancelled) return;
 				setPrepared(nodes);
@@ -61,9 +70,13 @@ export default function CallsPanel({ root, path, cursor, onNavigate, onClose }: 
 				});
 				return;
 			}
+			const running = new Set<ServerKind>(["rust-analyzer", "clangd"]);
+			const kind = servedByRunningServer(path, running);
+			if (kind === null) return;
+			const sid = sessionId(kind, root);
 			if (children.has(node.itemId) || loadingNodes.has(node.itemId)) return;
 			setLoadingNodes((current) => new Set(current).add(node.itemId));
-			void lspCallHierarchyCalls(root, node.itemId, direction)
+			void lspCallHierarchyCalls(sid, node.itemId, direction)
 				.then((nodes) => {
 					setChildren((current) => {
 						const next = new Map(current);
@@ -86,7 +99,7 @@ export default function CallsPanel({ root, path, cursor, onNavigate, onClose }: 
 					});
 				});
 		},
-		[root, direction, expanded, children, loadingNodes],
+		[root, path, direction, expanded, children, loadingNodes],
 	);
 
 	const renderNode = (node: CallHierarchyNode, depth: number): ReactElement => {

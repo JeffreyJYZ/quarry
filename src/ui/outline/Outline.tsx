@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { type DocumentSymbol as LspSymbol, lspSymbols } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
 import { isInsideRoot, lspErrorMessage } from "@/lib/lsp/paths";
+import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
+import type { ServerKind } from "@/lib/lsp/served";
 import { caretSymbolIndex, filterSymbolIndices } from "@/lib/outline/model";
 import { kindLabel } from "./outlineKinds";
 
@@ -40,10 +42,18 @@ export default function Outline({ root, activePath, onNavigate, cursor }: Outlin
 		const seq = ++seqRef.current;
 		setLoading(true);
 		setError(null);
+		const running = new Set<ServerKind>(["rust-analyzer", "clangd"]);
+		const kind = servedByRunningServer(activePath, running);
+		if (kind === null) {
+			setSymbols([]);
+			setLoading(false);
+			return;
+		}
+		const sid = sessionId(kind, root);
 		const timer = window.setTimeout(() => {
 			void (async () => {
 				try {
-					const result = await lspSymbols(root, activePath);
+					const result = await lspSymbols(sid, activePath);
 					if (seqRef.current !== seq) return;
 					setSymbols(result);
 					setLoading(false);

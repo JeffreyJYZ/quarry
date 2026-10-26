@@ -3,6 +3,7 @@ import type { BreakpointRow, useDebugSession } from "@/lib/debug/session";
 import type { FileEdit } from "@/lib/project/api";
 import type { GenerateItem } from "@/lib/generate/model";
 import { type Location, lspCodeActions } from "@/lib/project/api";
+import { sessionForContext } from "@/lib/lsp/context";
 import { describeError } from "@/lib/project/errors";
 import type { FileBuffer } from "@/lib/project/buffer";
 
@@ -102,9 +103,14 @@ export function useEditorActions(options: {
 	 */
 	const organizeImports = useCallback(async () => {
 		if (root === null || activePath === null) return;
+		const session = sessionForContext(activePath);
+		if (session === null) {
+			onNotice("No language server is running for this file");
+			return;
+		}
 		setFormatting(true);
 		try {
-			const actions = await lspCodeActions(root, activePath, 0, 0);
+			const actions = await lspCodeActions(session, activePath, 0, 0);
 			const organize = actions.find((action) =>
 				(action.kind ?? "").startsWith("source.organizeImports"),
 			);

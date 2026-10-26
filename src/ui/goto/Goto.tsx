@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { lspSymbols, lspWorkspaceSymbols, type WorkspaceSymbol } from "@/lib/project/api";
 import { isInsideRoot } from "@/lib/lsp/paths";
+import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
+import type { ServerKind } from "@/lib/lsp/served";
 import "@/ui/goto/goto.css";
 import { type GotoMode, type Row, TITLES, fileNameOf, filterRows } from "./gotoModel";
 
@@ -55,10 +57,14 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose }: Goto
 			setLoading(true);
 			try {
 				if (mode === "symbol") {
-					const symbols =
-						path === null || !isInsideRoot(root, path)
-							? []
-							: await lspSymbols(root, path).catch(() => []);
+					let symbols: Awaited<ReturnType<typeof lspSymbols>> = [];
+					if (path !== null && isInsideRoot(root, path)) {
+						const running = new Set<ServerKind>(["rust-analyzer", "clangd"]);
+						const kind = servedByRunningServer(path, running);
+						if (kind !== null) {
+							symbols = await lspSymbols(sessionId(kind, root), path).catch(() => []);
+						}
+					}
 					if (cancelled) return;
 					setRows(
 						symbols.map((symbol) => ({
@@ -71,9 +77,18 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose }: Goto
 						})),
 					);
 				} else {
-					const symbols: WorkspaceSymbol[] = await lspWorkspaceSymbols(root, query).catch(
-						() => [],
-					);
+					const running = new Set<ServerKind>(["rust-analyzer", "clangd"]);
+					const kind = running.has("rust-analyzer")
+						? "rust-analyzer"
+						: running.has("clangd")
+							? "clangd"
+							: null;
+					const symbols: WorkspaceSymbol[] =
+						kind === null
+							? []
+							: await lspWorkspaceSymbols(sessionId(kind, root), query).catch(
+									() => [],
+								);
 					if (cancelled) return;
 					setRows(
 						symbols.map((symbol) => ({

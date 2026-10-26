@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FileBuffer } from "@/lib/project/buffer";
 import { type CodeAction, lspCodeActions } from "@/lib/project/api";
+import { sessionForContext } from "@/lib/lsp/context";
 import { applyFileEdits } from "@/lib/refactor/apply";
 import { cacheKey } from "./parts";
 
@@ -61,7 +62,11 @@ export function useProblemActions({
 			if (root === null) {
 				return [];
 			}
-			const actions = await lspCodeActions(root, path, line, character);
+			const session = sessionForContext(path);
+			if (session === null) {
+				return [];
+			}
+			const actions = await lspCodeActions(session, path, line, character);
 			cache.current.set(key, actions);
 			return actions;
 		},
