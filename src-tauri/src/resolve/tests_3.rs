@@ -14,69 +14,7 @@ use super::*;
 pub mod tests_group_3 {
     use super::*;
 
-    use std::sync::{Mutex, MutexGuard, OnceLock};
-
-    /// `PATH` is process-wide, so every test that touches it holds this lock.
-    pub fn path_lock() -> MutexGuard<'static, ()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        let guard = LOCK.get_or_init(|| Mutex::new(())).lock();
-        guard.unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
-
-    /// Set `PATH` for the duration of a test, restoring the previous value afterwards.
-    pub fn with_path<T>(value: &str, body: impl FnOnce() -> T) -> T {
-        let _guard = path_lock();
-        let previous = env::var_os("PATH");
-        unsafe { env::set_var("PATH", value) };
-        let result = body();
-        match previous {
-            Some(previous) => unsafe { env::set_var("PATH", previous) },
-            None => unsafe { env::remove_var("PATH") },
-        }
-        result
-    }
-
-    /// A temporary directory that cleans itself up.
-    pub struct TempDir(PathBuf);
-
-    impl TempDir {
-        pub(crate) fn new(tag: &str) -> Self {
-            let mut path = env::temp_dir();
-            let stamp = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|elapsed| elapsed.as_nanos())
-                .unwrap_or(0);
-            path.push(format!(
-                "quarry-resolve-{tag}-{}-{stamp}",
-                std::process::id()
-            ));
-            fs::create_dir_all(&path).expect("temporary directory");
-            Self(path)
-        }
-
-        pub(crate) fn path(&self) -> &Path {
-            &self.0
-        }
-
-        /// Write a file, optionally executable.
-        pub(crate) fn file(&self, name: &str, executable: bool) -> PathBuf {
-            let path = self.0.join(name);
-            fs::write(&path, "#!/bin/sh\n").expect("write file");
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let mode = if executable { 0o755 } else { 0o644 };
-                fs::set_permissions(&path, fs::Permissions::from_mode(mode)).expect("chmod");
-            }
-            path
-        }
-    }
-
-    impl Drop for TempDir {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
-        }
-    }
+    use crate::test_support::{TempDir, with_path};
 
     #[test]
     pub fn resolve_prefers_a_path_hit_over_xcrun() {

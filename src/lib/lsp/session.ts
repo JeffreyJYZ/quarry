@@ -8,6 +8,7 @@ import {
 	stopLsp,
 } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
+import { serverKindForProject, servesPath } from "@/lib/lsp/served";
 
 /** Full-document sync only; one push per quiet period, not per keystroke. */
 const CHANGE_DEBOUNCE_MS = 350;
@@ -67,13 +68,22 @@ export type DocumentSyncOptions = {
 	report: (message: string) => void;
 	/** False until the server for this root has started; opening a document before that has no session. */
 	ready: boolean;
+	/** Project kind, used to decide whether the running server serves this path. */
+	kind?: string | null;
 };
 
 /**
  * Tell the server which document is open, push full text after a quiet period, and close the
  * document when its tab goes away. Every rejection is reported as one line, never thrown.
  */
-export function useDocumentSync({ root, path, text, report, ready }: DocumentSyncOptions): void {
+export function useDocumentSync({
+	root,
+	path,
+	text,
+	report,
+	ready,
+	kind = null,
+}: DocumentSyncOptions): void {
 	const latest = useRef({ text, report });
 	latest.current = { text, report };
 	const opened = useRef<{ root: string; path: string; text: string } | null>(null);
@@ -81,6 +91,19 @@ export function useDocumentSync({ root, path, text, report, ready }: DocumentSyn
 	useEffect(() => {
 		if (root === null || path === null || !ready) {
 			return;
+		}
+		const serverKind = serverKindForProject(kind);
+		const served = servesPath(serverKind, path);
+		if (!served) {
+			return () => {
+				const open = opened.current;
+				if (open !== null && open.root === root && open.path === path) {
+					opened.current = null;
+					lspCloseDocument(root, path).catch((error: unknown) => {
+						latest.current.report(`Close document: ${describeError(error)}`);
+					});
+				}
+			};
 		}
 		const initial = latest.current.text;
 		let live = true;
@@ -106,15 +129,21 @@ export function useDocumentSync({ root, path, text, report, ready }: DocumentSyn
 		);
 		return () => {
 			live = false;
-			opened.current = null;
-			lspCloseDocument(root, path).catch((error: unknown) => {
-				latest.current.report(`Close document: ${describeError(error)}`);
-			});
+			const open = opened.current;
+			if (open !== null && open.root === root && open.path === path) {
+				opened.current = null;
+				lspCloseDocument(root, path).catch((error: unknown) => {
+					latest.current.report(`Close document: ${describeError(error)}`);
+				});
+			}
 		};
-	}, [root, path, ready]);
+	}, [root, path, ready, kind]);
 
 	useEffect(() => {
 		if (root === null || path === null) {
+			return;
+		}
+		if (!servesPath(serverKindForProject(kind), path)) {
 			return;
 		}
 		const timer = setTimeout(() => {
@@ -135,5 +164,5 @@ export function useDocumentSync({ root, path, text, report, ready }: DocumentSyn
 			);
 		}, CHANGE_DEBOUNCE_MS);
 		return () => clearTimeout(timer);
-	}, [root, path, text]);
+	}, [root, path, text, kind]);
 }

@@ -150,6 +150,7 @@ mod tests {
 
     #[test]
     fn taplo_formats_when_discoverable() {
+        let _guard = crate::test_support::path_lock();
         let available = find_on_path("taplo").is_some() || find_on_path("taplo-cli").is_some();
         if !available {
             return;

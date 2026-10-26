@@ -1,4 +1,5 @@
 import { generateItems } from "@/lib/generate/model";
+import { serverKindForProject, servesPath } from "@/lib/lsp/served";
 import { DEFAULT_PROJECT_SETTINGS } from "@/lib/settings/model";
 import { languageLabel } from "@/ui/app/shellShortcuts";
 import AppOverlays from "@/ui/app/AppOverlays";
@@ -27,7 +28,12 @@ export default function OverlaysMount({ model }: { model: ShellModel }) {
 					? null
 					: model.lspStatus === undefined || model.lspStatus === null
 						? "lsp starting"
-						: model.lspStatus.server
+						: servesPath(
+									serverKindForProject(workspace.project?.kind ?? null),
+									model.activePath,
+							  )
+							? model.lspStatus.server
+							: null
 			}
 			onOpenSettings={() => panels.setSettingsOpen(true)}
 			railCollapsed={panels.railCollapsed}

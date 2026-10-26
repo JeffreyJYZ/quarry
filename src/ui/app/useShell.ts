@@ -103,6 +103,7 @@ export function useShell() {
 		text: active?.text ?? "",
 		report: reportNotice,
 		ready: lspStatus !== null,
+		kind: workspace.project?.kind ?? null,
 	});
 	const build = useBuild({
 		root,
