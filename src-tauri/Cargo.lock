@@ -2860,7 +2860,7 @@ dependencies = [
 
 [[package]]
 name = "quarry"
-version = "0.1.0-alpha.14"
+version = "0.1.0-alpha.15"
 dependencies = [
  "portable-pty",
  "regex",
