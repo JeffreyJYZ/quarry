@@ -1,18 +1,19 @@
 import type { ReactNode } from "react";
 
-/** Monochrome 15px glyphs for the status bar's left toggle row, in Zed's quiet register. */
+/** Monochrome 16px glyphs for the status bar's left toggle row, in Zed's quiet register. */
 function Glyph({ fill = "none", children }: { fill?: string; children: ReactNode }) {
 	return (
 		<svg
-			width="15"
-			height="15"
+			width="16"
+			height="16"
 			viewBox="0 0 15 15"
 			aria-hidden="true"
 			focusable="false"
 			fill={fill}
 			stroke="currentColor"
-			strokeWidth="1.5"
+			strokeWidth="1.1"
 			strokeLinecap="round"
+			strokeLinejoin="round"
 		>
 			{children}
 		</svg>

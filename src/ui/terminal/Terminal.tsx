@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { ptyResize } from "@/lib/project/api";
 import { ptySize } from "@/lib/terminal/sessions";
 import "@/ui/terminal/terminal.css";
+import { shouldFocusTerminal } from "@/ui/terminal/focusTarget";
 import TerminalHeader from "@/ui/terminal/TerminalHeader";
 import TerminalScreen from "@/ui/terminal/TerminalScreen";
 import { useTerminalKeys, useTerminalTabKeys } from "@/ui/terminal/useTerminalKeys";
@@ -48,6 +49,11 @@ export default function Terminal({
 		send,
 	} = useTerminalSessions({ root, activePath, defaultFontSize, containerRef });
 
+	/** Every keystroke reaches the shell through the offscreen textarea, so it is the typing surface. */
+	const focusInput = useCallback(() => {
+		inputRef.current?.focus({ preventScroll: true });
+	}, []);
+
 	const active = sessions.find((s) => s.id === activeId) ?? null;
 
 	// Open the first tab once, so the panel is never an empty box.
@@ -55,6 +61,11 @@ export default function Terminal({
 	useEffect(() => {
 		void openSession();
 	}, []);
+
+	useEffect(() => {
+		if (activeId === null) return;
+		focusInput();
+	}, [activeId, focusInput]);
 
 	const restart = useTerminalRestart({
 		root,
@@ -100,6 +111,15 @@ export default function Terminal({
 
 	useTerminalTabKeys(openSession, closeSession, activeIdRef);
 
+	// Selecting a tab, or clicking anywhere but a control, turns the keyboard back to the shell.
+	const selectTab = (id: number) => {
+		setActiveId(id);
+		focusInput();
+	};
+	const onPanelMouseDown = (event: React.MouseEvent<HTMLElement>) => {
+		if (shouldFocusTerminal(event.target)) focusInput();
+	};
+
 	const onScroll = useCallback(() => {
 		const el = containerRef.current;
 		if (el === null || activeId === null) return;
@@ -128,12 +148,13 @@ export default function Terminal({
 		<section
 			className={placement === "right" ? "terminal terminal-side" : "terminal"}
 			aria-label="Terminal"
+			onMouseDown={onPanelMouseDown}
 		>
 			<TerminalHeader
 				sessions={sessions}
 				active={active}
 				activeId={activeId}
-				onSelect={setActiveId}
+				onSelect={selectTab}
 				onOpen={() => void openSession()}
 				onClose={closeSession}
 				onRestart={restart}
