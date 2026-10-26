@@ -7,12 +7,13 @@
  * proves the public URL serves the version it just published. Full multi-platform builds stay on CI
  * for `quarry-beta*` and `v*` tags.
  *
- * Usage: bun scripts/release-local.ts [--tag quarry-alphaN] [--skip-build] [--notes FILE]
+ * Usage: bun scripts/release-local.ts [--tag quarry-alphaN] [--skip-build] [--skip-ci] [--notes FILE]
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { ciVerdict } from "./ci-status";
 
 const ROOT = join(import.meta.dir, "..");
 const REPO = "JeffreyJYZ/quarry";
@@ -135,6 +136,65 @@ async function main(): Promise<number> {
 
 	if (!existsSync(join(homedir(), ".tauri", "quarry-updater.key"))) {
 		fail("missing ~/.tauri/quarry-updater.key; the updater cannot be signed");
+	}
+
+	const sha = run("git", ["rev-parse", "HEAD"]).trim();
+	if (process.argv.includes("--skip-ci")) {
+		log(`WARNING: skipping CI check for ${sha} (--skip-ci)`);
+	} else {
+		const raw = run("gh", [
+			"run",
+			"list",
+			"--workflow",
+			"CI",
+			"--commit",
+			sha,
+			"--limit",
+			"1",
+			"--json",
+			"conclusion,status,databaseId,headSha,url",
+		]).trim();
+		const runs = JSON.parse(raw) as {
+			status: string;
+			conclusion: string | null;
+			url: string;
+			databaseId: number;
+		}[];
+		const ciRun = runs[0] ?? null;
+		let failingJobs: string[] = [];
+		if (ciRun !== null && ciRun.status === "completed" && ciRun.conclusion !== "success") {
+			const viewRaw = run("gh", [
+				"run",
+				"view",
+				String(ciRun.databaseId),
+				"--json",
+				"jobs",
+			]).trim();
+			const view = JSON.parse(viewRaw) as {
+				jobs: { name: string; conclusion: string | null }[];
+			};
+			failingJobs = view.jobs
+				.filter((job) => job.conclusion !== "success" && job.conclusion !== null)
+				.map((job) => job.name);
+		}
+		const verdict = ciVerdict(sha, ciRun, failingJobs);
+		if (!verdict.proceed) {
+			if (verdict.failingJobs.length > 0) {
+				fail(`${verdict.message} — failing jobs: ${verdict.failingJobs.join(", ")}`);
+			}
+			fail(verdict.message);
+		}
+		log(verdict.message);
+	}
+
+	if (!process.argv.includes("--skip-ci")) {
+		log("running the local gate (bun run gate)");
+		try {
+			run("bun", ["run", "gate"]);
+		} catch (error) {
+			fail(`local gate failed: ${error instanceof Error ? error.message : String(error)}`);
+		}
+		log("local gate green");
 	}
 
 	if (!process.argv.includes("--skip-build")) {
