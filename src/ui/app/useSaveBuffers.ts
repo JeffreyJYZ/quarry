@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef } from "react";
 import { isDirty, type FileBuffer } from "@/lib/project/buffer";
 import { type SaveOutcome, saveBuffer, saveErrorMessage, saveMessage } from "@/lib/project/save";
 import { formatterFor, lspDidSave } from "@/lib/project/api";
-import { servesAny } from "@/lib/lsp/served";
+import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
+import type { ServerKind } from "@/lib/lsp/served";
 import type { EditorHandle } from "@/ui/editor/Editor";
 import type { StatusText } from "@/ui/app/status";
 
@@ -12,6 +13,7 @@ export type SaveContext = {
 	root: string | null;
 	activePath: string | null;
 	formatting: boolean;
+	runningRef?: { current: ReadonlySet<ServerKind> };
 	buffersRef: React.RefObject<FileBuffer[]>;
 	activePathRef: React.RefObject<string | null>;
 	editorRef: React.RefObject<EditorHandle | null>;
@@ -35,6 +37,7 @@ export function useSaveBuffers(context: SaveContext) {
 		root,
 		activePath,
 		formatting,
+		runningRef: runningRefOption,
 		buffersRef,
 		activePathRef,
 		editorRef,
@@ -45,6 +48,7 @@ export function useSaveBuffers(context: SaveContext) {
 		setFormatting,
 	} = context;
 	const saveTimer = useRef<number | null>(null);
+	const runningRef = runningRefOption ?? { current: new Set<ServerKind>() };
 
 	const showSaveStatus = useCallback(
 		(status: StatusText) => {
@@ -127,8 +131,9 @@ export function useSaveBuffers(context: SaveContext) {
 						failed: false,
 					});
 					// The checker runs on save; without this the server never re-analyses.
-					if (servesAny(path)) {
-						void lspDidSave(root, path).catch(() => {
+					const kind = servedByRunningServer(path, runningRef.current);
+					if (kind !== null) {
+						void lspDidSave(sessionId(kind, root), path).catch(() => {
 							/* a server that is not running has nothing to tell */
 						});
 					}
@@ -155,6 +160,7 @@ export function useSaveBuffers(context: SaveContext) {
 			setSaving,
 			showSaveStatus,
 			context,
+			runningRef,
 		],
 	);
 

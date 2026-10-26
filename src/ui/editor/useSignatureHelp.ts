@@ -3,15 +3,18 @@ import type { EditorView } from "@codemirror/view";
 import { toLspPosition } from "@/lib/editor/positions";
 import type { SignatureHelp } from "@/lib/project/api";
 import { lspSignatureHelp } from "@/lib/project/api";
-import { servesAny } from "@/lib/lsp/served";
+import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
+import type { ServerKind } from "@/lib/lsp/served";
 
 export type SignatureHelpArgs = {
 	viewRef: { current: EditorView | null };
 	rootRef: { current: string | null };
 	pathRef: { current: string | null };
+	runningRef?: { current: ReadonlySet<ServerKind> };
 };
 
-export function useSignatureHelp({ viewRef, rootRef, pathRef }: SignatureHelpArgs) {
+export function useSignatureHelp({ viewRef, rootRef, pathRef, runningRef }: SignatureHelpArgs) {
+	const running = runningRef ?? { current: new Set<ServerKind>(["rust-analyzer", "clangd"]) };
 	const [sigHelp, setSigHelp] = useState<SignatureHelp | null>(null);
 	const [sigCoords, setSigCoords] = useState<{
 		left: number;
@@ -35,12 +38,8 @@ export function useSignatureHelp({ viewRef, rootRef, pathRef }: SignatureHelpArg
 		const view = viewRef.current;
 		const currentRoot = rootRef.current;
 		const currentPath = pathRef.current;
-		if (
-			view === null ||
-			currentRoot === null ||
-			currentPath === null ||
-			!servesAny(currentPath)
-		) {
+		const kind = servedByRunningServer(currentPath, running.current);
+		if (view === null || currentRoot === null || currentPath === null || kind === null) {
 			hideSig();
 			return;
 		}
@@ -49,7 +48,12 @@ export function useSignatureHelp({ viewRef, rootRef, pathRef }: SignatureHelpArg
 		const mySeq = ++sigSeqRef.current;
 		let result: SignatureHelp | null = null;
 		try {
-			result = await lspSignatureHelp(currentRoot, currentPath, line, character);
+			result = await lspSignatureHelp(
+				sessionId(kind, currentRoot),
+				currentPath,
+				line,
+				character,
+			);
 		} catch {
 			result = null;
 		}
@@ -69,7 +73,7 @@ export function useSignatureHelp({ viewRef, rootRef, pathRef }: SignatureHelpArg
 			setSigHelp(null);
 			setSigCoords(null);
 		}, 10000);
-	}, [viewRef, rootRef, pathRef, hideSig]);
+	}, [viewRef, rootRef, pathRef, hideSig, running.current]);
 
 	const scheduleSig = useCallback(() => {
 		if (sigTimerRef.current !== null) window.clearTimeout(sigTimerRef.current);

@@ -17,6 +17,8 @@ import {
 	type VisibleNode,
 } from "@/lib/lsp/typeHierarchy";
 import { describeError } from "@/lib/project/errors";
+import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
+import type { ServerKind } from "@/lib/lsp/served";
 
 type Hierarchies = Record<TypeHierarchyDirection, TypeHierarchy>;
 
@@ -31,13 +33,16 @@ export function useHierarchy({
 	cursor,
 	onNavigate,
 	onClose,
+	running,
 }: {
 	root: string;
 	path: string;
 	cursor: { line: number; character: number };
 	onNavigate: (path: string, line: number, character: number) => void;
 	onClose: () => void;
+	running?: ReadonlySet<ServerKind>;
 }) {
+	const runningSet = running ?? new Set<ServerKind>(["rust-analyzer", "clangd"]);
 	const [direction, setDirection] = useState<TypeHierarchyDirection>("supertypes");
 	const [hierarchies, setHierarchies] = useState<Hierarchies>(freshHierarchies);
 	const [prepared, setPrepared] = useState<TypeHierarchyNode[] | null>(null);
@@ -49,7 +54,13 @@ export function useHierarchy({
 	/** Bumped per prepare, so a level fetched for an old symbol cannot land in the new tree. */
 	const generation = useRef(0);
 
+	const kind = servedByRunningServer(path, runningSet);
 	useEffect(() => {
+		if (kind === null) {
+			setLoading(false);
+			setError(null);
+			return;
+		}
 		let cancelled = false;
 		generation.current += 1;
 		const token = generation.current;
@@ -60,7 +71,7 @@ export function useHierarchy({
 		setActiveKey(null);
 		setLoadingKey(null);
 		setCopyState(null);
-		lspPrepareTypeHierarchy(root, path, cursor.line, cursor.character).then(
+		lspPrepareTypeHierarchy(sessionId(kind, root), path, cursor.line, cursor.character).then(
 			(nodes) => {
 				if (cancelled || generation.current !== token) return;
 				setPrepared(nodes);
@@ -79,7 +90,7 @@ export function useHierarchy({
 		return () => {
 			cancelled = true;
 		};
-	}, [root, path, cursor.line, cursor.character]);
+	}, [root, path, cursor.line, cursor.character, kind]);
 
 	/** Escape closes even after focus moved to the editor, so it is bound on the window. */
 	useEffect(() => {
@@ -131,7 +142,8 @@ export function useHierarchy({
 			const token = generation.current;
 			setLoadingKey(keyed);
 			setError(null);
-			lspTypeHierarchy(root, node).then(
+			if (kind === null) return;
+			lspTypeHierarchy(sessionId(kind, root), node).then(
 				(answer) => {
 					if (generation.current !== token) return;
 					const nodes = neighbourNodes(answer, direction);
@@ -148,7 +160,7 @@ export function useHierarchy({
 				},
 			);
 		},
-		[root, direction, hierarchies],
+		[root, direction, hierarchies, kind],
 	);
 
 	const copyQualified = useCallback(() => {

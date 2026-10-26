@@ -1,6 +1,7 @@
 import type { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import type { CodeAction, Location } from "@/lib/project/api";
+import type { ServerKind } from "@/lib/lsp/served";
 import type { InlayHint } from "@/lib/project/api";
 
 /** What the surface's key bindings reach: refs for live values, setters for the panels they open. */
@@ -10,6 +11,7 @@ export type KeymapDeps = {
 	latestRef: {
 		current: { path: string | null; value: string; onChange: (value: string) => void };
 	};
+	runningRef: { current: ReadonlySet<ServerKind> };
 	navigateRef: { current: ((path: string, line: number, character: number) => void) | null };
 	referencesRef: { current: ((locations: Location[]) => void) | null };
 	occurrenceHistoryRef: { current: EditorSelection[] };

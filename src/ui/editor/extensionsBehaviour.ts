@@ -4,11 +4,13 @@ import { kindToType } from "@/lib/editor/completion";
 import { toLspPosition } from "@/lib/editor/positions";
 import { renderMarkdown } from "@/lib/editor/markdown";
 import { type Location, lspCompletion, lspDefinition, lspHover } from "@/lib/project/api";
-import { servesAny } from "@/lib/lsp/served";
+import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
+import type { ServerKind } from "@/lib/lsp/served";
 import type { KeymapDeps } from "@/ui/editor/keymapDeps";
 
 export type BehaviourDeps = KeymapDeps & {
 	recomputeRef: { current: () => void };
+	runningRef: { current: ReadonlySet<ServerKind> };
 	scheduleSig: () => void;
 	scheduleOccurrences: () => void;
 	inlayTimerRef: { current: number | null };
@@ -79,7 +81,8 @@ export function behaviourExtensions(deps: BehaviourDeps) {
 				const currentPath = deps.latestRef.current.path;
 				const callback = deps.navigateRef.current;
 				if (currentRoot === null || currentPath === null || callback === null) return false;
-				if (!servesAny(currentPath)) return false;
+				const kind = servedByRunningServer(currentPath, deps.runningRef.current);
+				if (kind === null) return false;
 				const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
 				if (pos === null) return false;
 				const { line, character } = toLspPosition(view, pos);
@@ -87,7 +90,12 @@ export function behaviourExtensions(deps: BehaviourDeps) {
 				void (async () => {
 					let locations: Location[] = [];
 					try {
-						locations = await lspDefinition(currentRoot, currentPath, line, character);
+						locations = await lspDefinition(
+							sessionId(kind, currentRoot),
+							currentPath,
+							line,
+							character,
+						);
 					} catch {
 						locations = [];
 					}
@@ -106,7 +114,8 @@ export function behaviourExtensions(deps: BehaviourDeps) {
 					const currentRoot = deps.rootRef.current;
 					const currentPath = deps.latestRef.current.path;
 					if (currentRoot === null || currentPath === null) return null;
-					if (!servesAny(currentPath)) return null;
+					const kind = servedByRunningServer(currentPath, deps.runningRef.current);
+					if (kind === null) return null;
 					if (!context.explicit && context.matchBefore(/[\w:.]+/) === null) {
 						return null;
 					}
@@ -116,7 +125,12 @@ export function behaviourExtensions(deps: BehaviourDeps) {
 					const { line, character } = toLspPosition(completionView, context.pos);
 					let result: Awaited<ReturnType<typeof lspCompletion>>;
 					try {
-						result = await lspCompletion(currentRoot, currentPath, line, character);
+						result = await lspCompletion(
+							sessionId(kind, currentRoot),
+							currentPath,
+							line,
+							character,
+						);
 					} catch {
 						return null;
 					}
@@ -138,12 +152,13 @@ export function behaviourExtensions(deps: BehaviourDeps) {
 			const currentRoot = deps.rootRef.current;
 			const currentPath = deps.latestRef.current.path;
 			if (currentRoot === null || currentPath === null) return null;
-			if (!servesAny(currentPath)) return null;
+			const kind = servedByRunningServer(currentPath, deps.runningRef.current);
+			if (kind === null) return null;
 			const mySeq = ++deps.hoverSeq;
 			const { line, character } = toLspPosition(view, pos);
 			let info: Awaited<ReturnType<typeof lspHover>>;
 			try {
-				info = await lspHover(currentRoot, currentPath, line, character);
+				info = await lspHover(sessionId(kind, currentRoot), currentPath, line, character);
 			} catch {
 				return null;
 			}

@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { useDebugSession } from "@/lib/debug/session";
-import { useDocumentSync, useLspServer } from "@/lib/lsp/session";
+import { useLspWiring } from "@/ui/app/useLspWiring";
+import type { ServerKind } from "@/lib/lsp/served";
 import type { RunConfiguration } from "@/lib/project/api";
 import { splitArgs } from "@/lib/run/splitArgs";
 import { useTests } from "@/lib/tests/useTests";
@@ -19,9 +20,7 @@ import { useAutoOpenDock } from "@/ui/app/useAutoOpenDock";
 import { resetProjectState } from "@/ui/app/projectReset";
 import { useShellGlue } from "@/ui/app/useShellGlue";
 import { useWorkspace } from "@/ui/app/useWorkspace";
-
 export type ShellModel = ReturnType<typeof useShell>;
-
 /**
  * The whole shell, composed.
  *
@@ -36,7 +35,7 @@ export function useShell() {
 	const projectOpenedRef = useRef<() => void>(() => {});
 	const editorRef = useRef<EditorHandle | null>(null);
 	const runConfigurationsRef = useRef<RunConfiguration[]>([]);
-
+	const lspRunningRef = useRef<ReadonlySet<ServerKind>>(new Set());
 	const workspace = useWorkspace({
 		onNotice: setNotice,
 		onProjectOpened: () => projectOpenedRef.current(),
@@ -48,7 +47,6 @@ export function useShell() {
 		setSearchOpen: overlays.setSearchOpen,
 		setQuickOpenOpen: overlays.setQuickOpenOpen,
 	});
-
 	const root = workspace.project?.root ?? null;
 	const activePath = workspace.activePath;
 
@@ -78,6 +76,7 @@ export function useShell() {
 		activePathRef: workspace.activePathRef,
 		editorRef,
 		formatOnSaveRef,
+		runningRef: lspRunningRef,
 		setBuffers: workspace.setBuffers,
 		setSaving: workspace.setSaving,
 		setSaveStatus: panels.setSaveStatus,
@@ -88,23 +87,25 @@ export function useShell() {
 	savePathsRef.current = save.savePaths;
 
 	const reportNotice = useCallback((message: string) => setNotice(message), []);
-	const lspOverrides =
-		workspace.project?.kind === "cargo"
-			? { path: effective.rustAnalyzerPath, args: splitArgs(effective.rustAnalyzerArgs) }
-			: { path: effective.clangdPath, args: splitArgs(effective.clangdArgs) };
-	const lspStatus = useLspServer(root, reportNotice, lspOverrides);
+	const active = workspace.buffers.find((buffer) => buffer.path === activePath) ?? null;
+	const lspOverrides = {
+		"rust-analyzer": {
+			path: effective.rustAnalyzerPath,
+			args: splitArgs(effective.rustAnalyzerArgs),
+		},
+		clangd: { path: effective.clangdPath, args: splitArgs(effective.clangdArgs) },
+	};
+	const lspStatuses = useLspWiring({
+		root,
+		activePath: active?.path ?? null,
+		activeText: active?.text ?? "",
+		report: reportNotice,
+		overrides: lspOverrides,
+		runningRef: lspRunningRef,
+	});
 	const debug = useDebugSession(root, settings.buildProfile);
 
 	const diagnostics = useDiagnosticsState({ root, onError: reportNotice });
-	const active = workspace.buffers.find((buffer) => buffer.path === activePath) ?? null;
-	useDocumentSync({
-		root,
-		path: active?.path ?? null,
-		text: active?.text ?? "",
-		report: reportNotice,
-		ready: lspStatus !== null,
-		kind: workspace.project?.kind ?? null,
-	});
 	const build = useBuild({
 		root,
 		profile: settings.buildProfile,
@@ -178,7 +179,7 @@ export function useShell() {
 		diagnostics,
 		debug,
 		tests,
-		lspStatus,
+		lspStatuses,
 		notice,
 		setNotice,
 		commands,
@@ -186,7 +187,7 @@ export function useShell() {
 		editorRef,
 		root,
 		activePath,
-		active,
+		active: workspace.buffers.find((buffer) => buffer.path === activePath) ?? null,
 		panelExpanded,
 		missingTools,
 		saveError,

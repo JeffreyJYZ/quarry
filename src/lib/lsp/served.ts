@@ -10,10 +10,6 @@ const EXTENSIONS: Record<ServerKind, readonly string[]> = {
 	clangd: CLANG_EXTENSIONS,
 };
 
-export function serverKindForProject(kind: string | null): ServerKind {
-	return kind === "cargo" ? "rust-analyzer" : "clangd";
-}
-
 export function extensionOf(path: string): string {
 	const normalized = path.replace(/\\/g, "/");
 	const lastSlash = normalized.lastIndexOf("/");
@@ -37,11 +33,70 @@ export function servedExtensions(kind: ServerKind): readonly string[] {
 	return EXTENSIONS[kind];
 }
 
-/** Whether any running language server serves this path, by extension alone. */
-export function servesAny(path: string | null): boolean {
+/** Compose the session id a server is keyed by. Single source of truth. */
+export function sessionId(kind: ServerKind, root: string): string {
+	return `${kind}::${root}`;
+}
+
+/** Which servers should run for a root, from what is actually there. */
+export type RootSignals = {
+	hasCargoToml: boolean;
+	hasCompileCommands: boolean;
+	hasCMakeLists: boolean;
+	hasCppFiles: boolean;
+};
+
+export function serversForRoot(signals: RootSignals): ServerKind[] {
+	const out: ServerKind[] = [];
+	if (signals.hasCargoToml) {
+		out.push("rust-analyzer");
+	}
+	if (signals.hasCompileCommands || signals.hasCMakeLists || signals.hasCppFiles) {
+		out.push("clangd");
+	}
+	return out;
+}
+
+/** Server kind serving a given path, if any. */
+export function serverKindForPath(path: string | null): ServerKind | null {
 	if (path === null || path === "") {
-		return false;
+		return null;
 	}
 	const ext = extensionOf(path);
-	return Object.values(EXTENSIONS).some((list) => list.includes(ext));
+	for (const kind of Object.keys(EXTENSIONS) as ServerKind[]) {
+		if (EXTENSIONS[kind].includes(ext)) {
+			return kind;
+		}
+	}
+	return null;
+}
+
+/** Whether any running language server serves this path, by extension alone. */
+export function servesAny(path: string | null): boolean {
+	return serverKindForPath(path) !== null;
+}
+
+/** The kind serving `path` when that kind is running; otherwise null. */
+export function servedByRunningServer(
+	path: string | null,
+	running: ReadonlySet<ServerKind>,
+): ServerKind | null {
+	const kind = serverKindForPath(path);
+	if (kind === null) {
+		return null;
+	}
+	return running.has(kind) ? kind : null;
+}
+
+/** Session id for the running server serving `path`, or null when none. */
+export function sessionForPath(
+	path: string | null,
+	running: ReadonlySet<ServerKind>,
+	root: string,
+): string | null {
+	const kind = servedByRunningServer(path, running);
+	if (kind === null) {
+		return null;
+	}
+	return sessionId(kind, root);
 }

@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
 import { type InlayHint, lspInlayHints } from "@/lib/project/api";
-import { servesAny } from "@/lib/lsp/served";
+import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
+import type { ServerKind } from "@/lib/lsp/served";
 import { setInlayHints } from "@/lib/editor/inlayHints";
 
 /** Inlay hints: fetched after a short pause and discarded if the document moved on. */
@@ -9,8 +10,12 @@ export function useInlayHints(options: {
 	viewRef: { current: EditorView | null };
 	rootRef: { current: string | null };
 	pathRef: { current: string | null };
+	runningRef?: { current: ReadonlySet<ServerKind> };
 }) {
 	const { viewRef, rootRef, pathRef } = options;
+	const runningRef = options.runningRef ?? {
+		current: new Set<ServerKind>(["rust-analyzer", "clangd"]),
+	};
 	const [hintsVisible, setHintsVisible] = useState(true);
 	const hintsVisibleRef = useRef(hintsVisible);
 	hintsVisibleRef.current = hintsVisible;
@@ -28,19 +33,15 @@ export function useInlayHints(options: {
 		const view = viewRef.current;
 		const currentRoot = rootRef.current;
 		const currentPath = pathRef.current;
-		if (
-			view === null ||
-			currentRoot === null ||
-			currentPath === null ||
-			!servesAny(currentPath)
-		) {
+		const kind = servedByRunningServer(currentPath, runningRef.current);
+		if (view === null || currentRoot === null || currentPath === null || kind === null) {
 			applyInlay(null);
 			return;
 		}
 		const mySeq = ++inlaySeqRef.current;
 		let result: InlayHint[] = [];
 		try {
-			result = await lspInlayHints(currentRoot, currentPath);
+			result = await lspInlayHints(sessionId(kind, currentRoot), currentPath);
 		} catch {
 			if (mySeq !== inlaySeqRef.current) return;
 			applyInlay(null);

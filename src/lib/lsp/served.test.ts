@@ -1,18 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { serverKindForProject, servesPath, servedExtensions } from "@/lib/lsp/served";
+import {
+	servesPath,
+	servedExtensions,
+	servedByRunningServer,
+	sessionForPath,
+} from "@/lib/lsp/served";
 
 const RUST_TABLE = [".rs"];
 const CLANG_TABLE = [".c", ".h", ".cc", ".cpp", ".cxx", ".hh", ".hpp"];
-
-describe("serverKindForProject", () => {
-	test("cargo maps to rust-analyzer", () => {
-		expect(serverKindForProject("cargo")).toBe("rust-analyzer");
-	});
-	test("everything else maps to clangd", () => {
-		expect(serverKindForProject(null)).toBe("clangd");
-		expect(serverKindForProject("cmake")).toBe("clangd");
-	});
-});
 
 describe("servedExtensions", () => {
 	test("one table per server", () => {
@@ -55,5 +50,46 @@ describe("servesPath", () => {
 		expect(servesPath("clangd", "/p/README")).toBe(false);
 		expect(servesPath("rust-analyzer", null)).toBe(false);
 		expect(servesPath("clangd", "")).toBe(false);
+	});
+});
+
+describe("servedByRunningServer", () => {
+	test("served and running", () => {
+		expect(servedByRunningServer("/p/src/main.rs", new Set(["rust-analyzer"]))).toBe(
+			"rust-analyzer",
+		);
+	});
+	test("served but not running", () => {
+		expect(servedByRunningServer("/p/src/main.c", new Set(["rust-analyzer"]))).toBeNull();
+	});
+	test("unsupported extension", () => {
+		expect(servedByRunningServer("/p/README", new Set(["rust-analyzer", "clangd"]))).toBeNull();
+	});
+	test("null path", () => {
+		expect(servedByRunningServer(null, new Set(["rust-analyzer"]))).toBeNull();
+	});
+});
+
+describe("sessionForPath", () => {
+	test(".rs with rust running returns id", () => {
+		expect(sessionForPath("/p/src/main.rs", new Set(["rust-analyzer"]), "/root")).toBe(
+			"rust-analyzer::/root",
+		);
+	});
+	test(".c with clangd running returns id", () => {
+		expect(sessionForPath("/p/src/main.c", new Set(["clangd"]), "/root")).toBe("clangd::/root");
+	});
+	test(".c with only rust running returns null", () => {
+		expect(sessionForPath("/p/src/main.c", new Set(["rust-analyzer"]), "/root")).toBeNull();
+	});
+	test(".toml returns null", () => {
+		expect(
+			sessionForPath("/p/Cargo.toml", new Set(["rust-analyzer", "clangd"]), "/root"),
+		).toBeNull();
+	});
+	test("two kinds produce different ids", () => {
+		const rust = sessionForPath("/p/src/main.rs", new Set(["rust-analyzer"]), "/root");
+		const c = sessionForPath("/p/src/main.c", new Set(["clangd"]), "/root");
+		expect(rust).not.toBe(c);
 	});
 });

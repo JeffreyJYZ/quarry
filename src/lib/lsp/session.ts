@@ -8,57 +8,93 @@ import {
 	stopLsp,
 } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
-import { serverKindForProject, servesPath } from "@/lib/lsp/served";
+import {
+	serverKindForPath,
+	serversForRoot,
+	sessionId as makeSessionId,
+	type RootSignals,
+	type ServerKind,
+} from "@/lib/lsp/served";
 
-/** Full-document sync only; one push per quiet period, not per keystroke. */
 const CHANGE_DEBOUNCE_MS = 350;
 
-/**
- * One language server per project root. Opening a project starts it, opening another one stops the
- * previous server first, and closing the project stops the last one.
- */
-export function useLspServer(
+export type LspStatusMap = Partial<Record<ServerKind, LspStatus | null>>;
+
+function useOneServer(
 	root: string | null,
+	kind: ServerKind,
+	enabled: boolean,
 	report: (message: string) => void,
-	overrides: { path?: string; args?: string[] } = {},
+	path: string,
+	args: string[],
 ): LspStatus | null {
 	const [status, setStatus] = useState<LspStatus | null>(null);
 	const reportRef = useRef(report);
 	reportRef.current = report;
-	const path = overrides.path ?? "";
-	const argsKey = (overrides.args ?? []).join(" ");
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: effect runs per session identity
 	useEffect(() => {
 		setStatus(null);
-		if (root === null) {
+		if (root === null || !enabled) {
 			return;
 		}
-		// `argsKey` is the stable identity of the argument list; splitting it inside keeps the hook
-		// from restarting the server on every render.
-		const args = argsKey === "" ? [] : argsKey.split(" ");
+		const sessionId = makeSessionId(kind, root);
 		let live = true;
-		startLsp(root, path, args).then(
+		startLsp(sessionId, path, args).then(
 			(next) => {
-				if (live) {
-					setStatus(next);
-				}
+				if (live) setStatus(next);
 			},
 			(error) => {
-				if (live) {
-					reportRef.current(`Language server: ${describeError(error)}`);
-				}
+				if (live) reportRef.current(`${kind}: ${describeError(error)}`);
 			},
 		);
 		return () => {
 			live = false;
 			setStatus(null);
-			stopLsp(root).catch((error: unknown) => {
-				reportRef.current(`Language server stop: ${describeError(error)}`);
+			stopLsp(sessionId).catch((error: unknown) => {
+				reportRef.current(`${kind} stop: ${describeError(error)}`);
 			});
 		};
-	}, [root, path, argsKey]);
+	}, [root, kind, enabled, path, args.join(" ")]);
 
 	return status;
+}
+
+export function useLspServers(
+	root: string | null,
+	signals: RootSignals | null,
+	report: (message: string) => void,
+	overrides: Partial<Record<ServerKind, { path?: string; args?: string[] }>> = {},
+): LspStatusMap {
+	const kinds = signals === null ? [] : serversForRoot(signals);
+	const rustEnabled = kinds.includes("rust-analyzer");
+	const clangEnabled = kinds.includes("clangd");
+	const rustOverrides = overrides["rust-analyzer"] ?? {};
+	const clangOverrides = overrides.clangd ?? {};
+	const rustStatus = useOneServer(
+		root,
+		"rust-analyzer",
+		rustEnabled,
+		report,
+		rustOverrides.path ?? "",
+		rustOverrides.args ?? [],
+	);
+	const clangStatus = useOneServer(
+		root,
+		"clangd",
+		clangEnabled,
+		report,
+		clangOverrides.path ?? "",
+		clangOverrides.args ?? [],
+	);
+	const out: LspStatusMap = {};
+	if (rustEnabled) {
+		out["rust-analyzer"] = rustStatus;
+	}
+	if (clangEnabled) {
+		out.clangd = clangStatus;
+	}
+	return out;
 }
 
 export type DocumentSyncOptions = {
@@ -66,23 +102,17 @@ export type DocumentSyncOptions = {
 	path: string | null;
 	text: string;
 	report: (message: string) => void;
-	/** False until the server for this root has started; opening a document before that has no session. */
 	ready: boolean;
-	/** Project kind, used to decide whether the running server serves this path. */
-	kind?: string | null;
+	statuses: LspStatusMap;
 };
 
-/**
- * Tell the server which document is open, push full text after a quiet period, and close the
- * document when its tab goes away. Every rejection is reported as one line, never thrown.
- */
 export function useDocumentSync({
 	root,
 	path,
 	text,
 	report,
 	ready,
-	kind = null,
+	statuses,
 }: DocumentSyncOptions): void {
 	const latest = useRef({ text, report });
 	latest.current = { text, report };
@@ -92,39 +122,29 @@ export function useDocumentSync({
 		if (root === null || path === null || !ready) {
 			return;
 		}
-		const serverKind = serverKindForProject(kind);
-		const served = servesPath(serverKind, path);
-		if (!served) {
-			return () => {
-				const open = opened.current;
-				if (open !== null && open.root === root && open.path === path) {
-					opened.current = null;
-					lspCloseDocument(root, path).catch((error: unknown) => {
-						latest.current.report(`Close document: ${describeError(error)}`);
-					});
-				}
-			};
+		const kind = serverKindForPath(path);
+		if (kind === null) {
+			return;
+		}
+		const sessionId = makeSessionId(kind, root);
+		if (statuses[kind] === undefined || statuses[kind] === null) {
+			return;
 		}
 		const initial = latest.current.text;
 		let live = true;
-		lspOpenDocument(root, path, initial).then(
+		lspOpenDocument(sessionId, path, initial).then(
 			() => {
-				if (!live) {
-					return;
-				}
+				if (!live) return;
 				opened.current = { root, path, text: initial };
-				// Edits made while the open was in flight would otherwise never reach the server.
 				const current = latest.current.text;
 				if (current !== initial) {
-					lspChangeDocument(root, path, current).catch((error: unknown) => {
+					lspChangeDocument(sessionId, path, current).catch((error) => {
 						latest.current.report(`Sync document: ${describeError(error)}`);
 					});
 				}
 			},
 			(error) => {
-				if (live) {
-					latest.current.report(`Open document: ${describeError(error)}`);
-				}
+				if (live) latest.current.report(`Open document: ${describeError(error)}`);
 			},
 		);
 		return () => {
@@ -132,18 +152,21 @@ export function useDocumentSync({
 			const open = opened.current;
 			if (open !== null && open.root === root && open.path === path) {
 				opened.current = null;
-				lspCloseDocument(root, path).catch((error: unknown) => {
+				lspCloseDocument(sessionId, path).catch((error) => {
 					latest.current.report(`Close document: ${describeError(error)}`);
 				});
 			}
 		};
-	}, [root, path, ready, kind]);
+	}, [root, path, ready, statuses]);
 
 	useEffect(() => {
 		if (root === null || path === null) {
 			return;
 		}
-		if (!servesPath(serverKindForProject(kind), path)) {
+		const kind = serverKindForPath(path);
+		if (kind === null) return;
+		const sessionId = makeSessionId(kind, root);
+		if (statuses[kind] === undefined || statuses[kind] === null) {
 			return;
 		}
 		const timer = setTimeout(() => {
@@ -151,7 +174,7 @@ export function useDocumentSync({
 			if (open !== null && open.root === root && open.path === path && open.text === text) {
 				return;
 			}
-			lspChangeDocument(root, path, text).then(
+			lspChangeDocument(sessionId, path, text).then(
 				() => {
 					const current = opened.current;
 					if (current !== null && current.root === root && current.path === path) {
@@ -164,5 +187,5 @@ export function useDocumentSync({
 			);
 		}, CHANGE_DEBOUNCE_MS);
 		return () => clearTimeout(timer);
-	}, [root, path, text, kind]);
+	}, [root, path, text, statuses]);
 }

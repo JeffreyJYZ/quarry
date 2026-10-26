@@ -42,17 +42,26 @@ type Actions = {
  * They are built once with the view, so every value they need arrives as a ref; the two completion
  * counters live in a box so a binding can bump them without rebuilding the keymap.
  */
-export function useEditorBindings(options: { refs: EditorRefs; search: Refs; actions: Actions }): {
+export function useEditorBindings(options: {
+	refs: EditorRefs;
+	search: Refs;
+	actions: Actions;
+	runningRef?: { current: ReadonlySet<import("@/lib/lsp/served").ServerKind> };
+}): {
 	deps: KeymapDeps;
 	behaviour: BehaviourDeps;
 } {
 	const { refs, search, actions } = options;
+	const runningRef = options.runningRef ?? {
+		current: new Set<import("@/lib/lsp/served").ServerKind>(["rust-analyzer", "clangd"]),
+	};
 	const counters = { completionSeq: 0, hoverSeq: 0 };
 
 	const deps: KeymapDeps = {
 		viewRef: refs.viewRef,
 		rootRef: refs.rootRef,
 		latestRef: refs.latestRef,
+		runningRef,
 		navigateRef: refs.navigateRef,
 		referencesRef: refs.referencesRef,
 		occurrenceHistoryRef: search.occurrenceHistoryRef,
