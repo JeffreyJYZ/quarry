@@ -26,6 +26,7 @@ Rust and C/C++ IDE. Tauri 2 + React 19 shell; clangd, rust-analyzer and lldb-dap
 - **MIT.** Zed is GPL-3.0: read its debugger code for patterns, copy nothing.
 - **`.gitignore` carries `.DS_Store`** at the top level.
 - **`lldb-dap` is Xcode's LLVM 21.0.0**; `readMemory`, `disassemble` and data breakpoints work — measured in `docs/spikes/dap.md`.
+- **Terminal keystrokes reach the shell only through the offscreen `.terminal-input` textarea** — nothing native listens for keys, so a panel that renders but ignores typing is a missing `focus()`, not a PTY fault; `focusTarget.ts` decides whether a click may take focus.
 - **Rust pretty printing needs `initCommands: ["command script import <sysroot>/lib/rustlib/etc/lldb_lookup.py"]`** — without it `Vec`/`String` arrive as raw structs, silently.
 - **Never gate memory or disassembly on `supportsMemoryReferences`** — it is false while frames carry `instructionPointerReference` and both requests work.
 - **`evaluate` is broken for Rust** (falls back to Objective-C++, errors) — no watch-expression pane until a workaround is measured.
@@ -41,4 +42,8 @@ Rust and C/C++ IDE. Tauri 2 + React 19 shell; clangd, rust-analyzer and lldb-dap
 - **Linux bundles AppImage and Windows nsis only** — the deb and msi bundlers reject the hyphen in `X.Y.Z-alpha.N` (`invalid version`), AppImage and nsis accept it.
 - **Main agent may push alpha tags and publish test releases here; subagents never push, tag or release.** Tag `quarry-alphaN` pairs with version `X.Y.Z-alpha.N` (`bun scripts/bump-version.ts alpha`), and a stable tag is `v<version>`.
 - **Standing permission (user, 2026-10-26): release an alpha whenever there is something to ship — no ask, no "want me to cut a release?"**; bump, push, `bun run release:local`, report the URL.
+- **The updater needs `updater:allow-download` and `updater:allow-install` separately** in `src-tauri/capabilities/default.json`; `allow-download-and-install` covers only that one command, so `download()` then `install()` dies `Command plugin:updater|download not allowed by ACL` at runtime, never at gate.
+- **`src/lib/updates/capabilities.test.ts` guards that pairing** — it reads the capability file and the store, so a renamed updater call fails the suite instead of failing silently in the app.
+- **The updater installs into the bundle it is running from, so a second copy silently freezes** — `2026-10-26`: `/Applications/quarry.app` sat at `alpha.7` while alpha.16/17 self-updated the repo bundle; check both `defaults read <app>/Contents/Info.plist CFBundleShortVersionString` values when a version looks wrong.
+- **Never swap `/Applications/quarry.app` by hand** — a self-update is the only end-to-end proof the ACL and signature work; replacing the bundle skips the one path that broke (user, 2026-10-26).
 - **Verification ladder: `bun run gate` and `bun run build`; Rust adds `cargo test`, `cargo check --all-targets`, `cargo clippy --all-targets -- -D warnings`**; LSP work adds `scripts/lsp-*.ts`, debugger work `scripts/dap-*.ts`. The DAP evaluate probe is expected to fail.
