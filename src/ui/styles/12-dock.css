@@ -119,13 +119,6 @@
 	overflow: auto;
 }
 
-/* Narrow windows: drop the project path before anything is squeezed. */
-@media (max-width: 1180px) {
-	.crumbs {
-		display: none;
-	}
-}
-
 /* References panel: compact overlay anchored above the status bar. */
 .refs-panel {
 	flex: 0 0 auto;

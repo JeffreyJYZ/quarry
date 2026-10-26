@@ -159,14 +159,6 @@
 	outline-offset: -1px;
 }
 
-.crumbs {
-	flex: 1 1 auto;
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
 .notice {
 	flex: 0 0 auto;
 }
