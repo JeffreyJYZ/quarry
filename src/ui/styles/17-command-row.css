@@ -77,16 +77,6 @@
 	padding: 4px 8px;
 }
 
-.terminal-pre {
-	margin: 0;
-	font-family: var(--mono);
-	font-size: 11.5px;
-	line-height: 1.4;
-	white-space: pre;
-	color: var(--text);
-	user-select: text;
-}
-
 .terminal-restart {
 	flex: 0 0 auto;
 	padding: 2px 8px;
@@ -104,14 +94,6 @@
 .terminal-restart:hover {
 	color: var(--text);
 	border-color: var(--muted);
-}
-
-.terminal-input {
-	position: absolute;
-	left: -9999px;
-	width: 1px;
-	height: 1px;
-	opacity: 0;
 }
 
 .terminal-error {

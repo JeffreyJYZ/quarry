@@ -1,15 +1,14 @@
-import { useCallback, useEffect, useRef } from "react";
-import { ptyResize } from "@/lib/project/api";
-import { ptySize } from "@/lib/terminal/sessions";
+import { useEffect, useRef } from "react";
+import { DEFAULT_FONT_SIZE } from "@/lib/terminal/fontSize";
 import "@/ui/terminal/terminal.css";
+import "@/ui/terminal/xterm.css";
 import { shouldFocusTerminal } from "@/ui/terminal/focusTarget";
 import TerminalHeader from "@/ui/terminal/TerminalHeader";
 import TerminalScreen from "@/ui/terminal/TerminalScreen";
-import { useTerminalKeys, useTerminalTabKeys } from "@/ui/terminal/useTerminalKeys";
+import { useTerminalTabKeys } from "@/ui/terminal/useTerminalKeys";
 import { useTerminalRestart } from "@/ui/terminal/useTerminalRestart";
 import { useTerminalSessions } from "@/ui/terminal/useTerminalSessions";
-
-const RESIZE_DEBOUNCE_MS = 120;
+import { useXterm } from "@/ui/terminal/useXterm";
 
 export type TerminalProps = {
 	root: string;
@@ -25,8 +24,8 @@ export type TerminalProps = {
 /**
  * The terminal panel.
  *
- * Session state, the PTY listeners and the keymap live in their own modules; this file is the shell
- * that wires them together and draws the frame.
+ * Session state, the PTY listeners and the emulator live in their own modules; this file is the
+ * shell that wires them together and draws the frame.
  */
 export default function Terminal({
 	root,
@@ -36,25 +35,29 @@ export default function Terminal({
 	fontFamily = "",
 }: TerminalProps) {
 	const containerRef = useRef<HTMLDivElement | null>(null);
-	const inputRef = useRef<HTMLTextAreaElement | null>(null);
-	const resizeTimer = useRef<number | null>(null);
 	const {
 		sessions,
 		activeId,
 		setActiveId,
 		activeIdRef,
+		sessionsRef,
 		updateSession,
 		openSession,
 		closeSession,
 		send,
+		subscribeRaw,
 	} = useTerminalSessions({ root, activePath, defaultFontSize, containerRef });
 
-	/** Every keystroke reaches the shell through the offscreen textarea, so it is the typing surface. */
-	const focusInput = useCallback(() => {
-		inputRef.current?.focus({ preventScroll: true });
-	}, []);
-
 	const active = sessions.find((s) => s.id === activeId) ?? null;
+
+	// The emulator is per PTY, so a new tab or a restart gets a fresh screen rather than a leftover.
+	const { write, focus } = useXterm({
+		hostRef: containerRef,
+		ptyId: active?.ptyId ?? null,
+		fontSize: active?.fontSize ?? DEFAULT_FONT_SIZE,
+		fontFamily,
+		onData: send,
+	});
 
 	// Open the first tab once, so the panel is never an empty box.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: mount only
@@ -62,10 +65,12 @@ export default function Terminal({
 		void openSession();
 	}, []);
 
+	// Selecting a tab, and a fresh PTY inside it, both hand the keyboard to the shell.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the PTY id is the trigger, not a value
 	useEffect(() => {
 		if (activeId === null) return;
-		focusInput();
-	}, [activeId, focusInput]);
+		focus();
+	}, [activeId, active?.ptyId, focus]);
 
 	const restart = useTerminalRestart({
 		root,
@@ -76,73 +81,26 @@ export default function Terminal({
 		updateSession,
 	});
 
-	// A resize changes the grid, so the shell has to learn its new size.
-	useEffect(() => {
-		const el = containerRef.current;
-		if (el === null) return;
-		const schedule = () => {
-			if (resizeTimer.current !== null) window.clearTimeout(resizeTimer.current);
-			resizeTimer.current = window.setTimeout(() => {
-				resizeTimer.current = null;
-				const id = activeIdRef.current;
-				const session = sessions.find((s) => s.id === id);
-				if (session?.ptyId === null || session?.ptyId === undefined) return;
-				const { rows, cols } = ptySize(el);
-				void ptyResize(session.ptyId, rows, cols).catch(() => undefined);
-			}, RESIZE_DEBOUNCE_MS);
-		};
-		const ro = new ResizeObserver(() => schedule());
-		ro.observe(el);
-		return () => {
-			ro.disconnect();
-			if (resizeTimer.current !== null) {
-				window.clearTimeout(resizeTimer.current);
-				resizeTimer.current = null;
-			}
-		};
-	}, [activeIdRef, sessions]);
-
-	// Keep the view pinned to the newest line unless the user scrolled away.
-	useEffect(() => {
-		const el = containerRef.current;
-		if (el === null || active === null || !active.stick) return;
-		el.scrollTop = el.scrollHeight;
-	}, [active]);
-
 	useTerminalTabKeys(openSession, closeSession, activeIdRef);
 
-	// Selecting a tab, or clicking anywhere but a control, turns the keyboard back to the shell.
+	// Raw bytes for the active tab only: the buffer replays a session's pre-handshake output here too.
+	useEffect(
+		() =>
+			subscribeRaw((ptyId, data) => {
+				const current = sessionsRef.current.find((s) => s.id === activeIdRef.current);
+				if (current?.ptyId !== ptyId) return;
+				write(data);
+			}),
+		[subscribeRaw, sessionsRef, activeIdRef, write],
+	);
+
 	const selectTab = (id: number) => {
 		setActiveId(id);
-		focusInput();
+		focus();
 	};
 	const onPanelMouseDown = (event: React.MouseEvent<HTMLElement>) => {
-		if (shouldFocusTerminal(event.target)) focusInput();
+		if (shouldFocusTerminal(event.target)) focus();
 	};
-
-	const onScroll = useCallback(() => {
-		const el = containerRef.current;
-		if (el === null || activeId === null) return;
-		const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
-		updateSession(activeId, (s) => ({ ...s, stick: atBottom }));
-	}, [activeId, updateSession]);
-
-	const { onKeyDown } = useTerminalKeys({
-		active,
-		send,
-		restart,
-		openSession,
-		closeSession,
-		updateSession,
-		activeIdRef,
-	});
-
-	const displayed: string[] =
-		active === null
-			? []
-			: active.dropped > 0
-				? [`… ${active.dropped} lines dropped`, ...active.lines]
-				: active.lines;
 
 	return (
 		<section
@@ -172,22 +130,8 @@ export default function Terminal({
 					</button>
 				</div>
 			) : (
-				<TerminalScreen
-					active={active}
-					displayed={displayed}
-					fontFamily={fontFamily}
-					containerRef={containerRef}
-					onScroll={onScroll}
-				/>
+				<TerminalScreen active={active} hostRef={containerRef} />
 			)}
-			<textarea
-				ref={inputRef}
-				className="terminal-input"
-				aria-label="Terminal input"
-				value=""
-				readOnly
-				onKeyDown={onKeyDown}
-			/>
 		</section>
 	);
 }

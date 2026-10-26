@@ -36,7 +36,6 @@ export function useTerminalRestart(options: {
 			exited: null,
 			error: null,
 			opening: true,
-			stick: true,
 			fontSize: session?.fontSize ?? DEFAULT_FONT_SIZE,
 		}));
 		void (async () => {

@@ -1,58 +1,22 @@
 import type { Session } from "@/lib/terminal/sessions";
-import { parseAnsi } from "@/lib/terminal/ansi";
 
 type ScreenProps = {
 	active: Session | null;
-	displayed: string[];
-	fontFamily: string;
-	containerRef: React.RefObject<HTMLDivElement | null>;
-	onScroll: () => void;
+	/** The element xterm draws into; the fit addon measures this box. */
+	hostRef: React.RefObject<HTMLDivElement | null>;
 };
 
-/** The scrollback itself: styled runs, the dropped-line marker, and the pid footer. */
-export default function TerminalScreen({
-	active,
-	displayed,
-	fontFamily,
-	containerRef,
-	onScroll,
-}: ScreenProps) {
+/** The terminal surface itself: xterm owns the grid, the strip below reports the shell. */
+export default function TerminalScreen({ active, hostRef }: ScreenProps) {
 	if (active === null) return null;
 	if (active.error !== null) return <div className="terminal-error">{active.error}</div>;
 
 	return (
 		<>
-			<div ref={containerRef} className="terminal-body" onScroll={onScroll}>
-				<pre
-					className="terminal-pre"
-					style={{
-						fontSize: `${active.fontSize}px`,
-						...(fontFamily === "" ? null : { fontFamily }),
-					}}
-				>
-					{displayed.map((line, index) => (
-						// biome-ignore lint/suspicious/noArrayIndexKey: a scrollback line has no identity beyond its position
-						<span key={index} className="terminal-line">
-							{parseAnsi(line).map((run, runIndex) => (
-								<span
-									// biome-ignore lint/suspicious/noArrayIndexKey: runs are positional by nature
-									key={runIndex}
-									style={{
-										color: run.fg ?? undefined,
-										backgroundColor: run.bg ?? undefined,
-										fontWeight: run.bold ? 600 : undefined,
-										opacity: run.dim ? 0.7 : undefined,
-										fontStyle: run.italic ? "italic" : undefined,
-										textDecoration: run.underline ? "underline" : undefined,
-									}}
-								>
-									{run.text}
-								</span>
-							))}
-							{"\n"}
-						</span>
-					))}
-				</pre>
+			<div className="terminal-surface">
+				<div ref={hostRef} className="terminal-body terminal-xterm" />
+				{/* The shell's first prompt lands after the PTY answers, so say what the gap is. */}
+				{active.opening ? <span className="terminal-starting">starting shell…</span> : null}
 			</div>
 			<div className="terminal-status">
 				<span>pid {active.pid ?? "—"}</span>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	onPtyExited,
 	onPtyOutput,
@@ -8,7 +8,7 @@ import {
 	ptyOpen,
 	ptyWrite,
 } from "@/lib/project/api";
-import { parseOsc7Cwd } from "@/lib/terminal/fontSize";
+import { applyChunks, PtyBuffer, withChunk } from "@/lib/terminal/ptyBuffer";
 import {
 	appendData,
 	describe,
@@ -18,11 +18,19 @@ import {
 	type Session,
 } from "@/lib/terminal/sessions";
 
-/**
- * The terminal's sessions: one PTY each, plus the global event wiring.
- *
- * The hook owns nothing visual; the panel decides how a session is drawn.
- */
+/** A raw PTY chunk, for a renderer that needs bytes rather than the parsed line model. */
+export type RawOutputHandler = (ptyId: string, data: string) => void;
+
+/** A promise that settles once the PTY listeners are attached, whichever way that went. */
+function gate(): { promise: Promise<void>; open: () => void } {
+	let open: () => void = () => undefined;
+	const promise = new Promise<void>((done) => {
+		open = done;
+	});
+	return { promise, open: () => open() };
+}
+
+/** The terminal's sessions: one PTY each, plus the global event wiring. It owns nothing visual. */
 export function useTerminalSessions(options: {
 	root: string;
 	activePath: string | null | undefined;
@@ -35,13 +43,19 @@ export function useTerminalSessions(options: {
 	const nextId = useRef(1);
 	const sessionsRef = useRef<Session[]>([]);
 	const activeIdRef = useRef<number | null>(null);
+	/** Output that beats its session's `ptyId` assignment; replayed below, never dropped. */
+	const [buffer] = useState(() => new PtyBuffer());
+	const listeners = useMemo(gate, []);
+	const rawHandlers = useRef<Set<RawOutputHandler>>(new Set());
+	const subscribeRaw = useCallback((handler: RawOutputHandler) => {
+		rawHandlers.current.add(handler);
+		return () => void rawHandlers.current.delete(handler);
+	}, []);
 
 	useEffect(() => {
 		sessionsRef.current = sessions;
-	}, [sessions]);
-	useEffect(() => {
 		activeIdRef.current = activeId;
-	}, [activeId]);
+	}, [sessions, activeId]);
 
 	const updateSession = useCallback((id: number, updater: (s: Session) => Session) => {
 		setSessions((current) => current.map((s) => (s.id === id ? updater(s) : s)));
@@ -53,14 +67,23 @@ export function useTerminalSessions(options: {
 		const cwd = activePath !== null && activePath !== undefined ? dirOf(activePath) : root;
 		setSessions((current) => [...current, emptySession(id, cwd, defaultFontSize)]);
 		setActiveId(id);
+		// The prompt lands milliseconds after `pty_open`, so its listeners must exist first. The gate
+		// settles on a failed subscription too.
+		await listeners.promise;
 		try {
 			const { rows, cols } = ptySize(containerRef.current);
 			const result = await ptyOpen(cwd, rows, cols);
 			if (sessionsRef.current.find((s) => s.id === id) === undefined) {
+				buffer.discard(result.id);
 				void ptyClose(result.id).catch(() => undefined);
 				return;
 			}
-			updateSession(id, (s) => ({ ...s, ptyId: result.id, pid: result.pid, opening: false }));
+			updateSession(id, (s) => ({
+				...s,
+				ptyId: result.id,
+				pid: result.pid,
+				opening: false,
+			}));
 		} catch (err) {
 			updateSession(id, (s) => ({
 				...s,
@@ -68,23 +91,27 @@ export function useTerminalSessions(options: {
 				opening: false,
 			}));
 		}
-	}, [root, activePath, updateSession, defaultFontSize, containerRef]);
+	}, [root, activePath, updateSession, defaultFontSize, containerRef, buffer, listeners]);
 
-	const closeSession = useCallback((id: number) => {
-		const session = sessionsRef.current.find((s) => s.id === id);
-		if (session !== undefined && session.ptyId !== null) {
-			void ptyClose(session.ptyId).catch(() => undefined);
-		}
-		setSessions((current) => {
-			const remaining = current.filter((s) => s.id !== id);
-			if (activeIdRef.current === id) {
-				const idx = current.findIndex((s) => s.id === id);
-				const neighbour = remaining[idx] ?? remaining[idx - 1] ?? null;
-				setActiveId(neighbour ? neighbour.id : null);
+	const closeSession = useCallback(
+		(id: number) => {
+			const session = sessionsRef.current.find((s) => s.id === id);
+			if (session !== undefined && session.ptyId !== null) {
+				buffer.discard(session.ptyId);
+				void ptyClose(session.ptyId).catch(() => undefined);
 			}
-			return remaining;
-		});
-	}, []);
+			setSessions((current) => {
+				const remaining = current.filter((s) => s.id !== id);
+				if (activeIdRef.current === id) {
+					const idx = current.findIndex((s) => s.id === id);
+					const neighbour = remaining[idx] ?? remaining[idx - 1] ?? null;
+					setActiveId(neighbour ? neighbour.id : null);
+				}
+				return remaining;
+			});
+		},
+		[buffer],
+	);
 
 	// One listener pair for every session; the PTY id is the key.
 	useEffect(() => {
@@ -94,13 +121,13 @@ export function useTerminalSessions(options: {
 		void (async () => {
 			try {
 				unOutput = await onPtyOutput((event: PtyOutputEvent) => {
+					for (const handler of rawHandlers.current) handler(event.id, event.data);
+					if (!sessionsRef.current.some((s) => s.ptyId === event.id)) {
+						buffer.push(event.id, event.data);
+						return;
+					}
 					setSessions((current) =>
-						current.map((s) => {
-							if (s.ptyId !== event.id) return s;
-							const next = appendData(s, event.data);
-							const cwd = parseOsc7Cwd(event.data);
-							return cwd === null ? next : { ...next, cwd };
-						}),
+						current.map((s) => (s.ptyId !== event.id ? s : withChunk(s, event.data))),
 					);
 				});
 				unExited = await onPtyExited((event: PtyExitedEvent) => {
@@ -119,13 +146,26 @@ export function useTerminalSessions(options: {
 				unOutput?.();
 				unExited?.();
 			}
+			listeners.open();
 		})();
 		return () => {
 			cancelled = true;
 			unOutput?.();
 			unExited?.();
 		};
-	}, []);
+	}, [buffer, listeners]);
+
+	// A claimed PTY owns the handshake output; the replay restarts this effect for a late chunk.
+	useEffect(() => {
+		for (const session of sessions) {
+			const ptyId = session.ptyId;
+			if (ptyId === null || !buffer.has(ptyId)) continue;
+			const pending = buffer.take(ptyId);
+			updateSession(session.id, (s) => applyChunks(s, pending));
+			for (const handler of rawHandlers.current)
+				for (const data of pending) handler(ptyId, data);
+		}
+	}, [sessions, buffer, updateSession]);
 
 	// Closing the panel must not leave shells running in the background.
 	useEffect(() => {
@@ -155,5 +195,6 @@ export function useTerminalSessions(options: {
 		closeSession,
 		send,
 		setSessions,
+		subscribeRaw,
 	};
 }

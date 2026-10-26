@@ -26,7 +26,8 @@ Rust and C/C++ IDE. Tauri 2 + React 19 shell; clangd, rust-analyzer and lldb-dap
 - **MIT.** Zed is GPL-3.0: read its debugger code for patterns, copy nothing.
 - **`.gitignore` carries `.DS_Store`** at the top level.
 - **`lldb-dap` is Xcode's LLVM 21.0.0**; `readMemory`, `disassemble` and data breakpoints work — measured in `docs/spikes/dap.md`.
-- **Terminal keystrokes reach the shell only through the offscreen `.terminal-input` textarea** — nothing native listens for keys, so a panel that renders but ignores typing is a missing `focus()`, not a PTY fault; `focusTarget.ts` decides whether a click may take focus.
+- **Terminal rendering and keystrokes belong to xterm, not React** — `useXterm.ts` owns one emulator per PTY; a prompt that repaints itself with carriage returns needs a VT grid, which a line parser cannot be taught. `focusTarget.ts` decides whether a click may take focus.
+- **Raw PTY bytes reach the emulator through `subscribeRaw`** in `useTerminalSessions.ts`, which also replays the handshake buffer — a blank panel beside a live pid means a missing subscription, not a PTY fault.
 - **Rust pretty printing needs `initCommands: ["command script import <sysroot>/lib/rustlib/etc/lldb_lookup.py"]`** — without it `Vec`/`String` arrive as raw structs, silently.
 - **Never gate memory or disassembly on `supportsMemoryReferences`** — it is false while frames carry `instructionPointerReference` and both requests work.
 - **`evaluate` is broken for Rust** (falls back to Objective-C++, errors) — no watch-expression pane until a workaround is measured.

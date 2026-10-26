@@ -70,6 +70,19 @@ impl Drop for PtyState {
     }
 }
 
+/// A Finder launch inherits a bare environment: without `TERM` a shell prints no prompt and picks no
+/// colours, whichever shell reads it. Set the facts a login shell would otherwise have had.
+pub fn apply_terminal_env(cmd: &mut CommandBuilder) {
+    cmd.env("TERM", "xterm-256color");
+    cmd.env("COLORTERM", "truecolor");
+    // Only fill a gap: a locale the user chose must survive the app.
+    for key in ["LANG", "LC_ALL"] {
+        if std::env::var_os(key).is_none() {
+            cmd.env(key, "en_US.UTF-8");
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn pty_open(
     app: AppHandle,
@@ -91,6 +104,7 @@ pub async fn pty_open(
         .map_err(|e| format!("cannot open pty: {e}"))?;
     let mut cmd = CommandBuilder::new(&shell);
     cmd.cwd(&cwd_path);
+    apply_terminal_env(&mut cmd);
     let child = pair
         .slave
         .spawn_command(cmd)
@@ -145,4 +159,18 @@ pub async fn pty_write(state: State<'_, PtyState>, id: String, data: String) -> 
         .flush()
         .map_err(|e| format!("cannot flush {id}: {e}"))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn terminal_env_carries_term_and_colour() {
+        let mut cmd = CommandBuilder::new("/bin/sh");
+        apply_terminal_env(&mut cmd);
+        let envs: Vec<(&str, &str)> = cmd.iter_extra_env_as_str().collect();
+        assert!(envs.contains(&("TERM", "xterm-256color")));
+        assert!(envs.contains(&("COLORTERM", "truecolor")));
+    }
 }

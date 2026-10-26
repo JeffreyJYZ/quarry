@@ -16,7 +16,6 @@ export type Session = {
 	exited: number | null;
 	error: string | null;
 	opening: boolean;
-	stick: boolean;
 	fontSize: number;
 };
 
@@ -31,7 +30,6 @@ export function emptySession(id: number, cwd: string, fontSize = DEFAULT_FONT_SI
 		exited: null,
 		error: null,
 		opening: true,
-		stick: true,
 		fontSize,
 	};
 }
