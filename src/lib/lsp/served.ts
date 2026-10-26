@@ -36,3 +36,12 @@ export function servesPath(kind: ServerKind, path: string | null): boolean {
 export function servedExtensions(kind: ServerKind): readonly string[] {
 	return EXTENSIONS[kind];
 }
+
+/** Whether any running language server serves this path, by extension alone. */
+export function servesAny(path: string | null): boolean {
+	if (path === null || path === "") {
+		return false;
+	}
+	const ext = extensionOf(path);
+	return Object.values(EXTENSIONS).some((list) => list.includes(ext));
+}

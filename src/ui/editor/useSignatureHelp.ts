@@ -3,6 +3,7 @@ import type { EditorView } from "@codemirror/view";
 import { toLspPosition } from "@/lib/editor/positions";
 import type { SignatureHelp } from "@/lib/project/api";
 import { lspSignatureHelp } from "@/lib/project/api";
+import { servesAny } from "@/lib/lsp/served";
 
 export type SignatureHelpArgs = {
 	viewRef: { current: EditorView | null };
@@ -34,7 +35,12 @@ export function useSignatureHelp({ viewRef, rootRef, pathRef }: SignatureHelpArg
 		const view = viewRef.current;
 		const currentRoot = rootRef.current;
 		const currentPath = pathRef.current;
-		if (view === null || currentRoot === null || currentPath === null) {
+		if (
+			view === null ||
+			currentRoot === null ||
+			currentPath === null ||
+			!servesAny(currentPath)
+		) {
 			hideSig();
 			return;
 		}

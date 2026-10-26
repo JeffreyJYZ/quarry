@@ -4,6 +4,7 @@ import { kindToType } from "@/lib/editor/completion";
 import { toLspPosition } from "@/lib/editor/positions";
 import { renderMarkdown } from "@/lib/editor/markdown";
 import { type Location, lspCompletion, lspDefinition, lspHover } from "@/lib/project/api";
+import { servesAny } from "@/lib/lsp/served";
 import type { KeymapDeps } from "@/ui/editor/keymapDeps";
 
 export type BehaviourDeps = KeymapDeps & {
@@ -78,6 +79,7 @@ export function behaviourExtensions(deps: BehaviourDeps) {
 				const currentPath = deps.latestRef.current.path;
 				const callback = deps.navigateRef.current;
 				if (currentRoot === null || currentPath === null || callback === null) return false;
+				if (!servesAny(currentPath)) return false;
 				const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
 				if (pos === null) return false;
 				const { line, character } = toLspPosition(view, pos);
@@ -104,6 +106,7 @@ export function behaviourExtensions(deps: BehaviourDeps) {
 					const currentRoot = deps.rootRef.current;
 					const currentPath = deps.latestRef.current.path;
 					if (currentRoot === null || currentPath === null) return null;
+					if (!servesAny(currentPath)) return null;
 					if (!context.explicit && context.matchBefore(/[\w:.]+/) === null) {
 						return null;
 					}
@@ -135,6 +138,7 @@ export function behaviourExtensions(deps: BehaviourDeps) {
 			const currentRoot = deps.rootRef.current;
 			const currentPath = deps.latestRef.current.path;
 			if (currentRoot === null || currentPath === null) return null;
+			if (!servesAny(currentPath)) return null;
 			const mySeq = ++deps.hoverSeq;
 			const { line, character } = toLspPosition(view, pos);
 			let info: Awaited<ReturnType<typeof lspHover>>;

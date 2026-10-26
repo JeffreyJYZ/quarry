@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import { isDirty, type FileBuffer } from "@/lib/project/buffer";
 import { type SaveOutcome, saveBuffer, saveErrorMessage, saveMessage } from "@/lib/project/save";
-import { lspDidSave } from "@/lib/project/api";
+import { formatterFor, lspDidSave } from "@/lib/project/api";
+import { servesAny } from "@/lib/lsp/served";
 import type { EditorHandle } from "@/ui/editor/Editor";
 import type { StatusText } from "@/ui/app/status";
 
@@ -78,17 +79,28 @@ export function useSaveBuffers(context: SaveContext) {
 				if (!found) continue;
 				let buffer = found;
 				if (formatOnSaveRef.current && path === activePathRef.current) {
-					const formatted = await editorRef.current?.formatText();
-					if (
-						formatted !== null &&
-						formatted !== undefined &&
-						formatted !== buffer.text
-					) {
-						buffer = { ...buffer, text: formatted };
-						const next: FileBuffer = buffer;
-						setBuffers((current) =>
-							current.map((entry) => (entry.path === path ? next : entry)),
-						);
+					const ext = path.split(".").pop()?.toLowerCase();
+					let hasFormatter = ext === "json" || ext === "jsonc";
+					if (!hasFormatter) {
+						try {
+							hasFormatter = (await formatterFor(path)) !== "";
+						} catch {
+							hasFormatter = false;
+						}
+					}
+					if (hasFormatter) {
+						const formatted = await editorRef.current?.formatText();
+						if (
+							formatted !== null &&
+							formatted !== undefined &&
+							formatted !== buffer.text
+						) {
+							buffer = { ...buffer, text: formatted };
+							const next: FileBuffer = buffer;
+							setBuffers((current) =>
+								current.map((entry) => (entry.path === path ? next : entry)),
+							);
+						}
 					}
 				}
 				setSaving((current) => new Set(current).add(path));
@@ -115,9 +127,11 @@ export function useSaveBuffers(context: SaveContext) {
 						failed: false,
 					});
 					// The checker runs on save; without this the server never re-analyses.
-					void lspDidSave(root, path).catch(() => {
-						/* a server that is not running has nothing to tell */
-					});
+					if (servesAny(path)) {
+						void lspDidSave(root, path).catch(() => {
+							/* a server that is not running has nothing to tell */
+						});
+					}
 				} finally {
 					setSaving((current) => {
 						const next = new Set(current);

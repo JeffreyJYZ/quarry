@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { EditorView } from "@codemirror/view";
 import { type FileEdit, lspRename } from "@/lib/project/api";
+import { servesAny } from "@/lib/lsp/served";
 import { toLspPosition } from "@/lib/editor/positions";
 
 /** The inline rename: F2 opens it with the identifier under the caret, Enter sends the request. */
@@ -19,7 +20,12 @@ export function useRenamePanel(options: {
 		const view = viewRef.current;
 		const currentRoot = rootRef.current;
 		const currentPath = pathRef.current;
-		if (view === null || currentRoot === null || currentPath === null) {
+		if (
+			view === null ||
+			currentRoot === null ||
+			currentPath === null ||
+			!servesAny(currentPath)
+		) {
 			setRenameOpen(false);
 			return;
 		}

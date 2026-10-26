@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
 import { type InlayHint, lspInlayHints } from "@/lib/project/api";
+import { servesAny } from "@/lib/lsp/served";
 import { setInlayHints } from "@/lib/editor/inlayHints";
 
 /** Inlay hints: fetched after a short pause and discarded if the document moved on. */
@@ -27,7 +28,12 @@ export function useInlayHints(options: {
 		const view = viewRef.current;
 		const currentRoot = rootRef.current;
 		const currentPath = pathRef.current;
-		if (view === null || currentRoot === null || currentPath === null) {
+		if (
+			view === null ||
+			currentRoot === null ||
+			currentPath === null ||
+			!servesAny(currentPath)
+		) {
 			applyInlay(null);
 			return;
 		}

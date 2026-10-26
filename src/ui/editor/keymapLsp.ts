@@ -9,6 +9,7 @@ import {
 	lspReferences,
 } from "@/lib/project/api";
 import { toLspPosition } from "@/lib/editor/positions";
+import { servesAny } from "@/lib/lsp/served";
 import type { KeymapDeps } from "@/ui/editor/keymapDeps";
 
 /** Language-server keys. Live values come through refs, so bindings are built once per editor. */
@@ -31,6 +32,7 @@ export function lspBindings(deps: KeymapDeps): KeyBinding[] {
 				const currentRoot = deps.rootRef.current;
 				const currentPath = deps.latestRef.current.path;
 				if (currentRoot === null || currentPath === null) return false;
+				if (!servesAny(currentPath)) return false;
 				const callback = deps.navigateRef.current;
 				if (callback === null) return false;
 				const pos = currentView.state.selection.main.head;
@@ -59,6 +61,7 @@ export function lspBindings(deps: KeymapDeps): KeyBinding[] {
 				const currentRoot = deps.rootRef.current;
 				const currentPath = deps.latestRef.current.path;
 				if (currentRoot === null || currentPath === null) return false;
+				if (!servesAny(currentPath)) return false;
 				const callback = deps.referencesRef.current;
 				if (callback === null) return false;
 				const pos = currentView.state.selection.main.head;
@@ -125,6 +128,7 @@ export function lspBindings(deps: KeymapDeps): KeyBinding[] {
 				const currentRoot = deps.rootRef.current;
 				const currentPath = deps.latestRef.current.path;
 				if (currentRoot === null || currentPath === null) return false;
+				if (!servesAny(currentPath)) return false;
 				const { line, character } = toLspPosition(view, view.state.selection.main.head);
 				void (async () => {
 					let actions: CodeAction[] = [];
