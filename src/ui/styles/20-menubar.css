@@ -1,0 +1,87 @@
+.titlebar-nodrag {
+	-webkit-app-region: no-drag;
+	app-region: no-drag;
+	display: inline-flex;
+	align-items: center;
+}
+
+.menubar {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.menubar-group {
+	position: relative;
+}
+
+.menubar-trigger {
+	border: 0;
+	background: transparent;
+	color: var(--text);
+	font-size: 12px;
+	padding: 4px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.menubar-trigger:hover,
+.menubar-trigger[aria-expanded="true"] {
+	background: var(--hover);
+}
+
+.menubar-panel {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	min-width: 200px;
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+	padding: 4px 0;
+	z-index: 50;
+}
+
+.menubar-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	width: 100%;
+	border: 0;
+	background: transparent;
+	color: var(--text);
+	font-size: 12px;
+	padding: 6px 12px;
+	cursor: pointer;
+	text-align: left;
+}
+
+.menubar-item:hover:not(:disabled) {
+	background: var(--hover);
+}
+
+.menubar-item:disabled {
+	color: var(--muted);
+	cursor: default;
+}
+
+.menubar-item-label {
+	white-space: nowrap;
+}
+
+.menubar-accel {
+	color: var(--muted);
+	font-size: 11px;
+}
+
+.menubar-sep {
+	border: 0;
+	border-top: 1px solid var(--line);
+	margin: 4px 0;
+}
+
+.titlebar-right {
+	margin-left: auto;
+}

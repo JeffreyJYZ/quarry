@@ -8,6 +8,7 @@ export function useSelectionKeybindings(context: {
 	activePathRef: React.RefObject<string | null>;
 	runToCursor: (path: string, line: number) => void;
 	setFileRevealToken: (updater: (current: number) => number) => void;
+	setRailCollapsed: (updater: (current: boolean) => boolean) => void;
 	setQuickOpenOpen: (open: boolean) => void;
 	setCallsCursor: (cursor: { line: number; character: number } | null) => void;
 	setCallsOpen: (open: boolean) => void;
@@ -23,11 +24,12 @@ export function useSelectionKeybindings(context: {
 			if (event.key.toLowerCase() !== "e") return;
 			if (root === null || activePath === null) return;
 			event.preventDefault();
+			context.setRailCollapsed(() => false);
 			context.setFileRevealToken((current) => current + 1);
 		};
 		window.addEventListener("keydown", handleKeyDown, true);
 		return () => window.removeEventListener("keydown", handleKeyDown, true);
-	}, [root, activePath, context.setFileRevealToken]);
+	}, [root, activePath, context.setFileRevealToken, context.setRailCollapsed]);
 
 	/** Cmd+P opens quick open by file name. */
 	useEffect(() => {

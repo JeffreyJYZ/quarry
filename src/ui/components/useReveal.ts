@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from "react";
+import { ancestorDirs, isInside } from "./revealTarget";
 
 export function useReveal(
 	root: string,
@@ -12,17 +13,8 @@ export function useReveal(
 	const reveal = useCallback(
 		async (target: string | null) => {
 			if (target === null) return;
-			if (!target.startsWith(`${root}/`)) return;
-			const parts = target
-				.slice(root.length + 1)
-				.split("/")
-				.filter((p) => p.length > 0);
-			let current = root;
-			const ancestors: string[] = [];
-			for (const part of parts.slice(0, -1)) {
-				current = `${current}/${part}`;
-				if (current !== root) ancestors.push(current);
-			}
+			if (!isInside(root, target)) return;
+			const ancestors = ancestorDirs(root, target);
 			try {
 				for (const dir of ancestors) await load(dir);
 			} catch {
@@ -39,10 +31,10 @@ export function useReveal(
 				setHighlightedPath(null);
 				highlightTimer.current = null;
 			}, 1500);
-			window.setTimeout(() => {
+			requestAnimationFrame(() => {
 				const row = document.querySelector(`[data-path="${CSS.escape(target)}"]`);
 				if (row instanceof HTMLElement) row.scrollIntoView({ block: "nearest" });
-			}, 0);
+			});
 		},
 		[root, load, setExpanded, setHighlightedPath, highlightTimer],
 	);

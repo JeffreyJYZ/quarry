@@ -14,7 +14,7 @@ import { usePanels } from "@/ui/app/usePanels";
 import { useRunControls } from "@/ui/app/useRunControls";
 import { useSaveBuffers } from "@/ui/app/useSaveBuffers";
 import { useSettings } from "@/ui/app/useSettings";
-import { useSnapshotRef } from "@/ui/app/useSnapshotRef";
+import { useShellSnapshot } from "@/ui/app/useShellSnapshot";
 import { useAutoOpenDock } from "@/ui/app/useAutoOpenDock";
 import { resetProjectState } from "@/ui/app/projectReset";
 import { useShellGlue } from "@/ui/app/useShellGlue";
@@ -136,22 +136,15 @@ export function useShell() {
 	// Everything that belonged to the previous project, cleared when a new one opens.
 	projectOpenedRef.current = () => resetProjectState({ git, panels, overlays, diagnostics });
 
-	const snapshotRef = useSnapshotRef(() => ({
-		project: workspace.project,
-		buffers: workspace.buffers,
+	const snapshotRef = useShellSnapshot({
+		workspace,
+		panels,
 		activePath,
-		railCollapsed: panels.railCollapsed,
-		debugOpen: panels.debugOpen,
-		gitOpen: panels.gitOpen,
-		panelOpen: panels.panelOpen,
-		dockTab: panels.dockTab,
-		runConfigurations: runs.configurations,
-		preferences: settings.preferences,
-		recentFiles: workspace.recentFiles,
-		newProjectParent: panels.newProjectParent,
-	}));
+		runs,
+		settings,
+	});
 
-	const { commands } = useShellGlue({
+	const { commands, runCommand } = useShellGlue({
 		workspace,
 		overlays,
 		panels,
@@ -188,6 +181,7 @@ export function useShell() {
 		notice,
 		setNotice,
 		commands,
+		runCommand,
 		editorRef,
 		root,
 		activePath,

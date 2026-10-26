@@ -6,20 +6,19 @@ import {
 	type TabSize,
 	type TerminalPlacement,
 } from "@/lib/settings/model";
-import type { State } from "@/lib/updates/store";
+
 import { Segmented, Stepper } from "./controls";
 import { LanguageServerSection } from "./LanguageServerSection";
 import { ShellSections } from "./ShellSections";
+import { UpdatesSection } from "./UpdatesSection";
 
 /** The user-wide preferences tab: values every project starts from. */
 export function UserTab(props: {
 	user: Preferences;
 	onChange: (patch: Partial<Preferences>) => void;
 	onResetPanels: () => void;
-	updates: State;
-	version: string;
 }): JSX.Element {
-	const { user, onChange, onResetPanels, updates, version } = props;
+	const { user, onChange, onResetPanels } = props;
 	return (
 		<>
 			<section className="settings-section">
@@ -114,13 +113,8 @@ export function UserTab(props: {
 			</section>
 
 			<LanguageServerSection user={user} onChange={onChange} />
-			<ShellSections
-				user={user}
-				onChange={onChange}
-				onResetPanels={onResetPanels}
-				updates={updates}
-				version={version}
-			/>
+			<UpdatesSection />
+			<ShellSections user={user} onChange={onChange} onResetPanels={onResetPanels} />
 		</>
 	);
 }

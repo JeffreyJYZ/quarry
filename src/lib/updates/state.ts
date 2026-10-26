@@ -3,14 +3,13 @@ import type { Offer } from "@/lib/updates/model";
 
 export type { Offer } from "@/lib/updates/model";
 
-export type Phase = "idle" | "checking" | "current" | "available" | "downloading" | "failed";
+export type Phase = "idle" | "checking" | "downloading" | "ready" | "current" | "failed";
 
 export type State = {
 	phase: Phase;
 	offer: Offer | null;
 	message: string | null;
 	progress: number | null;
-	dismissed: boolean;
 };
 
 const idle: State = {
@@ -18,7 +17,6 @@ const idle: State = {
 	offer: null,
 	message: null,
 	progress: null,
-	dismissed: false,
 };
 
 let state: State = idle;

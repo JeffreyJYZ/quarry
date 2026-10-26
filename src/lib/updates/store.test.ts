@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import {
 	checkForUpdates,
 	getState,
-	installNow,
+	restartWithUpdate,
 	resetUpdateDeps,
 	setUpdateDeps,
 } from "@/lib/updates/store";
 
-describe("store no-op rules", () => {
+describe("store phases", () => {
 	beforeEach(() => {
 		resetUpdateDeps();
 	});
@@ -23,7 +23,6 @@ describe("store no-op rules", () => {
 			currentVersion: async () => "1.0.0",
 		});
 		const first = checkForUpdates();
-		// allow microtask to set checking
 		await Promise.resolve();
 		expect(getState().phase).toBe("checking");
 		const second = checkForUpdates();
@@ -33,16 +32,68 @@ describe("store no-op rules", () => {
 		await first;
 	});
 
-	test("install refused unless updater offer available", async () => {
+	test("no newer version ends current", async () => {
 		setUpdateDeps({
 			checkUpdater: async () => null,
-			fetchGithub: async () => ({ version: "2.0.0" }),
+			fetchGithub: async () => null,
 			currentVersion: async () => "1.0.0",
 		});
 		await checkForUpdates();
-		expect(getState().phase).toBe("available");
-		expect(getState().offer?.kind).toBe("github");
-		await installNow();
-		expect(getState().phase).toBe("available");
+		expect(getState().phase).toBe("current");
+	});
+
+	test("newer version goes to ready after download", async () => {
+		const update = {
+			version: "2.0.0",
+			download: async (onEvent?: (e: unknown) => void) => {
+				onEvent?.({ event: "Started", data: { contentLength: 10 } });
+				onEvent?.({ event: "Progress", data: { chunkLength: 10 } });
+				onEvent?.({ event: "Finished" });
+			},
+			install: async () => {},
+			close: async () => {},
+		};
+		setUpdateDeps({
+			checkUpdater: async () => update as never,
+			fetchGithub: async () => null,
+			currentVersion: async () => "1.0.0",
+			relaunch: async () => {},
+		});
+		await checkForUpdates();
+		expect(getState().phase).toBe("ready");
+	});
+
+	test("download failure ends failed without throwing", async () => {
+		const update = {
+			version: "2.0.0",
+			download: async () => {
+				throw new Error("boom");
+			},
+			install: async () => {},
+			close: async () => {},
+		};
+		setUpdateDeps({
+			checkUpdater: async () => update as never,
+			fetchGithub: async () => null,
+			currentVersion: async () => "1.0.0",
+			relaunch: async () => {},
+		});
+		await checkForUpdates();
+		expect(getState().phase).toBe("failed");
+		expect(getState().message).toBe("boom");
+	});
+
+	test("restartWithUpdate calls injected relaunch once", async () => {
+		let calls = 0;
+		setUpdateDeps({
+			checkUpdater: async () => null,
+			fetchGithub: async () => null,
+			currentVersion: async () => "1.0.0",
+			relaunch: async () => {
+				calls += 1;
+			},
+		});
+		await restartWithUpdate();
+		expect(calls).toBe(1);
 	});
 });

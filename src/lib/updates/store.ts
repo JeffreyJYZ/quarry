@@ -31,9 +31,9 @@ export async function checkForUpdates(): Promise<void> {
 		offer: null,
 		message: null,
 		progress: null,
-		dismissed: false,
 	});
 	let offer: Offer | null = null;
+	let version: string | null = null;
 	try {
 		const deps = getDeps();
 		const current = await deps.currentVersion();
@@ -47,6 +47,7 @@ export async function checkForUpdates(): Promise<void> {
 			if (isNewer(updater.version, current)) {
 				currentHandle = updater;
 				offer = { kind: "updater", version: updater.version, update: updater };
+				version = updater.version;
 			} else {
 				try {
 					await updater.close();
@@ -70,27 +71,36 @@ export async function checkForUpdates(): Promise<void> {
 	} catch {
 		offer = null;
 	}
+	if (offer === null) {
+		setState({
+			phase: "current",
+			offer: null,
+			message: null,
+			progress: null,
+		});
+		return;
+	}
+	if (offer.kind === "github") {
+		setState({
+			phase: "current",
+			offer,
+			message: null,
+			progress: null,
+		});
+		return;
+	}
+	// updater offer: download automatically
 	setState({
-		phase: offer === null ? "current" : "available",
+		phase: "downloading",
 		offer,
 		message: null,
 		progress: null,
-		dismissed: false,
 	});
-}
-
-export async function installNow(): Promise<void> {
-	const state = getState();
-	const offer = state.offer;
-	if (offer === null || offer.kind !== "updater") {
-		return;
-	}
 	const update = offer.update as Update;
-	setState({ ...state, phase: "downloading", progress: null, message: null });
 	let downloaded = 0;
 	let total: number | null = null;
 	try {
-		await update.downloadAndInstall((event) => {
+		await update.download((event) => {
 			if (event.event === "Started") {
 				total = event.data.contentLength ?? null;
 				downloaded = 0;
@@ -100,15 +110,48 @@ export async function installNow(): Promise<void> {
 				setState({ ...getState(), progress: progressPercent(downloaded, total) });
 			}
 		});
-		await getDeps().relaunch();
+		setState({
+			phase: "ready",
+			offer,
+			message: null,
+			progress: progressPercent(downloaded, total),
+		});
 	} catch (error) {
 		setState({
-			...getState(),
 			phase: "failed",
+			offer: null,
 			message: error instanceof Error ? error.message : String(error),
 			progress: null,
 		});
 	}
+	void version;
+}
+
+export async function restartWithUpdate(): Promise<void> {
+	const state = getState();
+	const offer = state.offer;
+	if (offer !== null && offer.kind === "updater") {
+		const update = offer.update as { install?: (options?: unknown) => Promise<void> };
+		if (typeof update.install === "function") {
+			try {
+				await update.install();
+			} catch (error) {
+				setState({
+					...getState(),
+					phase: "failed",
+					message: error instanceof Error ? error.message : String(error),
+					progress: null,
+				});
+				return;
+			}
+		}
+	}
+	await getDeps().relaunch();
+}
+
+/** @deprecated use restartWithUpdate */
+export async function installNow(): Promise<void> {
+	await restartWithUpdate();
 }
 
 export async function releaseOffer(): Promise<void> {
@@ -118,6 +161,5 @@ export async function releaseOffer(): Promise<void> {
 		offer: null,
 		message: null,
 		progress: null,
-		dismissed: true,
 	});
 }

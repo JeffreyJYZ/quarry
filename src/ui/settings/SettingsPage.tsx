@@ -1,5 +1,4 @@
 import { type JSX, useEffect, useRef, useState } from "react";
-import { getVersion } from "@tauri-apps/api/app";
 import {
 	effectivePreferences,
 	normalizePreferences,
@@ -8,7 +7,6 @@ import {
 	type Preferences,
 	type ProjectSettings,
 } from "@/lib/settings/model";
-import { useUpdates } from "@/lib/updates/store";
 import "@/ui/settings/settings.css";
 import { ProjectTab } from "./ProjectTab";
 import { UserTab } from "./UserTab";
@@ -49,12 +47,7 @@ export default function SettingsPage({
 	initialTab = "user",
 }: SettingsPageProps): JSX.Element | null {
 	const [tab, setTab] = useState<Tab>(initialTab);
-	const updates = useUpdates();
-	const [version, setVersion] = useState("");
-
-	useEffect(() => {
-		void getVersion().then(setVersion, () => setVersion(""));
-	}, []);
+	// updates/version now live in UpdatesSection
 	const panelRef = useRef<HTMLDivElement>(null);
 	const effective = effectivePreferences(user, project);
 	const projectEmpty = project === null || projectSettingsAreEmpty(project);
@@ -130,13 +123,7 @@ export default function SettingsPage({
 
 				<div className="settings-body">
 					{tab === "user" ? (
-						<UserTab
-							user={user}
-							onChange={setUser}
-							onResetPanels={onResetPanels}
-							updates={updates}
-							version={version}
-						/>
+						<UserTab user={user} onChange={setUser} onResetPanels={onResetPanels} />
 					) : (
 						<ProjectTab
 							project={project}

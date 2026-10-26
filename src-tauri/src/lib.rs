@@ -6,6 +6,7 @@ mod git;
 mod ignore;
 mod launch;
 mod lsp;
+mod menu;
 mod new_project;
 mod processes;
 mod project;
@@ -130,6 +131,14 @@ pub fn run() {
             pty::pty_resize,
             pty::pty_close
         ])
+        .on_menu_event(|app, event| {
+            menu::on_menu_event(app, event);
+        })
+        .setup(|app| {
+            let menu = menu::build_menu(app.handle())?;
+            app.set_menu(menu)?;
+            Ok(())
+        })
         .build(tauri::generate_context!())
         .expect("error while building the application")
         .run(|handle, event| {

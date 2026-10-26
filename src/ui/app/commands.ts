@@ -27,6 +27,8 @@ export type CommandContext = {
 	openShortcuts: () => void;
 	refreshGit: () => void;
 	toggleBlame: () => void;
+	newProject: () => void;
+	checkUpdates: () => void;
 };
 
 /**
@@ -170,6 +172,18 @@ export function buildCommands(context: CommandContext): Command[] {
 			hint: "",
 			disabled: root === null || activePath === null,
 			run: context.toggleBlame,
+		},
+		{
+			id: "new-project",
+			label: "New project",
+			hint: "",
+			run: context.newProject,
+		},
+		{
+			id: "check-updates",
+			label: "Check for updates",
+			hint: "",
+			run: context.checkUpdates,
 		},
 	];
 }

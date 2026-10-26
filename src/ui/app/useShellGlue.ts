@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef } from "react";
 import type { SessionSnapshot } from "@/ui/app/useSessionPersistence";
 import type { BuildModel } from "@/ui/app/useBuild";
 import type { EditorActions } from "@/ui/app/useEditorActions";
@@ -13,6 +14,8 @@ import type { useWorkspace } from "@/ui/app/useWorkspace";
 import { buildCommands } from "@/ui/app/commands";
 import { useClionKeymap } from "@/ui/app/useClionKeymap";
 import { useKeybindings } from "@/ui/app/useKeybindings";
+import { useNativeMenu } from "@/ui/app/useNativeMenu";
+import { startUpdatePolling } from "@/lib/updates/poll";
 import { useSelectionKeybindings } from "@/ui/app/useSelectionKeybindings";
 import { useSessionPersistence } from "@/ui/app/useSessionPersistence";
 import { normalizePreferences } from "@/lib/settings/model";
@@ -80,6 +83,7 @@ export function useShellGlue(options: GlueOptions) {
 		activePathRef: workspace.activePathRef,
 		runToCursor: debug.runToCursor,
 		setFileRevealToken: panels.setFileRevealToken,
+		setRailCollapsed: panels.setRailCollapsed,
 		setQuickOpenOpen: overlays.setQuickOpenOpen,
 		setCallsCursor: overlays.setCallsCursor,
 		setCallsOpen: overlays.setCallsOpen,
@@ -129,16 +133,17 @@ export function useShellGlue(options: GlueOptions) {
 		openSearch: () => overlays.setSearchOpen(true),
 		toggleRail: () => panels.setRailCollapsed((current) => !current),
 		toggleDock: () => panels.setPanelOpen(!panelExpanded),
-		toggleTerminal: () =>
-			panels.setTerminalOpen((current) => {
-				if (!current) panels.setPanelOpen(true);
-				return !current;
-			}),
+		// Only the terminal toggles: opening the bottom panel here also revealed Problems.
+		toggleTerminal: () => panels.setTerminalOpen((current) => !current),
 		revealFile: () => panels.setFileRevealToken((current) => current + 1),
 		openQuick: () => overlays.setQuickOpenOpen(true),
 		openShortcuts: () => overlays.setShortcutsOpen(true),
 		refreshGit: () => git.setRefreshToken((current) => current + 1),
 		toggleBlame: () => git.setBlameOn((current) => !current),
+		newProject: () => panels.setNewProjectOpen(true),
+		checkUpdates: () => {
+			void import("@/lib/updates/store").then((updates) => updates.checkForUpdates());
+		},
 	});
 
 	useSessionPersistence({
@@ -161,5 +166,24 @@ export function useShellGlue(options: GlueOptions) {
 		},
 	});
 
-	return { commands };
+	// The native menu runs the same commands as the in-window menu and the palette. The dispatch is
+	// held in a ref so the event listener registers once instead of on every render.
+	const dispatchRef = useRef<(id: string) => void>(() => {});
+	dispatchRef.current = (id: string) => {
+		if (id === "open-settings") {
+			panels.setSettingsTab(root === null ? "user" : "project");
+			panels.setSettingsOpen(true);
+			return;
+		}
+		const command = commands.find((entry) => entry.id === id);
+		if (command !== undefined && command.disabled !== true) command.run();
+	};
+	const runCommand = useCallback((id: string) => dispatchRef.current(id), []);
+
+	useNativeMenu(runCommand);
+
+	// Updates stay quiet: check and download in the background, then offer a restart in the title bar.
+	useEffect(() => startUpdatePolling(), []);
+
+	return { commands, runCommand };
 }

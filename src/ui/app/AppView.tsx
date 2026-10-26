@@ -1,15 +1,14 @@
-import UpdateNotice from "@/ui/updates/UpdateNotice";
 import AppBody from "@/ui/app/AppBody";
 import AppTopBar from "@/ui/app/AppTopBar";
 import OverlaysMount from "@/ui/app/OverlaysMount";
+import UpdateSlot from "@/ui/updates/UpdateSlot";
 import type { ShellModel } from "@/ui/app/useShell";
 
 /** The shell's frame: title bar, notice line, the workspace, and everything floating over it. */
 export default function AppView({ model }: { model: ShellModel }) {
 	return (
 		<div className="shell">
-			<UpdateNotice />
-			<AppTopBar model={model} />
+			<AppTopBar model={model} right={<UpdateSlot />} />
 			{model.notice === null ? null : (
 				<div className="notice" role="status">
 					<span className="notice-text" title={model.notice}>
