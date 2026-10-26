@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { lspSymbols, lspWorkspaceSymbols, type WorkspaceSymbol } from "@/lib/project/api";
+import { describeError } from "@/lib/project/errors";
 import { isInsideRoot } from "@/lib/lsp/paths";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
 import type { ServerKind } from "@/lib/lsp/served";
 import "@/ui/goto/goto.css";
 import { type GotoMode, type Row, TITLES, fileNameOf, filterRows } from "./gotoModel";
-
 export type { GotoMode } from "./gotoModel";
 export { filterRows } from "./gotoModel";
-
 export type GotoProps = {
 	mode: GotoMode;
 	root: string;
@@ -18,26 +17,24 @@ export type GotoProps = {
 	recent: string[];
 	onOpen: (path: string, line: number, character: number) => void;
 	onClose: () => void;
+	onNotice?: (message: string) => void;
 };
-
 /**
  * One palette for the three "go to" gestures.
  *
  * Class and symbol modes ask the language server; recent mode takes the caller's history, so it
  * still works before the server has answered anything.
  */
-export default function Goto({ mode, root, path, recent, onOpen, onClose }: GotoProps) {
+export default function Goto({ mode, root, path, recent, onOpen, onClose, onNotice }: GotoProps) {
 	const [query, setQuery] = useState("");
 	const [rows, setRows] = useState<Row[]>([]);
 	const [active, setActive] = useState(0);
 	const [loading, setLoading] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const listRef = useRef<HTMLUListElement>(null);
-
 	useEffect(() => {
 		inputRef.current?.focus();
 	}, []);
-
 	useEffect(() => {
 		let cancelled = false;
 		const load = async () => {
@@ -62,7 +59,10 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose }: Goto
 						const running = new Set<ServerKind>(["rust-analyzer", "clangd"]);
 						const kind = servedByRunningServer(path, running);
 						if (kind !== null) {
-							symbols = await lspSymbols(sessionId(kind, root), path).catch(() => []);
+							symbols = await lspSymbols(sessionId(kind, root), path).catch((err) => {
+								onNotice?.(`symbols unavailable: ${describeError(err)}`);
+								return [];
+							});
 						}
 					}
 					if (cancelled) return;
@@ -87,7 +87,10 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose }: Goto
 						kind === null
 							? []
 							: await lspWorkspaceSymbols(sessionId(kind, root), query).catch(
-									() => [],
+									(err) => {
+										onNotice?.(`symbols unavailable: ${describeError(err)}`);
+										return [];
+									},
 								);
 					if (cancelled) return;
 					setRows(
@@ -110,15 +113,12 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose }: Goto
 			cancelled = true;
 		};
 		// The class mode is the only one that re-queries as the query changes.
-	}, [mode, path, recent, root, query]);
-
+	}, [mode, path, recent, root, query, onNotice]);
 	const visible = useMemo(() => filterRows(rows, query).slice(0, 200), [query, rows]);
-
 	useEffect(() => {
 		const item = listRef.current?.children[active] as HTMLElement | undefined;
 		item?.scrollIntoView({ block: "nearest" });
 	}, [active]);
-
 	return (
 		<div
 			className="goto-backdrop"

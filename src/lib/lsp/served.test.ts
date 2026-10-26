@@ -104,6 +104,10 @@ describe("isSessionId", () => {
 		expect(isSessionId("/Users/jyz/dev/langs/rust/hi")).toBe(false);
 		expect(isSessionId("/root")).toBe(false);
 	});
+	test("composed id with empty root is rejected", () => {
+		expect(isSessionId("rust-analyzer::")).toBe(false);
+		expect(isSessionId("clangd::")).toBe(false);
+	});
 	test("null session short-circuits feature", () => {
 		expect(sessionForPath("/p/src/main.rs", new Set(), "/root")).toBeNull();
 	});

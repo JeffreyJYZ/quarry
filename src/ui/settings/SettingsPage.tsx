@@ -49,13 +49,19 @@ export default function SettingsPage({
 	const [tab, setTab] = useState<Tab>(initialTab);
 	// updates/version now live in UpdatesSection
 	const panelRef = useRef<HTMLDivElement>(null);
+	const openerRef = useRef<HTMLElement | null>(null);
 	const effective = effectivePreferences(user, project);
 	const projectEmpty = project === null || projectSettingsAreEmpty(project);
 
 	useEffect(() => {
 		if (!open) return;
+		openerRef.current =
+			document.activeElement instanceof HTMLElement ? document.activeElement : null;
 		setTab(initialTab);
 		panelRef.current?.focus();
+		return () => {
+			openerRef.current?.focus();
+		};
 	}, [initialTab, open]);
 
 	if (!open) return null;
@@ -86,6 +92,26 @@ export default function SettingsPage({
 					if (event.key === "Escape") {
 						event.preventDefault();
 						onClose();
+						return;
+					}
+					if (event.key !== "Tab") return;
+					const panel = panelRef.current;
+					if (panel === null) return;
+					const focusable = panel.querySelectorAll<HTMLElement>(
+						'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])',
+					);
+					if (focusable.length === 0) {
+						event.preventDefault();
+						return;
+					}
+					const first = focusable[0];
+					const last = focusable[focusable.length - 1];
+					if (event.shiftKey && document.activeElement === first) {
+						event.preventDefault();
+						last.focus();
+					} else if (!event.shiftKey && document.activeElement === last) {
+						event.preventDefault();
+						first.focus();
 					}
 				}}
 			>

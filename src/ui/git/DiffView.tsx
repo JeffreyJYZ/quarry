@@ -10,9 +10,17 @@ export type DiffViewProps = {
 	commit?: string | null;
 	staged?: boolean;
 	onClose: () => void;
+	onNotice?: (message: string | null) => void;
 };
 
-export default function DiffView({ root, path, commit, staged = false, onClose }: DiffViewProps) {
+export default function DiffView({
+	root,
+	path,
+	commit,
+	staged = false,
+	onClose,
+	onNotice,
+}: DiffViewProps) {
 	const isCommit = commit !== null && commit !== undefined;
 	const key = isCommit ? (commit as string) : (path as string);
 	const [diff, setDiff] = useState<GitFileDiff | CommitDiff | null>(null);
@@ -77,7 +85,13 @@ export default function DiffView({ root, path, commit, staged = false, onClose }
 											staged
 												? gitUnstageHunk(root, key, hunk.id)
 												: gitStageHunk(root, key, hunk.id)
-										).catch(() => {})
+										)
+											.then(() => onNotice?.(null))
+											.catch((err) =>
+												onNotice?.(
+													`${staged ? "unstage" : "stage"} hunk failed: ${describeError(err)}`,
+												),
+											)
 									}
 								>
 									{staged ? "unstage" : "stage"}

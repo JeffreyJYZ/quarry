@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 
 export const MENU_COMMAND_IDS: ReadonlySet<string> = new Set([
@@ -30,13 +30,15 @@ export function isMenuCommand(id: string): boolean {
 }
 
 export function useNativeMenu(dispatch: (id: string) => void): void {
+	const dispatchRef = useRef(dispatch);
+	dispatchRef.current = dispatch;
 	useEffect(() => {
 		let unlisten: (() => void) | undefined;
 		let cancelled = false;
 		listen<string>("menu-command", (event) => {
 			const id = event.payload;
 			if (isMenuCommand(id)) {
-				dispatch(id);
+				dispatchRef.current(id);
 			}
 		}).then((fn) => {
 			if (cancelled) {
@@ -51,5 +53,5 @@ export function useNativeMenu(dispatch: (id: string) => void): void {
 				unlisten();
 			}
 		};
-	}, [dispatch]);
+	}, []);
 }

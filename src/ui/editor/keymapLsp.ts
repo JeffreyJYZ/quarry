@@ -9,6 +9,7 @@ import {
 	lspReferences,
 } from "@/lib/project/api";
 import { toLspPosition } from "@/lib/editor/positions";
+import { inEditableTarget } from "@/ui/app/focusGuard";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
 import type { KeymapDeps } from "@/ui/editor/keymapDeps";
 
@@ -95,6 +96,9 @@ export function lspBindings(deps: KeymapDeps): KeyBinding[] {
 		{
 			key: "Mod-f",
 			run: () => {
+				if (inEditableTarget()) return false;
+				const view = deps.viewRef.current;
+				if (view === null || !view.hasFocus) return false;
 				deps.openSearchRef.current(false);
 				return true;
 			},
@@ -102,6 +106,9 @@ export function lspBindings(deps: KeymapDeps): KeyBinding[] {
 		{
 			key: "Mod-Alt-f",
 			run: () => {
+				if (inEditableTarget()) return false;
+				const view = deps.viewRef.current;
+				if (view === null || !view.hasFocus) return false;
 				deps.openSearchRef.current(true);
 				return true;
 			},

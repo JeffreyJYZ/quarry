@@ -27,13 +27,18 @@ export default function CommandPalette({
 	const [active, setActive] = useState(0);
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const listRef = useRef<HTMLDivElement | null>(null);
+	const openerRef = useRef<HTMLElement | null>(null);
 
 	useEffect(() => {
 		if (!open) {
 			setQuery("");
 			setActive(0);
+			openerRef.current?.focus();
+			openerRef.current = null;
 			return;
 		}
+		openerRef.current =
+			document.activeElement instanceof HTMLElement ? document.activeElement : null;
 		inputRef.current?.focus();
 	}, [open]);
 

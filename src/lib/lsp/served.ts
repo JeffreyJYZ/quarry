@@ -40,7 +40,9 @@ export function sessionId(kind: ServerKind, root: string): string {
 
 /** Whether a string is a composed session id (`{kind}::{root}`), not a bare path. */
 export function isSessionId(value: string): boolean {
-	return value.includes("::");
+	const separator = value.indexOf("::");
+	if (separator <= 0) return false;
+	return value.slice(separator + 2).length > 0;
 }
 
 /** Which servers should run for a root, from what is actually there. */

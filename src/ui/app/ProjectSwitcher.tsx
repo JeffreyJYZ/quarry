@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { splitPath } from "@/ui/projects/recentPaths";
 
 export type ProjectSwitcherProps = {
@@ -31,11 +31,11 @@ export default function ProjectSwitcher(props: ProjectSwitcherProps) {
 		return roots.filter((root) => root.toLowerCase().includes(needle));
 	}, [roots, query]);
 
-	const close = (refocus: boolean) => {
+	const close = useCallback((refocus: boolean) => {
 		setOpen(false);
 		setQuery("");
 		if (refocus) triggerRef.current?.focus();
-	};
+	}, []);
 
 	const choose = (root: string) => {
 		close(true);
@@ -62,12 +62,11 @@ export default function ProjectSwitcher(props: ProjectSwitcherProps) {
 		if (!open) return;
 		const handlePointer = (event: MouseEvent) => {
 			if (boxRef.current?.contains(event.target as Node) === true) return;
-			setOpen(false);
-			setQuery("");
+			close(true);
 		};
 		document.addEventListener("mousedown", handlePointer);
 		return () => document.removeEventListener("mousedown", handlePointer);
-	}, [open]);
+	}, [open, close]);
 
 	const handleKey = (event: KeyboardEvent<HTMLDivElement>) => {
 		if (event.key === "Escape") {

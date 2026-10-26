@@ -69,4 +69,13 @@ describe("progressPercent", () => {
 	test("zero total null", () => {
 		expect(progressPercent(42, 0)).toBeNull();
 	});
+	test("clamps below zero to 0", () => {
+		expect(progressPercent(-50, 100)).toBe(0);
+	});
+	test("clamps above 100 to 100", () => {
+		expect(progressPercent(200, 100)).toBe(100);
+	});
+	test("rounds", () => {
+		expect(progressPercent(1, 3)).toBe(33);
+	});
 });

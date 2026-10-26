@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { inTerminal } from "@/ui/app/focusGuard";
 
 type Cursor = { line: number; character: number } | null;
 
@@ -106,7 +107,7 @@ export function useKeybindings(context: KeybindingContext): void {
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (!event.metaKey || event.ctrlKey || event.altKey) return;
-			if (inEditor() || inInput()) return;
+			if (inEditor() || inInput() || inTerminal()) return;
 			const key = event.key.toLowerCase();
 			if (!event.shiftKey) {
 				if (key === "b") {

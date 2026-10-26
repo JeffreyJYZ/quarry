@@ -49,7 +49,12 @@ export type WorkspaceSymbol = {
 
 export type TextEdit = { range: Range; newText: string };
 export type FileEdit = { path: string; edits: TextEdit[] };
-export type CodeAction = { title: string; kind: string | null; edits: FileEdit[] };
+export type CodeAction = {
+	title: string;
+	kind: string | null;
+	edits: FileEdit[];
+	command?: string;
+};
 
 export type SignatureInformation = { label: string; documentation: string | null };
 export type SignatureHelp = {

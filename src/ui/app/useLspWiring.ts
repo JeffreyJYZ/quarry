@@ -1,4 +1,4 @@
-import type { MutableRefObject } from "react";
+import { useEffect, useMemo, type MutableRefObject } from "react";
 import { useRootSignals } from "@/lib/lsp/rootSignals";
 import { useDocumentSync, useLspServers, type LspStatusMap } from "@/lib/lsp/session";
 import { setLspContext } from "@/lib/lsp/context";
@@ -21,11 +21,17 @@ export type LspWiringOptions = {
 export function useLspWiring(options: LspWiringOptions): LspStatusMap {
 	const signals = useRootSignals(options.root);
 	const statuses = useLspServers(options.root, signals, options.report, options.overrides);
-	const running = new Set(
-		(Object.keys(statuses) as ServerKind[]).filter((kind) => statuses[kind] != null),
+	const running = useMemo(
+		() =>
+			new Set(
+				(Object.keys(statuses) as ServerKind[]).filter((kind) => statuses[kind] != null),
+			),
+		[statuses],
 	);
-	options.runningRef.current = running;
-	setLspContext(options.root, running);
+	useEffect(() => {
+		options.runningRef.current = running;
+		setLspContext(options.root, running);
+	}, [running, options.root, options.runningRef]);
 
 	useDocumentSync({
 		root: options.root,

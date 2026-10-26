@@ -7,6 +7,7 @@ import { describeError } from "@/lib/project/errors";
 import type { Settings } from "@/lib/project/api";
 import type { DockTab } from "@/ui/tests/TestsDock";
 import type { ProjectInfo, RunConfiguration } from "@/lib/project/api";
+import { snapshotSignature } from "@/ui/app/sessionSignature";
 import { openProject } from "@/lib/project/api";
 
 export type SessionSnapshot = {
@@ -151,10 +152,20 @@ export function useSessionPersistence(options: {
 	};
 
 	// Debounced because typing moves the caret and the buffer on every keystroke.
+	// A counter that only moves when the serialized snapshot changes keeps the timer from being
+	// cleared on every unrelated render.
+	const serialized = snapshotSignature(snapshotRef.current);
+	const changeCounter = useRef(0);
+	const previousSerialized = useRef<string | null>(null);
+	if (serialized !== previousSerialized.current) {
+		previousSerialized.current = serialized;
+		changeCounter.current += 1;
+	}
+	// biome-ignore lint/correctness/useExhaustiveDependencies: changeCounter is a ref-derived change token
 	useEffect(() => {
 		const timer = window.setTimeout(write, 400);
 		return () => window.clearTimeout(timer);
-	});
+	}, [changeCounter.current]);
 
 	// A hidden window means a quit is likely; write before the webview goes away.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: the write reads a ref, not a value

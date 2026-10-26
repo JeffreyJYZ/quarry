@@ -3,7 +3,6 @@ import type { DirState, EditState } from "./FileTreeTypes";
 import { indent } from "./FileTreeIcons";
 import { CreateInputRow } from "./TreeCreateInput";
 import { TreeRow } from "./TreeRow";
-
 export type TreeLevelProps = {
 	path: string;
 	depth: number;
@@ -23,7 +22,6 @@ export type TreeLevelProps = {
 	onCancelDelete: () => void;
 	changes: Record<string, GitStatusEntry["status"]>;
 };
-
 export function TreeLevel({
 	path,
 	depth,
@@ -45,7 +43,6 @@ export function TreeLevel({
 }: TreeLevelProps) {
 	const state = dirs[path];
 	const noteStyle = indent(depth + 1);
-
 	if (!state || state.status === "loading") {
 		return (
 			<p className="tree-note" style={noteStyle}>
@@ -76,10 +73,15 @@ export function TreeLevel({
 			</p>
 		);
 	}
-
-	const hasChangeUnder = (dirPath: string) =>
-		Object.keys(changes).some((p) => p === dirPath || p.startsWith(`${dirPath}/`));
-
+	const changedDirs = new Set<string>();
+	for (const p of Object.keys(changes)) {
+		for (let cur = p; ;) {
+			changedDirs.add(cur);
+			const i = cur.lastIndexOf("/");
+			if (i <= 0) break;
+			cur = cur.slice(0, i);
+		}
+	}
 	const showCreateInput =
 		editing?.kind.startsWith("create") === true &&
 		editing !== null &&
@@ -133,7 +135,7 @@ export function TreeLevel({
 								status={status}
 								activePath={activePath}
 								highlightedPath={highlightedPath}
-								hasChangeUnder={hasChangeUnder(entry.path)}
+								hasChangeUnder={changedDirs.has(entry.path)}
 								onToggle={onToggle}
 								onOpenFile={onOpenFile}
 								onMenu={onMenu}

@@ -39,6 +39,10 @@ const IDLE_CONTEXT: CommandContext = {
 	toggleBlame: noop,
 	newProject: noop,
 	checkUpdates: noop,
+	workspaceSymbol: noop,
+	gotoImplementation: noop,
+	gotoTypeDefinition: noop,
+	quickDoc: noop,
 };
 
 /** Read a repo file, failing the test with its name instead of an opaque fs error. */

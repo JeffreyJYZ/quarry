@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { plural } from "@/lib/problems/model";
 import type { GitStatus, ProjectInfo } from "@/lib/project/api";
 import { kindLabel } from "@/lib/project/kind";
@@ -141,11 +142,7 @@ export default function StatusBar({
 						{server}
 					</span>
 				)}
-				{caret === null ? null : (
-					<span className="status-caret" title="Caret position">
-						{caret.line}:{caret.column}
-					</span>
-				)}
+				<CaretSegment caret={caret} />
 				{language === null ? null : (
 					<span className="status-language" title="Language">
 						{language}
@@ -177,3 +174,16 @@ export default function StatusBar({
 		</footer>
 	);
 }
+
+const CaretSegment = memo(function CaretSegment({
+	caret,
+}: {
+	caret: { line: number; column: number } | null;
+}) {
+	if (caret === null) return null;
+	return (
+		<span className="status-caret" title="Caret position">
+			{caret.line}:{caret.column}
+		</span>
+	);
+});

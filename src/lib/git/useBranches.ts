@@ -61,7 +61,12 @@ export function useBranches({
 				await gitCheckout(root, branch);
 				await onRefresh();
 				await loadHistory(historyLimit);
-				setBranches(await gitBranches(root).catch(() => branches ?? []));
+				setBranches(
+					await gitBranches(root).catch((err) => {
+						setError(`branch list refresh failed: ${describeError(err)}`);
+						return branches ?? [];
+					}),
+				);
 				setOpen(false);
 				onCommitDiff(null);
 				if (diffPath !== null) {

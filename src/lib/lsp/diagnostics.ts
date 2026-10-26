@@ -27,6 +27,20 @@ export function sortDiagnostics(diagnostics: Diagnostic[]): Diagnostic[] {
 	);
 }
 
+function isSorted(diagnostics: Diagnostic[]): boolean {
+	for (let i = 1; i < diagnostics.length; i++) {
+		const left = diagnostics[i - 1];
+		const right = diagnostics[i];
+		const cmp =
+			left.severity - right.severity ||
+			left.range.start.line - right.range.start.line ||
+			left.range.start.character - right.range.start.character ||
+			left.message.localeCompare(right.message);
+		if (cmp > 0) return false;
+	}
+	return true;
+}
+
 /** Replace one file's server-sourced diagnostics; an empty publish clears them. */
 export function withServerDiagnostics(
 	current: DiagnosticMap,
@@ -37,7 +51,7 @@ export function withServerDiagnostics(
 	if (diagnostics.length === 0) {
 		next.delete(path);
 	} else {
-		next.set(path, sortDiagnostics(diagnostics));
+		next.set(path, isSorted(diagnostics) ? [...diagnostics] : sortDiagnostics(diagnostics));
 	}
 	return next;
 }
@@ -57,7 +71,7 @@ export function groupDiagnostics(diagnostics: Diagnostic[]): DiagnosticMap {
 		}
 	}
 	for (const [path, list] of grouped) {
-		grouped.set(path, sortDiagnostics(list));
+		grouped.set(path, isSorted(list) ? list : sortDiagnostics(list));
 	}
 	return grouped;
 }
@@ -84,7 +98,7 @@ export function combineDiagnostics(server: DiagnosticMap, build: DiagnosticMap):
 			seen.add(key);
 			merged.push(diagnostic);
 		}
-		next.set(path, sortDiagnostics(merged));
+		next.set(path, isSorted(merged) ? merged : sortDiagnostics(merged));
 	}
 	return next;
 }

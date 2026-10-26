@@ -6,6 +6,8 @@ import { useEffect } from "react";
  * Keystrokes themselves belong to xterm: it translates every chord into the bytes a terminal
  * expects and hands them to `onData`, so nothing here re-implements a keymap.
  */
+import { inEditableTarget } from "@/ui/app/focusGuard";
+
 export function useTerminalTabKeys(
 	openSession: () => Promise<void>,
 	closeSession: (id: number) => void,
@@ -14,6 +16,9 @@ export function useTerminalTabKeys(
 	useEffect(() => {
 		const handler = (event: KeyboardEvent) => {
 			if (!event.metaKey || event.ctrlKey || event.altKey) return;
+			const target = document.activeElement;
+			const inTerminal = target instanceof Element && target.closest(".xterm") !== null;
+			if (!inTerminal && inEditableTarget()) return;
 			const key = event.key.toLowerCase();
 			if (key === "t") {
 				event.preventDefault();

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type GitStatus, gitBlame, gitStatus } from "@/lib/project/api";
+import { describeError } from "@/lib/project/errors";
 
 /**
  * Git state for the side rail and the editor's blame gutter.
@@ -7,8 +8,12 @@ import { type GitStatus, gitBlame, gitStatus } from "@/lib/project/api";
  * `refresh` coalesces: while a status read is in flight another request marks a follow-up and the
  * loop runs once more, so a burst of saves cannot interleave stale and fresh answers.
  */
-export function useGitState(options: { root: string | null; activePath: string | null }) {
-	const { root, activePath } = options;
+export function useGitState(options: {
+	root: string | null;
+	activePath: string | null;
+	onNotice?: (message: string) => void;
+}) {
+	const { root, activePath, onNotice } = options;
 	const [status, setStatus] = useState<GitStatus | null>(null);
 	const [refreshToken, setRefreshToken] = useState(0);
 	const [blameOn, setBlameOn] = useState(false);
@@ -19,6 +24,8 @@ export function useGitState(options: { root: string | null; activePath: string |
 
 	const inFlight = useRef<Promise<void> | null>(null);
 	const followup = useRef(false);
+	const blameByPathRef = useRef(blameByPath);
+	blameByPathRef.current = blameByPath;
 
 	const refresh = useCallback(async () => {
 		if (root === null) {
@@ -32,7 +39,11 @@ export function useGitState(options: { root: string | null; activePath: string |
 		const run = async () => {
 			do {
 				followup.current = false;
-				setStatus(await gitStatus(root));
+				try {
+					setStatus(await gitStatus(root));
+				} catch (error) {
+					onNotice?.(`git status failed: ${describeError(error)}`);
+				}
 			} while (followup.current);
 		};
 		const promise = run().finally(() => {
@@ -40,7 +51,7 @@ export function useGitState(options: { root: string | null; activePath: string |
 		});
 		inFlight.current = promise;
 		return promise;
-	}, [root]);
+	}, [root, onNotice]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: refreshToken is an explicit trigger
 	useEffect(() => {
@@ -61,7 +72,7 @@ export function useGitState(options: { root: string | null; activePath: string |
 	// Blame is fetched only while the toggle is on, and cached per path.
 	useEffect(() => {
 		if (!blameOn || root === null || activePath === null) return;
-		if (blameByPath.has(activePath)) return;
+		if (blameByPathRef.current.has(activePath)) return;
 		let cancelled = false;
 		gitBlame(root, activePath)
 			.then((rows) => {
@@ -78,7 +89,7 @@ export function useGitState(options: { root: string | null; activePath: string |
 		return () => {
 			cancelled = true;
 		};
-	}, [blameOn, root, activePath, blameByPath]);
+	}, [blameOn, root, activePath]);
 
 	const forgetBlame = useCallback((path: string) => {
 		setBlameByPath((current) => {

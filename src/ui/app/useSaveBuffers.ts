@@ -159,7 +159,8 @@ export function useSaveBuffers(context: SaveContext) {
 			setBuffers,
 			setSaving,
 			showSaveStatus,
-			context,
+			context.onSaved,
+			context.onBatchSaved,
 			runningRef,
 		],
 	);

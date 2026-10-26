@@ -50,7 +50,7 @@ export function useShell() {
 	const root = workspace.project?.root ?? null;
 	const activePath = workspace.activePath;
 
-	const git = useGitState({ root, activePath });
+	const git = useGitState({ root, activePath, onNotice: setNotice });
 	const runs = useRunControls({
 		root,
 		initialConfigurations: runConfigurationsRef.current,
@@ -164,6 +164,7 @@ export function useShell() {
 		cursor: overlays.cursor,
 		panelExpanded,
 		snapshotRef,
+		onNotice: setNotice,
 	});
 
 	return {

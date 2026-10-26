@@ -169,6 +169,10 @@ export function useDocumentSync({
 		if (statuses[kind] === undefined || statuses[kind] === null) {
 			return;
 		}
+		const open = opened.current;
+		if (open !== null && open.root === root && open.path === path && open.text === text) {
+			return;
+		}
 		const timer = setTimeout(() => {
 			const open = opened.current;
 			if (open !== null && open.root === root && open.path === path && open.text === text) {

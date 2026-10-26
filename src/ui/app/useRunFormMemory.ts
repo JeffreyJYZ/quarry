@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { type EnvVar, defaultLaunchConfig } from "@/lib/project/api";
+import { describeError } from "@/lib/project/errors";
 
 export type RunFormState = {
 	program: string;
@@ -23,11 +24,13 @@ export function useRunFormMemory(options: {
 	root: string | null;
 	form: RunFormState;
 	onRestore: (next: RunFormState) => void;
+	onNotice?: (message: string) => void;
 }): void {
-	const { root, form, onRestore } = options;
+	const { root, form, onRestore, onNotice } = options;
 	const memory = useRef<Map<string, { args: string; cwd: string; env: EnvVar[] }>>(new Map());
 	const restoreRef = useRef(onRestore);
 	restoreRef.current = onRestore;
+	const reported = useRef<Set<string>>(new Set());
 
 	useEffect(() => {
 		if (root === null) return;
@@ -52,13 +55,16 @@ export function useRunFormMemory(options: {
 							},
 				);
 			})
-			.catch(() => {
-				/* a root with nothing to prefill keeps what the form already holds */
+			.catch((error: unknown) => {
+				if (root !== null && !reported.current.has(root)) {
+					reported.current.add(root);
+					onNotice?.(`no default launch configuration: ${describeError(error)}`);
+				}
 			});
 		return () => {
 			cancelled = true;
 		};
-	}, [root]);
+	}, [root, onNotice]);
 
 	useEffect(() => {
 		if (root === null) return;

@@ -120,18 +120,15 @@ async function scanForCpp(dir: string, depth: number, budget: { count: number })
 	}
 	budget.count += 1;
 	for (const entry of entries) {
-		if (entry.isDir) {
-			if (SKIP_DIRS.has(entry.name)) {
-				continue;
-			}
-			if (await scanForCpp(entry.path, depth + 1, budget)) {
-				return true;
-			}
-		} else {
-			if (CPP_EXTENSIONS.has(extensionOf(entry.name))) {
-				return true;
-			}
+		if (!entry.isDir && CPP_EXTENSIONS.has(extensionOf(entry.name))) {
+			return true;
 		}
 	}
-	return false;
+	const childDirs = entries
+		.filter((entry) => entry.isDir && !SKIP_DIRS.has(entry.name))
+		.map((entry) => entry.path);
+	const results = await Promise.all(
+		childDirs.map((child) => scanForCpp(child, depth + 1, budget)),
+	);
+	return results.some(Boolean);
 }

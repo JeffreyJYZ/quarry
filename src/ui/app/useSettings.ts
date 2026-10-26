@@ -35,10 +35,18 @@ export function useSettings(options: {
 	const writeQueue = useRef<Promise<void>>(Promise.resolve());
 
 	useEffect(() => {
+		let cancelled = false;
 		toolchains().then(
-			(next) => setReport(next),
-			() => setReport(null),
+			(next) => {
+				if (!cancelled) setReport(next);
+			},
+			() => {
+				if (!cancelled) setReport(null);
+			},
 		);
+		return () => {
+			cancelled = true;
+		};
 	}, []);
 
 	useEffect(() => {

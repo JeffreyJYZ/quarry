@@ -101,7 +101,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		codeMenuOpen,
 		setCodeMenuOpen,
 		apply: applyCodeAction,
-	} = useCodeActionMenu({ onApplyEdits: onApplyEditsRef });
+	} = useCodeActionMenu({ onApplyEdits: onApplyEditsRef, rootRef, onNotice: onNoticeRef });
 	const sig = useSignatureHelp({ viewRef, rootRef, pathRef });
 	const { sigHelp, sigCoords, hideSig, runSig, scheduleSig } = sig;
 	const inlay = useInlayHints({ viewRef, rootRef, pathRef });

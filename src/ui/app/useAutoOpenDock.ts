@@ -11,7 +11,7 @@ export function useAutoOpenDock(options: {
 	onOpen: (value: boolean | null) => void;
 }): void {
 	const { errorCount, onOpen } = options;
-	const previous = useRef(errorCount);
+	const previous = useRef(0);
 	useEffect(() => {
 		if (errorCount > 0 && previous.current === 0) onOpen(null);
 		previous.current = errorCount;

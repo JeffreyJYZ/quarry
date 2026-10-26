@@ -10,8 +10,8 @@ export function useDocumentSync({ viewRef, value }: DocumentSyncArgs): void {
 	useEffect(() => {
 		const view = viewRef.current;
 		if (view === null) return;
-		const current = view.state.doc.toString();
-		if (current === value) return;
-		view.dispatch({ changes: { from: 0, to: current.length, insert: value } });
+		const doc = view.state.doc;
+		if (doc.length === value.length && doc.toString() === value) return;
+		view.dispatch({ changes: { from: 0, to: doc.length, insert: value } });
 	}, [value, viewRef]);
 }

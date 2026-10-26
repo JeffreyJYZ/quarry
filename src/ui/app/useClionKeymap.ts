@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { inEditableTarget, inTerminal } from "@/ui/app/focusGuard";
 
 export type ClionKeymapContext = {
 	root: string | null;
@@ -24,6 +25,9 @@ export type ClionKeymapContext = {
 	setTerminalOpen: (updater: (current: boolean) => boolean) => void;
 	setSettingsOpen: (open: boolean) => void;
 	setSettingsTab: (tab: "user" | "project") => void;
+	gotoImplementation: () => void;
+	gotoTypeDefinition: () => void;
+	quickDoc: () => void;
 };
 
 /**
@@ -37,6 +41,7 @@ export function useClionKeymap(context: ClionKeymapContext): void {
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
+			if (inEditableTarget() || inTerminal()) return;
 			const mod = event.metaKey || event.ctrlKey;
 			const ctrlOnly = event.ctrlKey && !event.metaKey && !event.altKey;
 			const key = event.key.toLowerCase();
@@ -124,6 +129,21 @@ export function useClionKeymap(context: ClionKeymapContext): void {
 			if (mod && !event.altKey && key === "5") {
 				event.preventDefault();
 				if (root !== null) context.setDebugOpen((current) => !current);
+				return;
+			}
+			if (event.key === "F1") {
+				event.preventDefault();
+				context.quickDoc();
+				return;
+			}
+			if (mod && event.altKey && key === "b") {
+				event.preventDefault();
+				context.gotoImplementation();
+				return;
+			}
+			if (mod && event.altKey && key === "y") {
+				event.preventDefault();
+				context.gotoTypeDefinition();
 				return;
 			}
 			if (event.altKey && event.key === "F12") {

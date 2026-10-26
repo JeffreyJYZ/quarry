@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useRef } from "react";
 import type { SessionSnapshot } from "@/ui/app/useSessionPersistence";
 import type { BuildModel } from "@/ui/app/useBuild";
 import type { EditorActions } from "@/ui/app/useEditorActions";
@@ -12,10 +12,10 @@ import type { useSaveBuffers } from "@/ui/app/useSaveBuffers";
 import type { useSettings } from "@/ui/app/useSettings";
 import type { useWorkspace } from "@/ui/app/useWorkspace";
 import { buildCommands } from "@/ui/app/commands";
+import { makeLspCommandHandlers } from "@/ui/app/lspCommandHandlers";
 import { useClionKeymap } from "@/ui/app/useClionKeymap";
 import { useKeybindings } from "@/ui/app/useKeybindings";
-import { useNativeMenu } from "@/ui/app/useNativeMenu";
-import { startUpdatePolling } from "@/lib/updates/poll";
+import { useShellEffects } from "@/ui/app/useShellEffects";
 import { useSelectionKeybindings } from "@/ui/app/useSelectionKeybindings";
 import { useSessionPersistence } from "@/ui/app/useSessionPersistence";
 import { normalizePreferences } from "@/lib/settings/model";
@@ -36,6 +36,7 @@ export type GlueOptions = {
 	root: string | null;
 	activePath: string | null;
 	cursor: { line: number; character: number } | null;
+	onNotice?: (message: string | null) => void;
 	panelExpanded: boolean;
 	snapshotRef: { current: SessionSnapshot };
 };
@@ -49,7 +50,7 @@ export type GlueOptions = {
 export function useShellGlue(options: GlueOptions) {
 	const { workspace, overlays, panels, settings, git, runs, save, build, editorActions } =
 		options;
-	const { debug, root, activePath, cursor, panelExpanded, snapshotRef } = options;
+	const { debug, root, activePath, cursor, panelExpanded, snapshotRef, onNotice } = options;
 
 	useKeybindings({
 		root,
@@ -91,6 +92,14 @@ export function useShellGlue(options: GlueOptions) {
 		setTypeHierarchyOpen: overlays.setTypeHierarchyOpen,
 	});
 
+	const lspCommands = makeLspCommandHandlers({
+		workspace,
+		overlays: { setGotoMode: overlays.setGotoMode },
+		activePath,
+		cursor,
+		onNotice,
+	});
+
 	useClionKeymap({
 		root,
 		activePath,
@@ -110,8 +119,10 @@ export function useShellGlue(options: GlueOptions) {
 		setTerminalOpen: panels.setTerminalOpen,
 		setSettingsOpen: panels.setSettingsOpen,
 		setSettingsTab: panels.setSettingsTab,
+		gotoImplementation: lspCommands.gotoImplementation,
+		gotoTypeDefinition: lspCommands.gotoTypeDefinition,
+		quickDoc: lspCommands.quickDoc,
 	});
-
 	const commands = buildCommands({
 		root,
 		activePath,
@@ -138,6 +149,10 @@ export function useShellGlue(options: GlueOptions) {
 		revealFile: () => panels.setFileRevealToken((current) => current + 1),
 		openQuick: () => overlays.setQuickOpenOpen(true),
 		openShortcuts: () => overlays.setShortcutsOpen(true),
+		workspaceSymbol: lspCommands.workspaceSymbol,
+		gotoImplementation: lspCommands.gotoImplementation,
+		gotoTypeDefinition: lspCommands.gotoTypeDefinition,
+		quickDoc: lspCommands.quickDoc,
 		refreshGit: () => git.setRefreshToken((current) => current + 1),
 		toggleBlame: () => git.setBlameOn((current) => !current),
 		newProject: () => panels.setNewProjectOpen(true),
@@ -166,8 +181,6 @@ export function useShellGlue(options: GlueOptions) {
 		},
 	});
 
-	// The native menu runs the same commands as the in-window menu and the palette. The dispatch is
-	// held in a ref so the event listener registers once instead of on every render.
 	const dispatchRef = useRef<(id: string) => void>(() => {});
 	dispatchRef.current = (id: string) => {
 		if (id === "open-settings") {
@@ -180,10 +193,7 @@ export function useShellGlue(options: GlueOptions) {
 	};
 	const runCommand = useCallback((id: string) => dispatchRef.current(id), []);
 
-	useNativeMenu(runCommand);
-
-	// Updates stay quiet: check and download in the background, then offer a restart in the title bar.
-	useEffect(() => startUpdatePolling(), []);
+	useShellEffects(runCommand);
 
 	return { commands, runCommand };
 }

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import { decreaseFontSize, increaseFontSize, scrollbackText } from "@/lib/terminal/fontSize";
 import { describe, type Session, shortCwd } from "@/lib/terminal/sessions";
 import {
@@ -55,7 +55,27 @@ export default function TerminalHeader({
 }: HeaderProps) {
 	return (
 		<div className="terminal-chrome">
-			<div className="terminal-tabs" role="tablist" aria-label="Terminal sessions">
+			<div
+				className="terminal-tabs"
+				role="tablist"
+				aria-label="Terminal sessions"
+				onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
+					const index = sessions.findIndex((s) => s.id === activeId);
+					if (index < 0) return;
+					let next = index;
+					if (event.key === "ArrowRight" || event.key === "ArrowDown")
+						next = (index + 1) % sessions.length;
+					else if (event.key === "ArrowLeft" || event.key === "ArrowUp")
+						next = (index - 1 + sessions.length) % sessions.length;
+					else if (event.key === "Enter" || event.key === " ") {
+						event.preventDefault();
+						return;
+					} else return;
+					if (next === index) return;
+					event.preventDefault();
+					onSelect(sessions[next].id);
+				}}
+			>
 				{sessions.map((s) => {
 					const label = shortCwd(s.cwd);
 					return (
@@ -64,7 +84,7 @@ export default function TerminalHeader({
 							className={`terminal-tab${s.id === activeId ? " active" : ""}${s.exited !== null ? " exited" : ""}`}
 							role="tab"
 							aria-selected={s.id === activeId}
-							tabIndex={-1}
+							tabIndex={s.id === activeId ? 0 : -1}
 							title={`${s.cwd} · pid ${s.pid ?? "—"}`}
 						>
 							<span className="terminal-tab-glyph">

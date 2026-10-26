@@ -17,10 +17,8 @@ import {
 	ptySize,
 	type Session,
 } from "@/lib/terminal/sessions";
-
 /** A raw PTY chunk, for a renderer that needs bytes rather than the parsed line model. */
 export type RawOutputHandler = (ptyId: string, data: string) => void;
-
 /** A promise that settles once the PTY listeners are attached, whichever way that went. */
 function gate(): { promise: Promise<void>; open: () => void } {
 	let open: () => void = () => undefined;
@@ -29,15 +27,16 @@ function gate(): { promise: Promise<void>; open: () => void } {
 	});
 	return { promise, open: () => open() };
 }
-
 /** The terminal's sessions: one PTY each, plus the global event wiring. It owns nothing visual. */
 export function useTerminalSessions(options: {
 	root: string;
 	activePath: string | null | undefined;
 	defaultFontSize: number | undefined;
 	containerRef: React.RefObject<HTMLDivElement | null>;
+	onNotice?: (message: string) => void;
 }) {
-	const { root, activePath, defaultFontSize, containerRef } = options;
+	const { root, activePath, defaultFontSize, containerRef, onNotice } = options;
+	const writeFailed = useRef<Set<number>>(new Set());
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [activeId, setActiveId] = useState<number | null>(null);
 	const nextId = useRef(1);
@@ -51,16 +50,13 @@ export function useTerminalSessions(options: {
 		rawHandlers.current.add(handler);
 		return () => void rawHandlers.current.delete(handler);
 	}, []);
-
 	useEffect(() => {
 		sessionsRef.current = sessions;
 		activeIdRef.current = activeId;
 	}, [sessions, activeId]);
-
 	const updateSession = useCallback((id: number, updater: (s: Session) => Session) => {
 		setSessions((current) => current.map((s) => (s.id === id ? updater(s) : s)));
 	}, []);
-
 	const openSession = useCallback(async () => {
 		const id = nextId.current;
 		nextId.current += 1;
@@ -92,7 +88,6 @@ export function useTerminalSessions(options: {
 			}));
 		}
 	}, [root, activePath, updateSession, defaultFontSize, containerRef, buffer, listeners]);
-
 	const closeSession = useCallback(
 		(id: number) => {
 			const session = sessionsRef.current.find((s) => s.id === id);
@@ -112,7 +107,6 @@ export function useTerminalSessions(options: {
 		},
 		[buffer],
 	);
-
 	// One listener pair for every session; the PTY id is the key.
 	useEffect(() => {
 		let unOutput: (() => void) | undefined;
@@ -154,7 +148,6 @@ export function useTerminalSessions(options: {
 			unExited?.();
 		};
 	}, [buffer, listeners]);
-
 	// A claimed PTY owns the handshake output; the replay restarts this effect for a late chunk.
 	useEffect(() => {
 		for (const session of sessions) {
@@ -166,7 +159,6 @@ export function useTerminalSessions(options: {
 				for (const data of pending) handler(ptyId, data);
 		}
 	}, [sessions, buffer, updateSession]);
-
 	// Closing the panel must not leave shells running in the background.
 	useEffect(() => {
 		return () => {
@@ -177,13 +169,19 @@ export function useTerminalSessions(options: {
 			}
 		};
 	}, []);
-
-	const send = useCallback((data: string) => {
-		const session = sessionsRef.current.find((s) => s.id === activeIdRef.current);
-		if (session?.ptyId === null || session?.ptyId === undefined) return;
-		void ptyWrite(session.ptyId, data).catch(() => undefined);
-	}, []);
-
+	const send = useCallback(
+		(data: string) => {
+			const session = sessionsRef.current.find((s) => s.id === activeIdRef.current);
+			if (session?.ptyId === null || session?.ptyId === undefined) return;
+			void ptyWrite(session.ptyId, data).catch((err) => {
+				if (!writeFailed.current.has(session.id)) {
+					writeFailed.current.add(session.id);
+					onNotice?.(`terminal write failed: ${describe(err)}`);
+				}
+			});
+		},
+		[onNotice],
+	);
 	return {
 		sessions,
 		activeId,

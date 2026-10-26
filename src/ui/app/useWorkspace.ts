@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
 	type FileEdit,
@@ -13,9 +13,7 @@ import { describeError } from "@/lib/project/errors";
 import { applyFileEdits } from "@/lib/refactor/apply";
 import { useTabClose } from "@/ui/app/useTabClose";
 import { useFileNavigation } from "@/ui/app/useFileNavigation";
-
 export type Reveal = { line: number; character: number };
-
 export type WorkspaceOptions = {
 	onNotice: (message: string | null) => void;
 	onProjectOpened: () => void;
@@ -27,7 +25,6 @@ export type WorkspaceOptions = {
 	setSearchOpen: (open: boolean) => void;
 	setQuickOpenOpen: (open: boolean) => void;
 };
-
 /**
  * The project and its open buffers.
  *
@@ -44,12 +41,17 @@ export function useWorkspace(options: WorkspaceOptions) {
 	const [saving, setSaving] = useState<ReadonlySet<string>>(() => new Set<string>());
 	const [confirmClose, setConfirmClose] = useState<string | null>(null);
 	const reading = useRef<Set<string>>(new Set());
-
+	const mountedRef = useRef(true);
+	useEffect(
+		() => () => {
+			mountedRef.current = false;
+		},
+		[],
+	);
 	const buffersRef = useRef<FileBuffer[]>(buffers);
 	buffersRef.current = buffers;
 	const activePathRef = useRef<string | null>(activePath);
 	activePathRef.current = activePath;
-
 	const openRoot = useCallback(
 		async (nextRoot: string) => {
 			setOpening(true);
@@ -75,7 +77,6 @@ export function useWorkspace(options: WorkspaceOptions) {
 		},
 		[options],
 	);
-
 	const handleOpenProject = useCallback(async () => {
 		try {
 			const picked = await open({ directory: true, multiple: false, title: "Open project" });
@@ -85,7 +86,6 @@ export function useWorkspace(options: WorkspaceOptions) {
 			options.onNotice(describeError(error));
 		}
 	}, [openRoot, options]);
-
 	const openPath = useCallback(
 		async (path: string, name: string) => {
 			setRecentFiles((current) =>
@@ -99,6 +99,7 @@ export function useWorkspace(options: WorkspaceOptions) {
 			reading.current.add(path);
 			try {
 				const text = await readTextFile(path);
+				if (!mountedRef.current) return;
 				setBuffers((current) =>
 					current.some((buffer) => buffer.path === path)
 						? current
@@ -107,7 +108,8 @@ export function useWorkspace(options: WorkspaceOptions) {
 				setActivePath(path);
 				options.onNotice(null);
 			} catch (error) {
-				options.onNotice(`Could not open ${name}: ${describeError(error)}`);
+				if (mountedRef.current)
+					options.onNotice(`Could not open ${name}: ${describeError(error)}`);
 			} finally {
 				reading.current.delete(path);
 			}
@@ -122,7 +124,6 @@ export function useWorkspace(options: WorkspaceOptions) {
 		},
 		[openPath, options],
 	);
-
 	const navigation = useFileNavigation({
 		openPath,
 		activePathRef,

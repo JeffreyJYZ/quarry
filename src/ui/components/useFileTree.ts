@@ -65,9 +65,11 @@ export function useFileTree({
 		(path: string) => {
 			settled.current.delete(path);
 			promises.current.delete(path);
-			void load(path).catch(() => {});
+			void load(path).catch((error: unknown) => {
+				onNotice?.(`refresh failed: ${describeError(error)}`);
+			});
 		},
-		[load],
+		[load, onNotice],
 	);
 
 	useEffect(() => {
