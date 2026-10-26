@@ -3,7 +3,13 @@ import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { useCallback, useEffect, useRef } from "react";
 import { ptyResize } from "@/lib/project/api";
-import { xtermFontFamily, xtermOptions } from "@/ui/terminal/xtermOptions";
+import { DEFAULT_PREFERENCES } from "@/lib/settings/model";
+import type { TerminalCursorStyle } from "@/lib/settings/terminal";
+import {
+	applyXtermAppearance,
+	type XtermAppearance,
+	xtermOptions,
+} from "@/ui/terminal/xtermOptions";
 
 /** A drag fires a stream of resize observations; the shell hears about the settled size once. */
 const RESIZE_DEBOUNCE_MS = 120;
@@ -25,15 +31,39 @@ export function useXterm(options: {
 	ptyId: string | null;
 	fontSize: number;
 	fontFamily: string;
+	lineHeight?: number;
+	letterSpacing?: number;
+	cursorStyle?: TerminalCursorStyle;
+	cursorBlink?: boolean;
+	scrollback?: number;
 	onData: (data: string) => void;
 }): XtermHandle {
-	const { hostRef, ptyId, fontSize, fontFamily, onData } = options;
+	const {
+		hostRef,
+		ptyId,
+		fontSize,
+		fontFamily,
+		lineHeight = DEFAULT_PREFERENCES.terminalLineHeight,
+		letterSpacing = DEFAULT_PREFERENCES.terminalLetterSpacing,
+		cursorStyle = DEFAULT_PREFERENCES.terminalCursorStyle,
+		cursorBlink = DEFAULT_PREFERENCES.terminalCursorBlink,
+		scrollback = DEFAULT_PREFERENCES.terminalScrollback,
+		onData,
+	} = options;
 	const termRef = useRef<Terminal | null>(null);
 	const fitRef = useRef<FitAddon | null>(null);
 	const ptyIdRef = useRef<string | null>(null);
 	const timer = useRef<number | null>(null);
 	const onDataRef = useRef(onData);
-	const font = useRef({ family: fontFamily, size: fontSize });
+	const appearanceRef = useRef<XtermAppearance>({
+		fontFamily,
+		fontSize,
+		lineHeight,
+		letterSpacing,
+		cursorStyle,
+		cursorBlink,
+		scrollback,
+	});
 	/** Output that arrives between the PTY id landing and the emulator being mounted. */
 	const pending = useRef("");
 
@@ -63,23 +93,39 @@ export function useXterm(options: {
 		onDataRef.current = onData;
 	}, [onData]);
 
-	// A font change moves the grid without resizing the host, so the fit has to be re-run by hand.
+	// A live change to the appearance moves the grid, so the fit has to be re-run by hand.
 	useEffect(() => {
-		font.current = { family: fontFamily, size: fontSize };
+		const next = {
+			fontFamily,
+			fontSize,
+			lineHeight,
+			letterSpacing,
+			cursorStyle,
+			cursorBlink,
+			scrollback,
+		};
+		appearanceRef.current = next;
 		const term = termRef.current;
 		if (term === null) return;
-		const family = xtermFontFamily(fontFamily);
-		if (term.options.fontFamily !== family) term.options.fontFamily = family;
-		if (term.options.fontSize !== fontSize) term.options.fontSize = fontSize;
+		applyXtermAppearance(term, next);
 		scheduleSize();
-	}, [fontFamily, fontSize, scheduleSize]);
+	}, [
+		fontFamily,
+		fontSize,
+		lineHeight,
+		letterSpacing,
+		cursorStyle,
+		cursorBlink,
+		scrollback,
+		scheduleSize,
+	]);
 
 	// One emulator per PTY: a new tab is a new shell, and a restart swaps the emulator with it.
 	useEffect(() => {
 		ptyIdRef.current = ptyId;
 		const host = hostRef.current;
 		if (ptyId === null || host === null) return;
-		const term = new Terminal(xtermOptions(font.current.family, font.current.size));
+		const term = new Terminal(xtermOptions(appearanceRef.current));
 		const fit = new FitAddon();
 		term.loadAddon(fit);
 		term.open(host);

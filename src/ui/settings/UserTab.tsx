@@ -1,15 +1,10 @@
 import type { JSX } from "react";
-import {
-	FONT_SIZE_RANGE,
-	type Preferences,
-	TAB_SIZES,
-	type TabSize,
-	type TerminalPlacement,
-} from "@/lib/settings/model";
+import { FONT_SIZE_RANGE, type Preferences, TAB_SIZES, type TabSize } from "@/lib/settings/model";
 
 import { Segmented, Stepper } from "./controls";
 import { LanguageServerSection } from "./LanguageServerSection";
 import { ShellSections } from "./ShellSections";
+import { TerminalSection } from "./TerminalSection";
 import { UpdatesSection } from "./UpdatesSection";
 
 /** The user-wide preferences tab: values every project starts from. */
@@ -71,46 +66,7 @@ export function UserTab(props: {
 				</div>
 			</section>
 
-			<section className="settings-section">
-				<h3 className="settings-heading">Terminal</h3>
-				<div className="settings-row">
-					<span>Placement</span>
-					<Segmented<TerminalPlacement>
-						label="Terminal placement"
-						value={user.terminalPlacement}
-						options={[
-							{ value: "bottom", label: "bottom" },
-							{ value: "right", label: "right" },
-						]}
-						onChange={(next) => {
-							if (next !== null) onChange({ terminalPlacement: next });
-						}}
-					/>
-				</div>
-				<div className="settings-row">
-					<label htmlFor="settings-terminal-font">Font size</label>
-					<Stepper
-						id="settings-terminal-font"
-						label="terminal font size"
-						value={user.terminalFontSize}
-						min={FONT_SIZE_RANGE.min}
-						max={FONT_SIZE_RANGE.max}
-						onChange={(next) => onChange({ terminalFontSize: next })}
-					/>
-				</div>
-				<div className="settings-row">
-					<label htmlFor="settings-terminal-family">Font family</label>
-					<input
-						id="settings-terminal-family"
-						type="text"
-						className="settings-text"
-						value={user.terminalFontFamily}
-						placeholder="empty: built-in monospace"
-						spellCheck={false}
-						onChange={(event) => onChange({ terminalFontFamily: event.target.value })}
-					/>
-				</div>
-			</section>
+			<TerminalSection user={user} onChange={onChange} />
 
 			<LanguageServerSection user={user} onChange={onChange} />
 			<UpdatesSection />

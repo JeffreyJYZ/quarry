@@ -33,14 +33,15 @@
 	gap: 5px;
 	flex: 0 0 auto;
 	max-width: 220px;
-	padding: 0 4px 0 6px;
+	padding: 0 8px;
 	border: 0;
 	border-bottom: 1px solid transparent;
 	border-radius: 0;
 	background: transparent;
 	color: var(--muted);
 	font-family: var(--mono);
-	font-size: 12px;
+	font-size: 10.5px;
+	letter-spacing: 0.02em;
 	cursor: pointer;
 }
 
@@ -156,11 +157,14 @@
 .terminal-status {
 	flex: 0 0 auto;
 	display: flex;
-	gap: 6px;
-	padding: 1px 8px;
+	align-items: center;
+	gap: 10px;
+	height: 26px;
+	padding: 0 10px;
 	border-top: 1px solid var(--line);
+	background: var(--panel);
 	font-family: var(--mono);
-	font-size: 10px;
+	font-size: 10.5px;
 	color: var(--muted);
 }
 
@@ -169,4 +173,11 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+/* Right-docked: a column of the layout, same chrome as the debug column, no extra border. */
+.terminal.terminal-side {
+	min-width: 0;
+	overflow: hidden;
+	background: var(--panel);
 }

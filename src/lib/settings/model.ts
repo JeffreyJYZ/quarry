@@ -7,6 +7,12 @@
  */
 
 import { clampPanelSizes, type PanelSizes } from "@/lib/layout/model";
+import type { TerminalCursorStyle } from "@/lib/settings/terminal";
+import {
+	DEFAULT_TERMINAL_PREFERENCES,
+	effectiveTerminalPreferences,
+	normalizeTerminalPreferences,
+} from "@/lib/settings/terminal";
 
 export type BuildProfile = "debug" | "release";
 export type TerminalPlacement = "bottom" | "right";
@@ -20,6 +26,11 @@ export type Preferences = {
 	editorFontSize: number;
 	editorTabSize: TabSize;
 	terminalFontSize: number;
+	terminalLineHeight: number;
+	terminalCursorStyle: TerminalCursorStyle;
+	terminalCursorBlink: boolean;
+	terminalScrollback: number;
+	terminalLetterSpacing: number;
 	formatOnSave: boolean;
 	buildProfile: BuildProfile;
 	terminalPlacement: TerminalPlacement;
@@ -45,6 +56,11 @@ export type EffectivePreferences = {
 	editorFontSize: number;
 	editorTabSize: TabSize;
 	terminalFontSize: number;
+	terminalLineHeight: number;
+	terminalCursorStyle: TerminalCursorStyle;
+	terminalCursorBlink: boolean;
+	terminalScrollback: number;
+	terminalLetterSpacing: number;
 	formatOnSave: boolean;
 	buildProfile: BuildProfile;
 	terminalPlacement: TerminalPlacement;
@@ -61,6 +77,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
 	editorFontSize: 13,
 	editorTabSize: 4,
 	terminalFontSize: 13,
+	...DEFAULT_TERMINAL_PREFERENCES,
 	formatOnSave: false,
 	buildProfile: "debug",
 	terminalPlacement: "bottom",
@@ -112,6 +129,7 @@ export function normalizePreferences(input: unknown): Preferences {
 			source.terminalFontSize,
 			DEFAULT_PREFERENCES.terminalFontSize,
 		),
+		...normalizeTerminalPreferences(source, DEFAULT_TERMINAL_PREFERENCES),
 		formatOnSave:
 			typeof source.formatOnSave === "boolean"
 				? source.formatOnSave
@@ -149,6 +167,7 @@ export function effectivePreferences(
 		editorFontSize: user.editorFontSize,
 		editorTabSize: project?.editorTabSize ?? user.editorTabSize,
 		terminalFontSize: user.terminalFontSize,
+		...effectiveTerminalPreferences(user),
 		formatOnSave: project?.formatOnSave ?? user.formatOnSave,
 		buildProfile: project?.buildProfile ?? user.buildProfile,
 		terminalPlacement: user.terminalPlacement,
