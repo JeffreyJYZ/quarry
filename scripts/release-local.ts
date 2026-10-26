@@ -18,10 +18,12 @@ import { isStableTag, manifestPlatforms, selectDmg, versionDrift } from "./relea
 
 const ROOT = join(import.meta.dir, "..");
 const REPO = "JeffreyJYZ/quarry";
-const BUNDLE = join(ROOT, "src-tauri", "target", "release", "bundle", "macos");
+/** The release build is universal, so Tauri writes under the target-specific directory. */
+const BUILD_TARGET = "universal-apple-darwin";
+const BUNDLE = join(ROOT, "src-tauri", "target", BUILD_TARGET, "release", "bundle", "macos");
 const ARCHIVE = join(BUNDLE, "quarry.app.tar.gz");
 const ARCHIVE_SIG = `${ARCHIVE}.sig`;
-const DMG_DIR = join(ROOT, "src-tauri", "target", "release", "bundle", "dmg");
+const DMG_DIR = join(ROOT, "src-tauri", "target", BUILD_TARGET, "release", "bundle", "dmg");
 const RELEASE_DIR = join(ROOT, "dist-release");
 const LATEST = join(RELEASE_DIR, "latest.json");
 
@@ -87,8 +89,8 @@ function makeDmg(version: string): void {
 	const app = join(BUNDLE, "quarry.app");
 	if (!existsSync(app)) fail(`missing app bundle: ${app}`);
 	execFileSync("mkdir", ["-p", DMG_DIR]);
-	const arch =
-		execFileSync("uname", ["-m"], { encoding: "utf8" }).trim() === "arm64" ? "aarch64" : "x64";
+	// The bundle is universal, so the dmg name says so rather than naming one half of it.
+	const arch = "universal";
 	const target = join(DMG_DIR, `quarry_${version}_${arch}.dmg`);
 	execFileSync(
 		"hdiutil",
