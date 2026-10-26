@@ -12,7 +12,11 @@ export type SignatureHelpArgs = {
 
 export function useSignatureHelp({ viewRef, rootRef, pathRef }: SignatureHelpArgs) {
 	const [sigHelp, setSigHelp] = useState<SignatureHelp | null>(null);
-	const [sigCoords, setSigCoords] = useState<{ top: number; left: number } | null>(null);
+	const [sigCoords, setSigCoords] = useState<{
+		left: number;
+		top: number;
+		bottom: number;
+	} | null>(null);
 	const sigSeqRef = useRef(0);
 	const sigTimerRef = useRef<number | null>(null);
 	const sigHideTimerRef = useRef<number | null>(null);
@@ -49,11 +53,10 @@ export function useSignatureHelp({ viewRef, rootRef, pathRef }: SignatureHelpArg
 			return;
 		}
 		setSigHelp(result);
-		const host = view.dom.parentElement;
+		// Viewport coordinates: the popup is fixed-positioned, so it can flip near a screen edge.
 		const coords = view.coordsAtPos(pos);
-		if (coords !== null && host !== null) {
-			const rect = host.getBoundingClientRect();
-			setSigCoords({ top: coords.bottom - rect.top, left: coords.left - rect.left });
+		if (coords !== null) {
+			setSigCoords({ left: coords.left, top: coords.top, bottom: coords.bottom });
 		}
 		if (sigHideTimerRef.current !== null) window.clearTimeout(sigHideTimerRef.current);
 		sigHideTimerRef.current = window.setTimeout(() => {

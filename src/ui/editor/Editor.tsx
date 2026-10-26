@@ -190,7 +190,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 				<CodeActionMenu actions={codeActions} onPick={applyCodeAction} />
 			) : null}
 			{sigHelp !== null && sigCoords !== null ? (
-				<SignatureHelpView help={sigHelp} coords={sigCoords} />
+				<SignatureHelpView help={sigHelp} anchor={sigCoords} />
 			) : null}
 		</div>
 	);
