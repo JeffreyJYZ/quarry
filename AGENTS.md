@@ -40,4 +40,5 @@ Rust and C/C++ IDE. Tauri 2 + React 19 shell; clangd, rust-analyzer and lldb-dap
 - **The workflow builds Windows, so Rust must compile there**: gate every `std::os::unix`, `PermissionsExt` and `from_mode` behind `#[cfg(unix)]`; a macOS-only build hides it until CI.
 - **Linux bundles AppImage and Windows nsis only** — the deb and msi bundlers reject the hyphen in `X.Y.Z-alpha.N` (`invalid version`), AppImage and nsis accept it.
 - **Main agent may push alpha tags and publish test releases here; subagents never push, tag or release.** Tag `quarry-alphaN` pairs with version `X.Y.Z-alpha.N` (`bun scripts/bump-version.ts alpha`), and a stable tag is `v<version>`.
+- **Standing permission (user, 2026-10-26): release an alpha whenever there is something to ship — no ask, no "want me to cut a release?"**; bump, push, `bun run release:local`, report the URL.
 - **Verification ladder: `bun run gate` and `bun run build`; Rust adds `cargo test`, `cargo check --all-targets`, `cargo clippy --all-targets -- -D warnings`**; LSP work adds `scripts/lsp-*.ts`, debugger work `scripts/dap-*.ts`. The DAP evaluate probe is expected to fail.
