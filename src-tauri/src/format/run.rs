@@ -117,40 +117,9 @@ pub fn truncate(text: &str, limit: usize) -> String {
 /// cannot see on its inherited `PATH`.
 pub fn resolve(name: &str) -> Option<String> {
     if name == TAPLO {
-        return find_on_path(TAPLO)
-            .or_else(|| find_on_path("taplo-cli"))
+        return super::tool_search::find_on_path(TAPLO)
+            .or_else(|| super::tool_search::find_on_path("taplo-cli"))
             .or_else(|| find_with_xcrun(TAPLO));
     }
-    find_on_path(name).or_else(|| find_with_xcrun(name))
-}
-
-/// Walk `PATH` by hand rather than shelling out, so a directory is never interpreted or expanded.
-pub fn find_on_path(name: &str) -> Option<String> {
-    let path = env::var_os("PATH")?;
-
-    env::split_paths(&path).find_map(|dir| {
-        if dir.as_os_str().is_empty() {
-            return None;
-        }
-
-        let candidate = dir.join(name);
-        is_executable(&candidate).then(|| candidate.to_string_lossy().into_owned())
-    })
-}
-
-#[cfg(unix)]
-pub fn is_executable(path: &Path) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-
-    // `metadata` follows symlinks, so a link to a regular file counts as a hit.
-    fs::metadata(path)
-        .map(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
-        .unwrap_or(false)
-}
-
-#[cfg(not(unix))]
-pub fn is_executable(path: &Path) -> bool {
-    fs::metadata(path)
-        .map(|meta| meta.is_file())
-        .unwrap_or(false)
+    super::tool_search::find_on_path(name).or_else(|| find_with_xcrun(name))
 }

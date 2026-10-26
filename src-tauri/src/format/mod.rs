@@ -25,6 +25,9 @@ pub use parse_edition_value::*;
 mod run;
 pub use run::*;
 
+mod tool_search;
+pub use tool_search::*;
+
 mod tests_1;
 pub use tests_1::*;
 
