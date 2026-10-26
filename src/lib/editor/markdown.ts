@@ -10,7 +10,8 @@ export type Block =
 	| { kind: "heading"; level: number; text: string }
 	| { kind: "code"; language: string; lines: string[] }
 	| { kind: "list"; ordered: boolean; items: string[] }
-	| { kind: "paragraph"; text: string };
+	| { kind: "paragraph"; text: string }
+	| { kind: "rule" };
 
 export function parseMarkdown(text: string): Block[] {
 	const lines = text.replace(/\r\n/g, "\n").split("\n");
@@ -36,6 +37,13 @@ export function parseMarkdown(text: string): Block[] {
 		const heading = /^(#{1,6})\s+(.*)$/.exec(line);
 		if (heading !== null) {
 			blocks.push({ kind: "heading", level: heading[1].length, text: heading[2] });
+			index += 1;
+			continue;
+		}
+
+		const rule = /^\s{0,3}((-{3,})|(\*{3,})|(_{3,}))\s*$/.exec(line);
+		if (rule !== null) {
+			blocks.push({ kind: "rule" });
 			index += 1;
 			continue;
 		}
@@ -137,6 +145,12 @@ export function renderMarkdown(text: string): HTMLElement {
 				list.append(li);
 			}
 			root.append(list);
+			continue;
+		}
+		if (block.kind === "rule") {
+			const rule = document.createElement("hr");
+			rule.className = "hover-md-rule";
+			root.append(rule);
 			continue;
 		}
 		const paragraph = document.createElement("p");

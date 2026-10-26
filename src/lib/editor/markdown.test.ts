@@ -47,15 +47,36 @@ describe("parseMarkdown", () => {
 			language: "rust",
 			lines: ["fn add(a: i32, b: i32) -> i32"],
 		});
-		expect(blocks.map((block) => block.kind)).toEqual([
-			"code",
-			"paragraph",
-			"paragraph",
-			"list",
-		]);
+		expect(blocks.map((block) => block.kind)).toEqual(["code", "rule", "paragraph", "list"]);
 	});
 
 	test("blank lines are dropped rather than becoming empty blocks", () => {
 		expect(parseMarkdown("\n\n\n")).toEqual([]);
+	});
+
+	test("horizontal rules parse as rule blocks", () => {
+		expect(parseMarkdown("---")).toEqual([{ kind: "rule" }]);
+		expect(parseMarkdown("***")).toEqual([{ kind: "rule" }]);
+		expect(parseMarkdown("___")).toEqual([{ kind: "rule" }]);
+	});
+
+	test("a rule sits between two paragraphs", () => {
+		expect(parseMarkdown("before\n\n---\n\nafter")).toEqual([
+			{ kind: "paragraph", text: "before" },
+			{ kind: "rule" },
+			{ kind: "paragraph", text: "after" },
+		]);
+	});
+
+	test("a rule inside a fenced code block stays code", () => {
+		expect(parseMarkdown("```\n---\n```")).toEqual([
+			{ kind: "code", language: "", lines: ["---"] },
+		]);
+	});
+
+	test("a dash list item is not mistaken for a rule", () => {
+		expect(parseMarkdown("- item")).toEqual([
+			{ kind: "list", ordered: false, items: ["item"] },
+		]);
 	});
 });
