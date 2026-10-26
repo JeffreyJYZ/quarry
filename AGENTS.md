@@ -25,6 +25,8 @@ Rust and C/C++ IDE. Tauri 2 + React 19 shell; clangd, rust-analyzer and lldb-dap
 - **`bun` only** — never npm; `bun run build` keeps `run` (built-in subcommand).
 - **Full-document LSP sync only**; revisit only on a measured stall.
 - **One LSP and one DAP session per project root.**
+- **A server only receives files it serves** — `src/lib/lsp/served.ts` holds one extension table per server (rust-analyzer `.rs`; clangd `.c .h .cc .cpp .cxx .hh .hpp`), and an unserved path is never opened, changed or closed; without that gate rust-analyzer was handed `Cargo.toml`, `Cargo.lock` and `.gitignore`, and the status chip claimed coverage it did not have.
+- **PATH-mutating Rust tests share one lock in `src-tauri/src/test_support.rs`** — the helper used to be copied per test module, so each copy held its own `OnceLock` and two modules mutated the process-wide `PATH` at once; a resolve test failed only when a new PATH-reading test changed the schedule.
 - **Never publish a crate named `quarry`** — use `quarry-app`, `quarry-lsp`, `quarry-dap`; frontend `@jyz/quarry-*`.
 - **MIT.** Zed is GPL-3.0: read its debugger code for patterns, copy nothing.
 - **`.gitignore` carries `.DS_Store`** at the top level.
