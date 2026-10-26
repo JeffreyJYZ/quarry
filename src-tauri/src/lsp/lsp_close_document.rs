@@ -53,6 +53,7 @@ pub async fn lsp_close_document(
 
     session.documents.remove(&path);
     session.document_ends.remove(&path);
+    session.document_texts.remove(&path);
 
     let message = notification(
         "textDocument/didClose",
@@ -74,10 +75,14 @@ pub fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 pub fn session_for(state: &LspState, root: &str) -> Result<Arc<Mutex<Session>>, String> {
-    lock(&state.sessions)
+    let session = lock(&state.sessions)
         .get(root)
         .cloned()
-        .ok_or_else(|| format!("no language server session for {root}"))
+        .ok_or_else(|| format!("no language server session for {root}"))?;
+    if lock(&session).dead {
+        return Err(format!("language server session for {root} is dead"));
+    }
+    Ok(session)
 }
 
 pub fn send(session: &mut Session, method: &str, message: &Value) -> Result<(), String> {

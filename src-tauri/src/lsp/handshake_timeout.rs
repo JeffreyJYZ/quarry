@@ -48,6 +48,7 @@ pub const FIRST_REQUEST_ID: i64 = 100;
 #[derive(Default)]
 pub struct LspState {
     pub sessions: Mutex<HashMap<String, Arc<Mutex<Session>>>>,
+    pub in_flight: Mutex<std::collections::HashSet<String>>,
 }
 
 /// A live server process plus the documents opened against it.
@@ -59,6 +60,8 @@ pub struct Session {
     pub(crate) documents: HashMap<String, u32>,
     /// Recorded end position of each open document, computed from the text last sent.
     pub(crate) document_ends: HashMap<String, Position>,
+    /// Last text sent for each open document, used to compute incremental changes.
+    pub(crate) document_texts: HashMap<String, String>,
     /// The next request id to hand out. Monotonic, so a late answer can never be mistaken for a
     /// newer request's answer.
     pub(crate) next_request_id: i64,
@@ -71,6 +74,8 @@ pub struct Session {
     /// Raw `TypeHierarchyItem` JSON keyed by [`type_hierarchy_key`], so a follow-up hands the server
     /// back the item it sent, `data` included.
     pub(crate) type_hierarchy_items: HashMap<String, Value>,
+    /// Set when the pump thread can no longer talk to the server; later commands fail fast.
+    pub(crate) dead: bool,
 }
 
 /// One request that is waiting for its answer.

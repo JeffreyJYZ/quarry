@@ -137,6 +137,10 @@ pub async fn pty_open(
         .name(format!("{id}-reader"))
         .spawn(move || pump(reader, &app2, &id2, child2))
         .map_err(|e| {
+            if let Some(mut c) = lock(&child).take() {
+                let _ = c.kill();
+                let _ = c.wait();
+            }
             lock(&state.sessions).remove(&id);
             format!("cannot start reader: {e}")
         })?;

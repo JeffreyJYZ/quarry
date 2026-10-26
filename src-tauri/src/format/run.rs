@@ -6,6 +6,7 @@ pub use std::io::Write;
 pub use std::path::Path;
 pub use std::process::{Command, Stdio};
 pub use std::thread;
+use std::time::{Duration, Instant};
 
 use super::*;
 
@@ -46,6 +47,8 @@ pub fn run(formatter: Formatter, root: &str, path: &str, text: &str) -> Result<S
         .stdin
         .take()
         .ok_or_else(|| format!("cannot write to {binary}: stdin is not available"))?;
+    let mut stdout_pipe = child.stdout.take();
+    let mut stderr_pipe = child.stderr.take();
 
     // The source goes out on its own thread: a large document must not fill the pipe while the child
     // is filling stdout, which would deadlock both sides.
@@ -55,21 +58,47 @@ pub fn run(formatter: Formatter, root: &str, path: &str, text: &str) -> Result<S
         // Dropping `stdin` closes the pipe, so the formatter sees end of input.
     });
 
-    let output = child
-        .wait_with_output()
-        .map_err(|error| format!("cannot wait for {binary}: {error}"))?;
-    // A formatter that exits early closes the pipe; the write error is already reflected in the status.
+    // Bounded wait: a hung formatter must not block forever.
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let exit_status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => {
+                if Instant::now() >= deadline {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    let _ = writer.join();
+                    return Err(format!("formatter timed out after 30s: {binary}"));
+                }
+                thread::sleep(Duration::from_millis(50));
+            }
+            Err(error) => {
+                let _ = writer.join();
+                return Err(format!("cannot wait for {binary}: {error}"));
+            }
+        }
+    };
     let _ = writer.join();
 
-    if !output.status.success() {
+    use std::io::Read;
+    let mut stdout_buf = Vec::new();
+    let mut stderr_buf = Vec::new();
+    if let Some(mut s) = stdout_pipe.take() {
+        let _ = s.read_to_end(&mut stdout_buf);
+    }
+    if let Some(mut s) = stderr_pipe.take() {
+        let _ = s.read_to_end(&mut stderr_buf);
+    }
+
+    if !exit_status.success() {
         return Err(format!(
             "{binary} failed ({}): {}",
-            output.status,
-            stderr_detail(&String::from_utf8_lossy(&output.stderr))
+            exit_status,
+            stderr_detail(&String::from_utf8_lossy(&stderr_buf))
         ));
     }
 
-    let formatted = String::from_utf8_lossy(&output.stdout).into_owned();
+    let formatted = String::from_utf8_lossy(&stdout_buf).into_owned();
     if formatted.is_empty() {
         return Err(format!("{binary} produced nothing ({path})"));
     }

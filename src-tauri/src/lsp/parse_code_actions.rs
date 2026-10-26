@@ -32,9 +32,6 @@ pub fn parse_code_actions(result: &Value) -> Vec<CodeAction> {
         return out;
     };
     for entry in entries {
-        let Some(edit) = entry.get("edit") else {
-            continue;
-        };
         let title = entry
             .get("title")
             .and_then(Value::as_str)
@@ -44,10 +41,20 @@ pub fn parse_code_actions(result: &Value) -> Vec<CodeAction> {
             .get("kind")
             .and_then(Value::as_str)
             .map(str::to_string);
+        let command = entry.get("command").cloned();
+        let edits = match entry.get("edit") {
+            Some(edit) => parse_workspace_edit(edit),
+            None => Vec::new(),
+        };
+        // command-only actions are kept
+        if entry.get("edit").is_none() && command.is_none() {
+            continue;
+        }
         out.push(CodeAction {
             title,
             kind,
-            edits: parse_workspace_edit(edit),
+            edits,
+            command,
         });
     }
     out
@@ -92,14 +99,16 @@ pub mod rename_extra_tests {
     }
 
     #[test]
-    fn code_action_keeps_edit_drops_command() {
+    fn code_action_keeps_edit_and_command() {
         let v = json!([
             { "title": "fix", "kind": "quickfix", "edit": { "changes": {} } },
             { "title": "cmd", "command": { "title": "x", "command": "y" } }
         ]);
         let out = parse_code_actions(&v);
-        assert_eq!(out.len(), 1);
+        assert_eq!(out.len(), 2);
         assert_eq!(out[0].title, "fix");
+        assert_eq!(out[1].title, "cmd");
+        assert!(out[1].command.is_some());
     }
 
     #[test]

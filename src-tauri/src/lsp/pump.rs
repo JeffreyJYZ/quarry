@@ -108,7 +108,10 @@ pub fn pump(
 
         if message.get("id").is_some() {
             let response = server_request_response(&message);
-            if lock(&session).pipe.send(&response).is_err() {
+            let mut guard = lock(&session);
+            if guard.pipe.send(&response).is_err() {
+                guard.dead = true;
+                drop(guard);
                 break;
             }
         }

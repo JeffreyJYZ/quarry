@@ -37,11 +37,15 @@ pub async fn start_lsp(
         args: server_args.unwrap_or_default(),
     };
     match start_lsp_session(app, state.inner(), &root, &overrides).await {
-        Ok(status) => Ok(status),
+        Ok(status) => {
+            lock(&state.in_flight).remove(&root);
+            Ok(status)
+        }
         Err(error) => {
             // A failed start must leave nothing behind: a half-registered session would make
             // later document syncs talk to a server that is not there.
             lock(&state.sessions).remove(&root);
+            lock(&state.in_flight).remove(&root);
             Err(error)
         }
     }
@@ -64,26 +68,39 @@ pub async fn start_lsp_session(
     overrides: &StartOverrides,
 ) -> Result<LspStatus, String> {
     let root = root.to_string();
-    if let Some(existing) = lock(&state.sessions).get(&root).cloned() {
-        let server = lock(&existing).server.clone();
-        return Ok(LspStatus {
-            root,
-            server,
-            version: None,
-        });
+    // Atomic check-and-reserve: a concurrent start for the same root waits instead of spawning a
+    // second server (which would leak the first child/pipe).
+    loop {
+        {
+            let sessions = lock(&state.sessions);
+            if let Some(existing) = sessions.get(&root).cloned() {
+                let server = lock(&existing).server.clone();
+                return Ok(LspStatus {
+                    root,
+                    server,
+                    version: None,
+                });
+            }
+        }
+        {
+            let mut flight = lock(&state.in_flight);
+            if !flight.contains(&root) {
+                flight.insert(root.clone());
+                break;
+            }
+        }
+        thread::sleep(Duration::from_millis(10));
     }
 
-    let info = open_project(root.clone())?;
-    let server = match info.kind {
-        ProjectKind::Cargo => "rust-analyzer",
-        ProjectKind::Cmake | ProjectKind::CompileCommands => "clangd",
-        ProjectKind::Unknown => {
-            return Err(format!(
-                "no language server for {root}: the directory has no Cargo.toml, CMakeLists.txt or \
-                 compile_commands.json"
-            ));
-        }
+    // The `root` argument is a session id of the form `{server}::{path}`. Strip the prefix to get
+    // the real project root and pick the server from the prefix.
+    let (server, actual_root) = if let Some((prefix, rest)) = root.split_once("::") {
+        (prefix.to_string(), rest.to_string())
+    } else {
+        return Err(format!("invalid session id: {root}"));
     };
+    let info = open_project(actual_root.clone())?;
+    let server = server.as_str();
 
     // A path from settings wins over discovery; it is how a second toolchain or a wrapper script is
     // used without touching `PATH`.
@@ -117,11 +134,13 @@ pub async fn start_lsp_session(
         pipe,
         documents: HashMap::new(),
         document_ends: HashMap::new(),
+        document_texts: HashMap::new(),
         next_request_id: FIRST_REQUEST_ID,
         pending: HashMap::new(),
         next_call_hierarchy_id: 1,
         call_hierarchy_items: HashMap::new(),
         type_hierarchy_items: HashMap::new(),
+        dead: false,
     }));
 
     let pump_session = Arc::clone(&session);

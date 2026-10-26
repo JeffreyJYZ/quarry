@@ -61,6 +61,7 @@ pub async fn lsp_open_document(
     session
         .document_ends
         .insert(path.clone(), document_end(&text));
+    session.document_texts.insert(path.clone(), text.clone());
 
     let message = notification(
         "textDocument/didOpen",
@@ -101,18 +102,66 @@ pub async fn lsp_change_document(
     let session = session_for(&state, &root)?;
     let mut session = lock(&session);
 
+    let old_text = session
+        .document_texts
+        .get(&path)
+        .cloned()
+        .unwrap_or_default();
+    if old_text == text {
+        // identical: no send
+        let v = session.documents.get(&path).copied().unwrap_or(0);
+        session.documents.insert(path.clone(), v);
+        return Ok(());
+    }
+
     let version = session.documents.get(&path).copied().unwrap_or(0) + 1;
     session.documents.insert(path.clone(), version);
     session
         .document_ends
         .insert(path.clone(), document_end(&text));
+    session.document_texts.insert(path.clone(), text.clone());
 
-    let message = notification(
-        "textDocument/didChange",
-        json!({
-            "textDocument": { "uri": path_to_uri(&path), "version": version },
-            "contentChanges": [{ "text": text }],
-        }),
-    );
+    let message = if let Some(range) = incremental_range(&old_text, &text) {
+        // replacement text is the tail of `new` from the first differing utf-16 position
+        let old_u: Vec<u16> = old_text.encode_utf16().collect();
+        let new_u: Vec<u16> = text.encode_utf16().collect();
+        let mut p = 0usize;
+        while p < old_u.len() && p < new_u.len() && old_u[p] == new_u[p] {
+            p += 1;
+        }
+        let new_text = String::from_utf16_lossy(&new_u[p..]);
+        notification(
+            "textDocument/didChange",
+            json!({
+                "textDocument": { "uri": path_to_uri(&path), "version": version },
+                "contentChanges": [{ "range": range, "text": new_text }],
+            }),
+        )
+    } else {
+        notification(
+            "textDocument/didChange",
+            json!({
+                "textDocument": { "uri": path_to_uri(&path), "version": version },
+                "contentChanges": [{ "text": text }],
+            }),
+        )
+    };
     send(&mut session, "textDocument/didChange", &message)
+}
+
+#[tauri::command]
+pub async fn lsp_execute_command(
+    state: State<'_, LspState>,
+    root: String,
+    command: String,
+    arguments: Option<Vec<Value>>,
+) -> Result<Value, String> {
+    let session = session_for(&state, &root)?;
+    let args = arguments.unwrap_or_default();
+    send_request(
+        &session,
+        "workspace/executeCommand",
+        json!({ "command": command, "arguments": args }),
+    )
+    .await
 }

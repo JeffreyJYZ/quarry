@@ -106,6 +106,7 @@ impl Session {
                 ))
             }
             Err(RecvTimeoutError::Disconnected) => {
+                lock(&self.pending).remove(&seq);
                 Err(format!("{command}: {ADAPTER} stopped answering"))
             }
         }

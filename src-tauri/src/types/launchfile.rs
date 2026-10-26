@@ -3,6 +3,7 @@
 pub use serde::{Deserialize, Serialize};
 
 use super::*;
+use serde_json::Value;
 
 /// One entry in `.quarry/launch.json`.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -159,6 +160,8 @@ pub struct CodeAction {
     pub title: String,
     pub kind: Option<String>,
     pub edits: Vec<FileEdit>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<Value>,
 }
 
 #[derive(Serialize, Clone, Debug)]
