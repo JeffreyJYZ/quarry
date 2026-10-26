@@ -121,28 +121,6 @@ where
     Ok(value.clamp(9.0, 24.0))
 }
 
-pub fn deserialize_preferences_editor_tab_size<'de, D>(deserializer: D) -> Result<u32, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let value = u32::deserialize(deserializer).unwrap_or(4);
-    Ok(match value {
-        2 | 4 | 8 => value,
-        _ => 4,
-    })
-}
-
-pub fn deserialize_preferences_build_profile<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let value = String::deserialize(deserializer).unwrap_or_else(|_| "debug".to_string());
-    Ok(match value.as_str() {
-        "debug" | "release" => value,
-        _ => "debug".to_string(),
-    })
-}
-
 pub fn deserialize_panel_rail_width<'de, D>(deserializer: D) -> Result<f64, D::Error>
 where
     D: serde::Deserializer<'de>,

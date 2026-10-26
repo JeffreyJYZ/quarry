@@ -25,6 +25,31 @@ pub struct Preferences {
         deserialize_with = "deserialize_preferences_terminal_font_size"
     )]
     pub terminal_font_size: f64,
+    #[serde(
+        default = "default_terminal_line_height",
+        deserialize_with = "deserialize_preferences_terminal_line_height"
+    )]
+    pub terminal_line_height: f64,
+    #[serde(
+        default = "default_terminal_cursor_style",
+        deserialize_with = "deserialize_preferences_terminal_cursor_style"
+    )]
+    pub terminal_cursor_style: String,
+    #[serde(
+        default = "default_terminal_cursor_blink",
+        deserialize_with = "deserialize_preferences_terminal_cursor_blink"
+    )]
+    pub terminal_cursor_blink: bool,
+    #[serde(
+        default = "default_terminal_scrollback",
+        deserialize_with = "deserialize_preferences_terminal_scrollback"
+    )]
+    pub terminal_scrollback: u32,
+    #[serde(
+        default = "default_terminal_letter_spacing",
+        deserialize_with = "deserialize_preferences_terminal_letter_spacing"
+    )]
+    pub terminal_letter_spacing: i32,
     #[serde(default)]
     pub format_on_save: bool,
     #[serde(
@@ -68,6 +93,26 @@ pub fn default_terminal_font_size() -> f64 {
     13.0
 }
 
+pub fn default_terminal_line_height() -> f64 {
+    1.2
+}
+
+pub fn default_terminal_cursor_style() -> String {
+    "block".to_string()
+}
+
+pub fn default_terminal_cursor_blink() -> bool {
+    true
+}
+
+pub fn default_terminal_scrollback() -> u32 {
+    5000
+}
+
+pub fn default_terminal_letter_spacing() -> i32 {
+    0
+}
+
 pub fn default_build_profile() -> String {
     "debug".to_string()
 }
@@ -94,6 +139,11 @@ impl Default for Preferences {
             editor_font_size: 13.0,
             editor_tab_size: 4,
             terminal_font_size: 13.0,
+            terminal_line_height: 1.2,
+            terminal_cursor_style: "block".to_string(),
+            terminal_cursor_blink: true,
+            terminal_scrollback: 5000,
+            terminal_letter_spacing: 0,
             format_on_save: false,
             build_profile: "debug".to_string(),
             terminal_placement: "bottom".to_string(),
@@ -112,6 +162,16 @@ impl Preferences {
     pub(crate) fn normalize(&mut self) {
         self.editor_font_size = self.editor_font_size.clamp(9.0, 24.0);
         self.terminal_font_size = self.terminal_font_size.clamp(9.0, 24.0);
+        let rounded = (self.terminal_line_height * 10.0).round() / 10.0;
+        self.terminal_line_height = rounded.clamp(1.0, 2.0);
+        if !matches!(
+            self.terminal_cursor_style.as_str(),
+            "block" | "bar" | "underline"
+        ) {
+            self.terminal_cursor_style = "block".to_string();
+        }
+        self.terminal_scrollback = self.terminal_scrollback.clamp(500, 50000);
+        self.terminal_letter_spacing = self.terminal_letter_spacing.clamp(-2, 4);
         if !matches!(self.editor_tab_size, 2 | 4 | 8) {
             self.editor_tab_size = 4;
         }

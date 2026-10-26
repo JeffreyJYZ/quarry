@@ -18,6 +18,9 @@ pub use settings_file::*;
 mod deserialize_panel_debug_width;
 pub use deserialize_panel_debug_width::*;
 
+mod deserialize_terminal_prefs;
+pub use deserialize_terminal_prefs::*;
+
 mod preferences;
 pub use preferences::*;
 
