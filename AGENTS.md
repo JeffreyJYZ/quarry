@@ -44,6 +44,7 @@ Rust and C/C++ IDE. Tauri 2 + React 19 shell; clangd, rust-analyzer and lldb-dap
 - **`realpath` the project directory before `launch`** — `/var/…` versus `/private/var/…` leaves every breakpoint unverified.
 - **`cargo fmt` in `src-tauri` rewrites `lsp.rs`** — that file is not rustfmt-clean, so a crate-wide format adds an out-of-unit diff. Format the one file instead: `rustfmt --edition 2024 src/dap.rs`.
 - **A dispatched unit's report is a claim, not evidence**: check the call site exists, not just the helper — one shipped an unused `resolveDebugArtifact` and an unwired panel, another left its `lib.rs` registration out, which fails only at runtime.
+- **An empty handler is the new unwired panel** — a parity batch shipped four commands with real labels, accelerators and `run: () => {}` plus a keymap file nothing imported; audit command → handler → API → visible result, and `rg 'run: \(\) => \{\}'` in `commandList.ts` must return nothing.
 - **Updater signing key: private `~/.tauri/quarry-updater.key` (no password), public key in `src-tauri/tauri.conf.json` `plugins.updater.pubkey`** — never print or commit the private one, never rotate it once a release ships, or every installed app orphans.
 - **A local `bun run tauri build` needs `TAURI_SIGNING_PRIVATE_KEY` set** (the key path or content) because `bundle.createUpdaterArtifacts` is on; without it the bundler refuses to produce updater artefacts.
 - **Alphas publish from this Mac with `bun run release:local`** — signed macOS bundle, `latest.json`, release, then a check that the public manifest serves it.
