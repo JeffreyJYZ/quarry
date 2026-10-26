@@ -7,6 +7,7 @@ Rust and C/C++ IDE. Tauri 2 + React 19 shell; clangd, rust-analyzer and lldb-dap
 - **Plan is `docs/plans/001-clion-parity.md`** — parity matrix, slices, estimates, non-goals; read before feature work.
 - **Non-goals stay non-goals**: profiler, remote, embedded, DB, Docker, AI, plugin API, other languages.
 - **Toolchains are detected, never bundled** — probe `PATH` then `xcrun --find`; GUI launch carries launchd's PATH.
+- **A PATH-only probe misses Homebrew and cargo binaries** — a Dock-launched app sees `/usr/bin:/bin:/usr/sbin:/sbin`; `format/tool_search.rs` therefore searches `PATH` first, then `/opt/homebrew/bin`, `/usr/local/bin` and `$HOME/.cargo/bin`, and `taplo 0.10.0` at `/opt/homebrew/bin/taplo` is only reachable that way.
 - **Machine paths**: rustup shims `/opt/homebrew/opt/rustup/bin`; `lldb-dap` and `clang-format` only via `xcrun`; `cmake`/`ninja` absent.
 - **No `cargo run` as a debug launch** — build first, pass `lldb-dap` the binary from cargo JSON.
 - **Rust module is `build_task.rs`**, never `build.rs` (Cargo's build script).
