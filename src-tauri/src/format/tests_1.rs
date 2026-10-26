@@ -118,7 +118,6 @@ pub mod tests_group_1 {
         for path in [
             "notes.txt",
             "README.md",
-            "Cargo.toml",
             "main",
             "/projects/demo/Makefile",
             "main.c.orig",

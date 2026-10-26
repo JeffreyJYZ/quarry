@@ -81,6 +81,7 @@ pub fn program_for(formatter: Formatter) -> &'static str {
     match formatter {
         Formatter::Rustfmt => RUSTFMT,
         Formatter::ClangFormat | Formatter::None => CLANG_FORMAT,
+        Formatter::Taplo => TAPLO,
     }
 }
 
@@ -89,6 +90,8 @@ pub fn program_for(formatter: Formatter) -> &'static str {
 pub fn missing(program: &str) -> String {
     if program == RUSTFMT {
         format!("{program} is not installed: run `rustup component add rustfmt`")
+    } else if program == TAPLO {
+        "no formatter for .toml: install taplo-cli".to_string()
     } else {
         format!(
             "{program} is not installed: install the Xcode command line tools \
@@ -113,6 +116,11 @@ pub fn truncate(text: &str, limit: usize) -> String {
 /// `PATH` first, then `xcrun`: `clang-format` lives in the Xcode toolchain, which a GUI-launched app
 /// cannot see on its inherited `PATH`.
 pub fn resolve(name: &str) -> Option<String> {
+    if name == TAPLO {
+        return find_on_path(TAPLO)
+            .or_else(|| find_on_path("taplo-cli"))
+            .or_else(|| find_with_xcrun(TAPLO));
+    }
     find_on_path(name).or_else(|| find_with_xcrun(name))
 }
 

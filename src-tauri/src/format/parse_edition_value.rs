@@ -41,6 +41,7 @@ pub fn argv(formatter: Formatter, path: &str) -> Vec<String> {
             format!("-assume-filename={path}"),
             format!("-style={}", clang_style(path)),
         ],
+        Formatter::Taplo => vec!["fmt".to_string(), "-".to_string()],
         Formatter::None => Vec::new(),
     }
 }

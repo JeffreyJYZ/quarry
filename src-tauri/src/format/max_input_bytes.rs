@@ -16,6 +16,8 @@ pub const RUSTFMT: &str = "rustfmt";
 
 pub const CLANG_FORMAT: &str = "clang-format";
 
+pub const TAPLO: &str = "taplo";
+
 /// A formatter's stderr line can be a whole diagnostic block, so it is cut for the status bar.
 pub const STDERR_LIMIT: usize = 300;
 
@@ -27,6 +29,7 @@ pub const C_FAMILY: [&str; 7] = ["c", "h", "cc", "cpp", "cxx", "hh", "hpp"];
 pub enum Formatter {
     Rustfmt,
     ClangFormat,
+    Taplo,
     None,
 }
 
@@ -51,6 +54,7 @@ pub async fn formatter_for(path: String) -> Result<String, String> {
     Ok(match formatter_for_path(&path) {
         Formatter::Rustfmt => RUSTFMT.to_string(),
         Formatter::ClangFormat => CLANG_FORMAT.to_string(),
+        Formatter::Taplo => TAPLO.to_string(),
         Formatter::None => String::new(),
     })
 }
@@ -65,6 +69,7 @@ pub fn formatter_for_path(path: &str) -> Formatter {
     match extension.as_deref() {
         Some("rs") => Formatter::Rustfmt,
         Some(extension) if C_FAMILY.contains(&extension) => Formatter::ClangFormat,
+        Some("toml") => Formatter::Taplo,
         _ => Formatter::None,
     }
 }
