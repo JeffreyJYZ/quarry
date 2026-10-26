@@ -1,14 +1,12 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { splitTopLevel } from "@/lib/editor/completion";
 import type { SignatureHelp as Help } from "@/lib/project/api";
+import { placePopup } from "./placePopup";
 
 /** Where the caret is, in viewport coordinates, so the popup can flip near an edge. */
 export type SignatureAnchor = { left: number; top: number; bottom: number };
 
-type Placement = { top?: number; bottom?: number; left: number };
-
-const MARGIN = 8;
-const GAP = 4;
+type Placement = ReturnType<typeof placePopup>;
 
 /**
  * The signature popup, with the parameter the caret sits in highlighted.
@@ -20,7 +18,7 @@ const GAP = 4;
 export default function SignatureHelp({ help, anchor }: { help: Help; anchor: SignatureAnchor }) {
 	const ref = useRef<HTMLDivElement | null>(null);
 	const [placement, setPlacement] = useState<Placement>({
-		top: anchor.bottom + GAP,
+		top: anchor.bottom + 4,
 		left: anchor.left,
 	});
 
@@ -28,19 +26,12 @@ export default function SignatureHelp({ help, anchor }: { help: Help; anchor: Si
 		const node = ref.current;
 		if (node === null) return;
 		const box = node.getBoundingClientRect();
-		const spaceBelow = window.innerHeight - anchor.bottom;
-		const spaceAbove = anchor.top;
-		const above = spaceBelow < Math.min(box.height, 200) && spaceAbove > spaceBelow;
-		let left = anchor.left;
-		if (left + box.width > window.innerWidth - MARGIN) left = anchor.left - box.width;
-		left = Math.max(
-			MARGIN,
-			Math.min(left, Math.max(MARGIN, window.innerWidth - box.width - MARGIN)),
-		);
 		setPlacement(
-			above
-				? { bottom: window.innerHeight - anchor.top + GAP, left }
-				: { top: anchor.bottom + GAP, left },
+			placePopup(
+				{ left: anchor.left, top: anchor.top, bottom: anchor.bottom },
+				{ width: box.width, height: box.height },
+				{ width: window.innerWidth, height: window.innerHeight },
+			),
 		);
 	}, [anchor]);
 
