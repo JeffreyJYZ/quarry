@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useFullscreen } from "@/ui/app/useFullscreen";
 
 export type TopBarProps = {
 	/** The project dropdown, so the bar stays a frame and the switcher owns its own state. */
@@ -14,8 +15,12 @@ export type TopBarProps = {
  * drag region.
  */
 export default function TopBar({ switcher, branch, right }: TopBarProps) {
+	const fullscreen = useFullscreen();
 	return (
-		<header className="titlebar" data-tauri-drag-region="">
+		<header
+			className={fullscreen ? "titlebar titlebar-fullscreen" : "titlebar"}
+			data-tauri-drag-region=""
+		>
 			<div className="titlebar-nodrag titlebar-switcher">{switcher}</div>
 			{branch === null ? null : (
 				<span className="titlebar-branch" title={branch}>

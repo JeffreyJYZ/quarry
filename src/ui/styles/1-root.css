@@ -87,6 +87,16 @@ body {
 	background: var(--panel);
 }
 
+/* In fullscreen macOS hides the traffic lights, so drop the left inset. */
+.titlebar.titlebar-fullscreen {
+	padding-left: 14px;
+}
+
+/* The notice line hangs under the title bar, so it follows the same inset. */
+.titlebar-fullscreen + .notice {
+	padding-left: 14px;
+}
+
 .button {
 	display: inline-flex;
 	align-items: center;
