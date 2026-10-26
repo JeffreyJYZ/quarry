@@ -31,8 +31,9 @@ read off `src-tauri/src/lib.rs` and `src/`:
   Shortcuts: `Cmd+S` save, `Cmd+Alt+S` save all, `Cmd+Alt+L` format, `Cmd+F` in-file search,
   `Cmd+Alt+F` project search, `F12` / `Shift+F12` / `Cmd+Click` for definition and references,
   `Cmd+K` for the shortcut sheet.
-- **Insight**: one language server per project root — `rust-analyzer` for Cargo, `clangd` for CMake or
-  `compile_commands.json` — with full-document sync. Diagnostics stream into the editor and the Problems
+- **Insight**: one LSP server per server kind per project root — `rust-analyzer` when the root has a
+  `Cargo.toml`, `clangd` when it has a `compile_commands.json`, `CMakeLists.txt` or a C/C++ source
+  (both run together when both are present) — with full-document sync. Diagnostics stream into the editor and the Problems
   dock, grouped by file with severity, line and message. The dock's severity counts in the header are
   toggles that hide or show errors, warnings or info, several at once, all on by default; a "group by
   file" toggle switches to a flat list ordered by severity, then path, then line, and the choice survives
@@ -194,7 +195,7 @@ bun install
 bun run tauri dev     # desktop app
 bun run dev           # browser-only UI
 bun check             # type check (bun builtin, all cores)
-bun fmt               # biome format --write .
+bun fmt               # bun fmt (Bun's built-in, configured by bunfig.toml [fmt])
 bun lint              # biome lint --write .
 bun run verify        # type check + biome check, the commit gate
 bun test              # frontend unit tests over pure helpers (rank, splitArgs, hex, buffer, blame, search model)
@@ -205,7 +206,8 @@ bun run verify:bundle # check version agreement, .app, signature, launch smoke
 
 Rust tests run from the Tauri crate: `cd src-tauri && cargo test`. Rust checks run there too: `cd src-tauri && cargo check --all-targets` and `cd src-tauri && cargo clippy --all-targets -- -D warnings`.
 
-The formatter for TypeScript, CSS and Markdown is Biome; `bun run verify` is the commit gate.
+The formatter for TypeScript, CSS and Markdown is `bun fmt` (Bun's built-in, configured by
+`bunfig.toml` `[fmt]`); Biome lints only; `bun run verify` is the commit gate.
 
 ## Tests
 

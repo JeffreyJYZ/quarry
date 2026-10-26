@@ -14,6 +14,7 @@ import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { ciVerdict } from "./ci-status";
+import { isStableTag, manifestPlatforms, selectDmg, versionDrift } from "./release-manifest";
 
 const ROOT = join(import.meta.dir, "..");
 const REPO = "JeffreyJYZ/quarry";
@@ -24,9 +25,22 @@ const DMG_DIR = join(ROOT, "src-tauri", "target", "release", "bundle", "dmg");
 const RELEASE_DIR = join(ROOT, "dist-release");
 const LATEST = join(RELEASE_DIR, "latest.json");
 
+function readVersions(): { package: string; tauri: string; cargo: string } {
+	const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { version: string };
+	const tauri = JSON.parse(readFileSync(join(ROOT, "src-tauri", "tauri.conf.json"), "utf8")) as {
+		version: string;
+	};
+	const cargoRaw = readFileSync(join(ROOT, "src-tauri", "Cargo.toml"), "utf8");
+	const cargoMatch = /^version\s*=\s*"([^"]+)"/m.exec(cargoRaw);
+	const cargo = cargoMatch?.[1] ?? "";
+	return { package: pkg.version, tauri: tauri.version, cargo };
+}
+
 function readVersion(): string {
-	const raw = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { version: string };
-	return raw.version;
+	const versions = readVersions();
+	const drift = versionDrift(versions);
+	if (drift !== null) fail(drift);
+	return versions.package;
 }
 
 /** `quarry-alpha12` for `X.Y.Z-alpha.12`, `vX.Y.Z` for a stable version. */
@@ -56,11 +70,10 @@ function run(command: string, args: string[], env?: NodeJS.ProcessEnv): string {
  */
 function dmgPath(version: string): string | null {
 	if (!existsSync(DMG_DIR)) return null;
-	const candidates = readdirSync(DMG_DIR).filter(
-		(name) => name.startsWith(`quarry_${version}`) && name.endsWith(".dmg"),
-	);
-	if (candidates.length === 0) return null;
-	return join(DMG_DIR, candidates.sort().at(-1) as string);
+	const candidates = readdirSync(DMG_DIR);
+	const { selected, error } = selectDmg(candidates, version);
+	if (error !== null) return null;
+	return selected === null ? null : join(DMG_DIR, selected);
 }
 
 /**
@@ -187,7 +200,9 @@ async function main(): Promise<number> {
 		log(verdict.message);
 	}
 
-	if (!process.argv.includes("--skip-ci")) {
+	if (process.argv.includes("--skip-gate")) {
+		log("WARNING: skipping local gate (--skip-gate)");
+	} else {
 		log("running the local gate (bun run gate)");
 		try {
 			run("bun", ["run", "gate"]);
@@ -199,15 +214,25 @@ async function main(): Promise<number> {
 
 	if (!process.argv.includes("--skip-build")) {
 		log(`building ${version} (universal, signed)`);
-		run("bun", ["run", "tauri", "build", "--bundles", "app"], {
-			TAURI_SIGNING_PRIVATE_KEY: join(homedir(), ".tauri", "quarry-updater.key"),
-			TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "",
-		});
+		run(
+			"bun",
+			["run", "tauri", "build", "--bundles", "app", "--target", "universal-apple-darwin"],
+			{
+				TAURI_SIGNING_PRIVATE_KEY: join(homedir(), ".tauri", "quarry-updater.key"),
+				TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "",
+			},
+		);
 		makeDmg(version);
 		detachVolumes();
 	}
 
-	if (dmgPath(version) === null) makeDmg(version);
+	if (dmgPath(version) === null) {
+		if (existsSync(DMG_DIR)) {
+			const { error } = selectDmg(readdirSync(DMG_DIR), version);
+			if (error !== null) fail(error);
+		}
+		makeDmg(version);
+	}
 
 	const archive = ARCHIVE;
 	const signatureFile = ARCHIVE_SIG;
@@ -242,12 +267,7 @@ async function main(): Promise<number> {
 		version,
 		notes: arg("--notes") !== null ? readFileSync(arg("--notes") as string, "utf8") : "",
 		pub_date: new Date().toISOString(),
-		platforms: {
-			"darwin-aarch64": entry,
-			"darwin-x86_64": entry,
-			"darwin-aarch64-app": entry,
-			"darwin-x86_64-app": entry,
-		},
+		platforms: Object.fromEntries(manifestPlatforms().map((key) => [key, entry])),
 	};
 	const latestDir = join(ROOT, "dist-release");
 	execFileSync("mkdir", ["-p", latestDir]);
@@ -286,7 +306,7 @@ async function main(): Promise<number> {
 		const notesFile = join(latestDir, "notes.md");
 		writeFileSync(notesFile, latest.notes);
 		const upload = assets.flatMap(([path, name]) => [`${path}#${name}`]);
-		run("gh", [
+		const createArgs = [
 			"release",
 			"create",
 			tag,
@@ -295,8 +315,9 @@ async function main(): Promise<number> {
 			`quarry ${version}`,
 			"--notes-file",
 			notesFile,
-			"--latest",
-		]);
+		];
+		if (isStableTag(tag)) createArgs.push("--latest");
+		run("gh", createArgs);
 	}
 
 	log("verifying the published manifest");
@@ -327,7 +348,7 @@ async function main(): Promise<number> {
 			`latest.json reports ${published.version ?? "nothing"} (${lastError}), expected ${version}`,
 		);
 	}
-	for (const platform of ["darwin-aarch64", "darwin-x86_64"]) {
+	for (const platform of manifestPlatforms().filter((key) => !key.endsWith("-app"))) {
 		const row = published.platforms?.[platform];
 		if (row === undefined || row.signature === undefined || row.url === undefined) {
 			fail(`latest.json has no usable ${platform} entry`);

@@ -183,5 +183,5 @@ jobs:
                       **Linux**: install the `.deb` / `.rpm`, or `chmod +x` the `.AppImage` and run it.
                       The app updates itself from the `latest.json` attached to this release page.
                   releaseDraft: false
-                  prerelease: false
+                  prerelease: ${{ startsWith(github.ref_name, 'quarry-beta') }}
                   args: ${{ matrix.args }}

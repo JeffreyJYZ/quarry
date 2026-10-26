@@ -29,12 +29,16 @@ function walk(dir: string, out: string[] = []): string[] {
 	return out;
 }
 
-function lineCount(path: string): number {
-	const text = readFileSync(path, "utf8");
+export function countLines(text: string): number {
 	if (text === "") return 0;
 	const lines = text.split("\n");
 	// A trailing newline does not open a new line.
 	return lines[lines.length - 1] === "" ? lines.length - 1 : lines.length;
+}
+
+export function lineCount(path: string): number {
+	const text = readFileSync(path, "utf8");
+	return countLines(text);
 }
 
 const allowed = new Set(
@@ -44,34 +48,40 @@ const allowed = new Set(
 		.filter((line) => line !== "" && !line.startsWith("#")),
 );
 
-const oversized: { file: string; lines: number }[] = [];
+export function runCheck(): void {
+	const oversized: { file: string; lines: number }[] = [];
 
-for (const root of ROOTS) {
-	for (const file of walk(join(ROOT, root))) {
-		if (!EXTENSIONS.includes(file.slice(file.lastIndexOf(".")))) continue;
-		const lines = lineCount(file);
-		if (lines <= LIMIT) continue;
-		oversized.push({ file: relative(ROOT, file), lines });
+	for (const root of ROOTS) {
+		for (const file of walk(join(ROOT, root))) {
+			if (!EXTENSIONS.includes(file.slice(file.lastIndexOf(".")))) continue;
+			const lines = lineCount(file);
+			if (lines <= LIMIT) continue;
+			oversized.push({ file: relative(ROOT, file), lines });
+		}
 	}
+
+	const saved = [...allowed].filter((file) => !oversized.some((entry) => entry.file === file));
+	const fresh = oversized.filter((entry) => !allowed.has(entry.file));
+
+	for (const entry of fresh.sort((a, b) => b.lines - a.lines)) {
+		console.error(`over ${LIMIT} lines: ${entry.file} (${entry.lines})`);
+	}
+
+	for (const file of saved) {
+		console.error(`listed in oversized.txt but now within ${LIMIT} lines: ${file}`);
+		console.error("  remove it from docs/refactor/oversized.txt");
+	}
+
+	if (fresh.length > 0 || saved.length > 0) {
+		console.error(
+			`\n${fresh.length} new oversized file(s), ${saved.length} stale exception(s); limit is ${LIMIT} lines`,
+		);
+		process.exit(1);
+	}
+
+	console.log(`${oversized.length} oversized file(s) remain on the exception list`);
 }
 
-const saved = [...allowed].filter((file) => !oversized.some((entry) => entry.file === file));
-const fresh = oversized.filter((entry) => !allowed.has(entry.file));
-
-for (const entry of fresh.sort((a, b) => b.lines - a.lines)) {
-	console.error(`over ${LIMIT} lines: ${entry.file} (${entry.lines})`);
+if (import.meta.main) {
+	runCheck();
 }
-
-for (const file of saved) {
-	console.error(`listed in oversized.txt but now within ${LIMIT} lines: ${file}`);
-	console.error("  remove it from docs/refactor/oversized.txt");
-}
-
-if (fresh.length > 0 || saved.length > 0) {
-	console.error(
-		`\n${fresh.length} new oversized file(s), ${saved.length} stale exception(s); limit is ${LIMIT} lines`,
-	);
-	process.exit(1);
-}
-
-console.log(`${oversized.length} oversized file(s) remain on the exception list`);

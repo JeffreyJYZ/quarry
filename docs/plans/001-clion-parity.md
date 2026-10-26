@@ -1,6 +1,6 @@
 # quarry — CLion-parity IDE for Rust and C/C++
 
-Status: plan, no feature code yet. Scaffold (Tauri 2 + React 19 + Vite + TypeScript + Biome) exists in this repo.
+Status: original plan, dated. Implementation has moved well past it — the app now runs the daily loop end to end (see README.md §Status); this document is kept as the parity matrix, slices and estimates.
 
 ## 1. Target
 
@@ -16,20 +16,21 @@ debugger front end is a GDB/LLDB client. quarry reuses all three servers and wri
 
 ## 2. Stack
 
-| Layer              | Choice                                  | Note                                                      |
-| ------------------ | --------------------------------------- | --------------------------------------------------------- |
-| Shell              | Tauri 2                                 | Rust process, native menus, small footprint               |
-| UI                 | React 19 + Vite 8 + TypeScript          | `@/*` → `./src/*`                                         |
-| Editor             | CodeMirror 6 + `@codemirror/lsp-client` | hides behind a 6-method adapter so Monaco stays swappable |
-| C/C++ insight      | `clangd`                                | `--background-index --clang-tidy --header-insertion=iwyu` |
-| Rust insight       | `rust-analyzer`                         | `checkOnSave` via `cargo check` (or `clippy`)             |
-| Formatting         | `rustfmt`, `clang-format`               | on save, per-project style file                           |
-| Debugging          | `lldb-dap` over raw DAP                 | one client serves both languages                          |
-| Memory             | custom hex view over DAP `readMemory`   | paged mapped/unmapped                                     |
-| Search             | `ripgrep` binary                        | no libgit2 or index service early                         |
-| Terminal           | `portable-pty`                          | embedded shell                                            |
-| VCS                | `git` CLI first                         | `git2` only if a seam demands it                          |
-| Lint/format (repo) | Biome                                   | tabs, indentWidth 4, lineWidth 100                        |
+| Layer         | Choice                                                       | Note                                                      |
+| ------------- | ------------------------------------------------------------ | --------------------------------------------------------- |
+| Shell         | Tauri 2                                                      | Rust process, native menus, small footprint               |
+| UI            | React 19 + Vite 8 + TypeScript                               | `@/*` → `./src/*`                                         |
+| Editor        | CodeMirror 6 + hand-written LSP client (`src-tauri/src/lsp`) | hides behind a 6-method adapter so Monaco stays swappable |
+| C/C++ insight | `clangd`                                                     | `--background-index --clang-tidy --header-insertion=iwyu` |
+| Rust insight  | `rust-analyzer`                                              | `checkOnSave` via `cargo check` (or `clippy`)             |
+| Formatting    | `rustfmt`, `clang-format`                                    | on save, per-project style file                           |
+| Debugging     | `lldb-dap` over raw DAP                                      | one client serves both languages                          |
+| Memory        | custom hex view over DAP `readMemory`                        | paged mapped/unmapped                                     |
+| Search        | `ripgrep` binary                                             | no libgit2 or index service early                         |
+| Terminal      | `portable-pty`                                               | embedded shell                                            |
+| VCS           | `git` CLI first                                              | `git2` only if a seam demands it                          |
+| Lint (repo)   | Biome                                                        | tabs, indentWidth 4, lineWidth 100                        |
+| Format (repo) | `bun fmt` (Bun's built-in)                                   | configured by `bunfig.toml` `[fmt]`                       |
 
 All external toolchains are **detected, never bundled**. Detection probes `PATH` and falls back to
 `xcrun --find` for the Apple-shipped tools.
@@ -167,8 +168,8 @@ and will not see the rustup shims.
 
 ## 10. Decisions
 
-- Editor is CodeMirror 6, not Monaco: smaller, no worker story, and `@codemirror/lsp-client` already
-  speaks the protocol.
+- Editor is CodeMirror 6, not Monaco: smaller, no worker story, and the LSP client is hand-written in
+  `src-tauri/src/lsp` (no `@codemirror/lsp-client` dependency).
 - One LSP and one DAP session per project root, no per-file servers.
 - The debugger targets `lldb-dap` only; GDB support is not planned.
 - Build module is `build_task.rs` to avoid colliding with Cargo's `build.rs`.
