@@ -33,6 +33,9 @@ export function useRunProcess(onNotice: (message: string) => void): {
 		runningRef.current = running;
 	}, [running]);
 
+	// A line's identity, so two identical lines are two rows rather than one.
+	const nextLineId = useRef(0);
+
 	useEffect(() => {
 		let unOutput: (() => void) | undefined;
 		let unExited: (() => void) | undefined;
@@ -42,7 +45,15 @@ export function useRunProcess(onNotice: (message: string) => void): {
 				unOutput = await onRunOutput((event) => {
 					if (event.runId !== runningRef.current) return;
 					setLines((current) => {
-						const next = [...current, { stream: event.stream, line: event.line }];
+						nextLineId.current += 1;
+						const next = [
+							...current,
+							{
+								id: nextLineId.current,
+								stream: event.stream,
+								line: event.line,
+							},
+						];
 						return next.length > MAX_LINES ? next.slice(next.length - MAX_LINES) : next;
 					});
 				});

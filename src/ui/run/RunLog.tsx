@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
-export type RunLine = { stream: "stdout" | "stderr"; line: string };
+/** One console line; the id makes a repeated line a distinct row. */
+export type RunLine = { id: number; stream: "stdout" | "stderr"; line: string };
 
 export type RunLogProps = {
 	lines: RunLine[];
@@ -101,24 +102,31 @@ export default function RunLog({ lines, exited, onClear, argv, running, onRerun 
 		<section className="run-log" aria-label="Run output">
 			<div className="run-log-head">
 				<span className="label">run</span>
-				<button type="button" className="dock-action" onClick={() => void copyOutput()}>
-					Copy output
-				</button>
-				<button type="button" className="dock-action" onClick={() => void copyArgv()}>
-					Copy argv
-				</button>
-				<button type="button" className="dock-action" onClick={onRerun} disabled={running}>
-					Re-run
-				</button>
-				<button type="button" className="dock-action" onClick={onClear}>
-					Clear
-				</button>
 				{copyStatus === null ? null : <span className="run-copy-status">{copyStatus}</span>}
+				<div className="run-log-actions">
+					<button type="button" className="dock-action" onClick={() => void copyOutput()}>
+						Copy output
+					</button>
+					<button type="button" className="dock-action" onClick={() => void copyArgv()}>
+						Copy argv
+					</button>
+					<button
+						type="button"
+						className="dock-action"
+						onClick={onRerun}
+						disabled={running}
+					>
+						Re-run
+					</button>
+					<button type="button" className="dock-action" onClick={onClear}>
+						Clear
+					</button>
+				</div>
 			</div>
 			<div ref={ref} className="run-log-body" onScroll={onScroll}>
 				{lines.map((entry) => (
 					<div
-						key={`${entry.stream}-${entry.line}`}
+						key={entry.id}
 						className={entry.stream === "stderr" ? "run-line stderr" : "run-line"}
 					>
 						{entry.line}

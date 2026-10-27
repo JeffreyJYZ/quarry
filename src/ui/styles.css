@@ -40,4 +40,6 @@
 
 @import "./styles/20-menubar.css";
 
-@import "./styles/21-debug-console.css";
+@import "./styles/debug-console.css";
+
+@import "./styles/run-log.css";
