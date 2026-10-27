@@ -33,6 +33,12 @@ export function usePanels() {
 		setPanelOpen(true);
 	}, []);
 
+	/** The same for a run: its output is the Run tab, and it has to be visible to be read. */
+	const showRun = useCallback(() => {
+		setDockTab("run");
+		setPanelOpen(true);
+	}, []);
+
 	return {
 		railCollapsed,
 		setRailCollapsed,
@@ -63,6 +69,7 @@ export function usePanels() {
 		fileRevealToken,
 		setFileRevealToken,
 		showDebugger,
+		showRun,
 	};
 }
 

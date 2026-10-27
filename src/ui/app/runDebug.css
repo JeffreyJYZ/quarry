@@ -40,20 +40,20 @@
 
 .run-debug-run,
 .run-debug-debug {
-	background: #3f8f52;
+	background: #2f7d43;
 }
 
 .run-debug-run:hover:not(:disabled),
 .run-debug-debug:hover:not(:disabled) {
-	background: #48a05c;
+	background: #3a9450;
 }
 
 .run-debug-stop {
-	background: #b8483f;
+	background: #a84a42;
 }
 
 .run-debug-stop:hover:not(:disabled) {
-	background: #c95046;
+	background: #bd564c;
 }
 
 .run-debug-action:disabled {

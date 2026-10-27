@@ -108,6 +108,7 @@ export function useShellGlue(options: GlueOptions) {
 		debug,
 		onReveal: workspace.handleNavigate,
 		onOpenDebug: panels.showDebugger,
+		onOpenRun: panels.showRun,
 		onNotice: (message) => onNotice?.(message),
 	});
 

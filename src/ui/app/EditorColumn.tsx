@@ -1,14 +1,13 @@
 import type { CSSProperties } from "react";
 import EditorStage from "@/ui/app/EditorStage";
 import { Palettes } from "@/ui/app/BottomDock";
-import RunSection from "@/ui/app/RunSection";
 import CanvasPanels from "@/ui/app/CanvasPanels";
 import { SHORTCUT_GROUPS } from "@/ui/app/shellShortcuts";
 import type { ShellModel } from "@/ui/app/useShell";
 
 /** The editor column: the tabs and surfaces, then the bottom slot and the palettes over it. */
 export default function EditorColumn({ model }: { model: ShellModel }) {
-	const { workspace, overlays, settings, runs, diagnostics, editorActions, git } = model;
+	const { workspace, overlays, settings, diagnostics, editorActions, git } = model;
 	const { dockHeight, terminalHeight } = settings.panels;
 
 	return (
@@ -53,31 +52,6 @@ export default function EditorColumn({ model }: { model: ShellModel }) {
 				onNotice={model.setNotice}
 			/>
 			<CanvasPanels model={model} />
-			<RunSection
-				root={model.root}
-				open={runs.panelOpen}
-				program={runs.program}
-				args={runs.args}
-				cwd={runs.cwd}
-				env={runs.env}
-				configurations={runs.configurations}
-				selectedConfiguration={runs.selected}
-				running={runs.running !== null}
-				lines={runs.lines}
-				exited={runs.exited}
-				onProgramChange={runs.setProgram}
-				onArgsChange={runs.setArgs}
-				onCwdChange={runs.setCwd}
-				onEnvChange={runs.setEnv}
-				onSelectConfiguration={runs.select}
-				onSaveConfiguration={runs.save}
-				onUpdateConfiguration={runs.update}
-				onDeleteConfiguration={runs.remove}
-				onRun={() => void runs.run()}
-				onStop={() => void runs.stop()}
-				onClose={runs.closePanel}
-				onClearLog={runs.clearLog}
-			/>
 			<Palettes
 				root={model.root}
 				searchOpen={overlays.searchOpen}

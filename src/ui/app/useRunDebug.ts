@@ -38,9 +38,10 @@ export function useRunDebug(options: {
 	debug: DebugController;
 	onReveal: (path: string, line: number, character: number) => void;
 	onOpenDebug: () => void;
+	onOpenRun: () => void;
 	onNotice: (message: string) => void;
 }): RunDebug {
-	const { root, profile, runs, debug, onReveal, onOpenDebug, onNotice } = options;
+	const { root, profile, runs, debug, onReveal, onOpenDebug, onOpenRun, onNotice } = options;
 	const targets = useRunTargets(root);
 
 	const onRun = useCallback(
@@ -79,6 +80,15 @@ export function useRunDebug(options: {
 		openedFor.current = sessionId;
 		onOpenDebug();
 	}, [sessionId, onOpenDebug]);
+
+	// A run's output is the dock's Run tab: a process that started while the dock was closed, or
+	// while another tab was up, would run where nobody is reading it.
+	const runLive = runs.running !== null;
+	const runFormOpen = runs.panelOpen;
+	useEffect(() => {
+		if (!runLive && !runFormOpen) return;
+		onOpenRun();
+	}, [runLive, runFormOpen, onOpenRun]);
 
 	// Every stop moves the editor to the frame that stopped, the way a debugger is expected to.
 	const top = debug.stopView?.frames[0] ?? null;

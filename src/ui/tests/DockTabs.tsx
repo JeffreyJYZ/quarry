@@ -5,6 +5,7 @@ import { DOCK_TABS, type DockTab } from "./parts";
 const LABELS: Record<DockTab, string> = {
 	problems: "Problems",
 	tests: "Tests",
+	run: "Run",
 	debugger: "Debugger",
 	console: "Console",
 	memory: "Memory",
@@ -19,6 +20,7 @@ export function DockTabs({
 	failed,
 	problemsErrors,
 	debugStatus,
+	runStatus,
 }: {
 	expanded: boolean;
 	onToggleExpanded: () => void;
@@ -28,6 +30,8 @@ export function DockTabs({
 	failed: number;
 	problemsErrors: number;
 	debugStatus: DebugStatus;
+	/** The run tab's suffix: `running`, the exit code, or nothing before the first run. */
+	runStatus: string | null;
 }) {
 	/** The suffix each tab carries beside its name; console and memory have nothing to count. */
 	function suffix(value: DockTab) {
@@ -52,6 +56,20 @@ export function DockTabs({
 		}
 		if (value === "debugger") {
 			return <span className={`dock-tab-status ${debugStatus}`}>{debugStatus}</span>;
+		}
+		if (value === "run") {
+			if (runStatus === null) {
+				return null;
+			}
+			return (
+				<span
+					className={
+						runStatus === "running" ? "dock-tab-status running" : "dock-tab-status"
+					}
+				>
+					{runStatus}
+				</span>
+			);
 		}
 		return null;
 	}

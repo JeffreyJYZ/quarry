@@ -31,24 +31,6 @@
 	border-color: var(--muted);
 }
 
-/* The form is a compact block above the log, and scrolls on its own when it outgrows it. */
-.run-dock .run-form {
-	flex: 0 0 auto;
-	max-height: 150px;
-	overflow: auto;
-	border-top: 0;
-	border-bottom: 1px solid var(--line);
-}
-
-/* The form is a compact block above the log, and scrolls on its own when it outgrows it. */
-.run-dock .run-form {
-	flex: 0 0 auto;
-	max-height: 150px;
-	overflow: auto;
-	border-top: 0;
-	border-bottom: 1px solid var(--line);
-}
-
 .run-dock-empty {
 	margin: 0;
 	padding: 10px;
@@ -185,4 +167,20 @@
 .run-exit {
 	margin-top: 6px;
 	color: var(--muted);
+}
+
+/* Inside the dock the tab supplies the height, so the form is capped and the log takes the rest. */
+.run-dock .run-form {
+	flex: 0 0 auto;
+	max-height: 150px;
+	overflow: auto;
+	border-top: 0;
+	border-bottom: 1px solid var(--line);
+}
+
+.run-dock .run-log {
+	flex: 1 1 auto;
+	height: auto;
+	min-height: 0;
+	border-top: 0;
 }

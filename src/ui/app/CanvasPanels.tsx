@@ -113,6 +113,7 @@ export default function CanvasPanels({ model }: { model: ShellModel }) {
 			cursor={overlays.cursor}
 			onNavigate={workspace.handleNavigate}
 			tests={model.tests}
+			runs={model.runs}
 		/>
 	);
 }

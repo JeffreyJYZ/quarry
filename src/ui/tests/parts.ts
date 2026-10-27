@@ -1,12 +1,29 @@
 import type { TestItem, TestReport } from "@/lib/project/api";
 
-export type DockTab = "problems" | "tests" | "debugger" | "console" | "memory";
+export type DockTab = "problems" | "tests" | "run" | "debugger" | "console" | "memory";
 
 /** Every tab in order; a stored value is validated against this list, not a second copy of it. */
-export const DOCK_TABS: DockTab[] = ["problems", "tests", "debugger", "console", "memory"];
+export const DOCK_TABS: DockTab[] = ["problems", "tests", "run", "debugger", "console", "memory"];
 
 export function isDockTab(value: unknown): value is DockTab {
 	return typeof value === "string" && (DOCK_TABS as string[]).includes(value);
+}
+
+/** What the run tab's suffix says: live while a process is up, then how it ended, then nothing. */
+export function runTabStatus(input: {
+	running: boolean;
+	exited: { code: number | null; killed?: boolean } | null;
+}): string | null {
+	if (input.running) {
+		return "running";
+	}
+	if (input.exited === null) {
+		return null;
+	}
+	if (input.exited.killed === true || input.exited.code === null) {
+		return "killed";
+	}
+	return `exit ${input.exited.code}`;
 }
 
 export const OUTPUT_LINE_CAP = 200;

@@ -1,6 +1,7 @@
 import type { FileBuffer as Buffer } from "@/lib/project/buffer";
 import { Suspense, lazy } from "react";
 import type { DebugController } from "@/lib/debug/session";
+import type { RunControls } from "@/ui/app/runControlsTypes";
 import Splitter from "@/ui/layout/Splitter";
 import TestsDock, { type DockTab, type TestsDockProps } from "@/ui/tests/TestsDock";
 import type { ShortcutGroup } from "@/ui/shortcuts/ShortcutSheet";
@@ -29,6 +30,7 @@ export type DockProps = {
 	cursor: { line: number; character: number } | null;
 	onNavigate: (path: string, line: number, character: number) => void;
 	tests: TestsDockProps["tests"];
+	runs: RunControls;
 };
 
 /** The bottom dock: problems, tests and the debugger share one region and one header. */
@@ -67,6 +69,7 @@ export default function BottomDock(props: DockProps) {
 					setBuffers: props.onBuffersChange,
 				}}
 				tests={props.tests}
+				runs={props.runs}
 			/>
 		</>
 	);

@@ -1,9 +1,12 @@
 import type { ProblemFile } from "@/lib/problems/model";
 import type { FileBuffer } from "@/lib/project/buffer";
 import type { DebugController } from "@/lib/debug/session";
+import type { RunControls } from "@/ui/app/runControlsTypes";
 import { DockTabs } from "./DockTabs";
 import { DockTools } from "./DockTools";
+import { runTabStatus } from "./parts";
 import { useDockFilters } from "./useDockFilters";
+import RunDock from "./RunDock";
 import ConsoleSection from "@/ui/debug/ConsoleSection";
 import MemoryPanes from "@/ui/debug/MemoryPanes";
 import DebugDockBody from "@/ui/debug/dock/DebugDockBody";
@@ -37,6 +40,7 @@ export type TestsDockProps = {
 		setBuffers: (updater: (current: FileBuffer[]) => FileBuffer[]) => void;
 	};
 	tests: TestsController;
+	runs: RunControls;
 };
 
 /** The bottom dock: diagnostics, tests and the debug session's own views share one header. */
@@ -51,8 +55,15 @@ export default function TestsDock({
 	onNavigate,
 	problems,
 	tests,
+	runs,
 }: TestsDockProps) {
 	const dock = useDockFilters({ tests, tab, expanded });
+	const bodyClass =
+		tab === "debugger"
+			? "dock-body dock-body-debug"
+			: tab === "run"
+				? "dock-body dock-body-run"
+				: "dock-body";
 
 	return (
 		<section className={expanded ? "dock" : "dock collapsed"} aria-label="Bottom dock">
@@ -66,12 +77,16 @@ export default function TestsDock({
 					failed={dock.failed}
 					problemsErrors={problems.errors}
 					debugStatus={debug.status}
+					runStatus={runTabStatus({
+						running: runs.running !== null,
+						exited: runs.exited,
+					})}
 				/>
 				{tab === "tests" ? <DockTools dock={dock} tests={tests} /> : null}
 				{tab === "debugger" ? <DebugMenu debug={debug} /> : null}
 			</div>
 			{expanded ? (
-				<div className={tab === "debugger" ? "dock-body dock-body-debug" : "dock-body"}>
+				<div className={bodyClass}>
 					{tab === "tests" ? (
 						<TestsPanel
 							items={dock.filtered}
@@ -109,6 +124,8 @@ export default function TestsDock({
 							cursor={cursor}
 							onNavigate={onNavigate}
 						/>
+					) : tab === "run" ? (
+						<RunDock runs={runs} />
 					) : tab === "console" ? (
 						<ConsoleSection session={debug.sessionId} />
 					) : (
