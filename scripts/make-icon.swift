@@ -51,24 +51,32 @@ func draw(size: CGFloat, into url: URL) {
 		xRadius: radius,
 		yRadius: radius
 	)
-	NSColor(srgbRed: 0.067, green: 0.075, blue: 0.086, alpha: 1).setFill()
+	NSColor(srgbRed: 0.071, green: 0.078, blue: 0.09, alpha: 1).setFill()
 	plate.fill()
 
-	let ring = NSBezierPath()
-	ring.appendOval(in: NSRect(x: 512 - 329, y: 512 - 329, width: 658, height: 658))
-	ring.lineWidth = 128
-	NSColor(srgbRed: 0.416, green: 0.62, blue: 1, alpha: 1).setStroke()
-	ring.stroke()
+	// The mark is negative space: a blue disc with the Q carved out of it. At 16px a carved
+	// counter holds its shape where a drawn ring turns to mush, and the tail breaking the rim is
+	// what makes the letter read as a Q instead of a C with a nick.
+	let blue = NSColor(srgbRed: 0.373, green: 0.549, blue: 0.996, alpha: 1)
+	let plateColor = NSColor(srgbRed: 0.071, green: 0.078, blue: 0.09, alpha: 1)
+
+	let disc = NSBezierPath(ovalIn: NSRect(x: 512 - 318, y: 520 - 318, width: 636, height: 636))
+	blue.setFill()
+	disc.fill()
+
+	let bowl = NSBezierPath(ovalIn: NSRect(x: 512 - 174, y: 520 - 174, width: 348, height: 348))
+	plateColor.setFill()
+	bowl.fill()
 
 	let tail = NSBezierPath(
-		roundedRect: NSRect(x: 0, y: 0, width: 420, height: 64),
-		xRadius: 32,
-		yRadius: 32
+		roundedRect: NSRect(x: 0, y: 0, width: 500, height: 104),
+		xRadius: 52,
+		yRadius: 52
 	)
-	var transform = AffineTransform(translationByX: 505, byY: 565)
-	transform.rotate(byDegrees: -42)
+	var transform = AffineTransform(translationByX: 462, byY: 640)
+	transform.rotate(byDegrees: -44)
 	tail.transform(using: transform)
-	NSColor(srgbRed: 0.85, green: 0.86, blue: 0.88, alpha: 1).setFill()
+	plateColor.setFill()
 	tail.fill()
 
 	NSGraphicsContext.restoreGraphicsState()
