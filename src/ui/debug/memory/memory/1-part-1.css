@@ -1,8 +1,8 @@
 /* Hex and disassembly panes. Dark only; colours come from the shell's root variables. */
 
 .memory-pane {
-	--memory-hover: #14191f;
-	--memory-selected: #182231;
+	--memory-hover: #363c46;
+	--memory-selected: #3e4451;
 
 	display: flex;
 	flex-direction: column;
@@ -17,9 +17,9 @@
 	display: flex;
 	align-items: center;
 	flex-wrap: wrap;
-	gap: 8px;
+	gap: 6px;
 	flex: 0 0 auto;
-	padding: 5px 10px;
+	padding: 4px 10px;
 	border-bottom: 1px solid var(--line);
 	background: var(--panel);
 }
@@ -28,7 +28,7 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
-	flex: 1 1 150px;
+	flex: 0 0 auto;
 	min-width: 0;
 }
 
@@ -38,8 +38,8 @@
 
 .memory-label {
 	flex: 0 0 auto;
-	font-size: 10px;
-	letter-spacing: 0.16em;
+	font-size: 9.5px;
+	letter-spacing: 0.12em;
 	text-transform: uppercase;
 	color: var(--muted);
 }
@@ -58,7 +58,8 @@
 }
 
 .memory-input {
-	flex: 1 1 auto;
+	flex: 0 0 190px;
+	width: 190px;
 }
 
 .memory-select {

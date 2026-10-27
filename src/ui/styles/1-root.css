@@ -1,16 +1,19 @@
 :root {
-	--bg: #0b0d10;
-	--panel: #0f1216;
-	--rail: #0d1014;
-	--line: #1c2127;
-	--text: #d7dbe0;
-	--muted: #7d858f;
-	--accent: #5b8def;
+	/* Zed's One Dark, taken from zed-industries/zed assets/themes/one/one.json. */
+	--bg: #282c33;
+	--panel: #2f343e;
+	--rail: #2e343e;
+	--line: #363c46;
+	--text: #dce0e5;
+	--muted: #a9afbc;
+	--accent: #74ade8;
+	/* Title bar and status bar sit one step above a panel, as Zed's chrome does. */
+	--chrome: #3b414d;
 
-	--hover: #14191f;
-	--danger: #d98b8b;
-	--warn: #d9b26a;
-	--good: #7fc98f;
+	--hover: #363c46;
+	--danger: #d07277;
+	--warn: #dec184;
+	--good: #a1c181;
 
 	--mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
 
@@ -32,7 +35,7 @@
 * {
 	box-sizing: border-box;
 	scrollbar-width: thin;
-	scrollbar-color: #242a32 transparent;
+	scrollbar-color: #4e5661 transparent;
 }
 
 ::-webkit-scrollbar {
@@ -45,7 +48,7 @@
 }
 
 ::-webkit-scrollbar-thumb {
-	background: #242a32;
+	background: #4e5661;
 	background-clip: content-box;
 	border: 3px solid transparent;
 	border-radius: 6px;
@@ -84,7 +87,7 @@ body {
 	height: 38px;
 	padding: 0 14px 0 82px;
 	border-bottom: 1px solid var(--line);
-	background: var(--panel);
+	background: var(--chrome);
 }
 
 /* In fullscreen macOS hides the traffic lights, so drop the left inset. */
@@ -117,7 +120,7 @@ body {
 
 .button:hover:not(:disabled) {
 	background: var(--hover);
-	border-color: #2a313a;
+	border-color: #363c46;
 }
 
 .button:disabled {

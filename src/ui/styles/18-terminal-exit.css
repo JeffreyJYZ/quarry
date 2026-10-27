@@ -35,51 +35,6 @@
 	outline-offset: -1px;
 }
 
-.run-form {
-	display: grid;
-	gap: 4px;
-	padding: 6px 8px;
-	border-top: 1px solid var(--border);
-}
-
-.run-form-row {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-}
-
-.run-form-label {
-	font-size: 11px;
-	opacity: 0.7;
-	width: 60px;
-}
-
-.run-form-input {
-	flex: 1;
-	font-family: monospace;
-	font-size: 12px;
-}
-
-.run-form-error {
-	color: var(--error, #d33);
-	font-size: 11px;
-}
-
-.run-form-actions {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-}
-
-.run-form-argv {
-	flex: 1;
-	font-family: monospace;
-	font-size: 11px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
 .git-branch-btn {
 	background: none;
 	border: none;

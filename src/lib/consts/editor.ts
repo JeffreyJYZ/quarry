@@ -2,29 +2,30 @@
 
 /** One hue per role, so a Rust or C++ buffer reads at a glance. */
 export const palette = {
-	keyword: "#c792ea",
-	type: "#56b6c2",
-	string: "#98c379",
-	comment: "#5c6370",
-	number: "#d19a66",
-	function: "#61afef",
-	macro: "#e5c07b",
-	operator: "#8a929c",
-	identifier: "#d7dbe0",
-	invalid: "#e06c75",
-	selection: "rgba(91, 141, 239, 0.25)",
-	activeLine: "rgba(255, 255, 255, 0.03)",
+	/* Zed's One Dark syntax colours, so the editor matches the theme the user runs. */
+	keyword: "#b477cf",
+	type: "#6eb4bf",
+	string: "#a1c181",
+	comment: "#5d636f",
+	number: "#bf956a",
+	function: "#73ade9",
+	macro: "#b477cf",
+	operator: "#6eb4bf",
+	identifier: "#acb2be",
+	invalid: "#d07277",
+	selection: "rgba(116, 173, 232, 0.25)",
+	activeLine: "rgba(47, 52, 62, 0.75)",
 } as const;
 
 /** Breakpoint dot hue; one colour for set and unverified, the latter hollow. */
 export const breakpointColor = "#e06c75";
 
-/** Lint colours, tuned to stay legible on the `#0b0d10` canvas. */
+/** Lint colours, One Dark's error/warning/info on the `#282c33` canvas. */
 export const lint = {
-	error: "#e06c75",
-	warning: "#e5c07b",
-	info: "#61afef",
-	hint: "#7d858f",
+	error: "#d07277",
+	warning: "#dec184",
+	info: "#74ade8",
+	hint: "#a9afbc",
 } as const;
 
 /** Editor chrome sizes, kept together with their hues. */

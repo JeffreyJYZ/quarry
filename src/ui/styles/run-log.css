@@ -1,5 +1,62 @@
 /* The Run tool window: a header with its actions, then the program's output. */
 
+/* The dock tab's body: its own bar, the optional form, then the log filling the rest. */
+.dock-body-run {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.run-dock {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.run-dock-bar {
+	display: flex;
+	flex: 0 0 26px;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 6px;
+	padding: 0 10px;
+	border-bottom: 1px solid var(--line);
+}
+
+.run-dock-bar .dock-action.active {
+	color: var(--text);
+	border-color: var(--muted);
+}
+
+/* The form is a compact block above the log, and scrolls on its own when it outgrows it. */
+.run-dock .run-form {
+	flex: 0 0 auto;
+	max-height: 150px;
+	overflow: auto;
+	border-top: 0;
+	border-bottom: 1px solid var(--line);
+}
+
+/* The form is a compact block above the log, and scrolls on its own when it outgrows it. */
+.run-dock .run-form {
+	flex: 0 0 auto;
+	max-height: 150px;
+	overflow: auto;
+	border-top: 0;
+	border-bottom: 1px solid var(--line);
+}
+
+.run-dock-empty {
+	margin: 0;
+	padding: 10px;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 11px;
+}
+
 .run-form {
 	display: grid;
 	gap: 8px;

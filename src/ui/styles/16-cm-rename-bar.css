@@ -97,7 +97,7 @@
 .dock-seg.active {
 	color: var(--text);
 	background: var(--hover);
-	border-color: #2a313a;
+	border-color: #363c46;
 }
 
 .dock-seg:disabled {

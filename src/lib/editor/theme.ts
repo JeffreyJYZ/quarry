@@ -59,7 +59,7 @@ export const quarryTheme: Extension = EditorView.theme(
 		},
 		// A faint tint only: an outline plus a fill read as bright as the caret did.
 		"&.cm-focused .cm-matchingBracket": {
-			backgroundColor: "rgba(91, 141, 239, 0.16)",
+			backgroundColor: "rgba(116, 173, 232, 0.16)",
 			borderRadius: "2px",
 			outline: "none",
 		},
@@ -67,15 +67,15 @@ export const quarryTheme: Extension = EditorView.theme(
 			color: "inherit",
 		},
 		"&.cm-focused .cm-nonmatchingBracket": {
-			backgroundColor: "rgba(217, 139, 139, 0.22)",
+			backgroundColor: "rgba(208, 114, 119, 0.22)",
 			borderRadius: "2px",
 			outline: "none",
 		},
 		".cm-searchMatch": {
-			backgroundColor: "rgba(229, 192, 123, 0.25)",
+			backgroundColor: "rgba(222, 193, 132, 0.25)",
 		},
 		".cm-searchMatch.cm-searchMatch-selected": {
-			backgroundColor: "rgba(229, 192, 123, 0.45)",
+			backgroundColor: "rgba(222, 193, 132, 0.45)",
 		},
 		".cm-panels": {
 			backgroundColor: "var(--panel)",
@@ -130,10 +130,10 @@ export const quarryTheme: Extension = EditorView.theme(
 		...breakpointStyles,
 		...foldStyles,
 		".cm-occurrence": {
-			backgroundColor: "rgba(91, 141, 239, 0.14)",
+			backgroundColor: "rgba(116, 173, 232, 0.14)",
 		},
 		".cm-occurrence-strong": {
-			backgroundColor: "rgba(91, 141, 239, 0.26)",
+			backgroundColor: "rgba(116, 173, 232, 0.26)",
 		},
 	},
 	{ dark: true },

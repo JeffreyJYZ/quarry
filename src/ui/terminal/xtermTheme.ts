@@ -1,26 +1,31 @@
 import type { ITheme } from "@xterm/xterm";
 
-/** xterm's palette in the app's own dark tokens, so the panel does not look bolted on. */
+/**
+ * xterm in Zed's One Dark, so the terminal matches the editor beside it.
+ *
+ * The ANSI names are One Dark's own terminal palette rather than a guess: the bright variants are
+ * the ones that theme ships, which is why they are not simply lightened.
+ */
 export const XTERM_THEME: ITheme = {
-	background: "#0b0d10",
-	foreground: "#d7dbe0",
-	cursor: "#5b8def",
-	cursorAccent: "#0b0d10",
-	selectionBackground: "#26303c",
-	black: "#3b4048",
+	background: "#282c34",
+	foreground: "#abb2bf",
+	cursor: "#74ade8",
+	cursorAccent: "#282c34",
+	selectionBackground: "#3e4451",
+	black: "#282c34",
 	red: "#e06c75",
-	green: "#7fc98f",
-	yellow: "#d9b26a",
-	blue: "#5b8def",
+	green: "#98c379",
+	yellow: "#e5c07b",
+	blue: "#61afef",
 	magenta: "#c678dd",
 	cyan: "#56b6c2",
-	white: "#d7dbe0",
-	brightBlack: "#5c6370",
-	brightRed: "#ef8790",
-	brightGreen: "#a3d9ad",
-	brightYellow: "#e8c98d",
-	brightBlue: "#7ea6f2",
-	brightMagenta: "#d79ce8",
-	brightCyan: "#7fd0d9",
-	brightWhite: "#ffffff",
+	white: "#abb2bf",
+	brightBlack: "#636d83",
+	brightRed: "#ea858b",
+	brightGreen: "#aad581",
+	brightYellow: "#ffd885",
+	brightBlue: "#85c1ff",
+	brightMagenta: "#d398eb",
+	brightCyan: "#6ed5de",
+	brightWhite: "#fafafa",
 };

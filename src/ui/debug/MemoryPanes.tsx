@@ -20,7 +20,6 @@ export default function MemoryPanes({
 			<section className="debug-section debug-pane-section">
 				<div className="debug-section-head">
 					<span className="label">memory</span>
-					<span className="debug-mem">bytes at the selected frame or variable</span>
 				</div>
 				<div className="debug-pane">
 					<MemoryPane session={session} address={memoryAddress} />
@@ -29,7 +28,6 @@ export default function MemoryPanes({
 			<section className="debug-section debug-pane-section">
 				<div className="debug-section-head">
 					<span className="label">disassembly</span>
-					<span className="debug-mem">instructions at the instruction pointer</span>
 				</div>
 				<div className="debug-pane">
 					<DisasmPane session={session} address={disasmAddress} />

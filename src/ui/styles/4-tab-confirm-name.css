@@ -18,7 +18,7 @@
 }
 
 .tab-choice:hover:not(:disabled) {
-	border-color: #2a313a;
+	border-color: #363c46;
 	color: var(--text);
 }
 
@@ -169,7 +169,7 @@
 	height: 26px;
 	padding: 0 14px;
 	border-top: 1px solid var(--line);
-	background: var(--panel);
+	background: var(--chrome);
 	font-family: var(--mono);
 	font-size: 10.5px;
 	color: var(--muted);
