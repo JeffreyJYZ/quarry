@@ -85,14 +85,18 @@ pub fn run_cmake_build(
     release: bool,
 ) -> Result<BuildReport, String> {
     let started = Instant::now();
+    let started_at = SystemTime::now();
     let mut text = String::new();
-    let mut success = true;
 
-    if !cmake_configured(Path::new(build_root)) {
-        let outcome = run_cmake(&cmake_configure_argv(source_root, build_root), build_root)?;
-        text.push_str(&outcome.text);
-        success = outcome.success;
-    }
+    // Configure on every build: the configure step is cheap and idempotent, and it is the only
+    // place the build type is set. Skipping it for an already-configured directory left a project
+    // built with no debug info forever.
+    let configure = run_cmake(
+        &cmake_configure_argv(source_root, build_root, release),
+        build_root,
+    )?;
+    text.push_str(&configure.text);
+    let mut success = configure.success;
 
     if success {
         let outcome = run_cmake(&cmake_build_argv(build_root, release), build_root)?;
@@ -106,25 +110,30 @@ pub fn run_cmake_build(
         diagnostics: parse_text_diagnostics(&text, Path::new(build_root)),
         duration_ms,
         summary: summarize_text(&text),
-        artifact: None,
+        // The program the build just wrote: a CMake target's name is not the directory's, so
+        // guessing it is how Run and Debug ended up launching a path that does not exist.
+        artifact: if success {
+            newest_executable(Path::new(build_root), started_at)
+        } else {
+            None
+        },
     })
 }
 
-/// True when the build root already holds a generator file, so configuring again is pointless.
-pub fn cmake_configured(build_root: &Path) -> bool {
-    CMAKE_GENERATOR_FILES
-        .iter()
-        .any(|name| build_root.join(name).is_file())
-}
-
-/// `cmake -S <source> -B <build root> -DCMAKE_EXPORT_COMPILE_COMMANDS=ON`.
-pub fn cmake_configure_argv(source_root: &str, build_root: &str) -> Vec<String> {
+/// `cmake -S <source> -B <build> -DCMAKE_BUILD_TYPE=<Debug|Release> …`.
+///
+/// The build type is not optional: a single-config generator (Makefiles, Ninja — the common case on
+/// macOS) ignores `--config` at build time and defaults to an empty build type, which means no `-g`
+/// and therefore no debug info. A binary without debug info cannot resolve a breakpoint, so the
+/// debugger appears to ignore every dot the user sets.
+pub fn cmake_configure_argv(source_root: &str, build_root: &str, release: bool) -> Vec<String> {
     vec![
         CMAKE_PROGRAM.to_string(),
         "-S".to_string(),
         source_root.to_string(),
         "-B".to_string(),
         build_root.to_string(),
+        format!("-DCMAKE_BUILD_TYPE={}", cmake_config(release)),
         "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON".to_string(),
     ]
 }

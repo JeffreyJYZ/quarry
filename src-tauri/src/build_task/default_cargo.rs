@@ -35,9 +35,6 @@ pub const CMAKE_CONFIG_DEBUG: &str = "Debug";
 
 pub const CMAKE_CONFIG_RELEASE: &str = "Release";
 
-/// A generator file in the build root means the project is configured already.
-pub const CMAKE_GENERATOR_FILES: [&str; 2] = ["build.ninja", "Makefile"];
-
 /// Status-bar summary for a CMake build that printed nothing at all.
 pub const DEFAULT_CPP_SUMMARY: &str = "cmake build finished";
 
