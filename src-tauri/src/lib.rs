@@ -86,6 +86,7 @@ pub fn run() {
             dap::dap_scopes,
             dap::dap_variables,
             dap::dap_set_variable,
+            dap::dap_evaluate,
             dap::dap_read_memory,
             dap::dap_write_memory,
             dap::dap_disassemble,

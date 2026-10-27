@@ -131,6 +131,16 @@ pub struct DataBreakpointInfo {
     pub access_types: Vec<String>,
 }
 
+/// One `evaluate` answer: the rendered value, its type when the adapter named one, and the
+/// reference that expands children (`0` for a scalar).
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct DapEvaluation {
+    pub result: String,
+    pub type_name: Option<String>,
+    pub variables_reference: i64,
+}
+
 /// Payload of the `dap://stopped` event.
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]

@@ -97,6 +97,10 @@ Two caveats worth knowing before P3 builds on it. `hitBreakpointIds` is `null` o
 
 ## `evaluate` is broken for Rust
 
+> **Superseded (2026-10-27).** The failures below were measured with requests that omitted `frameId`.
+> With the stopped frame's id attached, `watch` evaluates Rust (and C) correctly. See
+> `docs/spikes/evaluate.md`.
+
 `evaluate` with `{"expression": "*raw@8", "context": "watch"}`:
 
 ```text

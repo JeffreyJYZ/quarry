@@ -1,7 +1,7 @@
 //! Debug sessions over DAP.
 //!
 //! One `lldb-dap` child per session, request/response correlation by `seq`, events forwarded to the
-//! UI, and the measured facts in `docs/spikes/dap.md` taken as given (no `evaluate`, no gating on
+//! UI, and the measured facts in `docs/spikes/dap.md` taken as given (no gating on
 //! `supportsMemoryReferences`, `dataId` without `0x`, `realpath` the project before launch).
 //!
 //! Locking rule: the session map and a single session are never held across a blocking read. The
@@ -12,9 +12,9 @@
 pub(crate) use crate::protocol_pipe::{FrameError, ProcessPipe};
 pub(crate) use crate::resolve;
 pub(crate) use crate::types::{
-    BreakpointSpec, DapBreakpoint, DapFrame, DapScope, DapSession, DapStoppedEvent, DapThread,
-    DapVariable, DataBreakpointInfo, DisassembledInstruction, ExceptionFilter, LaunchConfig,
-    MemoryDump,
+    BreakpointSpec, DapBreakpoint, DapEvaluation, DapFrame, DapScope, DapSession, DapStoppedEvent,
+    DapThread, DapVariable, DataBreakpointInfo, DisassembledInstruction, ExceptionFilter,
+    LaunchConfig, MemoryDump,
 };
 pub use serde_json::{Map, Value, json};
 pub use std::collections::HashMap;
@@ -114,8 +114,14 @@ pub use tests_2::*;
 mod tests_3;
 pub use tests_3::*;
 
+mod tests_4;
+pub use tests_4::*;
+
 mod dap_write_memory;
 pub use dap_write_memory::*;
+
+mod dap_evaluate;
+pub use dap_evaluate::*;
 
 mod exception_filters_from;
 pub use exception_filters_from::*;

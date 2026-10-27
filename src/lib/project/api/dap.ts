@@ -4,6 +4,7 @@ import type {
 	BreakpointSpec,
 	DataBreakpointInfo,
 	DapBreakpoint,
+	DapEvaluation,
 	DapFrame,
 	DapOutputEvent,
 	DapScope,
@@ -71,6 +72,16 @@ export function dapScopes(session: string, frameId: number): Promise<DapScope[]>
 
 export function dapVariables(session: string, variablesReference: number): Promise<DapVariable[]> {
 	return invoke<DapVariable[]>("dap_variables", { session, variablesReference });
+}
+
+/** Evaluate one expression in a stopped frame; `context` defaults to `watch` on the backend. */
+export function dapEvaluate(
+	session: string,
+	expression: string,
+	frameId: number | null,
+	context?: string,
+): Promise<DapEvaluation> {
+	return invoke<DapEvaluation>("dap_evaluate", { session, expression, frameId, context });
 }
 
 export function dapSetVariable(

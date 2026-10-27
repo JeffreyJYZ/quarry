@@ -26,6 +26,12 @@ export type DapBreakpoint = {
 	source: string | null;
 };
 export type MemoryDump = { address: string; bytes: number[] };
+export type DapEvaluation = {
+	result: string;
+	typeName: string | null;
+	/** `0` for a scalar; otherwise the reference that expands the answer's children. */
+	variablesReference: number;
+};
 export type DisassembledInstruction = {
 	address: string;
 	instruction: string;

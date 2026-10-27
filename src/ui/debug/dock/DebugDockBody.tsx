@@ -1,5 +1,6 @@
 import BreakpointsSection from "@/ui/debug/BreakpointsSection";
 import CallStackList from "@/ui/debug/CallStackList";
+import EvaluateField from "@/ui/debug/dock/EvaluateField";
 import VariablesSection from "@/ui/debug/VariablesSection";
 import { PinsSection, WatchPointsSection } from "@/ui/debug/WatchSections";
 import TransportRail from "@/ui/debug/dock/TransportRail";
@@ -76,6 +77,7 @@ export default function DebugDockBody({
 							{view === null ? 0 : view.scopes.length}
 						</span>
 					</header>
+					<EvaluateField debug={debug} view={view} />
 					<div className="dock-debug-scroll">
 						<VariablesSection debug={debug} view={view} />
 					</div>
