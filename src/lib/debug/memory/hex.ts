@@ -1,7 +1,13 @@
 /** Address parsing and formatting shared by the hex and disassembly panes. */
 
-/** Bytes rendered per row in the hex pane. */
+/** Bytes rendered per row when no width has been chosen. */
 export const ROW_BYTES = 16;
+
+/** Row widths the hex pane offers, in bytes. */
+export const ROW_WIDTHS = [8, 16, 32];
+
+/** Hex digits the offset column is padded to. */
+export const OFFSET_DIGITS = 4;
 
 /** Largest count one `readMemory` call may ask for. */
 export const CHUNK_BYTES = 256;
@@ -33,6 +39,11 @@ export function formatRowAddress(address: bigint, digits: number): string {
 	return `0x${address.toString(16).padStart(digits, "0")}`;
 }
 
+/** Offset of a row from the start of the page, zero-padded so the column lines up. */
+export function formatOffset(offset: number, digits: number = OFFSET_DIGITS): string {
+	return offset.toString(16).padStart(digits, "0");
+}
+
 /** Two lowercase hex digits, or `--` for a byte that could not be read. */
 export function hexByte(value: number | null): string {
 	return value === null ? "--" : value.toString(16).padStart(2, "0");
@@ -49,6 +60,27 @@ export function asciiByte(value: number | null): string {
 		return ".";
 	}
 	return String.fromCharCode(value);
+}
+
+/**
+ * Hex bytes for one row, padded to `rowBytes` slots so the ASCII column starts at the same place
+ * on a short last row as on a full one.
+ */
+export function hexColumn(bytes: Array<number | null>, rowBytes: number): string {
+	const slots: string[] = [];
+	for (let index = 0; index < rowBytes; index += 1) {
+		slots.push(hexByte(bytes[index] ?? null));
+	}
+	return slots.join(" ");
+}
+
+/** One character per slot: printable ASCII, or `.` for a non-printable or unread byte. */
+export function asciiColumn(bytes: Array<number | null>, rowBytes: number): string {
+	let text = "";
+	for (let index = 0; index < rowBytes; index += 1) {
+		text += asciiByte(bytes[index] ?? null);
+	}
+	return text;
 }
 
 /**
@@ -76,23 +108,31 @@ export function mergeChunk(
 
 export type MemoryRow = {
 	address: bigint;
+	/** Byte offset of this row from the start of the page, for the offset column. */
+	offset: number;
 	/** Hex digits every row address is padded to, so the address column stays aligned. */
 	digits: number;
 	bytes: Array<number | null>;
 };
 
-/** Split one page of bytes into 16-byte rows. */
-export function buildRows(base: bigint, bytes: Array<number | null>): MemoryRow[] {
+/** Split one page of bytes into rows of `rowBytes`, 16 by default. */
+export function buildRows(
+	base: bigint,
+	bytes: Array<number | null>,
+	rowBytes: number = ROW_BYTES,
+): MemoryRow[] {
 	if (bytes.length === 0) {
 		return [];
 	}
+	const width = Math.max(1, Math.trunc(rowBytes));
 	const digits = Math.max(8, (base + BigInt(bytes.length - 1)).toString(16).length);
 	const rows: MemoryRow[] = [];
-	for (let offset = 0; offset < bytes.length; offset += ROW_BYTES) {
+	for (let offset = 0; offset < bytes.length; offset += width) {
 		rows.push({
 			address: base + BigInt(offset),
+			offset,
 			digits,
-			bytes: bytes.slice(offset, offset + ROW_BYTES),
+			bytes: bytes.slice(offset, offset + width),
 		});
 	}
 	return rows;
@@ -126,9 +166,13 @@ export function interpretAt(bytes: Array<number | null>, offset: number): Interp
 	});
 }
 
-/** Render loaded bytes as hex text: 16 bytes per line, address-prefixed, matching the pane. */
-export function formatHexText(base: bigint, bytes: Array<number | null>): string {
-	const rows = buildRows(base, bytes);
+/** Render loaded bytes as hex text: `rowBytes` per line, address-prefixed, matching the pane. */
+export function formatHexText(
+	base: bigint,
+	bytes: Array<number | null>,
+	rowBytes: number = ROW_BYTES,
+): string {
+	const rows = buildRows(base, bytes, rowBytes);
 	return rows
 		.map(
 			(row) =>

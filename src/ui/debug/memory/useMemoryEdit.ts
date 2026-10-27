@@ -119,14 +119,15 @@ export function useMemoryEdit({
 			setEditValue("");
 		},
 		commitEdit,
-		select,
+		onSelect: select,
 		rangeStart: range.rangeStart,
 		rangeFinish: range.rangeFinish,
 		rangeLabel: range.rangeLabel,
 		rangeSize: range.rangeSize,
 		rangeInput: range.rangeInput,
 		setRangeInput: range.setRangeInput,
-		handleEditChange,
-		handleEditKeyDown,
+		onEditChange: handleEditChange,
+		onEditKeyDown: handleEditKeyDown,
+		onBeginEdit: beginEdit,
 	};
 }

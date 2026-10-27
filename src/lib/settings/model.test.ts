@@ -44,11 +44,11 @@ describe("normalizePreferences", () => {
 
 	test("clamps panel sizes through the layout model", () => {
 		const preferences = normalizePreferences({
-			panelSizes: { railWidth: 5, debugWidth: 4000 },
+			panelSizes: { railWidth: 5, dockHeight: 5000 },
 		});
 		expect(preferences.panelSizes.railWidth).toBe(PANEL_LIMITS.railWidth.min);
-		expect(preferences.panelSizes.debugWidth).toBe(PANEL_LIMITS.debugWidth.max);
-		expect(preferences.panelSizes.dockHeight).toBe(DEFAULT_PANEL_SIZES.dockHeight);
+		expect(preferences.panelSizes.dockHeight).toBe(PANEL_LIMITS.dockHeight.max);
+		expect(preferences.panelSizes.terminalHeight).toBe(DEFAULT_PANEL_SIZES.terminalHeight);
 	});
 });
 

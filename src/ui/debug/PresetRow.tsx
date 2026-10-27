@@ -4,7 +4,7 @@ import type { DraftPreset } from "@/lib/debug/presets";
 const RUST_PRETTY_HINT =
 	"Rust pretty printing needs: command script import <sysroot>/lib/rustlib/etc/lldb_lookup.py";
 
-/** One editable launch preset: the identity fields, the build command and the init commands. */
+/** One editable launch configuration: the identity fields, the build command and the init commands. */
 export default function PresetRow({
 	draft,
 	onChange,

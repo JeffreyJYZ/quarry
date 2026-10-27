@@ -39,19 +39,19 @@ export function ShellSections(props: {
 				<h3 className="settings-heading">Panels</h3>
 				<div className="settings-row">
 					<span className="settings-mono">
-						{user.panelSizes.railWidth} · {user.panelSizes.debugWidth} ·{" "}
-						{user.panelSizes.dockHeight} · {user.panelSizes.terminalHeight}
+						{user.panelSizes.railWidth} · {user.panelSizes.dockHeight} ·{" "}
+						{user.panelSizes.terminalHeight} · {user.panelSizes.terminalWidth}
 					</span>
 					<button type="button" className="button" onClick={onResetPanels}>
 						Reset panel sizes
 					</button>
 				</div>
 				<p className="settings-hint">
-					Explorer width · debug width · dock height · terminal height. Defaults are{" "}
+					Explorer width · dock height · terminal height · terminal width. Defaults are{" "}
 					{DEFAULT_PREFERENCES.panelSizes.railWidth} ·{" "}
-					{DEFAULT_PREFERENCES.panelSizes.debugWidth} ·{" "}
 					{DEFAULT_PREFERENCES.panelSizes.dockHeight} ·{" "}
-					{DEFAULT_PREFERENCES.panelSizes.terminalHeight}.
+					{DEFAULT_PREFERENCES.panelSizes.terminalHeight} ·{" "}
+					{DEFAULT_PREFERENCES.panelSizes.terminalWidth}.
 				</p>
 			</section>
 		</>

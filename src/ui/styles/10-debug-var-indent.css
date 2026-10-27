@@ -169,19 +169,6 @@
 	padding-bottom: 4px;
 }
 
-/* below this width the panel would push the editor under 480px, so it floats instead */
-@media (max-width: 1040px) {
-	.debug {
-		position: absolute;
-		top: 0;
-		right: 0;
-		bottom: 0;
-		width: min(var(--debug-width, 320px), 60vw);
-		z-index: 30;
-		box-shadow: -10px 0 24px rgba(0, 0, 0, 0.45);
-	}
-}
-
 /* Layout guards: header, dock and status bar never shrink; only the editor absorbs height. */
 .titlebar {
 	flex: 0 0 auto;

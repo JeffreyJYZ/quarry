@@ -7,9 +7,8 @@ export type Settings = {
 	openFiles: string[];
 	activeFile: string | null;
 	railCollapsed?: boolean;
-	debugOpen?: boolean;
 	gitOpen?: boolean;
-	dockTab?: "tests" | "problems" | "refs" | "run";
+	dockTab?: "problems" | "tests" | "debugger" | "console" | "memory";
 	dockExpanded?: boolean | null;
 	recentRoots?: string[];
 	recentFiles?: string[];

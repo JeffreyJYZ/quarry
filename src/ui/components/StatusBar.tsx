@@ -27,14 +27,14 @@ export type StatusBarProps = {
 	terminalOpen: boolean;
 	panelExpanded: boolean;
 	gitOpen: boolean;
-	debugOpen: boolean;
+	debuggerActive: boolean;
 	building: boolean;
 	running: boolean;
 	onToggleRail: () => void;
 	onToggleTerminal: () => void;
 	onTogglePanel: () => void;
 	onToggleGit: () => void;
-	onToggleDebug: () => void;
+	onShowDebugger: () => void;
 	onBuild: () => void;
 	onRun: () => void;
 	onStop: () => void;
@@ -64,14 +64,14 @@ export default function StatusBar({
 	terminalOpen,
 	panelExpanded,
 	gitOpen,
-	debugOpen,
+	debuggerActive,
 	building,
 	running,
 	onToggleRail,
 	onToggleTerminal,
 	onTogglePanel,
 	onToggleGit,
-	onToggleDebug,
+	onShowDebugger,
 	onBuild,
 	onRun,
 	onStop,
@@ -102,7 +102,7 @@ export default function StatusBar({
 					terminalOpen={terminalOpen}
 					panelExpanded={panelExpanded}
 					gitOpen={gitOpen}
-					debugOpen={debugOpen}
+					debuggerActive={debuggerActive}
 					building={building}
 					running={running}
 					hasProject={project !== null}
@@ -110,7 +110,7 @@ export default function StatusBar({
 					onToggleTerminal={onToggleTerminal}
 					onTogglePanel={onTogglePanel}
 					onToggleGit={onToggleGit}
-					onToggleDebug={onToggleDebug}
+					onShowDebugger={onShowDebugger}
 					onBuild={onBuild}
 					onRun={onRun}
 					onStop={onStop}

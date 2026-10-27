@@ -129,7 +129,7 @@ export type StatusToolsProps = {
 	terminalOpen: boolean;
 	panelExpanded: boolean;
 	gitOpen: boolean;
-	debugOpen: boolean;
+	debuggerActive: boolean;
 	building: boolean;
 	running: boolean;
 	hasProject: boolean;
@@ -137,7 +137,7 @@ export type StatusToolsProps = {
 	onToggleTerminal: () => void;
 	onTogglePanel: () => void;
 	onToggleGit: () => void;
-	onToggleDebug: () => void;
+	onShowDebugger: () => void;
 	onBuild: () => void;
 	onRun: () => void;
 	onStop: () => void;
@@ -172,7 +172,11 @@ export function StatusTools(props: StatusToolsProps) {
 			<IconButton label="Toggle git" active={props.gitOpen} onClick={props.onToggleGit}>
 				<GitBranchIcon />
 			</IconButton>
-			<IconButton label="Toggle debug" active={props.debugOpen} onClick={props.onToggleDebug}>
+			<IconButton
+				label="Show debugger"
+				active={props.debuggerActive}
+				onClick={props.onShowDebugger}
+			>
 				<DebugIcon />
 			</IconButton>
 			<span className="status-tools-sep" aria-hidden="true" />

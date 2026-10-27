@@ -1,10 +1,12 @@
-import { PAGE_SIZES } from "@/ui/debug/memory/parts";
+import AddressFields from "@/ui/debug/memory/AddressFields";
 
-/** The address/page-size bar and the navigation/edit toggles above the hex table. */
+/** The bar above the hex table: address/row width/Read, then copy, history and edit toggles. */
 export default function MemoryToolbar({
 	input,
 	onInputChange,
 	onCommit,
+	rowWidth,
+	onRowWidthChange,
 	pageSize,
 	onSizeChange,
 	onCopy,
@@ -24,6 +26,8 @@ export default function MemoryToolbar({
 	input: string;
 	onInputChange: (value: string) => void;
 	onCommit: () => void;
+	rowWidth: number;
+	onRowWidthChange: (value: number) => void;
 	pageSize: number;
 	onSizeChange: (size: number) => void;
 	onCopy: () => void;
@@ -42,44 +46,16 @@ export default function MemoryToolbar({
 }) {
 	return (
 		<div className="memory-head">
-			<label className="memory-field">
-				<span className="memory-label">Address</span>
-				<input
-					className="memory-input"
-					value={input}
-					spellCheck={false}
-					autoComplete="off"
-					placeholder="0x…"
-					aria-label="Start address"
-					onChange={(event) => {
-						onInputChange(event.target.value);
-					}}
-					onKeyDown={(event) => {
-						if (event.key === "Enter") {
-							event.preventDefault();
-							onCommit();
-						}
-					}}
-				/>
-			</label>
-			<label className="memory-field memory-field-narrow">
-				<span className="memory-label">Bytes</span>
-				<select
-					className="memory-select"
-					value={String(pageSize)}
-					aria-label="Page size"
-					onChange={(event) => onSizeChange(Number(event.target.value))}
-				>
-					{PAGE_SIZES.map((size) => (
-						<option key={size} value={String(size)}>
-							{size}
-						</option>
-					))}
-				</select>
-			</label>
-			<button type="button" className="button" onClick={onCommit}>
-				Refresh
-			</button>
+			<AddressFields
+				input={input}
+				onInputChange={onInputChange}
+				onRead={onCommit}
+				rowWidth={rowWidth}
+				onRowWidthChange={onRowWidthChange}
+				pageSize={pageSize}
+				onPageSizeChange={onSizeChange}
+				busy={busy}
+			/>
 			<button type="button" className="button" onClick={onCopy}>
 				Copy
 			</button>
@@ -112,7 +88,6 @@ export default function MemoryToolbar({
 					{rangeInput !== "" ? ` ${rangeInput}` : ""}
 				</span>
 			)}
-			{busy && <span className="memory-muted memory-head-note">reading</span>}
 		</div>
 	);
 }

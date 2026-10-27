@@ -5,7 +5,9 @@ import {
 	type Interpreted,
 	interpretAt,
 	parseAddress,
+	ROW_BYTES,
 } from "@/lib/debug/memory/hex";
+import type { MemoryCellApi } from "@/ui/debug/memory/MemoryCell";
 import MemoryHexView from "@/ui/debug/memory/MemoryHexView";
 import MemoryToolbar from "@/ui/debug/memory/MemoryToolbar";
 import MemoryValueView from "@/ui/debug/memory/MemoryValueView";
@@ -17,7 +19,7 @@ import { useMemoryRead } from "@/ui/debug/memory/useMemoryRead";
 import "@/ui/debug/memory/memory.css";
 
 export type MemoryPaneProps = {
-	session: string;
+	session: string | null;
 	/** Frame or variable address, with or without `0x`; `null` means nothing is selected. */
 	address: string | null;
 };
@@ -25,18 +27,22 @@ export type MemoryPaneProps = {
 /**
  * Hex viewer over `readMemory`. Pages are read in 256-byte chunks because the adapter may refuse a
  * read that crosses an unmapped boundary, so a failed chunk becomes an `unmapped` band instead of
- * losing the whole page.
+ * losing the whole page. Without a session the bar stays editable and the table is replaced by a
+ * "no session" line, so nothing from an ended session lingers on screen.
  */
 export default function MemoryPane({ session, address }: MemoryPaneProps) {
 	const [request, setRequest] = useState<Request | null>(() => requestFor(address));
 	const [input, setInput] = useState(() => formatAddress(parseAddress(address)));
 	const [followed, setFollowed] = useState(true);
+	const [rowWidth, setRowWidth] = useState(ROW_BYTES);
 	const [loaded, setLoaded] = useState<Loaded | null>(null);
 	const [selected, setSelected] = useState<bigint | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	/** Bumped per read so an older reply can never overwrite a newer one. */
 	const pageSize = request?.size ?? DEFAULT_PAGE;
+	/** The hooks take a session id, so a pane with no session hands them an inert empty one. */
+	const liveSession = session ?? "";
 
 	const navigate = useCallback((next: bigint) => {
 		setInput(formatAddress(next));
@@ -79,7 +85,14 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 		});
 	}, [address, followed, recordVisit]);
 
-	useMemoryRead({ session, request, setLoaded, setError, setSelected, setBusy });
+	useMemoryRead({
+		session: liveSession,
+		request: session === null ? null : request,
+		setLoaded,
+		setError,
+		setSelected,
+		setBusy,
+	});
 
 	const commit = () => {
 		const next = parseAddress(input);
@@ -102,8 +115,8 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 	};
 
 	const rows = useMemo(
-		() => (loaded === null ? [] : buildRows(loaded.base, loaded.bytes)),
-		[loaded],
+		() => (loaded === null ? [] : buildRows(loaded.base, loaded.bytes, rowWidth)),
+		[loaded, rowWidth],
 	);
 
 	const interpreted = useMemo<Interpreted[] | null>(() => {
@@ -116,21 +129,10 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 
 	const selectedLabel = selected === null ? "" : formatAddress(selected);
 
-	const edit = useMemoryEdit({ session, loaded, setError, setSelected, refresh });
+	const edit = useMemoryEdit({ session: liveSession, loaded, setError, setSelected, refresh });
 	const clipboard = useMemoryClipboard({ loaded, setError });
 
-	const api = {
-		editing: edit.editing,
-		editValue: edit.editValue,
-		selected,
-		rangeStart: edit.rangeStart,
-		rangeFinish: edit.rangeFinish,
-		onEditChange: edit.handleEditChange,
-		onEditKeyDown: edit.handleEditKeyDown,
-		onSelect: edit.select,
-		onBeginEdit: edit.beginEdit,
-		commitEdit: edit.commitEdit,
-	};
+	const api: MemoryCellApi = { ...edit, selected };
 
 	return (
 		<div className="memory-pane">
@@ -141,6 +143,8 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 					setFollowed(false);
 				}}
 				onCommit={commit}
+				rowWidth={rowWidth}
+				onRowWidthChange={setRowWidth}
 				pageSize={pageSize}
 				onSizeChange={changeSize}
 				onCopy={() => void clipboard.copyHex()}
@@ -157,18 +161,25 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 				rangeInput={edit.rangeInput}
 				busy={busy}
 			/>
-			{error !== null && <p className="memory-error">{error}</p>}
+			{error !== null && (
+				<p className="memory-error" role="alert">
+					{error}
+				</p>
+			)}
 			{clipboard.copied !== null && (
 				<p className="memory-muted">{`Copied ${clipboard.copied}`}</p>
 			)}
-			{request === null ? (
-				<p className="memory-empty">No memory address selected</p>
+			{session === null ? (
+				<p className="memory-empty">No session: launch or attach to read memory</p>
+			) : request === null ? (
+				<p className="memory-empty">Enter an address to read memory</p>
 			) : loaded === null ? (
 				<p className="memory-empty">{busy ? "Reading memory…" : "No bytes loaded"}</p>
 			) : (
 				<MemoryHexView
 					rows={rows}
 					api={api}
+					rowWidth={rowWidth}
 					onCopyAddress={(target) => void clipboard.copyAddress(target)}
 				/>
 			)}

@@ -82,11 +82,11 @@ export default function PresetsEditor({
 			}}
 		>
 			<div className="debug-section-head">
-				<span className="label">presets editor</span>
+				<span className="label">configurations</span>
 			</div>
 			{drafts.map((draft, index) => (
 				<PresetRow
-					// biome-ignore lint/suspicious/noArrayIndexKey: a preset row is identified by its position while it is being edited
+					// biome-ignore lint/suspicious/noArrayIndexKey: a configuration row is identified by its position while it is being edited
 					key={`${draft.name}-${index}`}
 					draft={draft}
 					onChange={(changes) => patch(index, changes)}
@@ -115,7 +115,7 @@ export default function PresetsEditor({
 						])
 					}
 				>
-					Add preset
+					Add configuration
 				</button>
 				<button type="button" className="button" onClick={() => void saveEditor()}>
 					Save
@@ -127,7 +127,7 @@ export default function PresetsEditor({
 			{saveError === null ? null : <p className="debug-error">{saveError}</p>}
 			{discardConfirm ? (
 				<div className="debug-row">
-					<span>Discard unsaved preset edits?</span>
+					<span>Discard unsaved configuration edits?</span>
 					<button type="button" className="button" onClick={onClose}>
 						Discard
 					</button>

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { formatAddress, parseAddress } from "@/lib/debug/memory/hex";
 import { type DisassembledInstruction, dapDisassemble } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
-import { formatAddress, parseAddress } from "@/lib/debug/memory/hex";
+import DisasmBar from "@/ui/debug/memory/DisasmBar";
+import DisasmList from "@/ui/debug/memory/DisasmList";
 import "@/ui/debug/memory/memory.css";
 
-const COUNTS = [16, 64, 128];
 const DEFAULT_COUNT = 64;
 
 type Request = {
@@ -20,18 +21,20 @@ function requestFor(address: string | null): Request | null {
 }
 
 export type DisasmPaneProps = {
-	session: string;
+	session: string | null;
 	/** Instruction pointer, with or without `0x`; `null` means no frame is selected. */
 	address: string | null;
 };
 
 /**
- * Disassembly around the selected instruction pointer. `supportsMemoryReferences` is false on
- * lldb-dap while frames still carry `instructionPointerReference`; the caller passes that address
- * straight through, so nothing here inspects capabilities.
+ * Disassembly around the instruction pointer, with its own address field so an arbitrary address
+ * can be inspected without moving the debuggee. `supportsMemoryReferences` is false on lldb-dap
+ * while frames still carry `instructionPointerReference`; the caller passes that address straight
+ * through, so nothing here inspects capabilities.
  */
 export default function DisasmPane({ session, address }: DisasmPaneProps) {
 	const [request, setRequest] = useState<Request | null>(() => requestFor(address));
+	const [input, setInput] = useState(() => formatAddress(parseAddress(address)));
 	const [rows, setRows] = useState<DisassembledInstruction[] | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
@@ -41,9 +44,11 @@ export default function DisasmPane({ session, address }: DisasmPaneProps) {
 
 	const count = request?.count ?? DEFAULT_COUNT;
 
+	// Re-seed the field from the instruction pointer on every stop.
 	useEffect(() => {
 		const next = parseAddress(address);
 		setCopied(false);
+		setInput(formatAddress(next));
 		setRequest((previous) => {
 			if (next === null) {
 				return null;
@@ -56,7 +61,7 @@ export default function DisasmPane({ session, address }: DisasmPaneProps) {
 	}, [address]);
 
 	useEffect(() => {
-		if (request === null) {
+		if (request === null || session === null) {
 			sequence.current += 1;
 			setRows(null);
 			setError(null);
@@ -94,6 +99,18 @@ export default function DisasmPane({ session, address }: DisasmPaneProps) {
 		};
 	}, [session, request]);
 
+	const go = () => {
+		const next = parseAddress(input);
+		if (next === null) {
+			setError(
+				input.trim() === "" ? "Enter a hexadecimal address" : "Not a hexadecimal address",
+			);
+			return;
+		}
+		setError(null);
+		setRequest({ address: next, count, serial: (request?.serial ?? 0) + 1 });
+	};
+
 	const changeCount = (value: number) => {
 		setRequest((previous) =>
 			previous === null ? null : { ...previous, count: value, serial: previous.serial + 1 },
@@ -127,70 +144,35 @@ export default function DisasmPane({ session, address }: DisasmPaneProps) {
 		}
 	};
 
-	const active = parseAddress(address);
-	const empty = active === null;
-
 	return (
 		<div className="memory-pane">
-			<div className="memory-head">
-				<label className="memory-field memory-field-narrow">
-					<span className="memory-label">Count</span>
-					<select
-						className="memory-select"
-						value={String(count)}
-						aria-label="Instruction count"
-						onChange={(event) => changeCount(Number(event.target.value))}
-					>
-						{COUNTS.map((value) => (
-							<option key={value} value={String(value)}>
-								{value}
-							</option>
-						))}
-					</select>
-				</label>
-				<button type="button" className="button" disabled={empty} onClick={refresh}>
-					Refresh
-				</button>
-				<button
-					type="button"
-					className={copied ? "button active" : "button"}
-					disabled={rows === null || rows.length === 0}
-					onClick={() => {
-						void copy();
-					}}
-				>
-					{copied ? "Copied" : "Copy"}
-				</button>
-				{active !== null && (
-					<span className="memory-muted memory-head-note">{formatAddress(active)}</span>
-				)}
-				{busy && <span className="memory-muted memory-head-note">loading</span>}
-			</div>
-			{error !== null && <p className="memory-error">{error}</p>}
-			{empty ? (
-				<p className="memory-empty">No frame selected</p>
+			<DisasmBar
+				input={input}
+				onInputChange={setInput}
+				onGo={go}
+				count={count}
+				onCountChange={changeCount}
+				onRefresh={refresh}
+				onCopy={() => void copy()}
+				copied={copied}
+				canCopy={rows !== null && rows.length > 0}
+				busy={busy}
+			/>
+			{error !== null && (
+				<p className="memory-error" role="alert">
+					{error}
+				</p>
+			)}
+			{session === null ? (
+				<p className="memory-empty">No session: launch or attach to disassemble</p>
+			) : request === null ? (
+				<p className="memory-empty">No address: stop somewhere or type one above</p>
 			) : rows === null ? (
 				<p className="memory-empty">{busy ? "Disassembling…" : "No instructions loaded"}</p>
 			) : rows.length === 0 ? (
 				<p className="memory-empty">The adapter returned no instructions</p>
 			) : (
-				<ol className="disasm-list">
-					{rows.map((row) => {
-						const current = parseAddress(row.address) === active;
-						return (
-							<li
-								className={current ? "disasm-row active" : "disasm-row"}
-								key={row.address}
-							>
-								<span className="disasm-addr">{row.address}</span>
-								<span className="disasm-code">{row.instruction}</span>
-								{row.symbol !== null && (
-									<span className="disasm-symbol">{row.symbol}</span>
-								)}
-							</li>
-						);
-					})}
-				</ol>
+				<DisasmList rows={rows} active={request.address} />
 			)}
 		</div>
 	);

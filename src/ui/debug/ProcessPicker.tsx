@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { filterProcesses } from "@/lib/debug/processes";
 import type { DebugController } from "@/lib/debug/session";
 import { listProcesses, type ProcessInfo } from "@/lib/project/api";
+import ProcessOptions from "@/ui/debug/ProcessOptions";
+import "@/ui/debug/process-picker.css";
 
 /** How long a fetched process list stays valid before the next focus re-fetches. */
 const CACHE_MS = 10_000;
@@ -17,25 +20,27 @@ async function loadProcesses(): Promise<ProcessInfo[]> {
 	return data;
 }
 
+/**
+ * Attach-by-pid box that doubles as a filter over every process on the machine: typing narrows the
+ * list by name or pid, at most 50 rows at a time, and a bare number still feeds the Attach button
+ * beside it. The list re-fetches whenever the box is focused after the 10-second cache lapses.
+ */
 export default function ProcessPicker({ debug }: { debug: DebugController }) {
 	const [open, setOpen] = useState(false);
+	const [query, setQuery] = useState(() => debug.pidInput);
 	const [processes, setProcesses] = useState<ProcessInfo[] | null>(null);
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [highlight, setHighlight] = useState(0);
 	const containerRef = useRef<HTMLDivElement>(null);
+	const listId = useId();
 
-	const query = debug.pidInput.trim().toLowerCase();
-	const filtered =
-		processes === null
-			? []
-			: query === ""
-				? processes
-				: processes.filter(
-						(process) =>
-							String(process.pid).toLowerCase().includes(query) ||
-							process.name.toLowerCase().includes(query),
-					);
+	const visible = useMemo(
+		() => (processes === null ? [] : filterProcesses(processes, query)),
+		[processes, query],
+	);
+	const active = visible[highlight];
+	const optionId = (pid: number) => `${listId}-${pid}`;
 
 	const fetchList = useCallback(async () => {
 		setLoading(true);
@@ -53,72 +58,72 @@ export default function ProcessPicker({ debug }: { debug: DebugController }) {
 
 	const onFocus = useCallback(() => {
 		setOpen(true);
-		const now = Date.now();
-		const expired = cached === null || cached.expires <= now;
-		if (expired || processes === null) {
-			if (expired) setProcesses(null);
+		if (cached === null || cached.expires <= Date.now() || processes === null) {
+			setProcesses(null);
 			void fetchList();
 		}
 	}, [fetchList, processes]);
 
-	const attachHighlighted = useCallback(() => {
-		const target = filtered[highlight];
-		if (target !== undefined) {
-			debug.setPidInput(String(target.pid));
-		}
-		setTimeout(() => {
-			debug.attach();
-		}, 0);
-	}, [debug, filtered, highlight]);
-
-	const chooseProcess = useCallback(
+	const choose = useCallback(
 		(pid: number) => {
 			debug.setPidInput(String(pid));
-			setTimeout(() => {
-				debug.attach();
-			}, 0);
+			setQuery(String(pid));
 			setOpen(false);
+			// The controller reads its own pid state, which lands after this render.
+			setTimeout(() => debug.attach(), 0);
 		},
 		[debug],
 	);
 
-	const onKeyDown = useCallback(
-		(event: React.KeyboardEvent<HTMLInputElement>) => {
-			if (event.key === "ArrowDown") {
-				event.preventDefault();
-				setHighlight((current) =>
-					filtered.length === 0 ? 0 : (current + 1) % filtered.length,
-				);
-				return;
-			}
-			if (event.key === "ArrowUp") {
-				event.preventDefault();
-				setHighlight((current) =>
-					filtered.length === 0 ? 0 : (current - 1 + filtered.length) % filtered.length,
-				);
-				return;
-			}
-			if (event.key === "Enter") {
-				event.preventDefault();
-				attachHighlighted();
-				setOpen(false);
-				return;
-			}
-			if (event.key === "Escape") {
-				event.preventDefault();
-				setOpen(false);
-				return;
-			}
-		},
-		[attachHighlighted, filtered.length],
-	);
-
-	// Keep highlight in range as the filter narrows.
-	useEffect(() => {
-		if (highlight >= filtered.length && filtered.length > 0) {
-			setHighlight(filtered.length - 1);
+	const onChange = (value: string) => {
+		setQuery(value);
+		setHighlight(0);
+		const trimmed = value.trim();
+		// A bare number is still a pid, so the Attach button beside the box keeps working.
+		if (/^[0-9]*$/.test(trimmed)) {
+			debug.setPidInput(trimmed);
 		}
-	}, [filtered.length, highlight]);
+	};
+
+	const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+		const count = visible.length;
+		if (event.key === "ArrowDown") {
+			event.preventDefault();
+			setOpen(true);
+			setHighlight((current) => (count === 0 ? 0 : (current + 1) % count));
+			return;
+		}
+		if (event.key === "ArrowUp") {
+			event.preventDefault();
+			setOpen(true);
+			setHighlight((current) => (count === 0 ? 0 : (current - 1 + count) % count));
+			return;
+		}
+		if (event.key === "Enter") {
+			event.preventDefault();
+			if (active !== undefined) {
+				choose(active.pid);
+				return;
+			}
+			const typed = query.trim();
+			if (/^[0-9]+$/.test(typed)) {
+				debug.setPidInput(typed);
+				setTimeout(() => debug.attach(), 0);
+			}
+			return;
+		}
+		if (event.key === "Escape") {
+			event.preventDefault();
+			setOpen(false);
+		}
+	};
+
+	// Keep the highlight inside the list as the filter narrows.
+	useEffect(() => {
+		if (highlight >= visible.length) {
+			setHighlight(0);
+		}
+	}, [visible.length, highlight]);
 
 	// Close on outside click.
 	useEffect(() => {
@@ -135,62 +140,56 @@ export default function ProcessPicker({ debug }: { debug: DebugController }) {
 		return () => document.removeEventListener("mousedown", handler);
 	}, [open]);
 
+	const note = loading
+		? "Loading processes…"
+		: loadError !== null
+			? `Cannot list processes: ${loadError}`
+			: visible.length === 0
+				? query.trim() === ""
+					? "No processes found"
+					: "No matching processes"
+				: null;
+
 	return (
 		<div className="debug-pid-picker" ref={containerRef}>
 			<input
 				className="debug-pid"
 				type="text"
-				inputMode="numeric"
-				placeholder="pid"
-				value={debug.pidInput}
+				role="combobox"
+				aria-label="Filter processes by name or pid"
+				aria-expanded={open}
+				aria-controls={listId}
+				aria-autocomplete="list"
+				aria-activedescendant={
+					open && active !== undefined ? optionId(active.pid) : undefined
+				}
+				autoComplete="off"
+				spellCheck={false}
+				placeholder="filter or pid"
+				value={query}
 				disabled={debug.sessionId !== null}
-				onChange={(event) => debug.setPidInput(event.target.value)}
+				onChange={(event) => onChange(event.target.value)}
 				onFocus={onFocus}
 				onBlur={() => {
-					// Defer so a click on a list item registers first.
+					// Defer so a click on a row registers first.
 					setTimeout(() => setOpen(false), 120);
 				}}
 				onKeyDown={onKeyDown}
 			/>
-			{open ? (
-				<div className="debug-pid-list">
-					{loading ? <p className="debug-note">Loading…</p> : null}
-					{loadError !== null ? (
-						<p className="debug-error" role="status">
-							Cannot list processes: {loadError}
-						</p>
-					) : null}
-					{!loading && loadError === null && filtered.length === 0 ? (
-						<p className="debug-note">No matching processes</p>
-					) : null}
-					{!loading && loadError === null
-						? filtered.slice(0, 50).map((process, index) => (
-								<button
-									key={process.pid}
-									type="button"
-									className={
-										index === highlight
-											? "debug-pid-option active"
-											: "debug-pid-option"
-									}
-									onMouseDown={(event) => {
-										event.preventDefault();
-									}}
-									onClick={() => chooseProcess(process.pid)}
-									onKeyDown={(event) => {
-										if (event.key === "Enter" || event.key === " ") {
-											event.preventDefault();
-											chooseProcess(process.pid);
-										}
-									}}
-									onMouseEnter={() => setHighlight(index)}
-								>
-									<span className="debug-pid-num">{process.pid}</span>
-									<span className="debug-pid-name">{process.name}</span>
-								</button>
-							))
-						: null}
-				</div>
+			{open && note !== null ? (
+				<p className="debug-pid-note" role="status">
+					{note}
+				</p>
+			) : null}
+			{open && visible.length > 0 ? (
+				<ProcessOptions
+					listId={listId}
+					visible={visible}
+					highlight={highlight}
+					optionId={optionId}
+					onHighlight={setHighlight}
+					onChoose={choose}
+				/>
 			) : null}
 		</div>
 	);
