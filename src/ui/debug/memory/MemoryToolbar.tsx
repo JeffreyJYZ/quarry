@@ -46,7 +46,6 @@ export default function MemoryToolbar({
 }) {
 	return (
 		<div className="memory-head">
-			<span className="memory-title">memory</span>
 			<AddressFields
 				input={input}
 				onInputChange={onInputChange}
