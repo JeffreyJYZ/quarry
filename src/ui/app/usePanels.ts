@@ -15,6 +15,8 @@ export function usePanels() {
 	const [panelOpen, setPanelOpen] = useState<boolean | null>(null);
 	const [dockTab, setDockTab] = useState<DockTab>("problems");
 	const [terminalOpen, setTerminalOpen] = useState(false);
+	/** The assembly split beside the editor; its address follows the selected frame. */
+	const [disasmOpen, setDisasmOpen] = useState(false);
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	/** Which settings tab a shortcut asked for. */
 	const [settingsTab, setSettingsTab] = useState<"user" | "project">("user");
@@ -50,6 +52,8 @@ export function usePanels() {
 		setDockTab,
 		terminalOpen,
 		setTerminalOpen,
+		disasmOpen,
+		setDisasmOpen,
 		settingsOpen,
 		setSettingsOpen,
 		settingsTab,

@@ -1,0 +1,62 @@
+/* The assembly split beside the editor, the way CLion shows "<file> (Assembly)". */
+
+.editor-split {
+	display: flex;
+	flex: 0 0 46%;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	border-left: 1px solid var(--line);
+	background: var(--panel);
+}
+
+.editor-split-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	flex: 0 0 auto;
+	height: 26px;
+	padding: 0 6px 0 10px;
+	border-bottom: 1px solid var(--line);
+	background: var(--chrome);
+}
+
+.editor-split-title {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: var(--mono);
+	font-size: 11px;
+	color: var(--muted);
+}
+
+.editor-split-close {
+	flex: 0 0 auto;
+	padding: 1px 5px;
+	border: 0;
+	border-radius: 3px;
+	background: none;
+	color: var(--muted);
+	font-size: 14px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.editor-split-close:hover {
+	background: var(--hover);
+	color: var(--text);
+}
+
+.editor-split-body {
+	display: flex;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden;
+}
+
+/* The split owns its width and the editor takes the rest. */
+.editor-pane > .editor-split {
+	flex: 0 0 46%;
+}

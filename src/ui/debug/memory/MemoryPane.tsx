@@ -180,6 +180,7 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 					rows={rows}
 					api={api}
 					rowWidth={rowWidth}
+					pageStart={loaded.base}
 					onCopyAddress={(target) => void clipboard.copyAddress(target)}
 				/>
 			)}

@@ -6,10 +6,13 @@ import Breadcrumb from "@/ui/breadcrumb/Breadcrumb";
 import LazyEditor from "@/ui/editor/LazyEditor";
 import TabStrip from "@/ui/components/TabStrip";
 import Welcome from "@/ui/components/Welcome";
+import DisasmPane from "@/ui/debug/memory/DisasmPane";
 import type { Location, ProjectInfo } from "@/lib/project/api";
 import type { RefObject } from "react";
 
 export type EditorStageProps = {
+	/** The assembly split, or null when it is closed. */
+	disasm: { session: string | null; address: string | null; onClose: () => void } | null;
 	project: ProjectInfo | null;
 	root: string | null;
 	active: FileBuffer | null;
@@ -96,6 +99,28 @@ export default function EditorStage(props: EditorStageProps) {
 							: { ...props.revealTarget, token: props.revealToken }
 					}
 				/>
+				{props.disasm === null ? null : (
+					<aside className="editor-split" aria-label="Disassembly">
+						<header className="editor-split-head">
+							<span className="editor-split-title">{active.name} (assembly)</span>
+							<button
+								type="button"
+								className="editor-split-close"
+								aria-label="Close disassembly"
+								title="Close disassembly"
+								onClick={props.disasm.onClose}
+							>
+								×
+							</button>
+						</header>
+						<div className="editor-split-body">
+							<DisasmPane
+								session={props.disasm.session}
+								address={props.disasm.address}
+							/>
+						</div>
+					</aside>
+				)}
 			</div>
 		</>
 	);

@@ -69,7 +69,8 @@
 
 .editor-pane {
 	display: flex;
-	flex-direction: column;
+	/* A row, because the assembly split sits beside the editor; alone the editor still fills it. */
+	flex-direction: row;
 	flex: 1 1 auto;
 	min-width: 0;
 	min-height: 0;

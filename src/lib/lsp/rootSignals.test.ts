@@ -57,7 +57,7 @@ describe("probeRootSignals", () => {
 	test("depth cap stops scan", async () => {
 		const root = "/tmp/rs-depth";
 		// build 6 nested dirs each with a cpp at depth 5 (beyond MAX_DEPTH 4)
-		let tree: Record<string, any[]> = { [root]: [] };
+		const tree: Record<string, any[]> = { [root]: [] };
 		let cur = root;
 		for (let i = 0; i < 6; i++) {
 			const next = `${cur}/d${i}`;

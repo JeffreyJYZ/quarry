@@ -43,3 +43,7 @@
 @import "./styles/debug-console.css";
 
 @import "./styles/run-log.css";
+
+@import "./styles/outline.css";
+
+@import "./styles/editor-split.css";

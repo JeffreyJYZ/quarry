@@ -1,0 +1,100 @@
+/* The hex table: rows, address column, byte cells, ASCII. */
+
+.memory-scroll {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: auto;
+}
+
+.memory-table {
+	width: max-content;
+	min-width: 100%;
+	padding-bottom: 6px;
+	font-size: 11px;
+	line-height: 1.6;
+}
+
+.memory-row {
+	display: flex;
+	align-items: baseline;
+	gap: 12px;
+	padding: 0 12px;
+	border-bottom: 1px solid var(--line);
+	white-space: pre;
+}
+
+.memory-row:hover {
+	background: var(--memory-hover);
+}
+
+.memory-addr {
+	position: sticky;
+	left: 0;
+	flex: 0 0 auto;
+	padding-right: 12px;
+	background: var(--bg);
+	color: var(--muted);
+}
+
+.memory-row:hover .memory-addr {
+	background: var(--memory-hover);
+}
+
+.memory-cells {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 10px;
+	flex: 0 0 auto;
+}
+
+/* Eight bytes, then a gap, then eight more: how a hex dump is actually read. */
+.memory-group {
+	display: inline-flex;
+	gap: 4px;
+}
+
+/* The row the page starts at, tinted the way CLion marks the address you jumped to. */
+.memory-row.current {
+	background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.memory-cell {
+	min-width: 2ch;
+	padding: 0;
+	border: 0;
+	border-radius: 2px;
+	background: none;
+	color: var(--text);
+	font-family: var(--mono);
+	font-size: inherit;
+	line-height: inherit;
+	text-align: center;
+	cursor: pointer;
+}
+
+.memory-cell:hover {
+	background: var(--line);
+}
+
+.memory-cell:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: -1px;
+}
+
+.memory-cell.selected {
+	background: var(--memory-selected);
+	box-shadow: inset 0 0 0 1px var(--accent);
+	color: var(--accent);
+}
+
+.memory-ascii {
+	flex: 0 0 auto;
+	margin-left: 10px;
+	padding-left: 12px;
+	border-left: 1px solid var(--line);
+	color: var(--muted);
+}
+
+.memory-row.unreadable {
+	background: none;
+}

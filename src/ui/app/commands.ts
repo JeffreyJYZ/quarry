@@ -16,6 +16,7 @@ export type CommandContext = {
 	format: () => void;
 	runToCursor: (path: string, line: number) => void;
 	showDebugger: () => void;
+	showDisassembly: () => void;
 	toggleGit: () => void;
 	openSearch: () => void;
 	toggleRail: () => void;

@@ -8,6 +8,7 @@ import type { useSaveBuffers } from "@/ui/app/useSaveBuffers";
 import type { useWorkspace } from "@/ui/app/useWorkspace";
 import type { Command } from "@/ui/palette/CommandPalette";
 import { buildCommands } from "@/ui/app/commands";
+import { openDisassembly } from "@/lib/debug/disasm";
 import type { LspCommandHandlers } from "@/ui/app/lspCommandHandlers";
 
 /**
@@ -55,6 +56,7 @@ export function shellCommands(options: {
 		format: () => void save.formatActive(),
 		runToCursor: (path, line) => debug.runToCursor(path, line),
 		showDebugger: () => panels.showDebugger(),
+		showDisassembly: () => openDisassembly(),
 		toggleGit: () => panels.setGitOpen((current) => !current),
 		openSearch: () => overlays.setSearchOpen(true),
 		toggleRail: () => panels.setRailCollapsed((current) => !current),

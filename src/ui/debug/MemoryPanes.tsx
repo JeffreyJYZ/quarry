@@ -1,27 +1,22 @@
-import DisasmPane from "@/ui/debug/memory/DisasmPane";
 import MemoryPane from "@/ui/debug/memory/MemoryPane";
 import "@/ui/debug/memory/memory-view.css";
 
 /**
- * The memory tab: the hex dump with the disassembly under it.
+ * The memory tab: the hex dump, and nothing else.
  *
- * Each pane carries its own single toolbar — address, width, the actions — with the pane's name as
- * the first item on that row. No second header line, because the tab is already called Memory and
- * two labels for one pane is what made this window look crowded.
+ * CLion's Memory View is one toolbar and one table; stacking a disassembly section under it gave
+ * the window two toolbars and two titles for one tab. The disassembly is an editor split.
  */
 export default function MemoryPanes({
 	session,
 	memoryAddress,
-	disasmAddress,
 }: {
 	session: string | null;
 	memoryAddress: string | null;
-	disasmAddress: string | null;
 }) {
 	return (
 		<div className="memory-panes">
 			<MemoryPane session={session} address={memoryAddress} />
-			<DisasmPane session={session} address={disasmAddress} />
 		</div>
 	);
 }

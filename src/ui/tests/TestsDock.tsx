@@ -11,7 +11,7 @@ import ConsoleSection from "@/ui/debug/ConsoleSection";
 import MemoryPanes from "@/ui/debug/MemoryPanes";
 import DebugDockBody from "@/ui/debug/dock/DebugDockBody";
 import DebugMenu from "@/ui/debug/dock/DebugMenu";
-import { disasmAddressOf, memoryAddressOf } from "@/ui/debug/dock/addresses";
+import { memoryAddressOf } from "@/ui/debug/dock/addresses";
 import ProblemsPanel from "@/ui/problems/ProblemsPanel";
 import TestsPanel from "@/ui/tests/TestsPanel";
 import type { TestsController } from "@/lib/tests/useTests";
@@ -132,7 +132,6 @@ export default function TestsDock({
 						<MemoryPanes
 							session={debug.sessionId}
 							memoryAddress={memoryAddressOf(debug)}
-							disasmAddress={disasmAddressOf(debug)}
 						/>
 					)}
 				</div>

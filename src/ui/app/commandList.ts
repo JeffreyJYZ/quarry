@@ -1,5 +1,6 @@
 import type { Command } from "@/ui/palette/CommandPalette";
 import type { CommandContext } from "./commands";
+import { navigationCommands } from "./navigationCommands";
 
 /**
  * The command palette's list.
@@ -50,6 +51,13 @@ export function buildCommands(context: CommandContext): Command[] {
 			hint: "",
 			disabled: root === null,
 			run: context.showDebugger,
+		},
+		{
+			id: "show-disassembly",
+			label: "Show disassembly",
+			hint: "",
+			disabled: root === null,
+			run: context.showDisassembly,
 		},
 		{
 			id: "toggle-source-control",
@@ -162,33 +170,10 @@ export function buildCommands(context: CommandContext): Command[] {
 			hint: "",
 			run: context.checkUpdates,
 		},
-		{
-			id: "workspace-symbol",
-			label: "Go to symbol in workspace…",
-			hint: "Cmd+Alt+O",
-			disabled: root === null,
-			run: context.workspaceSymbol,
-		},
-		{
-			id: "goto-implementation",
-			label: "Go to implementation",
-			hint: "Cmd+Alt+B",
-			disabled: root === null || activePath === null || cursor === null,
-			run: context.gotoImplementation,
-		},
-		{
-			id: "goto-type-definition",
-			label: "Go to type definition",
-			hint: "Cmd+Alt+Y",
-			disabled: root === null || activePath === null || cursor === null,
-			run: context.gotoTypeDefinition,
-		},
-		{
-			id: "quick-doc",
-			label: "Quick documentation",
-			hint: "F1",
-			disabled: root === null || activePath === null || cursor === null,
-			run: context.quickDoc,
-		},
+		...navigationCommands(context, {
+			root,
+			activePath,
+			cursor: cursor !== null,
+		}),
 	];
 }

@@ -1,14 +1,24 @@
-import type { CSSProperties } from "react";
+import { useEffect, type CSSProperties } from "react";
+import { setDisassemblyOpener } from "@/lib/debug/disasm";
 import EditorStage from "@/ui/app/EditorStage";
 import { Palettes } from "@/ui/app/BottomDock";
 import CanvasPanels from "@/ui/app/CanvasPanels";
 import { SHORTCUT_GROUPS } from "@/ui/app/shellShortcuts";
 import type { ShellModel } from "@/ui/app/useShell";
+import { disasmAddressOf } from "@/ui/debug/dock/addresses";
 
 /** The editor column: the tabs and surfaces, then the bottom slot and the palettes over it. */
 export default function EditorColumn({ model }: { model: ShellModel }) {
-	const { workspace, overlays, settings, diagnostics, editorActions, git } = model;
+	const { workspace, overlays, settings, diagnostics, editorActions, git, panels } = model;
 	const { dockHeight, terminalHeight } = settings.panels;
+
+	// The dock's frame rows open the split through this registry; it is the shell's one owner of
+	// "what is open", so the dock never needs a setter drilled through its columns.
+	const openSplit = panels.setDisasmOpen;
+	useEffect(() => {
+		setDisassemblyOpener(() => openSplit(true));
+		return () => setDisassemblyOpener(null);
+	}, [openSplit]);
 
 	return (
 		<main
@@ -21,6 +31,15 @@ export default function EditorColumn({ model }: { model: ShellModel }) {
 			}
 		>
 			<EditorStage
+				disasm={
+					panels.disasmOpen
+						? {
+								session: model.debug.sessionId,
+								address: disasmAddressOf(model.debug),
+								onClose: () => panels.setDisasmOpen(false),
+							}
+						: null
+				}
 				project={workspace.project}
 				root={model.root}
 				active={model.active}
