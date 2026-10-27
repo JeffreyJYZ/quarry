@@ -1,6 +1,6 @@
 [package]
 name = "quarry"
-version = "0.1.0-alpha.30"
+version = "0.1.0-alpha.31"
 description = "Rust and C/C++ IDE"
 authors = ["Yizhou Jiang"]
 edition = "2024"
