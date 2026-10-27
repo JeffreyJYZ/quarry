@@ -2,8 +2,9 @@ import { ROW_WIDTHS } from "@/lib/debug/memory/hex";
 import { PAGE_SIZES } from "@/ui/debug/memory/parts";
 
 /**
- * The address, row width, page size and Read control at the top of the hex pane. `0x…` and bare
- * hex are both accepted; a value that is neither is reported by the pane below the bar.
+ * The address, row width, page size and Read control at the top of the hex pane. The field takes
+ * `0x…`, bare hex, or any expression the debugger can evaluate (`&count`, `head->next`); whatever
+ * it cannot resolve is reported by the pane below the bar.
  */
 export default function AddressFields({
 	input,
@@ -27,14 +28,14 @@ export default function AddressFields({
 	return (
 		<>
 			<label className="memory-field">
-				<span className="memory-label">Address</span>
+				<span className="memory-label">Go to</span>
 				<input
 					className="memory-input"
 					value={input}
 					spellCheck={false}
 					autoComplete="off"
-					placeholder="0x… or hex"
-					aria-label="Start address"
+					placeholder="0x1f00, &var or an expression"
+					aria-label="Go to address or expression"
 					onChange={(event) => onInputChange(event.target.value)}
 					onKeyDown={(event) => {
 						if (event.key === "Enter") {

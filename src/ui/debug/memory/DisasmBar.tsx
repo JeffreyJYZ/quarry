@@ -29,14 +29,14 @@ export default function DisasmBar({
 		<div className="memory-head">
 			<span className="memory-title">disassembly</span>
 			<label className="memory-field">
-				<span className="memory-label">Address</span>
+				<span className="memory-label">Go to</span>
 				<input
 					className="memory-input"
 					value={input}
 					spellCheck={false}
 					autoComplete="off"
-					placeholder="0x… or hex"
-					aria-label="Disassembly address"
+					placeholder="0x1f00, &func or an expression"
+					aria-label="Disassembly address or expression"
 					onChange={(event) => onInputChange(event.target.value)}
 					onKeyDown={(event) => {
 						if (event.key === "Enter") {

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { formatAddress, parseAddress } from "@/lib/debug/memory/hex";
+import { resolveAddress } from "@/lib/debug/memory/resolve";
 import { type DisassembledInstruction, dapDisassemble } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
 import DisasmBar from "@/ui/debug/memory/DisasmBar";
@@ -24,6 +25,8 @@ export type DisasmPaneProps = {
 	session: string | null;
 	/** Instruction pointer, with or without `0x`; `null` means no frame is selected. */
 	address: string | null;
+	/** The stopped frame an expression is evaluated in. */
+	frameId: number | null;
 };
 
 /**
@@ -32,7 +35,7 @@ export type DisasmPaneProps = {
  * while frames still carry `instructionPointerReference`; the caller passes that address straight
  * through, so nothing here inspects capabilities.
  */
-export default function DisasmPane({ session, address }: DisasmPaneProps) {
+export default function DisasmPane({ session, address, frameId }: DisasmPaneProps) {
 	const [request, setRequest] = useState<Request | null>(() => requestFor(address));
 	const [input, setInput] = useState(() => formatAddress(parseAddress(address)));
 	const [rows, setRows] = useState<DisassembledInstruction[] | null>(null);
@@ -99,15 +102,16 @@ export default function DisasmPane({ session, address }: DisasmPaneProps) {
 		};
 	}, [session, request]);
 
-	const go = () => {
-		const next = parseAddress(input);
-		if (next === null) {
-			setError(
-				input.trim() === "" ? "Enter a hexadecimal address" : "Not a hexadecimal address",
-			);
+	/** Go to the field's address, or the address an expression names. */
+	const go = async () => {
+		setError(null);
+		const resolved = await resolveAddress(input, { session, frameId });
+		if (resolved.address === null) {
+			setError(resolved.error);
 			return;
 		}
-		setError(null);
+		const next = resolved.address;
+		setInput(formatAddress(next));
 		setRequest({ address: next, count, serial: (request?.serial ?? 0) + 1 });
 	};
 

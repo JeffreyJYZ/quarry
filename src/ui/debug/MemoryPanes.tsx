@@ -10,13 +10,16 @@ import "@/ui/debug/memory/memory-view.css";
 export default function MemoryPanes({
 	session,
 	memoryAddress,
+	frameId,
 }: {
 	session: string | null;
 	memoryAddress: string | null;
+	/** The stopped frame, so an expression typed into the address field resolves there. */
+	frameId: number | null;
 }) {
 	return (
 		<div className="memory-panes">
-			<MemoryPane session={session} address={memoryAddress} />
+			<MemoryPane session={session} address={memoryAddress} frameId={frameId} />
 		</div>
 	);
 }

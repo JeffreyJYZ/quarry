@@ -12,7 +12,12 @@ import type { RefObject } from "react";
 
 export type EditorStageProps = {
 	/** The assembly split, or null when it is closed. */
-	disasm: { session: string | null; address: string | null; onClose: () => void } | null;
+	disasm: {
+		session: string | null;
+		address: string | null;
+		frameId: number | null;
+		onClose: () => void;
+	} | null;
 	project: ProjectInfo | null;
 	root: string | null;
 	active: FileBuffer | null;
@@ -117,6 +122,7 @@ export default function EditorStage(props: EditorStageProps) {
 							<DisasmPane
 								session={props.disasm.session}
 								address={props.disasm.address}
+								frameId={props.disasm.frameId}
 							/>
 						</div>
 					</aside>

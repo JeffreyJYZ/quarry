@@ -12,6 +12,7 @@ import MemoryHexView from "@/ui/debug/memory/MemoryHexView";
 import MemoryToolbar from "@/ui/debug/memory/MemoryToolbar";
 import MemoryValueView from "@/ui/debug/memory/MemoryValueView";
 import { DEFAULT_PAGE, type Loaded, type Request, requestFor } from "@/ui/debug/memory/parts";
+import { resolveAddress } from "@/lib/debug/memory/resolve";
 import { useMemoryClipboard } from "@/ui/debug/memory/useMemoryClipboard";
 import { useMemoryEdit } from "@/ui/debug/memory/useMemoryEdit";
 import { useMemoryHistory } from "@/ui/debug/memory/useMemoryHistory";
@@ -22,6 +23,8 @@ export type MemoryPaneProps = {
 	session: string | null;
 	/** Frame or variable address, with or without `0x`; `null` means nothing is selected. */
 	address: string | null;
+	/** The stopped frame an expression is evaluated in, so `&x` resolves against the right locals. */
+	frameId: number | null;
 };
 
 /**
@@ -30,7 +33,7 @@ export type MemoryPaneProps = {
  * losing the whole page. Without a session the bar stays editable and the table is replaced by a
  * "no session" line, so nothing from an ended session lingers on screen.
  */
-export default function MemoryPane({ session, address }: MemoryPaneProps) {
+export default function MemoryPane({ session, address, frameId }: MemoryPaneProps) {
 	const [request, setRequest] = useState<Request | null>(() => requestFor(address));
 	const [input, setInput] = useState(() => formatAddress(parseAddress(address)));
 	const [followed, setFollowed] = useState(true);
@@ -39,6 +42,7 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 	const [selected, setSelected] = useState<bigint | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
+	const [resolving, setResolving] = useState(false);
 	/** Bumped per read so an older reply can never overwrite a newer one. */
 	const pageSize = request?.size ?? DEFAULT_PAGE;
 	/** The hooks take a session id, so a pane with no session hands them an inert empty one. */
@@ -94,18 +98,24 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 		setBusy,
 	});
 
-	const commit = () => {
-		const next = parseAddress(input);
-		if (next === null) {
-			setError(
-				input.trim() === "" ? "Enter a hexadecimal address" : "Not a hexadecimal address",
-			);
-			return;
-		}
+	/** Go to what the field says: hex, a variable, or an expression such as `&count`. */
+	const commit = async () => {
+		setResolving(true);
 		setError(null);
-		setSelected(null);
-		recordVisit(next);
-		setRequest({ start: next, size: pageSize, serial: (request?.serial ?? 0) + 1 });
+		try {
+			const resolved = await resolveAddress(input, { session, frameId });
+			if (resolved.address === null) {
+				setError(resolved.error);
+				return;
+			}
+			const next = resolved.address;
+			setInput(formatAddress(next));
+			setSelected(null);
+			recordVisit(next);
+			setRequest({ start: next, size: pageSize, serial: (request?.serial ?? 0) + 1 });
+		} finally {
+			setResolving(false);
+		}
 	};
 
 	const changeSize = (size: number) => {
@@ -159,7 +169,7 @@ export default function MemoryPane({ session, address }: MemoryPaneProps) {
 				onToggleEdit={() => edit.setEditMode((value) => !value)}
 				rangeLabel={edit.rangeLabel}
 				rangeInput={edit.rangeInput}
-				busy={busy}
+				busy={busy || resolving}
 			/>
 			{error !== null && (
 				<p className="memory-error" role="alert">

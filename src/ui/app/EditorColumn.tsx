@@ -5,7 +5,7 @@ import { Palettes } from "@/ui/app/BottomDock";
 import CanvasPanels from "@/ui/app/CanvasPanels";
 import { SHORTCUT_GROUPS } from "@/ui/app/shellShortcuts";
 import type { ShellModel } from "@/ui/app/useShell";
-import { disasmAddressOf } from "@/ui/debug/dock/addresses";
+import { activeFrame, disasmAddressOf } from "@/ui/debug/dock/addresses";
 
 /** The editor column: the tabs and surfaces, then the bottom slot and the palettes over it. */
 export default function EditorColumn({ model }: { model: ShellModel }) {
@@ -36,6 +36,7 @@ export default function EditorColumn({ model }: { model: ShellModel }) {
 						? {
 								session: model.debug.sessionId,
 								address: disasmAddressOf(model.debug),
+								frameId: activeFrame(model.debug.stopView)?.id ?? null,
 								onClose: () => panels.setDisasmOpen(false),
 							}
 						: null
