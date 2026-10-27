@@ -36,6 +36,7 @@ Rust and C/C++ IDE. Tauri 2 + React 19 shell; clangd, rust-analyzer and lldb-dap
 - **MIT.** Zed is GPL-3.0: read its debugger code for patterns, copy nothing.
 - **`.gitignore` carries `.DS_Store`** at the top level.
 - **`lldb-dap` is Xcode's LLVM 21.0.0**; `readMemory`, `disassemble` and data breakpoints work — measured in `docs/spikes/dap.md`.
+- **A CMake project needs `-DCMAKE_BUILD_TYPE` at configure time or it has no debug info** — a single-config generator ignores `--config` at build time, so the binary is built without `-g`, lldb resolves no breakpoint, and the debugger looks broken; `scripts/dap-cpp-probe.ts` builds one project both ways and asserts only the configured one stops.
 - **Terminal rendering and keystrokes belong to xterm, not React** — `useXterm.ts` owns one emulator per PTY; a prompt that repaints itself with carriage returns needs a VT grid, which a line parser cannot be taught. `focusTarget.ts` decides whether a click may take focus.
 - **Raw PTY bytes reach the emulator through `subscribeRaw`** in `useTerminalSessions.ts`, which also replays the handshake buffer — a blank panel beside a live pid means a missing subscription, not a PTY fault.
 - **Rust pretty printing needs `initCommands: ["command script import <sysroot>/lib/rustlib/etc/lldb_lookup.py"]`** — without it `Vec`/`String` arrive as raw structs, silently.
