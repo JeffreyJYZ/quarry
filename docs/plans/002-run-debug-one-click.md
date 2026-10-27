@@ -87,14 +87,30 @@ needs the target path, and one dropdown that silently chooses between two resolv
 ambiguity that produces "it launched the wrong binary" bugs. The Run dock keeps its form for ad-hoc
 commands. The debugger column keeps presets, attach, memory and disassembly.
 
+### The debugger window
+
+CLion keeps the debugger in a bottom tool window, not a side column, and its transport controls are
+icons rather than a wall of buttons. quarry follows that: the bottom dock grows `debugger`,
+`console` and `memory` tabs beside `problems` and `tests`.
+
+- `debugger` is three columns — frames, then variables and watches, then breakpoints — with a 34px
+  icon rail on the left carrying continue, step over, step into, step out, run to cursor, restart
+  and stop.
+- `console` is what the debuggee printed, from the adapter's `output` events.
+- `memory` is the dump and the disassembly, with an address field each instead of a pane that only
+  reacts to whatever happened to be selected.
+- Launch configurations, attach and exception filters live behind one `…` menu in the dock header,
+  so there is exactly one Run/Debug control (the title bar) and exactly one place for the rest. The
+  word "preset" does not appear in the UI: a configuration is a configuration.
+
 ### Seeing the session
 
-A launch opens the debugger column and the editor follows every stop: the top frame's source is
+A launch opens the debugger tab and the editor follows every stop: the top frame's source is
 revealed at its line, so the first press of the bug lands in a stopped session with the caret where
 the program stopped. A terminated session clears the highlight and leaves the file open.
 
-Errors a hidden panel would swallow are also reported as a notice, because a failed launch that only
-writes a line into a closed column is indistinguishable from a dead button.
+A failed launch is also reported as a notice, because an error that only writes a line into a tab
+nobody switched to is indistinguishable from a dead button.
 
 ### The icon belongs to this slice
 
