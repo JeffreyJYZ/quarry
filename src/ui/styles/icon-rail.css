@@ -1,0 +1,60 @@
+/* The tool rail down the left edge: one column of icons, the way an IDE lays out its tools. */
+
+.icon-rail {
+	display: flex;
+	flex: 0 0 var(--icon-rail-width, 44px);
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	width: var(--icon-rail-width, 44px);
+	padding: 8px 0;
+	border-right: 1px solid var(--line);
+	background: var(--chrome);
+}
+
+.icon-rail-button {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	padding: 0;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--muted);
+	cursor: pointer;
+}
+
+.icon-rail-button:hover {
+	background: var(--hover);
+	color: var(--text);
+}
+
+.icon-rail-button.active {
+	background: var(--hover);
+	color: var(--text);
+}
+
+/* The selected tool carries a bar on the rail's own edge, not a filled block. */
+.icon-rail-button.active::before {
+	position: absolute;
+	top: 5px;
+	bottom: 5px;
+	left: -7px;
+	width: 2px;
+	border-radius: 1px;
+	background: var(--accent);
+	content: "";
+}
+
+.icon-rail-button:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: -1px;
+}
+
+/* Everything above the terminal and settings buttons is the tool group. */
+.icon-rail-gap {
+	flex: 1 1 auto;
+}

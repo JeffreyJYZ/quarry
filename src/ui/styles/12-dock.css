@@ -119,6 +119,12 @@
 	overflow: auto;
 }
 
+/* The tab already names the panel, so a panel that draws its own title bar says it twice. */
+.dock-body .problems-head-toggle,
+.dock-body .problems-title {
+	display: none;
+}
+
 /* References panel: compact overlay anchored above the status bar. */
 .refs-panel {
 	flex: 0 0 auto;

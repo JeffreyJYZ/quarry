@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { fileName } from "@/lib/problems/model";
 import { isDirty } from "@/lib/project/buffer";
 import SideRail from "@/ui/app/SideRail";
+import IconRail from "@/ui/app/IconRail";
 import EditorColumn from "@/ui/app/EditorColumn";
 import Splitter from "@/ui/layout/Splitter";
 import type { ShellModel } from "@/ui/app/useShell";
@@ -27,6 +28,7 @@ export default function AppBody({ model }: { model: ShellModel }) {
 				} as CSSProperties
 			}
 		>
+			<IconRail model={model} />
 			<SideRail
 				gitOpen={panels.gitOpen}
 				project={project}
