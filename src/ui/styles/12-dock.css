@@ -6,6 +6,8 @@
 	display: flex;
 	align-items: center;
 	gap: 10px;
+	/* The header's size is fixed, so switching tabs never moves the row: only its tools change. */
+	flex: 0 0 30px;
 	height: 30px;
 	padding: 0 10px;
 	border-bottom: 1px solid var(--line);
@@ -30,6 +32,8 @@
 	display: flex;
 	align-items: center;
 	gap: 2px;
+	/* A tab's suffix (a count, a status word) changes width, never the row's height. */
+	height: 100%;
 }
 
 .dock-tab {
@@ -115,6 +119,7 @@
 }
 
 .dock-body {
+	flex: 1 1 auto;
 	min-height: 0;
 	overflow: auto;
 }
