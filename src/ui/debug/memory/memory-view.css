@@ -76,3 +76,31 @@
 .memory-error[role="alert"] {
 	background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
+
+/* The tab stacks the dump over the disassembly, each half scrollable on its own. */
+.memory-panes {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	height: 100%;
+	overflow: auto;
+}
+
+.memory-panes > .memory-pane {
+	flex: 1 1 auto;
+}
+
+.memory-panes > .memory-pane + .memory-pane {
+	border-top: 1px solid var(--line);
+}
+
+.memory-title {
+	flex: 0 0 auto;
+	margin-right: 6px;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 9.5px;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+}

@@ -3,8 +3,11 @@ import MemoryPane from "@/ui/debug/memory/MemoryPane";
 import "@/ui/debug/memory/memory-view.css";
 
 /**
- * The memory and disassembly panes. Both render with or without a session: the address fields stay
- * editable and each pane says "no session" instead of holding rows from a session that ended.
+ * The memory tab: the hex dump with the disassembly under it.
+ *
+ * Each pane carries its own single toolbar — address, width, the actions — with the pane's name as
+ * the first item on that row. No second header line, because the tab is already called Memory and
+ * two labels for one pane is what made this window look crowded.
  */
 export default function MemoryPanes({
 	session,
@@ -16,23 +19,9 @@ export default function MemoryPanes({
 	disasmAddress: string | null;
 }) {
 	return (
-		<>
-			<section className="debug-section debug-pane-section">
-				<div className="debug-section-head">
-					<span className="label">memory</span>
-				</div>
-				<div className="debug-pane">
-					<MemoryPane session={session} address={memoryAddress} />
-				</div>
-			</section>
-			<section className="debug-section debug-pane-section">
-				<div className="debug-section-head">
-					<span className="label">disassembly</span>
-				</div>
-				<div className="debug-pane">
-					<DisasmPane session={session} address={disasmAddress} />
-				</div>
-			</section>
-		</>
+		<div className="memory-panes">
+			<MemoryPane session={session} address={memoryAddress} />
+			<DisasmPane session={session} address={disasmAddress} />
+		</div>
 	);
 }

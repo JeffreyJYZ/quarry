@@ -34,6 +34,6 @@ export const editorMetrics = {
 	gutterPad: "0 10px 0 14px",
 	gutterWidth: "42px",
 	foldGutterWidth: "1em",
-	breakpointGutterWidth: "1.1em",
+	breakpointGutterWidth: "1.9em",
 	hoverMaxWidth: "560px",
 } as const;

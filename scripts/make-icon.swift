@@ -51,14 +51,13 @@ func draw(size: CGFloat, into url: URL) {
 		xRadius: radius,
 		yRadius: radius
 	)
-	NSColor(srgbRed: 0.071, green: 0.078, blue: 0.09, alpha: 1).setFill()
+	NSColor(srgbRed: 0.157, green: 0.173, blue: 0.2, alpha: 1).setFill()
 	plate.fill()
 
-	// The mark is negative space: a blue disc with the Q carved out of it. At 16px a carved
-	// counter holds its shape where a drawn ring turns to mush, and the tail breaking the rim is
-	// what makes the letter read as a Q instead of a C with a nick.
-	let blue = NSColor(srgbRed: 0.373, green: 0.549, blue: 0.996, alpha: 1)
-	let plateColor = NSColor(srgbRed: 0.071, green: 0.078, blue: 0.09, alpha: 1)
+	// The mark is negative space: a disc with the Q carved out of it. The colours are the app's own
+	// One Dark tokens, so the icon is the window in miniature rather than a separate brand.
+	let blue = NSColor(srgbRed: 0.455, green: 0.678, blue: 0.941, alpha: 1)
+	let plateColor = NSColor(srgbRed: 0.157, green: 0.173, blue: 0.2, alpha: 1)
 
 	let disc = NSBezierPath(ovalIn: NSRect(x: 512 - 318, y: 520 - 318, width: 636, height: 636))
 	blue.setFill()

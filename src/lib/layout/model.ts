@@ -11,6 +11,8 @@ export type PanelSizes = {
 	dockHeight: number;
 	terminalHeight: number;
 	terminalWidth: number;
+	/** Height of the outline under the file tree, so a long file list cannot swallow it. */
+	outlineHeight: number;
 };
 
 export type PanelName = keyof PanelSizes;
@@ -20,6 +22,7 @@ export const DEFAULT_PANEL_SIZES: PanelSizes = {
 	dockHeight: 260,
 	terminalHeight: 180,
 	terminalWidth: 380,
+	outlineHeight: 200,
 };
 
 export const PANEL_LIMITS: Record<PanelName, { min: number; max: number }> = {
@@ -27,6 +30,7 @@ export const PANEL_LIMITS: Record<PanelName, { min: number; max: number }> = {
 	dockHeight: { min: 120, max: 900 },
 	terminalHeight: { min: 100, max: 900 },
 	terminalWidth: { min: 240, max: 900 },
+	outlineHeight: { min: 80, max: 600 },
 };
 
 export function clampPanel(name: PanelName, value: number): number {
@@ -50,6 +54,7 @@ export function clampPanelSizes(input: unknown): PanelSizes {
 		dockHeight: read("dockHeight"),
 		terminalHeight: read("terminalHeight"),
 		terminalWidth: read("terminalWidth"),
+		outlineHeight: read("outlineHeight"),
 	};
 }
 

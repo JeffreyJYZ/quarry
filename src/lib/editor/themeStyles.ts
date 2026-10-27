@@ -87,8 +87,12 @@ export const foldStyles = {
 /** The breakpoint gutter: a filled dot, or a hollow one while the runtime has not confirmed it. */
 export const breakpointStyles = {
 	".cm-breakpoint-gutter": {
-		width: "1.1em",
+		width: "1.9em",
 		cursor: "pointer",
+		/* The whole column is the target, so hovering anywhere in it reads as clickable. */
+		"&:hover": {
+			backgroundColor: "var(--hover)",
+		},
 		"& .cm-gutterElement": {
 			display: "flex",
 			alignItems: "center",
@@ -97,8 +101,8 @@ export const breakpointStyles = {
 		},
 	},
 	".cm-breakpoint-dot": {
-		width: "8px",
-		height: "8px",
+		width: "9px",
+		height: "9px",
 		boxSizing: "border-box",
 		borderRadius: "50%",
 		backgroundColor: breakpointColor,

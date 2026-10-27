@@ -27,6 +27,7 @@ export default function DisasmBar({
 }) {
 	return (
 		<div className="memory-head">
+			<span className="memory-title">disassembly</span>
 			<label className="memory-field">
 				<span className="memory-label">Address</span>
 				<input

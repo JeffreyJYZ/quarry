@@ -3,9 +3,17 @@ import type { FileEntry } from "@/lib/project/api";
 import FileTree from "@/ui/components/FileTree";
 import Outline from "@/ui/outline/Outline";
 import SourceControl from "@/ui/git/SourceControl";
+import Splitter from "@/ui/layout/Splitter";
+import { PANEL_LIMITS } from "@/lib/layout/model";
+
+const OUTLINE_MIN = PANEL_LIMITS.outlineHeight.min;
+const OUTLINE_MAX = PANEL_LIMITS.outlineHeight.max;
 
 export type SideRailProps = {
 	gitOpen: boolean;
+	/** Height of the outline under the tree, in pixels. */
+	outlineHeight: number;
+	onOutlineResize: (height: number) => void;
 	project: ProjectInfo | null;
 	root: string | null;
 	activePath: string | null;
@@ -77,12 +85,23 @@ export default function SideRail(props: SideRailProps) {
 						revealToken={props.revealToken}
 						changes={props.changes}
 					/>
-					<Outline
-						root={props.project.root}
-						activePath={props.activePath}
-						onNavigate={props.onNavigate}
-						cursor={props.cursor}
+					<Splitter
+						axis="y"
+						value={props.outlineHeight}
+						min={OUTLINE_MIN}
+						max={OUTLINE_MAX}
+						invert
+						label="Resize outline"
+						onChange={props.onOutlineResize}
 					/>
+					<div className="outline-fixed" style={{ height: props.outlineHeight }}>
+						<Outline
+							root={props.project.root}
+							activePath={props.activePath}
+							onNavigate={props.onNavigate}
+							cursor={props.cursor}
+						/>
+					</div>
 				</>
 			) : (
 				<p className="empty">No folder open. Use Open project to choose one.</p>

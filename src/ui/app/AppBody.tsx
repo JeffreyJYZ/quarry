@@ -31,6 +31,8 @@ export default function AppBody({ model }: { model: ShellModel }) {
 			<IconRail model={model} />
 			<SideRail
 				gitOpen={panels.gitOpen}
+				outlineHeight={settings.panels.outlineHeight}
+				onOutlineResize={(next) => settings.handlePanelResize("outlineHeight", next)}
 				project={project}
 				root={model.root}
 				activePath={model.activePath}

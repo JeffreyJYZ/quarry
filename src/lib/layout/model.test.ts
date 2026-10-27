@@ -52,6 +52,7 @@ describe("clampPanelSizes", () => {
 			dockHeight: PANEL_LIMITS.dockHeight.max,
 			terminalHeight: PANEL_LIMITS.terminalHeight.min,
 			terminalWidth: PANEL_LIMITS.terminalWidth.min,
+			outlineHeight: DEFAULT_PANEL_SIZES.outlineHeight,
 		});
 	});
 });

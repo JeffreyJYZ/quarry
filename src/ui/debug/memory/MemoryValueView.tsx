@@ -12,7 +12,7 @@ export default function MemoryValueView({
 	return (
 		<div className="memory-view">
 			{interpreted === null ? (
-				<span className="memory-muted">Select a byte for its value</span>
+				<span className="memory-muted">no byte selected</span>
 			) : (
 				<>
 					<span className="memory-view-address">{selectedLabel}</span>
