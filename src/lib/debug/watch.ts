@@ -20,11 +20,6 @@ export function pinKey(pin: Pin): string {
 	return `${pin.scopeReference}:${pin.path.join("/")}:${pin.name}`;
 }
 
-/** True when two pins refer to the same variable slot. */
-export function pinsEqual(left: Pin, right: Pin): boolean {
-	return pinKey(left) === pinKey(right);
-}
-
 /**
  * Walk an already-fetched children map along `pin.path` then `pin.name`. Returns the matching
  * variable, or null when any segment is absent. Pure: no fetching.
@@ -49,8 +44,4 @@ export function walkPin(
 		}
 	}
 	return found;
-}
-
-export function pinFromRow(row: { scopeReference: number; name: string; path: string[] }): Pin {
-	return { scopeReference: row.scopeReference, name: row.name, path: [...row.path] };
 }

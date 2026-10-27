@@ -1,5 +1,5 @@
 import type { ITerminalOptions, Terminal } from "@xterm/xterm";
-import type { Preferences } from "@/lib/settings/model";
+
 import type { TerminalCursorStyle } from "@/lib/settings/terminal";
 import { XTERM_THEME } from "@/ui/terminal/xtermTheme";
 
@@ -23,18 +23,6 @@ export type XtermAppearance = {
 	cursorBlink: boolean;
 	scrollback: number;
 };
-
-export function terminalAppearance(prefs: Preferences): XtermAppearance {
-	return {
-		fontFamily: prefs.terminalFontFamily,
-		fontSize: prefs.terminalFontSize,
-		lineHeight: prefs.terminalLineHeight,
-		letterSpacing: prefs.terminalLetterSpacing,
-		cursorStyle: prefs.terminalCursorStyle,
-		cursorBlink: prefs.terminalCursorBlink,
-		scrollback: prefs.terminalScrollback,
-	};
-}
 
 export function xtermOptions(appearance: XtermAppearance): ITerminalOptions {
 	return {

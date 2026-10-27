@@ -40,25 +40,3 @@ export function splitHunks(diff: string): Hunk[] {
 	}
 	return hunks;
 }
-
-export function hunkPatch(diff: string, id: string): string | null {
-	const hunks = splitHunks(diff);
-	const target = hunks.find((hunk) => hunk.id === id);
-	if (target === undefined) return null;
-	const headerLines = diff
-		.split("\n")
-		.filter(
-			(line) =>
-				!line.startsWith("@@") &&
-				(line.startsWith("diff ") ||
-					line.startsWith("---") ||
-					line.startsWith("+++ ") ||
-					line.startsWith("index ") ||
-					line.startsWith("new file") ||
-					line.startsWith("deleted file") ||
-					line.startsWith("old mode") ||
-					line.startsWith("new mode")),
-		);
-	const patch = [...headerLines, target.header, ...target.body].join("\n");
-	return patch;
-}

@@ -16,10 +16,6 @@ function extensionOf(name: string): string {
 	return name.slice(dot).toLowerCase();
 }
 
-export type TopLevelNames = {
-	names: string[];
-};
-
 /** Pure decision: turn gathered facts into RootSignals. */
 export function decideRootSignals(facts: {
 	hasCargoToml: boolean;

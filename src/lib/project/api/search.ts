@@ -15,12 +15,6 @@ export type SearchReport = {
 	durationMs: number;
 };
 
-export type ReplaceReport = {
-	filesChanged: number;
-	replacements: number;
-	errors: string[];
-};
-
 export function searchProject(
 	root: string,
 	query: string,

@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { type DapVariable, dapDataBreakpointInfo, dapSetDataBreakpoints } from "@/lib/project/api";
+import { dapDataBreakpointInfo, dapSetDataBreakpoints } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
 import type { WatchRow } from "./sessionTypes";
 
@@ -72,6 +72,3 @@ export function useWatchPoints(options: {
 
 	return { addWatchPoint, removeWatchPoint };
 }
-
-/** The expanded child list of a `variablesReference`, fetched once per stop. */
-export type DapChildren = DapVariable[];

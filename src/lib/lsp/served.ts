@@ -78,11 +78,6 @@ export function serverKindForPath(path: string | null): ServerKind | null {
 	return null;
 }
 
-/** Whether any running language server serves this path, by extension alone. */
-export function servesAny(path: string | null): boolean {
-	return serverKindForPath(path) !== null;
-}
-
 /** The kind serving `path` when that kind is running; otherwise null. */
 export function servedByRunningServer(
 	path: string | null,
