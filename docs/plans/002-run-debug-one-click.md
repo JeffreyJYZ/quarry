@@ -96,6 +96,12 @@ the program stopped. A terminated session clears the highlight and leaves the fi
 Errors a hidden panel would swallow are also reported as a notice, because a failed launch that only
 writes a line into a closed column is indistinguishable from a dead button.
 
+### The icon belongs to this slice
+
+An app that looks wrong in the Dock is part of "out of the box", so the icon is drawn on Apple's
+1024 grid by `scripts/make-icon.swift`: an 824 plate inset by 100 with the rest transparent. An icon
+that fills its canvas is what makes it render oversized beside every other app.
+
 ## Slices
 
 | #   | Slice                                              | Files                                                                       |
