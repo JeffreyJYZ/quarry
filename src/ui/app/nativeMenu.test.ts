@@ -27,7 +27,7 @@ const IDLE_CONTEXT: CommandContext = {
 	saveAll: noop,
 	format: noop,
 	runToCursor: noop,
-	toggleDebug: noop,
+	showDebugger: noop,
 	toggleGit: noop,
 	openSearch: noop,
 	toggleRail: noop,

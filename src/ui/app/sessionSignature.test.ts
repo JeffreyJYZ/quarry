@@ -8,7 +8,6 @@ function snapshot(overrides: Partial<SessionSnapshot> = {}): SessionSnapshot {
 		buffers: [],
 		activePath: null,
 		railCollapsed: false,
-		debugOpen: false,
 		gitOpen: false,
 		panelOpen: null,
 		dockTab: "problems",

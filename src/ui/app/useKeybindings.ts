@@ -16,7 +16,7 @@ export type KeybindingContext = {
 	setShortcutsOpen: (updater: (current: boolean) => boolean) => void;
 	setRailCollapsed: (updater: (current: boolean) => boolean) => void;
 	setPanelOpen: (next: boolean) => void;
-	setDebugOpen: (updater: (current: boolean) => boolean) => void;
+	showDebugger: () => void;
 	setGitOpen: (updater: (current: boolean) => boolean) => void;
 	setCommandPaletteOpen: (open: boolean) => void;
 	setFileRevealToken: (updater: (current: number) => number) => void;
@@ -103,7 +103,7 @@ export function useKeybindings(context: KeybindingContext): void {
 		return () => window.removeEventListener("keydown", handleKeyDown, true);
 	}, [context.setShortcutsOpen]);
 
-	/** Layout toggles: Cmd+B rail, Cmd+J dock, Cmd+Shift+D debug, Cmd+Shift+G git. */
+	/** Layout toggles: Cmd+B rail, Cmd+J dock, Cmd+Shift+D debugger tab, Cmd+Shift+G git. */
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (!event.metaKey || event.ctrlKey || event.altKey) return;
@@ -123,7 +123,7 @@ export function useKeybindings(context: KeybindingContext): void {
 			}
 			if (key === "d") {
 				event.preventDefault();
-				context.setDebugOpen((current) => !current);
+				context.showDebugger();
 				return;
 			}
 			if (key === "g") {
@@ -137,7 +137,7 @@ export function useKeybindings(context: KeybindingContext): void {
 		panelExpanded,
 		context.setRailCollapsed,
 		context.setPanelOpen,
-		context.setDebugOpen,
+		context.showDebugger,
 		context.setGitOpen,
 	]);
 

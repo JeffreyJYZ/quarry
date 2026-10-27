@@ -1,0 +1,56 @@
+/* The debugger dock's `…` menu: the header button and its popover. */
+
+.dock-debug-menu {
+	position: relative;
+	margin-left: auto;
+}
+
+.dock-debug-pop {
+	position: absolute;
+	top: 24px;
+	right: 0;
+	z-index: 40;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	width: 300px;
+	max-height: 60vh;
+	overflow-y: auto;
+	padding: 8px;
+	border: 1px solid var(--line);
+	border-radius: 4px;
+	background: var(--panel);
+	box-shadow: 0 10px 28px rgb(0 0 0 / 0.45);
+}
+
+.dock-debug-pop-head {
+	margin: 0;
+	padding: 0 2px;
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.dock-debug-pop-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+}
+
+.dock-debug-pop-row .debug-select,
+.dock-debug-pop-row .button {
+	flex: 1 1 auto;
+}
+
+.dock-debug-pop-wrap {
+	flex-wrap: wrap;
+}
+
+.dock-debug-pop-rule {
+	height: 1px;
+	margin: 2px 0;
+	background: var(--line);
+}

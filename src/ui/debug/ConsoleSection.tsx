@@ -1,12 +1,13 @@
 import { useEffect, useRef } from "react";
 import { useSessionOutput } from "@/lib/debug/useSessionOutput";
+import "@/ui/debug/dock/dock-console.css";
 
 /**
  * The program's own output during a debug session, the way CLion's Debug window keeps a Console tab.
  *
  * It reads the adapter's `output` events directly rather than going through the debug controller:
  * the console has one input and no shared state, so threading it through the controller would add
- * fields to every caller and buy nothing.
+ * fields to every caller and buy nothing. Body only — the dock tab names it.
  */
 export default function ConsoleSection({ session }: { session: string | null }) {
 	const { text, clear } = useSessionOutput(session);
@@ -22,17 +23,21 @@ export default function ConsoleSection({ session }: { session: string | null }) 
 	}, [text]);
 
 	return (
-		<section className="debug-section debug-console">
-			<div className="debug-section-head">
-				<span className="label">console</span>
-				<span className="debug-count">{session === null ? "no session" : "live"}</span>
-				<button type="button" className="button" disabled={text === ""} onClick={clear}>
+		<div className="dock-console">
+			<div className="dock-console-bar">
+				<span className="dock-debug-label">{session === null ? "no session" : "live"}</span>
+				<button
+					type="button"
+					className="dock-action"
+					disabled={text === ""}
+					onClick={clear}
+				>
 					Clear
 				</button>
 			</div>
 			<pre className="debug-console-text" ref={scroller}>
 				{text === "" ? (session === null ? "" : "No output yet.") : text}
 			</pre>
-		</section>
+		</div>
 	);
 }

@@ -28,14 +28,14 @@ export type OverlaysProps = {
 	terminalOpen: boolean;
 	panelExpanded: boolean;
 	gitOpen: boolean;
-	debugOpen: boolean;
+	debuggerActive: boolean;
 	building: boolean;
 	running: boolean;
 	onToggleRail: () => void;
 	onToggleTerminal: () => void;
 	onTogglePanel: () => void;
 	onToggleGit: () => void;
-	onToggleDebug: () => void;
+	onShowDebugger: () => void;
 	onBuild: () => void;
 	onRun: () => void;
 	onStop: () => void;
@@ -119,14 +119,14 @@ export default function AppOverlays(props: OverlaysProps) {
 				terminalOpen={props.terminalOpen}
 				panelExpanded={props.panelExpanded}
 				gitOpen={props.gitOpen}
-				debugOpen={props.debugOpen}
+				debuggerActive={props.debuggerActive}
 				building={props.building}
 				running={props.running}
 				onToggleRail={props.onToggleRail}
 				onToggleTerminal={props.onToggleTerminal}
 				onTogglePanel={props.onTogglePanel}
 				onToggleGit={props.onToggleGit}
-				onToggleDebug={props.onToggleDebug}
+				onShowDebugger={props.onShowDebugger}
 				onBuild={props.onBuild}
 				onRun={props.onRun}
 				onStop={props.onStop}

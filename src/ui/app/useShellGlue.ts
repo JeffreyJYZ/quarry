@@ -66,7 +66,7 @@ export function useShellGlue(options: GlueOptions) {
 		setShortcutsOpen: overlays.setShortcutsOpen,
 		setRailCollapsed: panels.setRailCollapsed,
 		setPanelOpen: panels.setPanelOpen,
-		setDebugOpen: panels.setDebugOpen,
+		showDebugger: panels.showDebugger,
 		setGitOpen: panels.setGitOpen,
 		setCommandPaletteOpen: overlays.setCommandPaletteOpen,
 		setFileRevealToken: panels.setFileRevealToken,
@@ -107,7 +107,7 @@ export function useShellGlue(options: GlueOptions) {
 		runs,
 		debug,
 		onReveal: workspace.handleNavigate,
-		onOpenDebug: () => panels.setDebugOpen(() => true),
+		onOpenDebug: panels.showDebugger,
 		onNotice: (message) => onNotice?.(message),
 	});
 
@@ -123,7 +123,7 @@ export function useShellGlue(options: GlueOptions) {
 		toggleBreakpoint: debug.toggleBreakpoint,
 		organizeImports: () => editorActions.organizeRef.current(),
 		openRunPanel: runs.openPanel,
-		setDebugOpen: panels.setDebugOpen,
+		showDebugger: panels.showDebugger,
 		setGotoMode: overlays.setGotoMode,
 		setGenerateOpen: overlays.setGenerateOpen,
 		setQuickOpenOpen: overlays.setQuickOpenOpen,
@@ -158,7 +158,6 @@ export function useShellGlue(options: GlueOptions) {
 		setters: {
 			onPreferences: (next) => settings.setPreferences(normalizePreferences(next)),
 			onRailCollapsed: panels.setRailCollapsed,
-			onDebugOpen: panels.setDebugOpen,
 			onGitOpen: panels.setGitOpen,
 			onPanelOpen: panels.setPanelOpen,
 			onRecentRoots: workspace.setRecentRoots,

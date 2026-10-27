@@ -71,7 +71,7 @@ export const SHORTCUT_GROUPS = [
 		entries: [
 			{ keys: ["Esc"], action: "Close in-file search / sheet" },
 			{ keys: ["Cmd", "1"], action: "Toggle project rail" },
-			{ keys: ["Cmd", "5"], action: "Toggle debug panel" },
+			{ keys: ["Cmd", "5"], action: "Show debugger" },
 			{ keys: ["Alt", "F12"], action: "Toggle terminal" },
 		],
 	},
@@ -80,7 +80,7 @@ export const SHORTCUT_GROUPS = [
 		entries: [
 			{ keys: ["Cmd", "B"], action: "Toggle left rail" },
 			{ keys: ["Cmd", "J"], action: "Toggle bottom dock" },
-			{ keys: ["Cmd", "Shift", "D"], action: "Toggle debug panel" },
+			{ keys: ["Cmd", "Shift", "D"], action: "Show debugger" },
 			{ keys: ["Cmd", "Shift", "G"], action: "Toggle source control" },
 		],
 	},

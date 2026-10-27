@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { StatusText } from "@/ui/app/status";
 import type { DockTab } from "@/ui/tests/TestsDock";
 
@@ -10,7 +10,6 @@ import type { DockTab } from "@/ui/tests/TestsDock";
  */
 export function usePanels() {
 	const [railCollapsed, setRailCollapsed] = useState(false);
-	const [debugOpen, setDebugOpen] = useState(false);
 	const [gitOpen, setGitOpen] = useState(false);
 	/** `null` means "follow the default": open when there is an error, collapsed otherwise. */
 	const [panelOpen, setPanelOpen] = useState<boolean | null>(null);
@@ -28,11 +27,15 @@ export function usePanels() {
 	const [newProjectParent, setNewProjectParent] = useState("");
 	const [fileRevealToken, setFileRevealToken] = useState(0);
 
+	/** The debugger is a dock tab now, so showing it means selecting the tab and expanding. */
+	const showDebugger = useCallback(() => {
+		setDockTab("debugger");
+		setPanelOpen(true);
+	}, []);
+
 	return {
 		railCollapsed,
 		setRailCollapsed,
-		debugOpen,
-		setDebugOpen,
 		gitOpen,
 		setGitOpen,
 		panelOpen,
@@ -59,6 +62,7 @@ export function usePanels() {
 		setNewProjectParent,
 		fileRevealToken,
 		setFileRevealToken,
+		showDebugger,
 	};
 }
 

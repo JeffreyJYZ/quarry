@@ -18,7 +18,7 @@ export type ClionKeymapContext = {
 	toggleBreakpoint: (path: string, line: number) => void;
 	organizeImports: () => void;
 	openRunPanel: () => void;
-	setDebugOpen: (updater: (current: boolean) => boolean) => void;
+	showDebugger: () => void;
 	setGotoMode: (mode: "class" | "symbol" | "recent") => void;
 	setGenerateOpen: (open: boolean) => void;
 	setQuickOpenOpen: (open: boolean) => void;
@@ -144,7 +144,7 @@ export function useClionKeymap(context: ClionKeymapContext): void {
 			}
 			if (mod && !event.altKey && key === "5") {
 				event.preventDefault();
-				if (root !== null) context.setDebugOpen((current) => !current);
+				if (root !== null) context.showDebugger();
 				return;
 			}
 			if (event.key === "F1") {

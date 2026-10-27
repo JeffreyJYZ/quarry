@@ -54,7 +54,7 @@ export function shellCommands(options: {
 		saveAll: () => void save.saveAll(),
 		format: () => void save.formatActive(),
 		runToCursor: (path, line) => debug.runToCursor(path, line),
-		toggleDebug: () => panels.setDebugOpen((current) => !current),
+		showDebugger: () => panels.showDebugger(),
 		toggleGit: () => panels.setGitOpen((current) => !current),
 		openSearch: () => overlays.setSearchOpen(true),
 		toggleRail: () => panels.setRailCollapsed((current) => !current),

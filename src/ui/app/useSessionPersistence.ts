@@ -6,6 +6,7 @@ import { normalizePreferences } from "@/lib/settings/model";
 import { describeError } from "@/lib/project/errors";
 import type { Settings } from "@/lib/project/api";
 import type { DockTab } from "@/ui/tests/TestsDock";
+import { isDockTab } from "@/ui/tests/parts";
 import type { ProjectInfo, RunConfiguration } from "@/lib/project/api";
 import { snapshotSignature } from "@/ui/app/sessionSignature";
 import { openProject } from "@/lib/project/api";
@@ -15,7 +16,6 @@ export type SessionSnapshot = {
 	buffers: FileBuffer[];
 	activePath: string | null;
 	railCollapsed: boolean;
-	debugOpen: boolean;
 	gitOpen: boolean;
 	panelOpen: boolean | null;
 	dockTab: DockTab;
@@ -28,7 +28,6 @@ export type SessionSnapshot = {
 export type SessionSetters = {
 	onPreferences: (value: Settings["preferences"]) => void;
 	onRailCollapsed: (value: boolean) => void;
-	onDebugOpen: (value: boolean) => void;
 	onGitOpen: (value: boolean) => void;
 	onPanelOpen: (value: boolean | null) => void;
 	onRecentRoots: (value: string[]) => void;
@@ -66,7 +65,6 @@ export function useSessionPersistence(options: {
 				preserved.current = settings;
 				setters.onPreferences(normalizePreferences(settings.preferences));
 				setters.onRailCollapsed(settings.railCollapsed ?? false);
-				setters.onDebugOpen(settings.debugOpen ?? false);
 				setters.onGitOpen(settings.gitOpen ?? false);
 				setters.onPanelOpen(settings.dockExpanded ?? null);
 				setters.onRecentRoots(settings.recentRoots ?? []);
@@ -74,9 +72,7 @@ export function useSessionPersistence(options: {
 				setters.onNewProjectParent(settings.newProjectParent ?? "");
 				setters.onRunConfigurations(settings.runConfigurations ?? []);
 				const storedTab = settings.dockTab;
-				setters.onDockTab(
-					storedTab === "tests" || storedTab === "problems" ? storedTab : "problems",
-				);
+				setters.onDockTab(isDockTab(storedTab) ? storedTab : "problems");
 				if (settings.lastRoot === null) return;
 				try {
 					const next = await openProject(settings.lastRoot);
@@ -138,7 +134,6 @@ export function useSessionPersistence(options: {
 			openFiles: snapshot.buffers.map((buffer) => buffer.path),
 			activeFile: snapshot.activePath,
 			railCollapsed: snapshot.railCollapsed,
-			debugOpen: snapshot.debugOpen,
 			gitOpen: snapshot.gitOpen,
 			dockTab: snapshot.dockTab as Settings["dockTab"],
 			dockExpanded: snapshot.panelOpen,

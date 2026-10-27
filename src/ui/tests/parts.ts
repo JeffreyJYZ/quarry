@@ -1,6 +1,13 @@
 import type { TestItem, TestReport } from "@/lib/project/api";
 
-export type DockTab = "tests" | "problems";
+export type DockTab = "problems" | "tests" | "debugger" | "console" | "memory";
+
+/** Every tab in order; a stored value is validated against this list, not a second copy of it. */
+export const DOCK_TABS: DockTab[] = ["problems", "tests", "debugger", "console", "memory"];
+
+export function isDockTab(value: unknown): value is DockTab {
+	return typeof value === "string" && (DOCK_TABS as string[]).includes(value);
+}
 
 export const OUTPUT_LINE_CAP = 200;
 export const RUNNING_GLYPH = "◦";

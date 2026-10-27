@@ -19,9 +19,9 @@ describe("clampPanel", () => {
 	});
 
 	test("falls back to the default for a non-finite value", () => {
-		expect(clampPanel("debugWidth", Number.NaN)).toBe(DEFAULT_PANEL_SIZES.debugWidth);
-		expect(clampPanel("debugWidth", Number.POSITIVE_INFINITY)).toBe(
-			DEFAULT_PANEL_SIZES.debugWidth,
+		expect(clampPanel("dockHeight", Number.NaN)).toBe(DEFAULT_PANEL_SIZES.dockHeight);
+		expect(clampPanel("dockHeight", Number.POSITIVE_INFINITY)).toBe(
+			DEFAULT_PANEL_SIZES.dockHeight,
 		);
 	});
 });
@@ -43,14 +43,12 @@ describe("clampPanelSizes", () => {
 	test("clamps out-of-range entries", () => {
 		const sizes = clampPanelSizes({
 			railWidth: 5000,
-			debugWidth: 1,
 			dockHeight: 5000,
 			terminalHeight: 1,
 			terminalWidth: 1,
 		});
 		expect(sizes).toEqual({
 			railWidth: PANEL_LIMITS.railWidth.max,
-			debugWidth: PANEL_LIMITS.debugWidth.min,
 			dockHeight: PANEL_LIMITS.dockHeight.max,
 			terminalHeight: PANEL_LIMITS.terminalHeight.min,
 			terminalWidth: PANEL_LIMITS.terminalWidth.min,
@@ -60,10 +58,9 @@ describe("clampPanelSizes", () => {
 
 describe("resizePanel", () => {
 	test("moves one panel and leaves the others alone", () => {
-		const next = resizePanel(DEFAULT_PANEL_SIZES, "debugWidth", 400);
-		expect(next.debugWidth).toBe(400);
+		const next = resizePanel(DEFAULT_PANEL_SIZES, "dockHeight", 400);
+		expect(next.dockHeight).toBe(400);
 		expect(next.railWidth).toBe(DEFAULT_PANEL_SIZES.railWidth);
-		expect(next.dockHeight).toBe(DEFAULT_PANEL_SIZES.dockHeight);
 		expect(next.terminalHeight).toBe(DEFAULT_PANEL_SIZES.terminalHeight);
 	});
 

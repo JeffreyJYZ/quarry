@@ -22,7 +22,6 @@ export function useShellSnapshot(args: {
 		buffers: workspace.buffers,
 		activePath,
 		railCollapsed: panels.railCollapsed,
-		debugOpen: panels.debugOpen,
 		gitOpen: panels.gitOpen,
 		panelOpen: panels.panelOpen,
 		dockTab: panels.dockTab,

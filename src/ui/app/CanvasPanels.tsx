@@ -109,6 +109,9 @@ export default function CanvasPanels({ model }: { model: ShellModel }) {
 			onSelectTab={panels.setDockTab}
 			onSelectProblem={workspace.handleSelectProblem}
 			onBuffersChange={workspace.setBuffers}
+			debug={model.debug}
+			cursor={overlays.cursor}
+			onNavigate={workspace.handleNavigate}
 			tests={model.tests}
 		/>
 	);

@@ -1,5 +1,5 @@
 /**
- * Panel geometry for the three resizable edges: the rail, the debug panel and the two stacked
+ * Panel geometry for the three resizable edges: the rail and the two stacked
  * regions in the canvas.
  *
  * Sizes live in user settings, so every value that arrives from disk is clamped here first — a
@@ -8,7 +8,6 @@
 
 export type PanelSizes = {
 	railWidth: number;
-	debugWidth: number;
 	dockHeight: number;
 	terminalHeight: number;
 	terminalWidth: number;
@@ -18,7 +17,6 @@ export type PanelName = keyof PanelSizes;
 
 export const DEFAULT_PANEL_SIZES: PanelSizes = {
 	railWidth: 240,
-	debugWidth: 320,
 	dockHeight: 260,
 	terminalHeight: 180,
 	terminalWidth: 380,
@@ -26,7 +24,6 @@ export const DEFAULT_PANEL_SIZES: PanelSizes = {
 
 export const PANEL_LIMITS: Record<PanelName, { min: number; max: number }> = {
 	railWidth: { min: 160, max: 560 },
-	debugWidth: { min: 200, max: 640 },
 	dockHeight: { min: 120, max: 900 },
 	terminalHeight: { min: 100, max: 900 },
 	terminalWidth: { min: 240, max: 900 },
@@ -50,7 +47,6 @@ export function clampPanelSizes(input: unknown): PanelSizes {
 	};
 	return {
 		railWidth: read("railWidth"),
-		debugWidth: read("debugWidth"),
 		dockHeight: read("dockHeight"),
 		terminalHeight: read("terminalHeight"),
 		terminalWidth: read("terminalWidth"),

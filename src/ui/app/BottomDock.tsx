@@ -1,5 +1,6 @@
 import type { FileBuffer as Buffer } from "@/lib/project/buffer";
 import { Suspense, lazy } from "react";
+import type { DebugController } from "@/lib/debug/session";
 import Splitter from "@/ui/layout/Splitter";
 import TestsDock, { type DockTab, type TestsDockProps } from "@/ui/tests/TestsDock";
 import type { ShortcutGroup } from "@/ui/shortcuts/ShortcutSheet";
@@ -24,10 +25,13 @@ export type DockProps = {
 	onSelectTab: (tab: DockTab) => void;
 	onSelectProblem: (path: string, line?: number, character?: number) => void;
 	onBuffersChange: (updater: (current: Buffer[]) => Buffer[]) => void;
+	debug: DebugController;
+	cursor: { line: number; character: number } | null;
+	onNavigate: (path: string, line: number, character: number) => void;
 	tests: TestsDockProps["tests"];
 };
 
-/** The bottom dock: problems and tests share one region and one header. */
+/** The bottom dock: problems, tests and the debugger share one region and one header. */
 export default function BottomDock(props: DockProps) {
 	if (!props.open) return null;
 	return (
@@ -48,6 +52,10 @@ export default function BottomDock(props: DockProps) {
 				expanded={props.expanded}
 				onToggleExpanded={props.onToggleExpanded}
 				onSelectTab={props.onSelectTab}
+				debug={props.debug}
+				activePath={props.activePath}
+				cursor={props.cursor}
+				onNavigate={props.onNavigate}
 				problems={{
 					files: props.problemFiles,
 					errors: props.counts.errors,

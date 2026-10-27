@@ -17,6 +17,5 @@ export function resetProjectState(
 	panels.setPanelOpen(null);
 	overlays.setSearchOpen(false);
 	overlays.setShortcutsOpen(false);
-	panels.setDebugOpen(false);
 	diagnostics.reset();
 }

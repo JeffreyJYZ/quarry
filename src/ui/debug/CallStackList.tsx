@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import type { DebugController, StopView } from "@/lib/debug/session";
 import { fileName } from "@/lib/problems/model";
 
-/** The stop reason and the frame list; a frame click selects it and opens its source line. */
+/**
+ * The stop reason and the frame list; a frame click selects it and opens its source line.
+ *
+ * Body only: the dock column owns the header and the scroll box, so this renders the rows.
+ */
 export default function CallStackList({
 	debug,
 	view,
@@ -23,80 +27,72 @@ export default function CallStackList({
 		}
 	}, [view]);
 
+	if (view === null) {
+		return <p className="debug-note">Not stopped</p>;
+	}
+
 	return (
-		<section className="debug-section debug-frames">
-			<div className="debug-section-head">
-				<span className="label">frames</span>
-				<span className="debug-count">{view === null ? 0 : view.frames.length}</span>
-			</div>
-			{view === null ? null : (
-				<p className="debug-stop" title={view.description ?? undefined}>
-					{view.description === null
-						? view.reason
-						: `${view.reason} · ${view.description}`}
-				</p>
-			)}
-			<div className="debug-scroll">
-				{view === null ? (
-					<p className="debug-note">Not stopped</p>
-				) : view.frames.length === 0 ? (
-					<p className="debug-note">No frames</p>
-				) : (
-					view.frames.map((frame) => {
-						const navigable = frame.source !== null && frame.line > 0;
-						const marked =
-							navigated !== null &&
-							frame.source === navigated.source &&
-							frame.line === navigated.line;
-						const className = [
-							"debug-frame",
-							frame.id === view.frameId ? "active" : "",
-							marked && frame.id !== view.frameId ? "navigated" : "",
-						]
-							.filter(Boolean)
-							.join(" ");
-						const content = (
-							<>
-								<span className="debug-frame-name">{frame.name}</span>
-								<span className="debug-frame-pos">
-									{frame.source === null
-										? "—"
-										: `${fileName(frame.source)}:${frame.line}`}
-								</span>
-							</>
-						);
-						if (!navigable || frame.source === null) {
-							return (
-								<span
-									key={frame.id}
-									className={className}
-									title={frame.source ?? undefined}
-									style={marked ? { opacity: 0.55 } : undefined}
-								>
-									{content}
-								</span>
-							);
-						}
-						const source = frame.source;
+		<>
+			<p className="debug-stop" title={view.description ?? undefined}>
+				{view.description === null ? view.reason : `${view.reason} · ${view.description}`}
+			</p>
+			{view.frames.length === 0 ? (
+				<p className="debug-note">No frames</p>
+			) : (
+				view.frames.map((frame) => {
+					const navigable = frame.source !== null && frame.line > 0;
+					const marked =
+						navigated !== null &&
+						frame.source === navigated.source &&
+						frame.line === navigated.line;
+					const className = [
+						"debug-frame",
+						frame.id === view.frameId ? "active" : "",
+						marked && frame.id !== view.frameId ? "navigated" : "",
+					]
+						.filter(Boolean)
+						.join(" ");
+					const content = (
+						<>
+							<span className="debug-frame-name">{frame.name}</span>
+							<span className="debug-frame-pos">
+								{frame.source === null
+									? "—"
+									: `${fileName(frame.source)}:${frame.line}`}
+							</span>
+						</>
+					);
+					if (!navigable || frame.source === null) {
 						return (
-							<button
+							<span
 								key={frame.id}
-								type="button"
 								className={className}
-								title={source}
+								title={frame.source ?? undefined}
 								style={marked ? { opacity: 0.55 } : undefined}
-								onClick={() => {
-									debug.selectFrame(frame.id);
-									setNavigated({ source, line: frame.line });
-									onNavigate?.(source, frame.line - 1, 0);
-								}}
 							>
 								{content}
-							</button>
+							</span>
 						);
-					})
-				)}
-			</div>
-		</section>
+					}
+					const source = frame.source;
+					return (
+						<button
+							key={frame.id}
+							type="button"
+							className={className}
+							title={source}
+							style={marked ? { opacity: 0.55 } : undefined}
+							onClick={() => {
+								debug.selectFrame(frame.id);
+								setNavigated({ source, line: frame.line });
+								onNavigate?.(source, frame.line - 1, 0);
+							}}
+						>
+							{content}
+						</button>
+					);
+				})
+			)}
+		</>
 	);
 }

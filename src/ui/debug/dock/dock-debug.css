@@ -1,0 +1,158 @@
+/* The debugger dock tab: the tab's status suffix, the transport rail and its three columns. */
+
+/* The debugger tab's own suffix: the session state, in the tab strip. */
+.dock-tab-status {
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: 0;
+	color: var(--muted);
+}
+
+.dock-tab-status.stopped {
+	color: var(--warn);
+}
+
+.dock-tab-status.launching,
+.dock-tab-status.running {
+	color: var(--accent);
+}
+
+.dock-body-debug {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.dock-debug {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	min-height: 0;
+}
+
+/* One row for a session fact, a launch error or the build offer. */
+.dock-debug-strip {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 0 0 auto;
+	height: 26px;
+	padding: 0 10px;
+	border-bottom: 1px solid var(--line);
+	background: var(--rail);
+}
+
+.dock-debug-strip.error {
+	color: var(--danger);
+}
+
+.dock-debug-strip-text {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10.5px;
+}
+
+.dock-debug-strip.error .dock-debug-strip-text {
+	color: var(--danger);
+}
+
+.dock-debug-grid {
+	display: grid;
+	grid-template-columns: 34px 25% minmax(0, 1fr) 24%;
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.dock-debug-rail {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	padding: 4px 0;
+	background: var(--rail);
+}
+
+.dock-debug-icon {
+	display: grid;
+	place-items: center;
+	width: 26px;
+	height: 24px;
+	padding: 0;
+	border: 0;
+	border-radius: 3px;
+	background: transparent;
+	color: var(--muted);
+	cursor: pointer;
+}
+
+.dock-debug-icon:hover:not(:disabled) {
+	background: var(--hover);
+	color: var(--text);
+}
+
+.dock-debug-icon:disabled {
+	opacity: 0.35;
+	cursor: default;
+}
+
+.dock-debug-icon:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: -1px;
+}
+
+.dock-debug-col {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	border-left: 1px solid var(--line);
+}
+
+.dock-debug-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	flex: 0 0 auto;
+	height: 30px;
+	padding: 0 10px;
+	border-bottom: 1px solid var(--line);
+	background: var(--rail);
+}
+
+.dock-debug-head-sub {
+	border-top: 1px solid var(--line);
+}
+
+.dock-debug-label {
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.dock-debug-count {
+	flex: 0 0 auto;
+	font-family: var(--mono);
+	font-size: 10px;
+	color: var(--muted);
+}
+
+.dock-debug-scroll {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-x: hidden;
+	overflow-y: auto;
+	padding-bottom: 4px;
+}
+
+.dock-debug-scroll-watch {
+	flex: 0 1 40%;
+	min-height: 48px;
+}

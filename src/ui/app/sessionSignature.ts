@@ -20,7 +20,6 @@ export function snapshotSignature(snapshot: SessionSnapshot | null): string {
 		JSON.stringify(snapshot.preferences),
 		JSON.stringify(snapshot.runConfigurations),
 		snapshot.railCollapsed ? "1" : "0",
-		snapshot.debugOpen ? "1" : "0",
 		snapshot.gitOpen ? "1" : "0",
 		String(snapshot.panelOpen),
 		snapshot.dockTab,

@@ -46,10 +46,10 @@ export function buildCommands(context: CommandContext): Command[] {
 		},
 		{
 			id: "toggle-debug",
-			label: "Toggle debug panel",
+			label: "Show debugger",
 			hint: "",
 			disabled: root === null,
-			run: context.toggleDebug,
+			run: context.showDebugger,
 		},
 		{
 			id: "toggle-source-control",

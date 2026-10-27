@@ -1,11 +1,19 @@
 import type { ProblemFile } from "@/lib/problems/model";
 import type { FileBuffer } from "@/lib/project/buffer";
+import type { DebugController } from "@/lib/debug/session";
 import { DockTabs } from "./DockTabs";
 import { DockTools } from "./DockTools";
 import { useDockFilters } from "./useDockFilters";
+import ConsoleSection from "@/ui/debug/ConsoleSection";
+import MemoryPanes from "@/ui/debug/MemoryPanes";
+import DebugDockBody from "@/ui/debug/dock/DebugDockBody";
+import DebugMenu from "@/ui/debug/dock/DebugMenu";
+import { disasmAddressOf, memoryAddressOf } from "@/ui/debug/dock/addresses";
 import ProblemsPanel from "@/ui/problems/ProblemsPanel";
 import TestsPanel from "@/ui/tests/TestsPanel";
 import type { TestsController } from "@/lib/tests/useTests";
+import "@/ui/debug/dock/dock-debug.css";
+import "@/ui/debug/debug.css";
 
 export type DockTab = import("./parts").DockTab;
 
@@ -14,6 +22,10 @@ export type TestsDockProps = {
 	expanded: boolean;
 	onToggleExpanded: () => void;
 	onSelectTab: (tab: DockTab) => void;
+	debug: DebugController;
+	activePath: string | null;
+	cursor: { line: number; character: number } | null;
+	onNavigate: (path: string, line: number, character: number) => void;
 	problems: {
 		files: ProblemFile[];
 		errors: number;
@@ -27,15 +39,21 @@ export type TestsDockProps = {
 	tests: TestsController;
 };
 
+/** The bottom dock: diagnostics, tests and the debug session's own views share one header. */
 export default function TestsDock({
 	tab,
 	expanded,
 	onToggleExpanded,
 	onSelectTab,
+	debug,
+	activePath,
+	cursor,
+	onNavigate,
 	problems,
 	tests,
 }: TestsDockProps) {
 	const dock = useDockFilters({ tests, tab, expanded });
+
 	return (
 		<section className={expanded ? "dock" : "dock collapsed"} aria-label="Bottom dock">
 			<div className="dock-head">
@@ -47,11 +65,13 @@ export default function TestsDock({
 					testsCount={tests.items.length}
 					failed={dock.failed}
 					problemsErrors={problems.errors}
+					debugStatus={debug.status}
 				/>
 				{tab === "tests" ? <DockTools dock={dock} tests={tests} /> : null}
+				{tab === "debugger" ? <DebugMenu debug={debug} /> : null}
 			</div>
 			{expanded ? (
-				<div className="dock-body">
+				<div className={tab === "debugger" ? "dock-body dock-body-debug" : "dock-body"}>
 					{tab === "tests" ? (
 						<TestsPanel
 							items={dock.filtered}
@@ -69,7 +89,7 @@ export default function TestsDock({
 							binaryFilter={dock.binaryFilter}
 							resultFilter={dock.resultFilter}
 						/>
-					) : (
+					) : tab === "problems" ? (
 						<ProblemsPanel
 							files={problems.files}
 							errors={problems.errors}
@@ -81,6 +101,21 @@ export default function TestsDock({
 							root={problems.root}
 							buffers={problems.buffers}
 							setBuffers={problems.setBuffers}
+						/>
+					) : tab === "debugger" ? (
+						<DebugDockBody
+							debug={debug}
+							activePath={activePath}
+							cursor={cursor}
+							onNavigate={onNavigate}
+						/>
+					) : tab === "console" ? (
+						<ConsoleSection session={debug.sessionId} />
+					) : (
+						<MemoryPanes
+							session={debug.sessionId}
+							memoryAddress={memoryAddressOf(debug)}
+							disasmAddress={disasmAddressOf(debug)}
 						/>
 					)}
 				</div>

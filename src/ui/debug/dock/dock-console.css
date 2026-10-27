@@ -1,0 +1,25 @@
+/* The console tab owns the whole dock body, so the transcript fills it. */
+
+.dock-console {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.dock-console-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	flex: 0 0 auto;
+	height: 26px;
+	padding: 0 10px;
+	border-bottom: 1px solid var(--line);
+}
+
+.dock-console .debug-console-text {
+	flex: 1 1 auto;
+	max-height: none;
+	border-radius: 0;
+}

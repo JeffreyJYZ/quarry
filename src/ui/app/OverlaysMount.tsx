@@ -40,14 +40,14 @@ export default function OverlaysMount({ model }: { model: ShellModel }) {
 			terminalOpen={panels.terminalOpen}
 			panelExpanded={model.panelExpanded}
 			gitOpen={panels.gitOpen}
-			debugOpen={panels.debugOpen}
+			debuggerActive={panels.dockTab === "debugger" && model.panelExpanded}
 			building={build.building}
 			running={runs.running !== null}
 			onToggleRail={() => panels.setRailCollapsed((collapsed) => !collapsed)}
 			onToggleTerminal={() => panels.setTerminalOpen((open) => !open)}
 			onTogglePanel={() => panels.setPanelOpen(!model.panelExpanded)}
 			onToggleGit={() => panels.setGitOpen((open) => !open)}
-			onToggleDebug={() => panels.setDebugOpen((open) => !open)}
+			onShowDebugger={() => panels.showDebugger()}
 			onBuild={() => void build.build()}
 			onRun={() => void runs.run()}
 			onStop={() => void runs.stop()}

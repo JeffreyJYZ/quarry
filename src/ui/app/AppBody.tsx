@@ -7,28 +7,22 @@ import EditorColumn from "@/ui/app/EditorColumn";
 import Splitter from "@/ui/layout/Splitter";
 import type { ShellModel } from "@/ui/app/useShell";
 
-const DebugPanel = lazy(() => import("@/ui/debug/DebugPanel"));
 const Terminal = lazy(() => import("@/ui/terminal/Terminal"));
 
-/** The rail and the canvas, with the terminal-on-the-right and debug columns beside them. */
+/** The rail and the canvas, with the terminal column beside them. */
 export default function AppBody({ model }: { model: ShellModel }) {
 	const { workspace, overlays, panels, settings, git } = model;
-	const { railWidth, debugWidth, terminalWidth } = settings.panels;
+	const { railWidth, terminalWidth } = settings.panels;
 	const project = workspace.project;
 
 	return (
 		<div
-			className={[
-				"body",
-				panels.debugOpen && model.root !== null ? "debug-open" : "",
-				panels.railCollapsed ? "rail-collapsed" : "",
-			]
+			className={["body", panels.railCollapsed ? "rail-collapsed" : ""]
 				.filter(Boolean)
 				.join(" ")}
 			style={
 				{
 					"--rail-width": `${railWidth}px`,
-					"--debug-width": `${debugWidth}px`,
 					"--terminal-width": `${terminalWidth}px`,
 				} as CSSProperties
 			}
@@ -109,28 +103,6 @@ export default function AppBody({ model }: { model: ShellModel }) {
 							defaultFontSize={settings.effective.terminalFontSize}
 							fontFamily={settings.effective.terminalFontFamily}
 							placement="right"
-						/>
-					</Suspense>
-				</>
-			) : null}
-
-			{panels.debugOpen && model.root !== null ? (
-				<>
-					<Splitter
-						axis="x"
-						value={debugWidth}
-						min={200}
-						max={640}
-						invert
-						label="Resize debug panel"
-						onChange={(next) => settings.handlePanelResize("debugWidth", next)}
-					/>
-					<Suspense fallback={null}>
-						<DebugPanel
-							debug={model.debug}
-							activePath={model.activePath}
-							cursor={overlays.cursor}
-							onNavigate={workspace.handleNavigate}
 						/>
 					</Suspense>
 				</>

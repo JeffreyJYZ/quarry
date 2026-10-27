@@ -15,7 +15,7 @@ export default function AppView({ model }: { model: ShellModel }) {
 					<>
 						<RunDebugWidget
 							runDebug={model.runDebug}
-							onEditConfigurations={() => model.panels.setDebugOpen(() => true)}
+							onEditConfigurations={() => model.panels.showDebugger()}
 						/>
 						<UpdateSlot />
 					</>
