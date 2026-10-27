@@ -61,7 +61,10 @@ pub async fn dap_restart(
     let adapter_filters = match handshake_launch(&mut pipe, &adapter, &config, &cwd) {
         Ok(adapter_filters) => adapter_filters,
         Err(error) => {
+            // Kill and reap the new pipe explicitly (its `Drop` is not enough), drop any
+            // partial registration, then surface the error.
             let _ = pipe.kill();
+            lock(&state.sessions).remove(&session);
             return Err(error);
         }
     };

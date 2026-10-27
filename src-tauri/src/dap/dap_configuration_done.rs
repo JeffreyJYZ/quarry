@@ -48,6 +48,8 @@ pub fn register_session(
         .name("quarry-dap-pump".to_string())
         .spawn(move || pump.run())
         .map_err(|error| {
+            // Reap the adapter before dropping the session so no live process survives a
+            // failed pump spawn. `shutdown` kills and waits; only then is the entry removed.
             session.shutdown();
             lock(&state.sessions).remove(&id);
             format!("cannot start the {ADAPTER} reader thread: {error}")

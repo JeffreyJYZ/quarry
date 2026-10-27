@@ -115,9 +115,9 @@ pub async fn lsp_inlay_hints(
 /// Line and character counts follow LSP: lines are separated by `\\n`, and
 /// characters are UTF-16 code units.
 pub fn document_end(text: &str) -> Position {
-    let lines: Vec<&str> = text.split('\n').collect();
-    let line = lines.len().saturating_sub(1) as u32;
-    let last = lines.last().copied().unwrap_or("");
+    // Counting with an iterator avoids collecting every line just to reach the last one.
+    let line = text.bytes().filter(|byte| *byte == b'\n').count() as u32;
+    let last = text.rsplit('\n').next().unwrap_or("");
     let character = last.chars().map(|c| c.len_utf16() as u32).sum();
     Position { line, character }
 }
