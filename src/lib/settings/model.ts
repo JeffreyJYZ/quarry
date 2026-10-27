@@ -13,6 +13,11 @@ import {
 	effectiveTerminalPreferences,
 	normalizeTerminalPreferences,
 } from "@/lib/settings/terminal";
+import {
+	DEFAULT_THEME_PREFERENCES,
+	normalizeThemePreferences,
+	type ThemePreferences,
+} from "@/lib/themes/preferences";
 
 export type BuildProfile = "debug" | "release";
 export type TerminalPlacement = "bottom" | "right";
@@ -22,7 +27,8 @@ export const TAB_SIZES: TabSize[] = [2, 4, 8];
 export const BUILD_PROFILES: BuildProfile[] = ["debug", "release"];
 export const FONT_SIZE_RANGE = { min: 9, max: 24 } as const;
 
-export type Preferences = {
+/** `theme` and `customThemes` are optional on disk, so an old settings file still loads. */
+export type Preferences = ThemePreferences & {
 	editorFontSize: number;
 	editorTabSize: TabSize;
 	terminalFontSize: number;
@@ -52,7 +58,7 @@ export type ProjectSettings = {
 	buildProfile: BuildProfile | null;
 };
 
-export type EffectivePreferences = {
+export type EffectivePreferences = ThemePreferences & {
 	editorFontSize: number;
 	editorTabSize: TabSize;
 	terminalFontSize: number;
@@ -74,6 +80,7 @@ export type EffectivePreferences = {
 };
 
 export const DEFAULT_PREFERENCES: Preferences = {
+	...DEFAULT_THEME_PREFERENCES,
 	editorFontSize: 13,
 	editorTabSize: 4,
 	terminalFontSize: 13,
@@ -123,6 +130,7 @@ export function normalizePreferences(input: unknown): Preferences {
 		unknown
 	>;
 	return {
+		...normalizeThemePreferences(source),
 		editorFontSize: clampFontSize(source.editorFontSize, DEFAULT_PREFERENCES.editorFontSize),
 		editorTabSize: readTabSize(source.editorTabSize) ?? DEFAULT_PREFERENCES.editorTabSize,
 		terminalFontSize: clampFontSize(
@@ -164,20 +172,11 @@ export function effectivePreferences(
 	project: ProjectSettings | null,
 ): EffectivePreferences {
 	return {
-		editorFontSize: user.editorFontSize,
+		...user,
 		editorTabSize: project?.editorTabSize ?? user.editorTabSize,
-		terminalFontSize: user.terminalFontSize,
 		...effectiveTerminalPreferences(user),
 		formatOnSave: project?.formatOnSave ?? user.formatOnSave,
 		buildProfile: project?.buildProfile ?? user.buildProfile,
-		terminalPlacement: user.terminalPlacement,
-		editorFontFamily: user.editorFontFamily,
-		terminalFontFamily: user.terminalFontFamily,
-		rustAnalyzerPath: user.rustAnalyzerPath,
-		rustAnalyzerArgs: user.rustAnalyzerArgs,
-		clangdPath: user.clangdPath,
-		clangdArgs: user.clangdArgs,
-		panelSizes: user.panelSizes,
 	};
 }
 

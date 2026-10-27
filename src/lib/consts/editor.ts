@@ -1,4 +1,10 @@
-/** Editor hues, one home so the theme, its stylesheets and the highlight style cannot drift. */
+/**
+ * Editor fallback hues, one home so the highlight style and its stylesheets cannot drift.
+ *
+ * These are no longer the source of truth: the active theme publishes `--editor-*` and `--lint-*`
+ * on the document root (see `@/lib/themes/apply`), and these constants are the first-paint
+ * fallback behind each variable.
+ */
 
 /** One hue per role, so a Rust or C++ buffer reads at a glance. */
 export const palette = {

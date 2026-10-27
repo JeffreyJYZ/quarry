@@ -1,9 +1,20 @@
 import { breakpointColor, lint } from "@/lib/consts/editor";
+import { themeVar } from "@/lib/themes/model";
 
 /** Inline SVG data helpers: the lint package wants a CSS image, not a class. */
 
 function svgUrl(content: string): string {
 	return `url("data:image/svg+xml,${encodeURIComponent(content)}")`;
+}
+
+/**
+ * A lint colour as a CSS variable.
+ *
+ * Only plain declarations can take a variable: `squiggle`/`marker` below bake a colour into an SVG
+ * data URI, where `var()` is not resolved, so those keep the One Dark constant.
+ */
+function lintHue(token: "error" | "warning" | "info" | "hint"): string {
+	return `var(${themeVar(token)}, ${lint[token]})`;
 }
 
 /** The hairline squiggle the lint package repeats under an underlined range. */
@@ -48,10 +59,10 @@ export const lintStyles = {
 		fontSize: "12px",
 		fontFamily: 'ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace',
 	},
-	".cm-diagnostic-error": { borderLeftColor: lint.error },
-	".cm-diagnostic-warning": { borderLeftColor: lint.warning },
-	".cm-diagnostic-info": { borderLeftColor: lint.info },
-	".cm-diagnostic-hint": { borderLeftColor: lint.hint },
+	".cm-diagnostic-error": { borderLeftColor: lintHue("error") },
+	".cm-diagnostic-warning": { borderLeftColor: lintHue("warning") },
+	".cm-diagnostic-info": { borderLeftColor: lintHue("info") },
+	".cm-diagnostic-hint": { borderLeftColor: lintHue("hint") },
 	".cm-diagnosticSource": { color: "var(--muted)", opacity: 1 },
 } as const;
 
@@ -105,11 +116,11 @@ export const breakpointStyles = {
 		height: "9px",
 		boxSizing: "border-box",
 		borderRadius: "50%",
-		backgroundColor: breakpointColor,
+		backgroundColor: `var(${themeVar("breakpoint")}, ${breakpointColor})`,
 	},
 	".cm-breakpoint-dot.unverified": {
 		backgroundColor: "transparent",
-		border: `1px solid ${breakpointColor}`,
+		border: `1px solid var(${themeVar("breakpoint")}, ${breakpointColor})`,
 		opacity: 0.65,
 	},
 } as const;

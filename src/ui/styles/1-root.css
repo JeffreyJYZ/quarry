@@ -1,19 +1,23 @@
 :root {
-	/* Zed's One Dark, taken from zed-industries/zed assets/themes/one/one.json. */
-	--bg: #282c33;
-	--panel: #2f343e;
-	--rail: #2e343e;
-	--line: #363c46;
-	--text: #dce0e5;
-	--muted: #a9afbc;
-	--accent: #74ade8;
+	/*
+	 * First-paint fallback: One Dark with a contrast pass, the same values as
+	 * `src/lib/themes/builtin/one-dark.ts`. `applyTheme` overwrites every one of them from the
+	 * active theme, so this block is only what the very first frame shows.
+	 */
+	--bg: #23272e;
+	--panel: #2c313a;
+	--rail: #2a2f37;
+	--line: #4a505c;
+	--text: #e6e9ee;
+	--muted: #b9c0cc;
+	--accent: #8bb8f0;
 	/* Title bar and status bar sit one step above a panel, as Zed's chrome does. */
-	--chrome: #3b414d;
+	--chrome: #343a45;
 
-	--hover: #363c46;
-	--danger: #d07277;
-	--warn: #dec184;
-	--good: #a1c181;
+	--hover: #363c47;
+	--danger: #e06c75;
+	--warn: #e5c07b;
+	--good: #98c379;
 
 	--mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
 

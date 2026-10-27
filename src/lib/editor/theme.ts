@@ -1,15 +1,24 @@
-import { HighlightStyle } from "@codemirror/language";
 import type { Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { tags } from "@lezer/highlight";
 import { editorMetrics, palette } from "@/lib/consts/editor";
 import { breakpointStyles, foldStyles, lintStyles } from "@/lib/editor/themeStyles";
+import { themeVar, type ThemeToken } from "@/lib/themes/model";
+
+/**
+ * A syntax or selection token as a CSS variable, falling back to the One Dark constant.
+ *
+ * `apply.ts` writes `--editor-*` on the document root, so these styles are built once and a theme
+ * switch rewrites the variables instead of rebuilding them.
+ */
+export function hue(token: ThemeToken & keyof typeof palette): string {
+	return `var(${themeVar(token)}, ${palette[token]})`;
+}
 
 /**
  * The editor skin.
  *
- * Colour and size constants live in `@/lib/consts/editor`, so the theme, the gutter styles and the
- * highlight style all read the same numbers.
+ * Chrome reads the shared `--bg`/`--line`/`--muted` variables; the sizes live in
+ * `@/lib/consts/editor` so the theme, the gutter styles and the highlight style cannot drift.
  */
 export const quarryTheme: Extension = EditorView.theme(
 	{
@@ -35,13 +44,13 @@ export const quarryTheme: Extension = EditorView.theme(
 			borderLeftWidth: "2px",
 		},
 		".cm-selectionBackground, .cm-content ::selection": {
-			backgroundColor: palette.selection,
+			backgroundColor: hue("selection"),
 		},
 		"&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground": {
-			backgroundColor: palette.selection,
+			backgroundColor: hue("selection"),
 		},
 		".cm-activeLine": {
-			backgroundColor: palette.activeLine,
+			backgroundColor: hue("activeLine"),
 		},
 		".cm-gutters": {
 			backgroundColor: "var(--bg)",
@@ -50,7 +59,7 @@ export const quarryTheme: Extension = EditorView.theme(
 			borderRight: "1px solid var(--line)",
 		},
 		".cm-activeLineGutter": {
-			backgroundColor: palette.activeLine,
+			backgroundColor: hue("activeLine"),
 			color: "var(--text)",
 		},
 		".cm-lineNumbers .cm-gutterElement": {
@@ -138,52 +147,3 @@ export const quarryTheme: Extension = EditorView.theme(
 	},
 	{ dark: true },
 );
-
-/** Syntax colours: each tag family maps to one hue from the shared palette. */
-export const quarryHighlightStyle: HighlightStyle = HighlightStyle.define([
-	{
-		tag: [tags.comment, tags.lineComment, tags.blockComment, tags.docComment],
-		color: palette.comment,
-		fontStyle: "italic",
-	},
-	{
-		tag: [
-			tags.keyword,
-			tags.controlKeyword,
-			tags.operatorKeyword,
-			tags.definitionKeyword,
-			tags.moduleKeyword,
-		],
-		color: palette.keyword,
-	},
-	{
-		tag: [tags.typeName, tags.className, tags.namespace, tags.definition(tags.typeName)],
-		color: palette.type,
-	},
-	{
-		tag: [tags.string, tags.special(tags.string), tags.regexp, tags.character],
-		color: palette.string,
-	},
-	{ tag: [tags.number, tags.integer, tags.float, tags.bool, tags.null], color: palette.number },
-	{
-		tag: [tags.operator, tags.punctuation, tags.separator, tags.bracket],
-		color: palette.operator,
-	},
-	{
-		tag: [tags.function(tags.variableName), tags.function(tags.propertyName), tags.macroName],
-		color: palette.function,
-	},
-	{ tag: [tags.variableName, tags.propertyName, tags.attributeName], color: palette.identifier },
-	{
-		tag: [tags.self, tags.standard(tags.variableName), tags.constant(tags.variableName)],
-		color: palette.macro,
-	},
-	{
-		tag: [tags.meta, tags.annotation, tags.processingInstruction, tags.documentMeta],
-		color: palette.macro,
-	},
-	{ tag: tags.invalid, color: palette.invalid },
-	{ tag: tags.strong, fontWeight: "600" },
-	{ tag: tags.emphasis, fontStyle: "italic" },
-	{ tag: tags.link, color: "var(--accent)", textDecoration: "underline" },
-]);

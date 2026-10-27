@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DEFAULT_PANEL_SIZES, PANEL_LIMITS } from "@/lib/layout/model";
+import { DEFAULT_THEME_ID } from "@/lib/themes/model";
 import {
 	clampFontSize,
 	DEFAULT_PREFERENCES,
@@ -14,6 +15,12 @@ describe("normalizePreferences", () => {
 		expect(normalizePreferences(null)).toEqual(DEFAULT_PREFERENCES);
 		expect(normalizePreferences({})).toEqual(DEFAULT_PREFERENCES);
 		expect(normalizePreferences("bogus")).toEqual(DEFAULT_PREFERENCES);
+	});
+
+	test("an old file without theme fields loads with the default theme", () => {
+		const preferences = normalizePreferences({ editorFontSize: 15 });
+		expect(preferences.theme).toBe(DEFAULT_THEME_ID);
+		expect(preferences.customThemes).toEqual([]);
 	});
 
 	test("clamps font sizes and keeps a usable tab size and profile", () => {

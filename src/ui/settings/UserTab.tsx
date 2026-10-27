@@ -1,6 +1,7 @@
 import type { JSX } from "react";
 import { FONT_SIZE_RANGE, type Preferences, TAB_SIZES, type TabSize } from "@/lib/settings/model";
 
+import { AppearanceSection } from "./AppearanceSection";
 import { Segmented, Stepper } from "./controls";
 import { LanguageServerSection } from "./LanguageServerSection";
 import { ShellSections } from "./ShellSections";
@@ -65,6 +66,8 @@ export function UserTab(props: {
 					/>
 				</div>
 			</section>
+
+			<AppearanceSection user={user} onChange={onChange} />
 
 			<TerminalSection user={user} onChange={onChange} />
 

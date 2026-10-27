@@ -77,6 +77,10 @@ pub struct Preferences {
     /// Extra arguments for clangd.
     #[serde(default)]
     pub clangd_args: String,
+    /// Theme selection: the active id (empty means One Dark) and themes imported from pasted JSON.
+    /// The values stay opaque here, so the frontend remains their only validator.
+    pub theme: String,
+    pub custom_themes: Vec<serde_json::Value>,
     #[serde(default, deserialize_with = "deserialize_panel_sizes")]
     pub panel_sizes: PanelSizes,
 }
@@ -153,6 +157,8 @@ impl Default for Preferences {
             rust_analyzer_args: String::new(),
             clangd_path: String::new(),
             clangd_args: String::new(),
+            theme: String::new(),
+            custom_themes: Vec::new(),
             panel_sizes: PanelSizes::default(),
         }
     }

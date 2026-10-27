@@ -1,0 +1,87 @@
+/* Theme picker, the paste box and the import error. */
+
+.settings-theme-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 6px 8px;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: var(--bg);
+}
+
+.settings-theme-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	font-size: 11px;
+}
+
+.settings-theme-delete {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	cursor: pointer;
+}
+
+.settings-theme-delete:hover {
+	color: var(--danger);
+}
+
+.settings-textarea {
+	width: 100%;
+	min-height: 72px;
+	padding: 6px 8px;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: var(--bg);
+	color: var(--text);
+	font-family: var(--mono);
+	font-size: 11px;
+	line-height: 1.5;
+	resize: vertical;
+}
+
+.settings-textarea:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: 1px;
+}
+
+.settings-button {
+	height: 22px;
+	padding: 0 10px;
+	border: 1px solid var(--line);
+	border-radius: 4px;
+	background: var(--rail);
+	color: var(--text);
+	font-family: var(--mono);
+	font-size: 10.5px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	cursor: pointer;
+}
+
+.settings-button:hover:not(:disabled) {
+	background: var(--hover);
+	border-color: var(--accent);
+}
+
+.settings-button:disabled {
+	color: var(--muted);
+	cursor: default;
+}
+
+.settings-error {
+	margin: 0;
+	font-family: var(--mono);
+	font-size: 11px;
+	line-height: 1.5;
+	color: var(--danger);
+	white-space: pre-wrap;
+}

@@ -16,6 +16,7 @@ import {
 	type ProjectSettings,
 } from "@/lib/settings/model";
 import type { BuildProfile } from "@/ui/app/shellShortcuts";
+import { useTheme } from "@/ui/app/useTheme";
 
 /**
  * Preferences and this project's overrides.
@@ -119,6 +120,8 @@ export function useSettings(options: {
 	}, [onOpenSettings]);
 
 	const effective = effectivePreferences(preferences, projectSettings);
+	// Painting happens in the hook, so a switch from the settings page repaints without a reload.
+	const theme = useTheme(preferences);
 
 	return {
 		preferences,
@@ -131,6 +134,7 @@ export function useSettings(options: {
 		onNotice,
 		report,
 		effective,
+		theme,
 		buildProfile: effective.buildProfile,
 		panels: effective.panelSizes,
 	};
