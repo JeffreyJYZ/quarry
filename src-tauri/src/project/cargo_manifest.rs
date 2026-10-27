@@ -61,7 +61,15 @@ pub struct Detected {
 
 /// Nearest ancestor wins; within one directory the markers are tried in priority order
 /// (`Cargo.toml`, `CMakeLists.txt`, `compile_commands.json`, then `build/compile_commands.json`).
+///
+/// Only when nothing is found at or above the root does it search two levels below it, so a
+/// repository whose crate lives in a subdirectory still resolves.
 pub fn detect(root: &Path) -> Option<Detected> {
+    detect_ancestors(root).or_else(|| descend(root))
+}
+
+/// The original upward walk: the root itself first, then each parent.
+fn detect_ancestors(root: &Path) -> Option<Detected> {
     for ancestor in root.ancestors() {
         let cargo_manifest = ancestor.join(CARGO_MANIFEST);
         if cargo_manifest.is_file() {

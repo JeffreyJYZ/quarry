@@ -142,3 +142,13 @@ pub struct DapStoppedEvent {
     pub line: Option<u32>,
     pub source: Option<String>,
 }
+
+/// Payload of the `dap://output` event: what the debuggee wrote to stdout, stderr or the
+/// debug console.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct DapOutputEvent {
+    pub session: String,
+    pub category: String,
+    pub output: String,
+}

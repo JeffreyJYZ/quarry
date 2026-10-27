@@ -56,24 +56,10 @@ pub fn compose_cargo(info: &ProjectInfo, stop_on_entry: bool) -> Result<LaunchCo
     require_cargo(info.kind)?;
 
     let cargo = cargo_program()?;
-    let rustc = tool_program(RUSTC, RUSTC_HINT)?;
-    let sysroot = rust_sysroot(&rustc)?;
-
     let metadata = cargo_metadata(&cargo, &info.build_root)?;
     let bin = find_bin_target(&metadata, &info.name)?;
-    let program = program_path(target_directory(&metadata)?, &bin);
 
-    if !Path::new(&program).is_file() {
-        return Err(missing_binary(&program, &info.root));
-    }
-
-    Ok(LaunchConfig {
-        program,
-        args: Vec::new(),
-        cwd: info.root.clone(),
-        stop_on_entry,
-        init_commands: init_commands(&sysroot),
-    })
+    cargo_launch_config(info, &metadata, &bin, stop_on_entry)
 }
 
 /// The Cargo branch accepts Cargo projects only.

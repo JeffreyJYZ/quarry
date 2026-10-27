@@ -76,24 +76,7 @@ impl Pump {
         };
         let body = message.get("body").cloned().unwrap_or(Value::Null);
 
-        match name {
-            "stopped" => {
-                if let Some(thread_id) = body.get("threadId").and_then(Value::as_u64) {
-                    self.session
-                        .stopped_thread
-                        .store(thread_id as u32, Ordering::SeqCst);
-                }
-                // DAP's `stopped` body carries no location, so the UI needs the top frame.
-                let (source, line) = self.top_frame(&body);
-                emit_stopped(
-                    &self.app,
-                    stopped_event(&self.session.id, &body, source, line),
-                );
-            }
-            "terminated" | "exited" => emit_terminated(&self.app, &self.session.id),
-            // `output`, `initialized`, `breakpoint` and the rest need nothing beyond a log.
-            _ => {}
-        }
+        dispatch_event(self, name, &body);
     }
 
     /// Where the stop happened: the top frame's source path and line, if the adapter gives them.

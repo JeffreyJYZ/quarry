@@ -33,6 +33,9 @@ pub use find_with_xcrun::*;
 mod is_bin_target;
 pub use is_bin_target::*;
 
+mod targets;
+pub use targets::*;
+
 mod tests_1;
 pub use tests_1::*;
 
@@ -41,6 +44,15 @@ pub use tests_2::*;
 
 mod tests_3;
 pub use tests_3::*;
+
+mod tests_4;
+pub use tests_4::*;
+
+mod tests_5;
+pub use tests_5::*;
+
+mod tests_6;
+pub use tests_6::*;
 
 /// The launch configuration for a project that has no preset, chosen by project kind.
 ///

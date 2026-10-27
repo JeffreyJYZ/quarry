@@ -87,6 +87,9 @@ pub use dap_restart::*;
 mod impl_pump_1;
 pub use impl_pump_1::*;
 
+mod pump_events;
+pub use pump_events::*;
+
 mod handshake_launch;
 pub use handshake_launch::*;
 

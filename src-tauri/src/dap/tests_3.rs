@@ -103,4 +103,56 @@ pub mod tests_group_3 {
         let unprefixed = write_memory_arguments("16FDFDCBC", &[0xde, 0xad]);
         assert_eq!(unprefixed["memoryReference"], json!("16FDFDCBC"));
     }
+
+    #[test]
+    pub fn output_event_keeps_a_stderr_category() {
+        let body = json!({ "category": "stderr", "output": "boom\n" });
+        let event = output_event("dap-out", &body).expect("an output event");
+
+        assert_eq!(event.session, "dap-out");
+        assert_eq!(event.category, "stderr");
+        assert_eq!(event.output, "boom\n");
+
+        // The wire shape the frontend listens for.
+        let wire = serde_json::to_value(&event).expect("serialize");
+        assert_eq!(wire["session"], json!("dap-out"));
+        assert_eq!(wire["category"], json!("stderr"));
+        assert_eq!(wire["output"], json!("boom\n"));
+    }
+
+    #[test]
+    pub fn output_event_defaults_a_missing_category_to_stdout() {
+        assert_eq!(DEFAULT_OUTPUT_CATEGORY, "stdout");
+
+        let missing =
+            output_event("dap-out", &json!({ "output": "hi\n" })).expect("an output event");
+        assert_eq!(missing.category, DEFAULT_OUTPUT_CATEGORY);
+
+        // A non-string category is not one the adapter sent, so it takes the same default.
+        let numeric = output_event("dap-out", &json!({ "category": 7, "output": "hi\n" }))
+            .expect("an output event");
+        assert_eq!(numeric.category, DEFAULT_OUTPUT_CATEGORY);
+        assert_eq!(numeric.output, "hi\n");
+    }
+
+    #[test]
+    pub fn output_event_skips_a_non_string_output() {
+        // Never emitted as the text "null", and never as an empty line.
+        assert!(output_event("dap-out", &json!({ "category": "stdout", "output": 42 })).is_none());
+        assert!(output_event("dap-out", &json!({ "category": "stdout" })).is_none());
+        assert!(output_event("dap-out", &json!({ "output": null })).is_none());
+        assert!(output_event("dap-out", &json!({ "output": ["a", "b"] })).is_none());
+    }
+
+    #[test]
+    pub fn event_route_still_sends_stopped_to_the_stop_handler() {
+        assert_eq!(event_route("stopped"), EventRoute::Stopped);
+        assert_eq!(event_route("output"), EventRoute::Output);
+        assert_eq!(event_route("terminated"), EventRoute::Terminated);
+        assert_eq!(event_route("exited"), EventRoute::Terminated);
+        assert_eq!(event_route("initialized"), EventRoute::Ignored);
+        // A neighbouring adapter event must not fall through to the stop handler.
+        assert_ne!(event_route("breakpoint"), EventRoute::Stopped);
+        assert_ne!(event_route(""), EventRoute::Stopped);
+    }
 }

@@ -38,10 +38,10 @@ pub const CMAKE_PROJECT: &str = r"(?im)^[ \t]*project[ \t]*\([ \t\r\n]*([A-Za-z0
 /// does for a missing binary, because the user can build from the toolbar and press Run again.
 pub fn compose_cpp(info: &ProjectInfo, stop_on_entry: bool) -> LaunchConfig {
     let root = Path::new(&info.root);
-    let names = program_names(root, &info.name, info.kind);
-    let candidates = candidate_programs(root, &names, info.kind);
-    let program =
-        first_existing(&candidates).unwrap_or_else(|| fallback_program(root, &names[0], info.kind));
+    let program = cpp_executables(info).into_iter().next().map_or_else(
+        || fallback_program(root, &info.name, info.kind),
+        |(_, path)| path,
+    );
 
     LaunchConfig {
         program: display(&program),
@@ -50,6 +50,36 @@ pub fn compose_cpp(info: &ProjectInfo, stop_on_entry: bool) -> LaunchConfig {
         stop_on_entry,
         init_commands: Vec::new(),
     }
+}
+
+/// The executables a C/C++ project can name, one per candidate name, most likely first.
+///
+/// This is the only candidate walk: [`compose_cpp`] takes the first entry, so the default launch and
+/// the toolbar's target list cannot disagree about which program a project has. A project with
+/// nothing built yet still yields one entry, the path its build will write, which is what the
+/// prefilled composition names.
+pub fn cpp_executables(info: &ProjectInfo) -> Vec<(String, PathBuf)> {
+    let root = Path::new(&info.root);
+    let names = program_names(root, &info.name, info.kind);
+    let mut found: Vec<(String, PathBuf)> = Vec::new();
+
+    for name in &names {
+        let Some(path) = first_existing(&paths_for_name(root, name, info.kind)) else {
+            continue;
+        };
+        if found.iter().any(|(_, existing)| *existing == path) {
+            continue;
+        }
+        found.push((name.clone(), path));
+    }
+
+    if found.is_empty() {
+        let primary = names.first().cloned().unwrap_or_else(|| info.name.clone());
+        let path = fallback_program(root, &primary, info.kind);
+        found.push((primary, path));
+    }
+
+    found
 }
 
 /// Names the executable may carry, most likely first: the CMake target, then the directory name.
@@ -84,14 +114,6 @@ pub fn cmake_target(root: &Path) -> Option<String> {
         }
     }
     None
-}
-
-/// Conventional program paths for every candidate name, most likely first.
-pub fn candidate_programs(root: &Path, names: &[String], kind: ProjectKind) -> Vec<PathBuf> {
-    names
-        .iter()
-        .flat_map(|name| paths_for_name(root, name, kind))
-        .collect()
 }
 
 /// The conventional locations one name may occupy, by project kind.

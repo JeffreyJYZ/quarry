@@ -101,6 +101,8 @@ pub fn run() {
             run_task::run_program,
             run_task::stop_program,
             launch::default_launch_config,
+            launch::list_run_targets,
+            launch::resolve_run_target,
             test_task::list_tests,
             test_task::run_test,
             settings::read_settings,

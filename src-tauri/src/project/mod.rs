@@ -12,8 +12,14 @@ pub use std::path::{Path, PathBuf};
 mod cargo_manifest;
 pub use cargo_manifest::*;
 
+mod descend;
+pub use descend::*;
+
 mod unquote;
 pub use unquote::*;
 
 mod tests_items;
 pub use tests_items::*;
+
+mod tests_descend;
+pub use tests_descend::*;

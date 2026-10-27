@@ -3,9 +3,9 @@
 pub(crate) use crate::protocol_pipe::{FrameError, ProcessPipe};
 pub(crate) use crate::resolve;
 pub(crate) use crate::types::{
-    BreakpointSpec, DapBreakpoint, DapFrame, DapScope, DapSession, DapStoppedEvent, DapThread,
-    DapVariable, DataBreakpointInfo, DisassembledInstruction, ExceptionFilter, LaunchConfig,
-    MemoryDump,
+    BreakpointSpec, DapBreakpoint, DapFrame, DapOutputEvent, DapScope, DapSession, DapStoppedEvent,
+    DapThread, DapVariable, DataBreakpointInfo, DisassembledInstruction, ExceptionFilter,
+    LaunchConfig, MemoryDump,
 };
 pub use serde_json::{Map, Value, json};
 pub use std::collections::HashMap;
@@ -69,6 +69,11 @@ pub fn emit_stopped(app: &AppHandle, payload: DapStoppedEvent) {
 
 pub fn emit_terminated(app: &AppHandle, session: &str) {
     let _ = app.emit("dap://terminated", json!({ "session": session }));
+}
+
+/// Never blocks the pump and never panics when no window is listening.
+pub fn emit_output(app: &AppHandle, payload: DapOutputEvent) {
+    let _ = app.emit("dap://output", payload);
 }
 
 /// The `stopped` body plus the location the pump looked up for it.
