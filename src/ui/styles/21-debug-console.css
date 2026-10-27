@@ -1,0 +1,16 @@
+.debug-console-text {
+	flex: 1 1 auto;
+	min-height: 64px;
+	max-height: 220px;
+	margin: 0;
+	overflow: auto;
+	padding: 6px 8px;
+	border-radius: 4px;
+	background: var(--rail);
+	color: var(--text);
+	font-family: var(--mono);
+	font-size: 11px;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}

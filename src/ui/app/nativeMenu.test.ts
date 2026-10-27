@@ -21,6 +21,7 @@ const IDLE_CONTEXT: CommandContext = {
 	openProject: noop,
 	build: noop,
 	run: noop,
+	debug: noop,
 	stop: noop,
 	save: noop,
 	saveAll: noop,

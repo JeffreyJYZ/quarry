@@ -3,6 +3,7 @@ import type { DebugController } from "./sessionTypes";
 
 type LaunchApi = {
 	launch: (offerBuild?: boolean, programOverride?: string | null) => Promise<void>;
+	launchConfig: (config: import("@/lib/project/api").LaunchConfig) => Promise<void>;
 	buildNow: () => Promise<void>;
 	attach: () => Promise<void>;
 	refreshPresets: () => Promise<void>;
@@ -87,6 +88,7 @@ export function assembleController(input: ControllerInput): DebugController {
 		setPreset: input.setPreset,
 		refreshPresets: input.launch.refreshPresets,
 		launch: () => void input.launch.launch(),
+		launchConfig: (config) => void input.launch.launchConfig(config),
 		resolved: s.resolved,
 		buildNeeded: s.buildNeeded,
 		building: s.building,

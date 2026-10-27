@@ -60,57 +60,17 @@ export type StopView = {
 	scopes: DapScope[];
 };
 
-export type BreakpointField = "condition" | "hitCondition" | "logMessage";
+import {
+	type BreakpointEntry,
+	type BreakpointField,
+	type BreakpointRow,
+	breakpointKey,
+	groupByPath,
+	sortBreakpoints,
+} from "@/lib/debug/breakpointTypes";
 
-export type BreakpointEntry = {
-	condition: string | null;
-	hitCondition: string | null;
-	logMessage: string | null;
-	enabled: boolean;
-	verified: boolean | null;
-	message: string | null;
-	temporary: boolean;
-};
-
-export type BreakpointRow = {
-	key: string;
-	path: string;
-	line: number;
-	verified: boolean | null;
-	message: string | null;
-	condition: string | null;
-	hitCondition: string | null;
-	logMessage: string | null;
-	enabled: boolean;
-	temporary: boolean;
-};
-
-/** `path:line`, the identity of one set breakpoint across both the panel and the editor gutter. */
-export function breakpointKey(path: string, line: number): string {
-	return `${path}:${line}`;
-}
-
-/** Rows stay sorted by path then line, so the panel and the gutter agree on order. */
-export function sortBreakpoints(rows: readonly BreakpointRow[]): BreakpointRow[] {
-	return [...rows].sort((left, right) => {
-		if (left.path !== right.path) return left.path < right.path ? -1 : 1;
-		return left.line - right.line;
-	});
-}
-
-/** One bucket per absolute path, each list already in line order. */
-export function groupByPath(rows: readonly BreakpointRow[]): Map<string, BreakpointRow[]> {
-	const grouped = new Map<string, BreakpointRow[]>();
-	for (const row of sortBreakpoints(rows)) {
-		const bucket = grouped.get(row.path);
-		if (bucket === undefined) {
-			grouped.set(row.path, [row]);
-		} else {
-			bucket.push(row);
-		}
-	}
-	return grouped;
-}
+export type { BreakpointEntry, BreakpointField, BreakpointRow };
+export { breakpointKey, groupByPath, sortBreakpoints };
 
 export type WatchRow = {
 	dataId: string;
@@ -148,6 +108,8 @@ export type DebugController = {
 	/** Re-read launch.json and replace presets; keeps selection by name. */
 	refreshPresets: () => Promise<void>;
 	launch: () => void;
+	/** Launch a configuration the shell resolved (a detected target), not a preset row. */
+	launchConfig: (config: LaunchConfig) => void;
 	/** The configuration the last launch resolved, for the panel's program line. */
 	resolved: LaunchConfig | null;
 	/** The missing-binary message; non-null only while one build is still offered. */

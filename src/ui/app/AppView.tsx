@@ -1,6 +1,7 @@
 import AppBody from "@/ui/app/AppBody";
 import AppTopBar from "@/ui/app/AppTopBar";
 import OverlaysMount from "@/ui/app/OverlaysMount";
+import RunDebugWidget from "@/ui/app/RunDebugWidget";
 import UpdateSlot from "@/ui/updates/UpdateSlot";
 import type { ShellModel } from "@/ui/app/useShell";
 
@@ -8,7 +9,18 @@ import type { ShellModel } from "@/ui/app/useShell";
 export default function AppView({ model }: { model: ShellModel }) {
 	return (
 		<div className="shell">
-			<AppTopBar model={model} right={<UpdateSlot />} />
+			<AppTopBar
+				model={model}
+				right={
+					<>
+						<RunDebugWidget
+							runDebug={model.runDebug}
+							onEditConfigurations={() => model.panels.setDebugOpen(() => true)}
+						/>
+						<UpdateSlot />
+					</>
+				}
+			/>
 			{model.notice === null ? null : (
 				<div className="notice" role="status">
 					<span className="notice-text" title={model.notice}>

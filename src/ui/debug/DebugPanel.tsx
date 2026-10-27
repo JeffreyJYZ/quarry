@@ -1,6 +1,7 @@
 import { useState } from "react";
 import BreakpointsSection from "@/ui/debug/BreakpointsSection";
 import CallStackList from "@/ui/debug/CallStackList";
+import ConsoleSection from "@/ui/debug/ConsoleSection";
 import ControlsSection from "@/ui/debug/ControlsSection";
 import ExceptionsSection from "@/ui/debug/ExceptionsSection";
 import LaunchSection from "@/ui/debug/LaunchSection";
@@ -106,6 +107,7 @@ export default function DebugPanel({
 				memoryAddress={memoryAddress}
 				disasmAddress={disasmAddress}
 			/>
+			<ConsoleSection session={debug.sessionId} />
 		</aside>
 	);
 }

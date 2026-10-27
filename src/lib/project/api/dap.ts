@@ -5,6 +5,7 @@ import type {
 	DataBreakpointInfo,
 	DapBreakpoint,
 	DapFrame,
+	DapOutputEvent,
 	DapScope,
 	DapSession,
 	DapStoppedEvent,
@@ -140,6 +141,10 @@ export function onDapTerminated(handler: (session: string) => void): Promise<() 
 	return listen<{ session: string }>("dap://terminated", (event) =>
 		handler(event.payload.session),
 	);
+}
+
+export function onDapOutput(handler: (event: DapOutputEvent) => void): Promise<() => void> {
+	return listen<DapOutputEvent>("dap://output", (event) => handler(event.payload));
 }
 
 export type ProcessInfo = { pid: number; name: string };

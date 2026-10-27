@@ -1,4 +1,4 @@
-import type { EnvVar, RunConfiguration } from "@/lib/project/api";
+import type { EnvVar, LaunchConfig, RunConfiguration } from "@/lib/project/api";
 import type { RunLine } from "@/ui/run/RunLog";
 
 export type RunExit = { code: number | null; killed?: boolean };
@@ -26,6 +26,8 @@ export type RunControls = {
 	update: () => string | null;
 	remove: () => string | null;
 	run: () => Promise<void>;
+	/** Run one already-resolved configuration, the path the Run button takes for a target. */
+	runConfig: (config: LaunchConfig) => Promise<void>;
 	stop: () => Promise<void>;
 	clearLog: () => void;
 	replaceConfigurations: (next: RunConfiguration[]) => void;

@@ -146,7 +146,7 @@ export function useShell() {
 		settings,
 	});
 
-	const { commands, runCommand } = useShellGlue({
+	const { commands, runCommand, runDebug } = useShellGlue({
 		workspace,
 		overlays,
 		panels,
@@ -185,6 +185,7 @@ export function useShell() {
 		setNotice,
 		commands,
 		runCommand,
+		runDebug,
 		editorRef,
 		root,
 		activePath,

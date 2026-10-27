@@ -47,8 +47,11 @@ export const SHORTCUT_GROUPS = [
 	{
 		title: "Build and run",
 		entries: [
-			{ keys: ["Ctrl", "R"], action: "Run" },
-			{ keys: ["Ctrl", "D"], action: "Debug" },
+			{ keys: ["Ctrl", "R"], action: "Run the selected target" },
+			{ keys: ["Ctrl", "D"], action: "Debug the selected target" },
+			{ keys: ["Ctrl", "F2"], action: "Stop" },
+			{ keys: ["Shift", "F10"], action: "Run" },
+			{ keys: ["Shift", "F9"], action: "Debug" },
 			{ keys: ["Cmd", "R"], action: "Rerun" },
 		],
 	},

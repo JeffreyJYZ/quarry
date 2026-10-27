@@ -44,6 +44,11 @@ export type DapStoppedEvent = {
 	line: number | null;
 	source: string | null;
 };
+export type DapOutputEvent = {
+	session: string;
+	category: string;
+	output: string;
+};
 export type BreakpointSpec = {
 	line: number;
 	condition?: string | null;

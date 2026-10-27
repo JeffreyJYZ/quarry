@@ -21,6 +21,15 @@ export type LaunchPreset = {
 
 export type LaunchFile = { configurations: LaunchPreset[] };
 
+/** One runnable target the backend detected, before any configuration exists. */
+export type RunTarget = {
+	id: string;
+	label: string;
+	kind: "cargo" | "cpp";
+	package: string;
+	target: string;
+};
+
 export type RunOutputEvent = { runId: string; stream: "stdout" | "stderr"; line: string };
 export type RunExitedEvent = { runId: string; code: number | null };
 export type EnvVar = { name: string; value: string };
@@ -39,6 +48,20 @@ export function resolveLaunchConfig(root: string, name: string): Promise<LaunchC
 
 export function defaultLaunchConfig(root: string, stopOnEntry: boolean): Promise<LaunchConfig> {
 	return invoke<LaunchConfig>("default_launch_config", { root, stopOnEntry });
+}
+
+/** Every target the project can run, without building it first. */
+export function listRunTargets(root: string): Promise<RunTarget[]> {
+	return invoke<RunTarget[]>("list_run_targets", { root });
+}
+
+/** The launch configuration for one detected target, built or not. */
+export function resolveRunTarget(
+	root: string,
+	id: string,
+	stopOnEntry: boolean,
+): Promise<LaunchConfig> {
+	return invoke<LaunchConfig>("resolve_run_target", { root, id, stopOnEntry });
 }
 
 export function runProgram(

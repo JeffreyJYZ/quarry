@@ -9,6 +9,7 @@ export type CommandContext = {
 	openProject: () => void;
 	build: () => void;
 	run: () => void;
+	debug: () => void;
 	stop: () => void;
 	save: () => void;
 	saveAll: () => void;

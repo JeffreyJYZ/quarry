@@ -11,8 +11,9 @@ import type { useRunControls } from "@/ui/app/useRunControls";
 import type { useSaveBuffers } from "@/ui/app/useSaveBuffers";
 import type { useSettings } from "@/ui/app/useSettings";
 import type { useWorkspace } from "@/ui/app/useWorkspace";
-import { buildCommands } from "@/ui/app/commands";
+import { shellCommands } from "@/ui/app/shellCommands";
 import { makeLspCommandHandlers } from "@/ui/app/lspCommandHandlers";
+import { useRunDebug } from "@/ui/app/useRunDebug";
 import { useClionKeymap } from "@/ui/app/useClionKeymap";
 import { useKeybindings } from "@/ui/app/useKeybindings";
 import { useShellEffects } from "@/ui/app/useShellEffects";
@@ -100,14 +101,25 @@ export function useShellGlue(options: GlueOptions) {
 		onNotice,
 	});
 
+	const runDebug = useRunDebug({
+		root,
+		profile: settings.buildProfile,
+		runs,
+		debug,
+		onReveal: workspace.handleNavigate,
+		onOpenDebug: () => panels.setDebugOpen(() => true),
+		onNotice: (message) => onNotice?.(message),
+	});
+
 	useClionKeymap({
 		root,
 		activePath,
 		cursor,
 		running: runs.running,
 		debug,
-		run: () => void runs.run(),
-		stop: () => void runs.stop(),
+		run: runDebug.run,
+		debugNow: runDebug.debugNow,
+		stop: runDebug.stop,
 		toggleBreakpoint: debug.toggleBreakpoint,
 		organizeImports: () => editorActions.organizeRef.current(),
 		openRunPanel: runs.openPanel,
@@ -123,42 +135,22 @@ export function useShellGlue(options: GlueOptions) {
 		gotoTypeDefinition: lspCommands.gotoTypeDefinition,
 		quickDoc: lspCommands.quickDoc,
 	});
-	const commands = buildCommands({
+	const commands = shellCommands({
 		root,
 		activePath,
 		cursor,
-		building: build.building,
-		formatting: panels.formatting,
-		running: runs.running,
 		panelExpanded,
-		openProject: () => void workspace.handleOpenProject(),
-		build: () => void build.build(),
-		run: () => void runs.run(),
-		stop: () => void runs.stop(),
-		save: () => void save.saveActive(),
-		saveAll: () => void save.saveAll(),
-		format: () => void save.formatActive(),
-		runToCursor: (path, line) => debug.runToCursor(path, line),
-		toggleDebug: () => panels.setDebugOpen((current) => !current),
-		toggleGit: () => panels.setGitOpen((current) => !current),
-		openSearch: () => overlays.setSearchOpen(true),
-		toggleRail: () => panels.setRailCollapsed((current) => !current),
-		toggleDock: () => panels.setPanelOpen(!panelExpanded),
-		// Only the terminal toggles: opening the bottom panel here also revealed Problems.
-		toggleTerminal: () => panels.setTerminalOpen((current) => !current),
-		revealFile: () => panels.setFileRevealToken((current) => current + 1),
-		openQuick: () => overlays.setQuickOpenOpen(true),
-		openShortcuts: () => overlays.setShortcutsOpen(true),
-		workspaceSymbol: lspCommands.workspaceSymbol,
-		gotoImplementation: lspCommands.gotoImplementation,
-		gotoTypeDefinition: lspCommands.gotoTypeDefinition,
-		quickDoc: lspCommands.quickDoc,
-		refreshGit: () => git.setRefreshToken((current) => current + 1),
-		toggleBlame: () => git.setBlameOn((current) => !current),
-		newProject: () => panels.setNewProjectOpen(true),
-		checkUpdates: () => {
-			void import("@/lib/updates/store").then((updates) => updates.checkForUpdates());
-		},
+		workspace,
+		overlays,
+		panels,
+		git,
+		save,
+		build,
+		runs,
+		debug,
+		lsp: lspCommands,
+		run: runDebug.run,
+		debugNow: runDebug.debugNow,
 	});
 
 	useSessionPersistence({
@@ -195,5 +187,5 @@ export function useShellGlue(options: GlueOptions) {
 
 	useShellEffects(runCommand);
 
-	return { commands, runCommand };
+	return { commands, runCommand, runDebug };
 }

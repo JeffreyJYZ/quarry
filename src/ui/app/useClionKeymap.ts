@@ -13,6 +13,7 @@ export type ClionKeymapContext = {
 		launch: () => void;
 	};
 	run: () => void;
+	debugNow: () => void;
 	stop: () => void;
 	toggleBreakpoint: (path: string, line: number) => void;
 	organizeImports: () => void;
@@ -37,7 +38,8 @@ export type ClionKeymapContext = {
  * Step keys only act while a session is live, so the same keys do nothing for the rest of the time.
  */
 export function useClionKeymap(context: ClionKeymapContext): void {
-	const { root, activePath, cursor, running, debug, run, stop, toggleBreakpoint } = context;
+	const { root, activePath, cursor, running, debug, run, debugNow, stop, toggleBreakpoint } =
+		context;
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -54,8 +56,22 @@ export function useClionKeymap(context: ClionKeymapContext): void {
 			}
 			if (ctrlOnly && key === "d") {
 				event.preventDefault();
-				context.setDebugOpen(() => true);
-				debug.launch();
+				debugNow();
+				return;
+			}
+			if (ctrlOnly && event.key === "F2") {
+				event.preventDefault();
+				stop();
+				return;
+			}
+			if (event.shiftKey && event.key === "F10") {
+				event.preventDefault();
+				run();
+				return;
+			}
+			if (event.shiftKey && event.key === "F9") {
+				event.preventDefault();
+				debugNow();
 				return;
 			}
 			if (mod && !event.altKey && key === "r") {
@@ -159,5 +175,5 @@ export function useClionKeymap(context: ClionKeymapContext): void {
 		};
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [activePath, cursor, debug, run, stop, root, running, toggleBreakpoint, context]);
+	}, [activePath, cursor, debug, debugNow, run, stop, root, running, toggleBreakpoint, context]);
 }
