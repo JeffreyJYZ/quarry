@@ -1,8 +1,9 @@
 import { autocompletion } from "@codemirror/autocomplete";
-import { EditorView, hoverTooltip } from "@codemirror/view";
+import { EditorView, hoverTooltip, tooltips } from "@codemirror/view";
 import { kindToType } from "@/lib/editor/completion";
 import { toLspPosition } from "@/lib/editor/positions";
 import { renderMarkdown } from "@/lib/editor/markdown";
+import { tooltipSpace } from "@/lib/editor/tooltipSpace";
 import { type Location, lspCompletion, lspDefinition, lspHover } from "@/lib/project/api";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
 import type { ServerKind } from "@/lib/lsp/served";
@@ -24,6 +25,17 @@ export type BehaviourDeps = KeymapDeps & {
 /** The editor's own event handlers: document changes, blur, cmd-click, completion and hover. */
 export function behaviourExtensions(deps: BehaviourDeps) {
 	return [
+		tooltips({
+			tooltipSpace: (view) => {
+				const root = view.dom.ownerDocument.documentElement;
+				return tooltipSpace(view.scrollDOM.getBoundingClientRect(), {
+					left: 0,
+					top: 0,
+					right: root.clientWidth,
+					bottom: root.clientHeight,
+				});
+			},
+		}),
 		EditorView.updateListener.of((update) => {
 			if (update.docChanged) {
 				let typed = false;
