@@ -31,6 +31,10 @@ export default function AppTopBar({ model, right }: { model: ShellModel; right?:
 				/>
 			}
 			branch={git.status?.branch ?? null}
+			onBranch={() => {
+				model.panels.setRailCollapsed(false);
+				model.panels.setGitOpen(true);
+			}}
 			right={right}
 		/>
 	);

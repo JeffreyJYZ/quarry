@@ -31,6 +31,26 @@ function StopIcon() {
 	);
 }
 
+/** A pencil, so the last button reads as "edit", not as a more-actions menu. */
+function EditIcon() {
+	return (
+		<svg
+			width="12"
+			height="12"
+			viewBox="0 0 12 12"
+			aria-hidden="true"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="1.1"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+		>
+			<path d="M8.2 1.8 10.2 3.8 4 10H2V8z" />
+			<path d="M7.1 2.9 9.1 4.9" />
+		</svg>
+	);
+}
+
 /**
  * The title bar's run widget: pick a target, press Run or Debug, stop what is running.
  *
@@ -96,11 +116,11 @@ export default function RunDebugWidget({
 			<button
 				type="button"
 				className="run-debug-edit"
-				title="Edit run configurations"
+				title="Edit run configurations — opens the Run tab with the form"
 				aria-label="Edit run configurations"
 				onClick={onEditConfigurations}
 			>
-				···
+				<EditIcon />
 			</button>
 		</div>
 	);
