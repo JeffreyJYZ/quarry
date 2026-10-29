@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { normalise } from "@/components/Sidebar";
-import { NAV, pageFor, siblings } from "@/lib/nav";
-import { editUrl, SITE } from "@/lib/site";
+import { normalise } from "~/components/Sidebar";
+import { NAV, pageFor, siblings } from "~/lib/nav";
+import { editUrl, SITE } from "~/lib/site";
 
 /** Breadcrumbs, the edit link and the previous/next pager: everything that needs the current route. */
 export default function DocFooter() {

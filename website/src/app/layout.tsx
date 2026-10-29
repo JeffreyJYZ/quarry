@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import HeaderControls from "@/components/HeaderControls";
-import SearchDialog from "@/components/SearchDialog";
-import { SITE } from "@/lib/site";
+import HeaderControls from "~/components/HeaderControls";
+import ThemeTokens from "~/components/ThemeTokens";
+import SearchDialog from "~/components/SearchDialog";
+import { SITE } from "~/lib/site";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -11,6 +12,8 @@ export const metadata: Metadata = {
 	},
 	description: SITE.description,
 	applicationName: SITE.name,
+	/** The app's own icon, copied into `public/` at build. */
+	icons: { icon: "/icon.svg" },
 	keywords: [
 		"quarry",
 		"Rust IDE",
@@ -72,6 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 	return (
 		<html lang="en" suppressHydrationWarning>
 			<head>
+				<ThemeTokens />
 				<script dangerouslySetInnerHTML={{ __html: BOOT_SCRIPT }} />
 			</head>
 			<body>

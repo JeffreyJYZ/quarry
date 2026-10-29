@@ -38,7 +38,11 @@
 			}
 		},
 		{
-			"includes": ["website/src/app/layout.tsx", "website/src/app/page.tsx"],
+			"includes": [
+				"website/src/app/layout.tsx",
+				"website/src/app/page.tsx",
+				"website/src/components/ThemeTokens.tsx"
+			],
 			"linter": {
 				"rules": {
 					"security": {

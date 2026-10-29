@@ -14,6 +14,8 @@ if (!["patch", "minor", "major", "alpha"].includes(bump)) {
 const PKG = "package.json";
 const TAURI = "src-tauri/tauri.conf.json";
 const CARGO = "src-tauri/Cargo.toml";
+// The docs site mirrors the app version so a deployment of `website/` alone still shows it.
+const SITE = "website/package.json";
 
 function readVersion(file: string, re: RegExp): string {
 	const text = readFileSync(file, "utf8");
@@ -25,11 +27,12 @@ function readVersion(file: string, re: RegExp): string {
 const pkgV = readVersion(PKG, /"version"\s*:\s*"([^"]+)"/);
 const tauriV = readVersion(TAURI, /"version"\s*:\s*"([^"]+)"/);
 const cargoV = readVersion(CARGO, /^version\s*=\s*"([^"]+)"/m);
+const siteV = readVersion(SITE, /"version"\s*:\s*"([^"]+)"/);
 
 // All three must agree before bumping.
-if (pkgV !== tauriV || pkgV !== cargoV) {
+if (pkgV !== tauriV || pkgV !== cargoV || pkgV !== siteV) {
 	console.error(
-		`version sources disagree: package.json=${pkgV} tauri.conf.json=${tauriV} Cargo.toml=${cargoV}`,
+		`version sources disagree: package.json=${pkgV} tauri.conf.json=${tauriV} Cargo.toml=${cargoV} website=${siteV}`,
 	);
 	process.exit(1);
 }
@@ -60,7 +63,7 @@ if (bump === "alpha") {
 }
 
 // package.json & tauri.conf.json: "version": "X"
-for (const f of [PKG, TAURI]) {
+for (const f of [PKG, TAURI, SITE]) {
 	const re = /"version"\s*:\s*"[^"]*"/;
 	const text = readFileSync(f, "utf8");
 	if (!re.test(text)) throw new Error(`version field missing in ${f}`);
@@ -86,13 +89,19 @@ if (r.status !== 0) {
 const afterPkg = readVersion(PKG, /"version"\s*:\s*"([^"]+)"/);
 const afterTauri = readVersion(TAURI, /"version"\s*:\s*"([^"]+)"/);
 const afterCargo = readVersion(CARGO, /^version\s*=\s*"([^"]+)"/m);
-if (afterPkg !== version || afterTauri !== version || afterCargo !== version) {
+const afterSite = readVersion(SITE, /"version"\s*:\s*"([^"]+)"/);
+if (
+	afterPkg !== version ||
+	afterTauri !== version ||
+	afterCargo !== version ||
+	afterSite !== version
+) {
 	console.error(
-		`post-bump version mismatch: package.json=${afterPkg} tauri.conf.json=${afterTauri} Cargo.toml=${afterCargo} expected=${version}`,
+		`post-bump version mismatch: package.json=${afterPkg} tauri.conf.json=${afterTauri} Cargo.toml=${afterCargo} website=${afterSite} expected=${version}`,
 	);
 	process.exit(1);
 }
-if (afterPkg !== afterTauri || afterPkg !== afterCargo) {
+if (afterPkg !== afterTauri || afterPkg !== afterCargo || afterPkg !== afterSite) {
 	console.error("version sources disagree after bump");
 	process.exit(1);
 }

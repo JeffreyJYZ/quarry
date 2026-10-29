@@ -44,3 +44,4 @@ website/.next
 website/out
 website/tsconfig.tsbuildinfo
 website/public/search-index.json
+website/public/icon.svg

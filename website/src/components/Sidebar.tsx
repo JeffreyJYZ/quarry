@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV } from "@/lib/nav";
+import { NAV } from "~/lib/nav";
 
 /** Strip the trailing slash the static export adds, so a route compares equal to its nav entry. */
 export function normalise(path: string): string {

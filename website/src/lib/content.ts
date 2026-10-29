@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { PAGES } from "@/lib/nav";
+import { PAGES } from "~/lib/nav";
 
 const DIR = join(process.cwd(), "content/docs");
 

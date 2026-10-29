@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { compileMDX } from "next-mdx-remote/rsc";
-import { mdxComponents } from "@/components/mdx";
-import { allSlugs, readDoc } from "@/lib/content";
-import { mdxOptions } from "@/lib/mdx-options";
+import { mdxComponents } from "~/components/mdx";
+import { allSlugs, readDoc } from "~/lib/content";
+import { mdxOptions } from "~/lib/mdx-options";
 
 type Params = { slug?: string[] };
 

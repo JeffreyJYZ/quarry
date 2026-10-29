@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { normalise } from "@/components/Sidebar";
-import { NAV, pageFor } from "@/lib/nav";
+import { normalise } from "~/components/Sidebar";
+import { NAV, pageFor } from "~/lib/nav";
 
 /** Docs / group / page, so a deep page always says where it sits. */
 export default function Breadcrumbs() {

@@ -1,3 +1,4 @@
+import ShortcutTable from "~/components/ShortcutTable";
 import type { ReactNode } from "react";
 
 /** An aside with fixed tones, so prose never hand-writes a box. */
@@ -23,4 +24,4 @@ export function Kbd({ children }: { children: ReactNode }) {
 	return <kbd>{children}</kbd>;
 }
 
-export const mdxComponents = { Callout, Kbd };
+export const mdxComponents = { Callout, Kbd, ShortcutTable };

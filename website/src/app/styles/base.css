@@ -1,23 +1,11 @@
 /*
- * The docs site wears quarry's own chrome. Every value here is copied from the app's token sets —
- * `src/lib/themes/builtin/one-dark.ts` and `one-light.ts` — so the site and the IDE look like one
- * product. Keep them in step if those palettes move.
+ * The palette is not here. The site renders the app's own One Dark and One Light tokens through
+ * `ThemeTokens`, which imports `src/lib/themes/builtin/*`; this file only adds the structural values
+ * those tokens do not carry.
  */
 :root {
-	--bg: #23272e;
-	--panel: #2c313a;
-	--rail: #2a2f37;
-	--chrome: #343a45;
-	--line: #4a505c;
-	--text: #e6e9ee;
-	--muted: #b9c0cc;
-	--accent: #8bb8f0;
-	--hover: #363c47;
-	--danger: #e06c75;
-	--warn: #e5c07b;
-	--good: #98c379;
-	--code-bg: #282c34;
-	--inline-bg: #31363f;
+	--code-bg: var(--panel);
+	--inline-bg: var(--hover);
 
 	--mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
 	--ui: system-ui, -apple-system, "SF Pro Text", sans-serif;
@@ -27,27 +15,14 @@
 	--toc-w: 224px;
 	--content-w: 752px;
 	--radius: 6px;
-
-	color-scheme: dark;
 }
 
 :root[data-theme="light"] {
-	--bg: #fafafa;
-	--panel: #f0f0f1;
-	--rail: #ededee;
-	--chrome: #e6e6e7;
-	--line: #b9bcc2;
-	--text: #1f2227;
-	--muted: #545a63;
-	--accent: #2f62c4;
-	--hover: #e4e6e9;
-	--danger: #b4424a;
-	--warn: #8a6d1f;
-	--good: #2f7d43;
-	--code-bg: #f4f5f7;
-	--inline-bg: #eceef1;
-
 	color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+	color-scheme: dark;
 }
 
 *,

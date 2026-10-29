@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { search, type SearchEntry } from "@/lib/search";
+import { search, type SearchEntry } from "~/lib/search";
 
 /** Opens the palette from anywhere, so the header button and Cmd+K share one door. */
 export const SEARCH_EVENT = "quarry:search";

@@ -1,9 +1,9 @@
-import Breadcrumbs from "@/components/Breadcrumbs";
-import CodeCopy from "@/components/CodeCopy";
-import DocFooter from "@/components/DocFooter";
-import NavScrim from "@/components/NavScrim";
-import Sidebar from "@/components/Sidebar";
-import Toc from "@/components/Toc";
+import Breadcrumbs from "~/components/Breadcrumbs";
+import CodeCopy from "~/components/CodeCopy";
+import DocFooter from "~/components/DocFooter";
+import NavScrim from "~/components/NavScrim";
+import Sidebar from "~/components/Sidebar";
+import Toc from "~/components/Toc";
 
 /** The docs frame: navigation, the article, and its headings. */
 export default function DocsLayout({ children }: { children: React.ReactNode }) {

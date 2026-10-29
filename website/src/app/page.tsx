@@ -1,8 +1,8 @@
 import { codeToHtml } from "shiki";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PAGES } from "@/lib/nav";
-import { SITE } from "@/lib/site";
+import { PAGES } from "~/lib/nav";
+import { SITE } from "~/lib/site";
 
 export const metadata: Metadata = {
 	title: `${SITE.name} — ${SITE.tagline}`,

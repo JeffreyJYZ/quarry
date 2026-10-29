@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="quarry">
-	<title>quarry</title>
-	<rect width="1024" height="1024" rx="224" fill="#0b0d10"/>
-	<circle cx="500" cy="480" r="268" fill="none" stroke="#5b8def" stroke-width="118"/>
-	<line x1="612" y1="612" x2="806" y2="806" stroke="#d7dbe0" stroke-width="118" stroke-linecap="square"/>
-</svg>

@@ -1,7 +1,7 @@
 "use client";
 
-import ThemeToggle from "@/components/ThemeToggle";
-import { SEARCH_EVENT } from "@/components/SearchDialog";
+import ThemeToggle from "~/components/ThemeToggle";
+import { SEARCH_EVENT } from "~/components/SearchDialog";
 
 /** The header's right side: search, the repository, the theme, and the phone-sized nav toggle. */
 export default function HeaderControls({ repo }: { repo: string }) {

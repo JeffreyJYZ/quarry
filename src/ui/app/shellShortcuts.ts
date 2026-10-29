@@ -35,6 +35,25 @@ export const SHORTCUT_GROUPS = [
 		],
 	},
 	{
+		title: "Editor",
+		entries: [
+			{ keys: ["Cmd", "D"], action: "Select the word, then the next occurrence" },
+			{ keys: ["Cmd", "Shift", "L"], action: "Select every occurrence" },
+			{ keys: ["Cmd", "U"], action: "Drop the last added range" },
+			{ keys: ["Cmd", "/"], action: "Toggle a line comment" },
+			{ keys: ["Cmd", "]"], action: "Indent" },
+			{ keys: ["Cmd", "["], action: "Outdent" },
+			{ keys: ["Cmd", "Shift", "K"], action: "Delete the line" },
+			{ keys: ["Cmd", "Space"], action: "Completion" },
+			{ keys: ["Cmd", "Shift", "Space"], action: "Signature help" },
+			{ keys: ["Alt", "Enter"], action: "Code actions at the caret" },
+			{ keys: ["Shift", "Alt", "T"], action: "Type hierarchy" },
+			{ keys: ["Cmd", "Shift", "\\"], action: "Jump to the matching bracket" },
+			{ keys: ["Cmd", "Shift", "["], action: "Fold the block" },
+			{ keys: ["Cmd", "Shift", "]"], action: "Unfold the block" },
+		],
+	},
+	{
 		title: "Navigation",
 		entries: [
 			{ keys: ["Cmd", "P"], action: "Quick open by file name" },
