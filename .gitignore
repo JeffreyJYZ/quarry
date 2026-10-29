@@ -43,3 +43,4 @@ dist-release/
 website/.next
 website/out
 website/tsconfig.tsbuildinfo
+website/public/search-index.json

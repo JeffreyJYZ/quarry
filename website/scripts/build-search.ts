@@ -110,5 +110,5 @@ for (const file of files) {
 	}
 }
 
-writeFileSync(join(OUT, "search-index.json"), `${JSON.stringify(entries, null, 1)}\n`);
+writeFileSync(join(OUT, "search-index.json"), `${JSON.stringify(entries, null, "\t")}\n`);
 console.log(`search index: ${entries.length} entries from ${mdxFiles(DOCS).length} pages`);

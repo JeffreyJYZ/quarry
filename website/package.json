@@ -3,7 +3,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev": "next dev -p 4321",
+		"dev": "bun scripts/build-search.ts && next dev -p 4321",
 		"build": "bun scripts/build-search.ts && next build",
 		"preview": "bunx serve out -l 4321",
 		"typecheck": "bunx tsc --noEmit"
