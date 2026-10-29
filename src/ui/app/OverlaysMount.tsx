@@ -1,7 +1,7 @@
 import { generateItems } from "@/lib/generate/model";
 import { serverKindForPath } from "@/lib/lsp/served";
 import { DEFAULT_PROJECT_SETTINGS } from "@/lib/settings/model";
-import { languageLabel } from "@/ui/app/shellShortcuts";
+import { languageLabel } from "@/lib/editor/languageLabel";
 import AppOverlays from "@/ui/app/AppOverlays";
 import type { ShellModel } from "@/ui/app/useShell";
 

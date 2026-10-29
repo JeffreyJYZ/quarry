@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { languageForPath, languageNameForPath } from "@/lib/editor/languages";
-import { languageLabel } from "@/ui/app/shellShortcuts";
+import { languageLabel } from "@/lib/editor/languageLabel";
 
 const CASES: Array<{ path: string; name: string | null; extEmpty: boolean }> = [
 	{ path: "src/main.rs", name: "rust", extEmpty: false },
