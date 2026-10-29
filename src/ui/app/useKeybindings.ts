@@ -8,6 +8,9 @@ export type KeybindingContext = {
 	activePath: string | null;
 	cursor: Cursor;
 	panelExpanded: boolean;
+	/** Whether the left column is on screen, and which view it holds, so a shortcut toggles the same pair the rail does. */
+	railCollapsed: boolean;
+	gitOpen: boolean;
 	activePathRef: React.RefObject<string | null>;
 	runToCursor: (path: string, line: number) => void;
 	saveActive: () => unknown;
@@ -128,13 +131,17 @@ export function useKeybindings(context: KeybindingContext): void {
 			}
 			if (key === "g") {
 				event.preventDefault();
-				context.setGitOpen((current) => !current);
+				const showing = !context.railCollapsed && context.gitOpen;
+				context.setRailCollapsed(() => showing);
+				context.setGitOpen(() => !showing);
 			}
 		};
 		window.addEventListener("keydown", handleKeyDown, true);
 		return () => window.removeEventListener("keydown", handleKeyDown, true);
 	}, [
 		panelExpanded,
+		context.railCollapsed,
+		context.gitOpen,
 		context.setRailCollapsed,
 		context.setPanelOpen,
 		context.showDebugger,

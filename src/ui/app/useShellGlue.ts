@@ -59,6 +59,8 @@ export function useShellGlue(options: GlueOptions) {
 		cursor,
 		panelExpanded,
 		activePathRef: workspace.activePathRef,
+		railCollapsed: panels.railCollapsed,
+		gitOpen: panels.gitOpen,
 		runToCursor: debug.runToCursor,
 		saveActive: save.saveActive,
 		saveAll: save.saveAll,

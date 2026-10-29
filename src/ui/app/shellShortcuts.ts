@@ -70,8 +70,6 @@ export const SHORTCUT_GROUPS = [
 		title: "Panels",
 		entries: [
 			{ keys: ["Esc"], action: "Close in-file search / sheet" },
-			{ keys: ["Cmd", "1"], action: "Toggle project rail" },
-			{ keys: ["Cmd", "5"], action: "Show debugger" },
 			{ keys: ["Alt", "F12"], action: "Toggle terminal" },
 		],
 	},

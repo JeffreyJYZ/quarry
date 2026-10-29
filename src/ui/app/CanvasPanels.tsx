@@ -106,7 +106,10 @@ export default function CanvasPanels({ model }: { model: ShellModel }) {
 			buffers={workspace.buffers}
 			onResize={(next) => settings.handlePanelResize("dockHeight", next)}
 			onToggleExpanded={() => panels.setPanelOpen(!model.panelExpanded)}
-			onSelectTab={panels.setDockTab}
+			onSelectTab={(tab) => {
+				panels.setDockTab(tab);
+				panels.setPanelOpen(true);
+			}}
 			onSelectProblem={workspace.handleSelectProblem}
 			onBuffersChange={workspace.setBuffers}
 			debug={model.debug}

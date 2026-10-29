@@ -32,6 +32,16 @@
 	color: var(--text);
 }
 
+.icon-rail-button:disabled {
+	opacity: 0.35;
+	cursor: default;
+}
+
+.icon-rail-button:disabled:hover {
+	background: transparent;
+	color: var(--muted);
+}
+
 .icon-rail-button.active {
 	background: var(--hover);
 	color: var(--text);
@@ -54,7 +64,18 @@
 	outline-offset: -1px;
 }
 
-/* Everything above the terminal and settings buttons is the tool group. */
+/* Everything above the footer is the tool group. */
 .icon-rail-gap {
 	flex: 1 1 auto;
+}
+
+/* Window actions sit below a hairline so they never read as another tool window. */
+.icon-rail-footer {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	align-items: center;
+	width: 28px;
+	padding-top: 8px;
+	border-top: 1px solid var(--line);
 }
