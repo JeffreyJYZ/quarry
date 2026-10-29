@@ -1,0 +1,69 @@
+---
+title: Install
+description: Build quarry from source on macOS, or take a signed alpha, and check that the toolchains are found.
+---
+
+# Install
+
+quarry ships as a signed macOS app, and builds from source with Bun and Cargo. There is no Windows or
+Linux build yet.
+
+## Requirements
+
+| Thing             | Why                                                         |
+| ----------------- | ----------------------------------------------------------- |
+| macOS 14 or later | Tauri 2 webview and `xcrun` are assumed                     |
+| Xcode CLT         | `clang`, `clang-format` and `lldb-dap` come from `xcrun`    |
+| Rust (rustup)     | the backend compiles with Cargo, and `rustfmt` formats Rust |
+| Bun               | the frontend, scripts and tests                             |
+| CMake and Ninja   | optional, for C/C++ projects that use them                  |
+
+Install the optional pair with Homebrew: `brew install cmake ninja`.
+
+## Run from source
+
+```sh
+git clone https://github.com/JeffreyJYZ/quarry.git
+cd quarry
+bun install
+bun run tauri dev
+```
+
+`bun run tauri dev` builds the Rust side, starts Vite, and opens the app window. `bun run dev` alone
+starts only the browser UI, which is useful for layout work but has no project access.
+
+A release build is `bun run tauri build`; it produces `quarry.app` and a dmg under
+`src-tauri/target/release/bundle/`.
+
+## Take a signed alpha
+
+Every alpha is a universal macOS build with an updater manifest:
+
+- releases: [github.com/JeffreyJYZ/quarry/releases](https://github.com/JeffreyJYZ/quarry/releases)
+- the app checks for a newer alpha at launch and offers **Update now**
+
+<Callout tone="warn" title="A copy that never updates">
+	The updater installs into the bundle it is running from. If two copies of quarry.app exist — one
+	in `/Applications` and one inside the repository — only the copy you launch moves forward. Check
+	the version in the title bar if an update seems to do nothing.
+</Callout>
+
+## Check what was found
+
+quarry never bundles a toolchain. It looks on `PATH` first, then in `/opt/homebrew/bin`,
+`/usr/local/bin` and `~/.cargo/bin`, and asks `xcrun` for anything Apple ships. A GUI launch inherits
+launchd's short `PATH`, which is why the extra directories and `xcrun` are probed at all.
+
+Settings shows which tools were found and which are missing. A formatter that is absent is named
+when it matters, rather than failing silently: formatting a TOML file without `taplo` says
+`no formatter for .toml: install taplo-cli`.
+
+<Callout tone="note" title="Rust toolchain location">
+	Cargo installs its binaries into `~/.cargo/bin`, and Homebrew's rustup puts shims in
+	`/opt/homebrew/opt/rustup/bin`. Both are probed, so neither has to be on the `PATH` a Dock
+	launch receives.
+</Callout>
+
+## Next
+
+[Open a project](/docs/projects) and let quarry detect what it is.

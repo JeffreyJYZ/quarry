@@ -1,0 +1,74 @@
+---
+title: Editor
+description: CodeMirror 6 editing in quarry: tabs, search, multi-cursor, formatting, config files and the breadcrumb.
+---
+
+# Editor
+
+The editing surface is CodeMirror 6 with Rust and C/C++ grammars, wired to the project's language
+server, formatter and debugger.
+
+## Tabs, saving and formatting
+
+Files open in tabs across the top of the editor column; a dirty file is marked in its tab. Saving is
+
+<Kbd>Cmd</Kbd>+<Kbd>S</Kbd>, saving everything is <Kbd>Cmd</Kbd>+<Kbd>Alt</Kbd>+<Kbd>S</Kbd>, and
+formatting the active file is <Kbd>Cmd</Kbd>+<Kbd>Alt</Kbd>+<Kbd>L</Kbd>. Format on save is a
+setting.
+
+A failed save earns a slot in the notice line; a successful one says nothing.
+
+## Search
+
+- <Kbd>Cmd</Kbd>+<Kbd>F</Kbd> searches the active file.
+- <Kbd>Cmd</Kbd>+<Kbd>Alt</Kbd>+<Kbd>F</Kbd> searches the project through `rg`, with case and regex
+  toggles, glob filters, include and exclude patterns, and a results list that opens a hit at its
+  line.
+- <Kbd>Cmd</Kbd>+<Kbd>G</Kbd> moves to the next match.
+- <Kbd>Cmd</Kbd>+<Kbd>P</Kbd> opens files by name: file-name matches rank above path matches, word
+  and path-segment boundaries are preferred, and recent files appear in their own group.
+
+## Multi-cursor
+
+Occurrences of the symbol under the caret are highlighted as you move.
+
+- <Kbd>Cmd</Kbd>+<Kbd>D</Kbd> selects the word, then adds the next unselected occurrence each press,
+  wrapping once and stopping when everything is selected.
+- <Kbd>Cmd</Kbd>+<Kbd>Shift</Kbd>+<Kbd>L</Kbd> selects every occurrence at once.
+- <Kbd>Cmd</Kbd>+<Kbd>U</Kbd> drops the most recently added range.
+
+Every range is a real editor selection, so one edit replaces them all in a single undo step.
+
+## Folding, comments and indentation
+
+<Callout tone="note" title="Where the keys come from">
+	The editor's keymap follows IntelliJ's Mac conventions: <Kbd>Cmd</Kbd> for navigation, and
+	comments, folds and indentation on the chords an IDEA user already knows.
+</Callout>
+
+## Config files are languages too
+
+`Cargo.toml`, `taplo`-formatted TOML, JSON and YAML are recognised by extension and by the names that
+carry no extension of their own: `Cargo.lock`, `Cargo.toml.orig`, `Gopkg.lock`, `Pipfile`,
+`poetry.lock`, `uv.lock` and `.cargo/config`. The status bar reads the same table, so the language it
+shows and the formatter it runs cannot disagree.
+
+Formatting is dispatched per language and never silent:
+
+- **JSON** is formatted in the frontend, keeping the file's own indent and trailing newline. Invalid
+  JSON is left exactly as it is.
+- **TOML** needs `taplo` or `taplo-cli` on the probed paths; without one the app says
+  `no formatter for .toml: install taplo-cli`.
+- **YAML** names the gap instead of pretending.
+- **Rust** goes through `rustfmt`, **C/C++** through `clang-format` with the nearest `.clang-format`
+  and `AllowShort*: Never`, so a one-line body never survives a format.
+
+## Breakpoints and blame
+
+The gutter carries breakpoints: click to toggle, and a conditional or log breakpoint is drawn
+differently from an unconditional one. Blame annotations sit at the end of the line and come from the
+same `git_blame` data the Source Control view shows.
+
+## Next
+
+[Language servers](/docs/language-servers) covers what happens when you hover, complete or rename.

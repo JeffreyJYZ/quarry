@@ -1,0 +1,62 @@
+---
+title: Architecture
+description: How the Tauri shell, the React frontend and the Rust backend split the work.
+---
+
+# Architecture
+
+quarry is a Tauri 2 application: a Rust process that owns projects, processes and protocol clients,
+and a React 19 frontend that renders them.
+
+## The two halves
+
+| Layer    | Lives in     | Owns                                                        |
+| -------- | ------------ | ----------------------------------------------------------- |
+| Shell    | `src-tauri/` | files, git, cargo, CMake, LSP, DAP, PTYs, settings, updates |
+| Frontend | `src/`       | editor, panels, docks, dialogs, themes, keymaps             |
+
+The frontend never shells out. Every action that touches the machine is a command on the Rust side,
+so the same logic serves the menu, the palette and the rail.
+
+## Frontend layout
+
+- `src/lib` — logic: the LSP and DAP models, the project buffer, settings, themes, formatting
+  dispatch, ranking, test filters. Pure enough to unit test with `bun test`.
+- `src/ui` — rendering: the editor surface, docks, overlays and styles. The feature directory is kept
+  on both sides, so `lib/editor/theme.ts` and `ui/editor/Editor.tsx` are obviously the same feature.
+
+The editor is CodeMirror 6, loaded lazily so its language packages stay out of the first bundle. Panels
+that are not on screen — the debugger, the terminal, search, quick open, the palette — are lazy as
+well.
+
+## Protocols
+
+| Protocol | Client                    | Notes                                          |
+| -------- | ------------------------- | ---------------------------------------------- |
+| LSP      | hand-written, over a pipe | one session per server kind per project root   |
+| DAP      | raw, against `lldb-dap`   | one client for Rust and C/C++                  |
+| PTY      | `portable-pty`            | a real terminal per session, not a line parser |
+
+Language servers are started by the backend, keyed by kind and root. Every request names its session,
+and a file is only sent to a server that serves its extension.
+
+## Where the seams are
+
+The expensive-looking pieces are deliberately separate:
+
+- **Formatter dispatch** is per language. JSON is formatted in the frontend; TOML needs `taplo`;
+  Rust and C/C++ keep their toolchain formatters. Nothing falls back silently.
+- **Diagnostics** have three sources — rust-analyzer, clangd, and cargo's JSON output — merged into
+  one model, so Problems does not care which produced a message.
+- **Themes** fill one token set. A token the theme omits keeps the default, and the first paint uses a
+  hard-coded fallback rather than the settings file.
+
+## Testing
+
+The Rust side has `cargo test` and clippy. The frontend has `bun test` over the pure helpers: ranking,
+argument splitting, hex, buffers, blame, search, test filters. Anything that needs a real language
+server or debugger lives in `scripts/*-smoke.ts`, which only run by hand.
+
+## Next
+
+[Contributing](/docs/contributing) has the gate those tests belong to.

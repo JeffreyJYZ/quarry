@@ -1,0 +1,70 @@
+---
+title: Language servers
+description: rust-analyzer and clangd in quarry — sessions, hover, completion, navigation, rename, code actions and diagnostics.
+---
+
+# Language servers
+
+quarry speaks LSP directly over a framed pipe. There is no plugin layer: a server is started for a
+project root, given the files it serves, and asked the questions the editor needs.
+
+## Sessions
+
+A session is keyed `kind::root` and started only when the root carries that kind's signal:
+rust-analyzer for a `Cargo.toml`, clangd for a `compile_commands.json`, `CMakeLists.txt` or a C/C++
+source. Both can be running at once.
+
+Servers only ever receive files they serve. rust-analyzer gets `.rs`; clangd gets `.c`, `.h`, `.cc`,
+`.cpp`, `.cxx`, `.hh`, `.hpp`. An unserved path is never opened, changed or closed against a server,
+which is what keeps a `.cpp` file in a Rust-only project from being reported as a clangd error.
+
+## What the editor asks for
+
+| Action         | How to reach it                                                  |
+| -------------- | ---------------------------------------------------------------- |
+| Hover          | rest the pointer on a symbol — shows the server's markdown docs  |
+| Completion     | type, or <Kbd>Cmd</Kbd>+<Kbd>Space</Kbd>                         |
+| Definition     | <Kbd>F12</Kbd>, or <Kbd>Cmd</Kbd>+click                          |
+| References     | <Kbd>Shift</Kbd>+<Kbd>F12</Kbd>                                  |
+| Signature help | <Kbd>Cmd</Kbd>+<Kbd>Shift</Kbd>+<Kbd>Space</Kbd>                 |
+| Code actions   | <Kbd>Alt</Kbd>+<Kbd>Enter</Kbd>, and the Fix button on a problem |
+| Inlay hints    | on by default after a pause in typing                            |
+| Type hierarchy | <Kbd>Shift</Kbd>+<Kbd>Alt</Kbd>+<Kbd>T</Kbd>                     |
+
+Rename is a dialog, not an inline prompt, so a long list of edits is reviewed before it is applied.
+
+Hover popups are drawn inside the editor pane and flip above the caret when the pane's own room below
+runs out — never over the panels underneath.
+
+## Diagnostics
+
+Diagnostics stream in from both servers and from builds. They are drawn as squiggles in the editor
+and as gutter markers, and collected in the Problems dock:
+
+- grouped by file, with severity, line and message
+- severity counts in the dock header are toggles: errors, warnings and info can be hidden
+  independently
+- "group by file" switches to a flat list ordered by severity, then path, then line
+- each row copies as `path:line:col severity: message`
+- the empty state distinguishes "no diagnostics" from "everything filtered out"
+
+Cargo build diagnostics merge into the same list, so a type error that rust-analyzer has not caught
+yet still appears in the same place as one that it has.
+
+## Outline, breadcrumb and calls
+
+The document outline and the breadcrumb both come from `textDocument/documentSymbol`, so the tree and
+the path under the title agree by construction. Call hierarchy is a panel of its own: callers and
+callees are fetched per level, arrow keys move, <Kbd>Enter</Kbd> opens, and a symbol with no hierarchy
+says so instead of erroring.
+
+## Known limits
+
+- Sync is full-document. Incremental sync is not implemented; it is worth doing only when a stall is
+  measured, not in advance.
+- `evaluate` is still broken for Rust through `lldb-dap`, which is why watch expressions are pinned
+  variables rather than arbitrary expressions. See [Debugging](/docs/debugging).
+
+## Next
+
+[Build and run](/docs/build-run) takes the project from clean to executing.

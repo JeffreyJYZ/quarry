@@ -1,0 +1,75 @@
+---
+title: Keyboard shortcuts
+description: Every accelerator the window answers to, plus the editor chords that follow IntelliJ's Mac conventions.
+---
+
+# Keyboard shortcuts
+
+The window's accelerators are registered on the capture phase, so they work wherever focus sits —
+except where a text field or the terminal owns the key, which is the point.
+
+## Project and view
+
+| Keys                                         | Action                              |
+| -------------------------------------------- | ----------------------------------- |
+| <Kbd>Cmd</Kbd>+<Kbd>B</Kbd>                  | Toggle the left column              |
+| <Kbd>Cmd</Kbd>+<Kbd>Shift</Kbd>+<Kbd>G</Kbd> | Toggle source control               |
+| <Kbd>Cmd</Kbd>+<Kbd>J</Kbd>                  | Toggle the bottom dock              |
+| <Kbd>Cmd</Kbd>+<Kbd>Shift</Kbd>+<Kbd>D</Kbd> | Show the debugger                   |
+| <Kbd>Alt</Kbd>+<Kbd>F12</Kbd>                | Toggle the terminal                 |
+| <Kbd>Cmd</Kbd>+<Kbd>K</Kbd>                  | Shortcut sheet                      |
+| <Kbd>Cmd</Kbd>+<Kbd>,</Kbd>                  | Settings                            |
+| <Kbd>?</Kbd>                                 | Shortcut sheet (outside the editor) |
+
+## Editing
+
+| Keys                                                      | Action                                    |
+| --------------------------------------------------------- | ----------------------------------------- |
+| <Kbd>Cmd</Kbd>+<Kbd>S</Kbd>                               | Save the active file                      |
+| <Kbd>Cmd</Kbd>+<Kbd>Alt</Kbd>+<Kbd>S</Kbd>                | Save every dirty file                     |
+| <Kbd>Cmd</Kbd>+<Kbd>Alt</Kbd>+<Kbd>L</Kbd>                | Format the active file                    |
+| <Kbd>Cmd</Kbd>+<Kbd>/</Kbd>                               | Toggle a line comment                     |
+| <Kbd>Cmd</Kbd>+<Kbd>]</Kbd> / <Kbd>Cmd</Kbd>+<Kbd>[</Kbd> | Indent / outdent                          |
+| <Kbd>Cmd</Kbd>+<Kbd>D</Kbd>                               | Select the word, then the next occurrence |
+| <Kbd>Cmd</Kbd>+<Kbd>Shift</Kbd>+<Kbd>L</Kbd>              | Select every occurrence                   |
+| <Kbd>Cmd</Kbd>+<Kbd>U</Kbd>                               | Drop the last added range                 |
+
+## Navigation and insight
+
+| Keys                                             | Action                                 |
+| ------------------------------------------------ | -------------------------------------- |
+| <Kbd>Cmd</Kbd>+<Kbd>P</Kbd>                      | Quick open by file name                |
+| <Kbd>Cmd</Kbd>+<Kbd>Shift</Kbd>+<Kbd>P</Kbd>     | Command palette                        |
+| <Kbd>Cmd</Kbd>+<Kbd>F</Kbd>                      | Find in file                           |
+| <Kbd>Cmd</Kbd>+<Kbd>Alt</Kbd>+<Kbd>F</Kbd>       | Find in project                        |
+| <Kbd>Cmd</Kbd>+<Kbd>G</Kbd>                      | Next match                             |
+| <Kbd>F12</Kbd> / <Kbd>Cmd</Kbd>+click            | Go to definition                       |
+| <Kbd>Shift</Kbd>+<Kbd>F12</Kbd>                  | Find references                        |
+| <Kbd>Cmd</Kbd>+<Kbd>Space</Kbd>                  | Completion                             |
+| <Kbd>Cmd</Kbd>+<Kbd>Shift</Kbd>+<Kbd>Space</Kbd> | Signature help                         |
+| <Kbd>Alt</Kbd>+<Kbd>Enter</Kbd>                  | Code actions at the caret              |
+| <Kbd>Shift</Kbd>+<Kbd>Alt</Kbd>+<Kbd>T</Kbd>     | Type hierarchy                         |
+| <Kbd>Cmd</Kbd>+<Kbd>Shift</Kbd>+<Kbd>E</Kbd>     | Reveal the active file in the explorer |
+
+## Build, run and debug
+
+| Keys                                                           | Action                                |
+| -------------------------------------------------------------- | ------------------------------------- |
+| <Kbd>Shift</Kbd>+<Kbd>F10</Kbd> / <Kbd>Ctrl</Kbd>+<Kbd>R</Kbd> | Run the selected target               |
+| <Kbd>Shift</Kbd>+<Kbd>F9</Kbd> / <Kbd>Ctrl</Kbd>+<Kbd>D</Kbd>  | Debug the selected target             |
+| <Kbd>Ctrl</Kbd>+<Kbd>F2</Kbd>                                  | Stop                                  |
+| <Kbd>Cmd</Kbd>+<Kbd>R</Kbd>                                    | Re-run                                |
+| <Kbd>Cmd</Kbd>+<Kbd>F8</Kbd>                                   | Toggle a breakpoint on the caret line |
+| <Kbd>Cmd</Kbd>+<Kbd>F10</Kbd>                                  | Run to cursor                         |
+| <Kbd>F7</Kbd> / <Kbd>F8</Kbd> / <Kbd>Shift</Kbd>+<Kbd>F8</Kbd> | Step into / over / out                |
+| <Kbd>F9</Kbd>                                                  | Resume                                |
+
+<Callout tone="note" title="Cmd is navigation, Control is execution">
+	IntelliJ's Mac keymap keeps <Kbd>Cmd</Kbd> for navigation and hands run and debug to
+	<Kbd>Ctrl</Kbd>. quarry follows that split, and also accepts the <Kbd>Shift</Kbd>+<Kbd>F9</Kbd>{" "}
+	/<Kbd>F10</Kbd> pair from Windows habits.
+</Callout>
+
+## Next
+
+[Architecture](/docs/architecture) if you want to see how these are wired.

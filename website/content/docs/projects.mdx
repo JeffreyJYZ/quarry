@@ -1,0 +1,56 @@
+---
+title: Projects
+description: Open a folder, let quarry detect the build system and language servers, and restore the last session.
+---
+
+# Projects
+
+quarry is built around one open project at a time. The project is a directory; everything else —
+buffers, layout, sessions — hangs off it.
+
+## Opening a project
+
+Use the project switcher in the title bar, or the recent-projects list beneath it. A remembered root
+that no longer exists is reported and skipped rather than opened into an error.
+
+On launch quarry reopens the last project along with the tabs that were open, the left column's view,
+the dock tab and the panel sizes, all from the global settings file. Nothing about a project's source
+is stored outside the project.
+
+## What gets detected
+
+| Signal                                    | What it turns on                          |
+| ----------------------------------------- | ----------------------------------------- |
+| `Cargo.toml`                              | rust-analyzer, `cargo` builds, Rust tests |
+| `CMakeLists.txt`                          | clangd, CMake configure and build         |
+| `compile_commands.json`                   | clangd with the compile database          |
+| A `.c` / `.cpp` file with no build system | clangd, and a plain clang build           |
+
+Both language servers can run at once: a repository with a Rust crate and a C++ test harness in the
+same tree gets rust-analyzer for the crate and clangd for the C++ file, each rooted where its own
+signal was found.
+
+Signals are looked for to a bounded depth, skipping `target`, `node_modules`, `.git`, `build` and
+`out`, so a monorepo root still finds the crates inside it without walking the whole tree.
+
+## Language-server sessions
+
+A session is keyed by server kind and root: `rust::/path/to/project` and `clang::/path/to/project`.
+Every request names its session, and a file is only offered to a server that serves its extension —
+rust-analyzer never sees `Cargo.toml`, clangd never sees a `.rs` file. That gate is what makes the
+status chip honest about what is actually running.
+
+## Per-project settings
+
+A project can carry its own overrides in `.quarry/settings.json` at its root. The file is optional;
+whatever it omits falls back to the global settings. It is the right place for a root that needs a
+different font size or dock layout from the rest of your projects.
+
+<Callout tone="note" title="What is never stored in the project">
+	quarry writes nothing else into a project directory. There is no index, no cache and no build
+	database of its own; the toolchains keep their own.
+</Callout>
+
+## Next
+
+[Editor](/docs/editor) covers what the window does once a project is open.

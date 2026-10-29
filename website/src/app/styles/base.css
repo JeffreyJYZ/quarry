@@ -1,0 +1,135 @@
+/*
+ * The docs site wears quarry's own chrome. Every value here is copied from the app's token sets —
+ * `src/lib/themes/builtin/one-dark.ts` and `one-light.ts` — so the site and the IDE look like one
+ * product. Keep them in step if those palettes move.
+ */
+:root {
+	--bg: #23272e;
+	--panel: #2c313a;
+	--rail: #2a2f37;
+	--chrome: #343a45;
+	--line: #4a505c;
+	--text: #e6e9ee;
+	--muted: #b9c0cc;
+	--accent: #8bb8f0;
+	--hover: #363c47;
+	--danger: #e06c75;
+	--warn: #e5c07b;
+	--good: #98c379;
+	--code-bg: #282c34;
+	--inline-bg: #31363f;
+
+	--mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+	--ui: system-ui, -apple-system, "SF Pro Text", sans-serif;
+
+	--header-h: 56px;
+	--sidebar-w: 264px;
+	--toc-w: 224px;
+	--content-w: 752px;
+	--radius: 6px;
+
+	color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+	--bg: #fafafa;
+	--panel: #f0f0f1;
+	--rail: #ededee;
+	--chrome: #e6e6e7;
+	--line: #b9bcc2;
+	--text: #1f2227;
+	--muted: #545a63;
+	--accent: #2f62c4;
+	--hover: #e4e6e9;
+	--danger: #b4424a;
+	--warn: #8a6d1f;
+	--good: #2f7d43;
+	--code-bg: #f4f5f7;
+	--inline-bg: #eceef1;
+
+	color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	scroll-behavior: smooth;
+	scroll-padding-top: calc(var(--header-h) + 16px);
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font-family: var(--ui);
+	font-size: 15px;
+	line-height: 1.6;
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
+}
+
+a {
+	color: var(--accent);
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: 2px;
+	border-radius: 3px;
+}
+
+/* The app's section label: mono, uppercase, wide tracking, muted. */
+.label {
+	margin: 0;
+	font-family: var(--mono);
+	font-size: 10px;
+	font-weight: 600;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+code,
+kbd,
+pre,
+samp {
+	font-family: var(--mono);
+}
+
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+::selection {
+	background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+	background: color-mix(in srgb, var(--line) 80%, transparent);
+	background-clip: content-box;
+	border: 3px solid transparent;
+	border-radius: 6px;
+}

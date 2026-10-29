@@ -1,0 +1,60 @@
+---
+title: Debugging
+description: lldb-dap in quarry — launch, breakpoints, data breakpoints, frames, memory and disassembly.
+---
+
+# Debugging
+
+quarry speaks raw DAP to `lldb-dap`, the adapter Xcode ships. One client drives Rust and C/C++,
+because both are LLDB targets underneath.
+
+## Starting a session
+
+Debugging launches the binary the build just produced, with the arguments and working directory from
+the selected run configuration. The launch is made against the real path of the project directory;
+`/var/…` and `/private/var/…` are different strings to lldb, and a mismatch leaves every breakpoint
+unverified.
+
+## Breakpoints
+
+- **Line breakpoints** — click the gutter. Set them before a session starts; they are applied when
+  the adapter launches.
+- **Conditional and log breakpoints** — a condition is evaluated by lldb, a log message prints without
+  stopping.
+- **Data breakpoints (watchpoints)** — watch a variable's address and stop when it is written. LLDB
+  reports the store's line, which is often the line after the assignment you had in mind.
+
+<Callout tone="note" title="No expression evaluation for Rust">
+	`evaluate` is broken for Rust through this adapter — it falls back to Objective-C++ and errors.
+	Watch entries are therefore **pinned variables**, re-read on every stop, plus memory views.
+	Arbitrary expressions are not available until a different adapter is measured.
+</Callout>
+
+## Frames, scopes and stepping
+
+The debug dock lists threads and their frames; selecting a frame shows its scopes and variables in a
+tree, with lazy expansion for deep structures. Stepping is <Kbd>F7</Kbd> into, <Kbd>F8</Kbd> over and
+
+<Kbd>Shift</Kbd>+<Kbd>F8</Kbd> out; <Kbd>F9</Kbd> resumes and <Kbd>Cmd</Kbd>+<Kbd>F10</Kbd> runs to
+the caret.
+
+<Callout tone="tip" title="Rust values print properly">
+	The debugger imports LLDB's Rust formatter script at session start, so `Vec`, `String` and
+	friends arrive as values rather than as raw structs. Without it they silently print as
+	internals.
+</Callout>
+
+## Memory
+
+The memory view reads the target by address, paged, and renders a hex band with an ASCII column.
+Unmapped regions are drawn as such rather than as zeroes. It is available while the target is stopped,
+and it works regardless of whether the adapter advertises memory references.
+
+## Disassembly
+
+The disassembly pane follows the selected frame and shows instructions around its instruction
+pointer. It opens beside the editor as a split, so source and instructions stay on screen together.
+
+## Next
+
+[Tests](/docs/tests) covers running and filtering the test suite.

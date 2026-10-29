@@ -1,0 +1,45 @@
+---
+title: Source control
+description: Status, diffs, commits, branches, history and blame, without leaving the window.
+---
+
+# Source control
+
+The left column's second view is the repository. The rail's Source control button and the title bar's
+branch chip both open it.
+
+## Status and diffs
+
+Changes are grouped into staged and unstaged, with a count beside each group. Selecting a file opens a
+unified diff beside the tree; the same view renders a commit's diff when you pick one from history.
+
+Stage and unstage work per group. Discard asks first — a two-step confirmation, because discarding is
+the one action in this view that loses work.
+
+## Commit
+
+The commit box takes a message and commits the staged changes. Amend rewrites the last commit and
+validates the message: empty and oversized messages are refused before anything runs.
+
+## Branches and history
+
+The branch dropdown lists local branches and checks one out. The History tab lists recent commits; a
+selected commit shows its diff, and its hash copies with one action.
+
+## Blame
+
+Blame appears in two places:
+
+- **in the editor**, at the end of the line, for the file you are reading
+- **in its own tab**, grouped by commit, so a file's history reads as a list
+
+Annotations come from the same `git_blame` data; the editor view and the tab cannot disagree.
+
+<Callout tone="note" title="Reading git links">
+	Copy actions on change rows, history rows and blame groups stop propagation, so copying a path
+	does not also open the file underneath it.
+</Callout>
+
+## Next
+
+[Settings and themes](/docs/settings) covers what the window remembers.

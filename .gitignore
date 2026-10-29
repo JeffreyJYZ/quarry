@@ -38,3 +38,8 @@ docs/reference/
 
 # Release scratch written by scripts/release-local.ts
 dist-release/
+
+# The docs site
+website/.next
+website/out
+website/tsconfig.tsbuildinfo

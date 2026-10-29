@@ -1,0 +1,49 @@
+---
+title: Overview
+description: quarry is a focused IDE for Rust and C/C++, built around the daily loop: navigate, fix, build, run, debug.
+---
+
+# Overview
+
+quarry is a desktop IDE for **Rust and C/C++ only**, built to match CLion on the loop you run every
+day: open a project, navigate it, read the errors, fix them, build, run a test, start the debugger,
+look at memory.
+
+It is not a general editor, and it does not try to match CLion's feature count. The three things a
+CLion user would miss after moving — clangd-grade C/C++ insight, rust-analyzer-grade Rust insight,
+and an LLDB debugger with variables, watchpoints, disassembly and a hex memory view — are exactly
+what it is built around. Those engines already exist; quarry is the IDE around them.
+
+<Callout tone="tip" title="Toolchains are found, not shipped">
+	quarry probes `PATH` and then `xcrun` for `rust-analyzer`, `clangd`, `lldb-dap`, `rustfmt`,
+	`clang-format`, `cargo`, `cmake` and `ninja`. Nothing is vendored, so the versions you debug
+	with are the versions your project builds with.
+</Callout>
+
+## What works today
+
+- **Projects** — open a folder, detect `Cargo.toml`, `CMakeLists.txt` or `compile_commands.json`,
+  browse a lazily expanded tree, restore the last project, tabs and layout on launch.
+- **Editing** — CodeMirror 6 with Rust and C/C++ highlighting, a breakpoint gutter, diagnostics as
+  squiggles and gutter markers, format on save, rename, code actions, signature help, inlay hints,
+  occurrence highlighting and multi-cursor.
+- **Insight** — rust-analyzer and clangd, one session per server kind per project root, with hover,
+  completion, go to definition, references, document highlights, symbols, type hierarchy and calls.
+- **Build and run** — `cargo build --message-format=json`, CMake, or plain clang; Debug and Release
+  profiles; run configurations with program, args, cwd and environment.
+- **Debugging** — raw DAP against `lldb-dap`: breakpoints (conditional, log, data), frames, scopes,
+  pinned watches, memory and disassembly.
+- **Tests, git and terminal** — a Tests dock, a source-control view with diffs, commit, branches,
+  history and blame, and an embedded terminal with real PTYs.
+
+## What it deliberately leaves out
+
+Remote development, embedded targets, CPU and memory profilers, databases, Docker, AI assistance,
+plugin APIs and every language other than Rust and C/C++. Naming them here is the point: a focused
+IDE is defined as much by what it refuses as by what it adds.
+
+## Where to next
+
+- [Install quarry](/docs/install) and open a project.
+- [Keyboard shortcuts](/docs/shortcuts) if you already know the IDE you are coming from.
+- [Architecture](/docs/architecture) if you want to know how the shell and the servers fit together.

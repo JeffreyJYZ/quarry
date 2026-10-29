@@ -1,0 +1,52 @@
+---
+title: Settings and themes
+description: Where quarry keeps its settings, what it remembers, the built-in themes and how to bring your own.
+---
+
+# Settings and themes
+
+Settings are split in two: the app's own file, and an optional per-project override.
+
+## Where things live
+
+| Scope   | Path                                                          |
+| ------- | ------------------------------------------------------------- |
+| Global  | `~/Library/Application Support/land.jyz.quarry/settings.json` |
+| Project | `<project root>/.quarry/settings.json`                        |
+
+The global file holds the last project, open tabs, the left column's view, the dock tab, panel sizes,
+editor and terminal fonts, and the theme. The project file overrides what it mentions and inherits
+everything else.
+
+## Themes
+
+Eight themes ship with the app: One Dark (the default), One Light, Ayu Dark, Catppuccin Mocha, Gruvbox
+Dark, Nord, Solarized Dark and Tokyo Night.
+
+Every theme fills the same token set — surfaces (`bg`, `panel`, `rail`, `chrome`), `line`, `text`,
+`muted`, `accent`, `hover`, `danger`, `warn`, `good`, the editor's syntax colours, and the lint
+colours. A token a custom theme leaves out keeps the default, so a partial theme is valid rather than
+broken.
+
+A custom theme can be imported as:
+
+- a **Zed theme file** (`{ name, themes: [{ name, style, … }] }`), which may carry several themes
+- a **quarry theme object** (`{ name, tokens }`)
+
+Parsing never throws: a bad file reports what is wrong. Old settings files load with the default
+theme rather than failing.
+
+<Callout tone="tip" title="The first frame">
+	Before any theme is applied, the window paints from a hard-coded One Dark fallback, so there is
+	no white flash between launch and the first render.
+</Callout>
+
+## Panels and layout
+
+Panel sizes are draggable and remembered: the explorer's width, the outline's height under the tree,
+the dock's height, and the terminal's width when it is placed beside the editor. Panel placement,
+fonts and the terminal's own font size live in the same settings file.
+
+## Next
+
+[Keyboard shortcuts](/docs/shortcuts) is the full list.

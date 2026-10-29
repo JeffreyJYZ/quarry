@@ -173,6 +173,19 @@ matrix, module seams, slices and estimates are in
 [`docs/plans/001-clion-parity.md`](docs/plans/001-clion-parity.md), and the slice documents are indexed
 in [`docs/plans/README.md`](docs/plans/README.md).
 
+## Documentation site
+
+The docs live in [`website/`](website) and are a static Next.js export that reuses the app's palette
+and fonts. Content is MDX under `website/content/docs/`; the sidebar, pager and search index all read
+`website/src/lib/nav.ts`.
+
+```sh
+cd website
+bun install
+bun run dev     # http://localhost:4321
+bun run build   # search index + static export in website/out/
+```
+
 ## Stack
 
 | Layer      | Choice                                                                        |

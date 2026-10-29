@@ -1,0 +1,196 @@
+/* Docs shell: navigation on the left, the page in the middle, its headings on the right. */
+.docs-shell {
+	display: grid;
+	grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+	max-width: 1440px;
+	margin: 0 auto;
+}
+
+@media (min-width: 1280px) {
+	.docs-shell {
+		grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--toc-w);
+	}
+}
+
+.sidebar {
+	position: sticky;
+	top: var(--header-h);
+	align-self: start;
+	height: calc(100vh - var(--header-h));
+	overflow-y: auto;
+	padding: 22px 14px 48px 20px;
+	border-right: 1px solid var(--line);
+}
+
+.sidebar-group + .sidebar-group {
+	margin-top: 22px;
+}
+
+.sidebar-group > .label {
+	padding: 0 8px;
+	margin-bottom: 6px;
+}
+
+.sidebar-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.sidebar-link {
+	position: relative;
+	display: block;
+	padding: 5px 8px;
+	border-radius: var(--radius);
+	color: var(--muted);
+	font-size: 13.5px;
+	text-decoration: none;
+}
+
+.sidebar-link:hover {
+	background: var(--hover);
+	color: var(--text);
+	text-decoration: none;
+}
+
+.sidebar-link[aria-current="page"] {
+	background: var(--panel);
+	color: var(--text);
+}
+
+/* The rail's own accent bar, the same mark the app puts beside the selected tool. */
+.sidebar-link[aria-current="page"]::before {
+	position: absolute;
+	top: 6px;
+	bottom: 6px;
+	left: -12px;
+	width: 2px;
+	border-radius: 1px;
+	background: var(--accent);
+	content: "";
+}
+
+.docs-main {
+	min-width: 0;
+	padding: 30px 40px 72px;
+}
+
+.doc {
+	max-width: var(--content-w);
+}
+
+.breadcrumbs {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 14px;
+	font-family: var(--mono);
+	font-size: 10.5px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.breadcrumbs a {
+	color: var(--muted);
+}
+
+.breadcrumbs a:hover {
+	color: var(--accent);
+	text-decoration: none;
+}
+
+.breadcrumbs .sep {
+	color: color-mix(in srgb, var(--muted) 60%, transparent);
+}
+
+/* The right column: on-page headings, sticky under the bar. */
+.toc {
+	position: sticky;
+	top: var(--header-h);
+	align-self: start;
+	max-height: calc(100vh - var(--header-h));
+	overflow-y: auto;
+	padding: 34px 20px 48px;
+}
+
+.toc .label {
+	margin-bottom: 8px;
+}
+
+.toc-list {
+	margin: 0;
+	padding: 0 0 0 10px;
+	list-style: none;
+	border-left: 1px solid var(--line);
+}
+
+.toc-list a {
+	display: block;
+	padding: 3px 0;
+	color: var(--muted);
+	font-size: 12.5px;
+	line-height: 1.5;
+	text-decoration: none;
+}
+
+.toc-list a:hover {
+	color: var(--text);
+}
+
+.toc-list a[data-depth="3"] {
+	padding-left: 12px;
+	font-size: 12px;
+}
+
+.toc-list a.active {
+	color: var(--accent);
+}
+
+@media (max-width: 1279px) {
+	.toc {
+		display: none;
+	}
+}
+
+/* The drawer's scrim exists only on narrow screens; on the desktop it must not take a grid cell. */
+.nav-scrim {
+	display: none;
+}
+
+@media (max-width: 1023px) {
+	.docs-shell {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.sidebar {
+		position: fixed;
+		top: var(--header-h);
+		left: 0;
+		z-index: 35;
+		width: var(--sidebar-w);
+		background: var(--bg);
+		transform: translateX(-100%);
+		transition: transform 160ms ease;
+	}
+
+	:root[data-nav="open"] .sidebar {
+		transform: translateX(0);
+		box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+	}
+
+	.docs-main {
+		padding: 24px 20px 64px;
+	}
+
+	:root[data-nav="open"] .nav-scrim {
+		position: fixed;
+		inset: var(--header-h) 0 0 0;
+		z-index: 30;
+		display: block;
+		border: 0;
+		background: rgba(8, 10, 13, 0.45);
+		cursor: default;
+	}
+}

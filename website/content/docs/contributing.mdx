@@ -1,0 +1,71 @@
+---
+title: Contributing
+description: The gate every change runs through, the house rules, and how an alpha is published.
+---
+
+# Contributing
+
+quarry is a personal project with a narrow scope: an IDE for Rust and C/C++ that matches CLion on the
+daily loop. Changes that widen the scope — another language, a plugin API, remote development — are
+out of scope by design, not by accident.
+
+## The gate
+
+```sh
+bun run gate
+```
+
+Nine steps, all of them required: file size, types, formatting, lint, frontend tests, and the four
+Rust steps (`cargo fmt --check`, `cargo check --all-targets`, `cargo test`, `cargo clippy -D
+warnings`). One invocation reports the whole picture; a failing step prints its own tail.
+
+| Step   | Command                                                      |
+| ------ | ------------------------------------------------------------ |
+| Types  | `bun check` (Bun's checker, nearest tsconfig per file)       |
+| Format | `bun fmt --check` (tabs, 4 wide, 100 columns)                |
+| Lint   | `biome lint .`                                               |
+| Tests  | `bun test` over the pure helpers                             |
+| Rust   | `cargo fmt --check`, `check --all-targets`, `test`, `clippy` |
+
+## House rules
+
+- **No file over 200 lines.** `scripts/check-file-size.ts` fails on a new offender and on a stale
+  exception in `docs/refactor/oversized.txt`, so the list only shrinks. Split Rust by module
+  directories and stylesheets with `bun scripts/split-css.ts`.
+- **`src/` only**, with `@/*` mapped to `./src/*`. Logic in `src/lib`, rendering in `src/ui`, and the
+  feature name kept on both sides.
+- **Bun only.** No npm, and `bun run <script>` only where the name collides with a builtin.
+- **A formatter is never a gate.** `bun fmt` writes; `bun fmt --check` verifies.
+- **Never a measured number in a commit message.** Name the gates, not their totals.
+
+## Smoke scripts
+
+The language servers and the debugger are only exercised by hand:
+
+```sh
+bun run scripts/lsp-smoke.ts       # initialize handshake
+bun run scripts/lsp-ux-smoke.ts    # hover, completion, definition, references
+bun run scripts/dap-spike.ts       # capabilities, memory, breakpoints, formatters
+bun run scripts/cxx-smoke.ts       # clang diagnostics, missing-cmake path
+```
+
+They need a real `rust-analyzer`, `lldb-dap` and `clangd`, which is why CI does not run them.
+
+## Releasing
+
+Alphas publish from a Mac:
+
+```sh
+bun scripts/bump-version.ts alpha     # 0.1.0-alpha.N across the three version files
+git tag quarry-alphaN && git push origin main quarry-alphaN
+bun run release:local                  # gate, signed universal build, release, manifest check
+```
+
+`release:local` refuses a commit whose CI run failed or was cancelled, runs the gate itself, signs the
+bundle, publishes the release and then fetches the public manifest to prove it serves the version it
+just published.
+
+<Callout tone="warn" title="Never rotate the updater key">
+	Installed apps trust the public key baked into the build. Rotating it orphans every installed
+	copy, so the key is generated once and never regenerated.
+</Callout>

@@ -1,0 +1,143 @@
+/* Page furniture: asides, the edit link, and the previous/next pager. */
+.callout {
+	margin: 20px 0;
+	padding: 12px 14px;
+	border: 1px solid var(--line);
+	border-left: 2px solid var(--accent);
+	border-radius: 0 var(--radius) var(--radius) 0;
+	background: color-mix(in srgb, var(--panel) 70%, transparent);
+}
+
+.callout-head {
+	margin: 0 0 4px;
+	font-family: var(--mono);
+	font-size: 10px;
+	font-weight: 600;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--accent);
+}
+
+.callout p:last-child {
+	margin-bottom: 0;
+}
+
+.callout[data-tone="warn"] {
+	border-left-color: var(--warn);
+}
+
+.callout[data-tone="warn"] .callout-head {
+	color: var(--warn);
+}
+
+.callout[data-tone="danger"] {
+	border-left-color: var(--danger);
+}
+
+.callout[data-tone="danger"] .callout-head {
+	color: var(--danger);
+}
+
+.callout[data-tone="tip"] {
+	border-left-color: var(--good);
+}
+
+.callout[data-tone="tip"] .callout-head {
+	color: var(--good);
+}
+
+.page-meta {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-top: 44px;
+	padding-top: 16px;
+	border-top: 1px solid var(--line);
+	font-size: 12.5px;
+	color: var(--muted);
+}
+
+.page-meta a {
+	color: var(--muted);
+}
+
+.page-meta a:hover {
+	color: var(--accent);
+}
+
+.pager {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+	margin-top: 24px;
+}
+
+.pager-link {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	padding: 12px 14px;
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	color: var(--text);
+	text-decoration: none;
+}
+
+.pager-link:hover {
+	border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+	background: var(--panel);
+	text-decoration: none;
+}
+
+.pager-link .label {
+	font-size: 9.5px;
+}
+
+.pager-link strong {
+	font-size: 13.5px;
+	font-weight: 600;
+}
+
+.pager-next {
+	grid-column: 2;
+	text-align: right;
+}
+
+.site-footer {
+	border-top: 1px solid var(--line);
+	padding: 22px 20px 34px;
+	color: var(--muted);
+	font-size: 12.5px;
+}
+
+.site-footer-inner {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px 18px;
+	max-width: 1440px;
+	margin: 0 auto;
+}
+
+.site-footer a {
+	color: var(--muted);
+}
+
+.site-footer a:hover {
+	color: var(--accent);
+}
+
+.site-footer .dot {
+	color: color-mix(in srgb, var(--muted) 50%, transparent);
+}
+
+@media (max-width: 640px) {
+	.pager {
+		grid-template-columns: 1fr;
+	}
+
+	.pager-next {
+		grid-column: 1;
+	}
+}

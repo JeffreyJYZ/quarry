@@ -1,0 +1,235 @@
+/* The landing page: one screen of what quarry is, then the parts of the loop it covers. */
+.hero {
+	position: relative;
+	max-width: 1160px;
+	margin: 0 auto;
+	padding: 72px 24px 40px;
+}
+
+.hero-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	gap: 40px;
+	align-items: center;
+}
+
+.hero-eyebrow {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 3px 10px 3px 8px;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10.5px;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+}
+
+.hero-eyebrow .dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--good);
+}
+
+.hero h1 {
+	margin: 18px 0 14px;
+	font-size: 52px;
+	font-weight: 660;
+	line-height: 1.04;
+	letter-spacing: -0.032em;
+}
+
+.hero h1 em {
+	font-style: normal;
+	color: var(--accent);
+}
+
+.hero-lede {
+	max-width: 46ch;
+	margin: 0;
+	color: var(--muted);
+	font-size: 16.5px;
+	line-height: 1.62;
+}
+
+.hero-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-top: 26px;
+}
+
+.button {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	height: 36px;
+	padding: 0 16px;
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	background: var(--panel);
+	color: var(--text);
+	font-size: 13.5px;
+	font-weight: 550;
+	cursor: pointer;
+	text-decoration: none;
+}
+
+.button:hover {
+	border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+	text-decoration: none;
+}
+
+.button-primary {
+	border-color: color-mix(in srgb, var(--accent) 70%, var(--line));
+	background: color-mix(in srgb, var(--accent) 18%, var(--panel));
+	color: var(--text);
+}
+
+.button-primary:hover {
+	background: color-mix(in srgb, var(--accent) 26%, var(--panel));
+}
+
+.hero-shot {
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--code-bg);
+	overflow: hidden;
+	box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+.hero-shot-bar {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 9px 12px;
+	border-bottom: 1px solid var(--line);
+	background: var(--panel);
+}
+
+.hero-shot-bar i {
+	width: 9px;
+	height: 9px;
+	border-radius: 50%;
+	background: var(--line);
+}
+
+.hero-shot-title {
+	margin-left: 8px;
+	font-family: var(--mono);
+	font-size: 10.5px;
+	letter-spacing: 0.08em;
+	color: var(--muted);
+}
+
+.hero-shot pre {
+	margin: 0;
+	padding: 14px 16px;
+	font-size: 12.5px;
+	line-height: 1.7;
+	overflow-x: auto;
+}
+
+.hero-shot-code pre {
+	margin: 0;
+}
+
+:root[data-theme="dark"] .hero-shot-code span {
+	color: var(--shiki-dark, inherit);
+}
+
+:root[data-theme="light"] .hero-shot-code span {
+	color: var(--shiki-light, inherit);
+}
+
+.feature-section {
+	max-width: 1160px;
+	margin: 0 auto;
+	padding: 24px 24px 72px;
+}
+
+.feature-head {
+	margin: 0 0 6px;
+	font-size: 12px;
+	font-family: var(--mono);
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.feature-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 14px;
+	margin-top: 16px;
+}
+
+.feature-card {
+	padding: 16px 18px 18px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--panel) 55%, transparent);
+}
+
+.feature-card h3 {
+	margin: 0 0 6px;
+	font-size: 14.5px;
+	font-weight: 620;
+}
+
+.feature-card p {
+	margin: 0;
+	color: var(--muted);
+	font-size: 13px;
+	line-height: 1.6;
+}
+
+.feature-card .label {
+	margin-bottom: 8px;
+}
+
+.feature-link {
+	color: var(--text);
+	text-decoration: none;
+}
+
+.feature-link:hover {
+	border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+	background: var(--panel);
+	text-decoration: none;
+}
+
+@media (max-width: 980px) {
+	.hero-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.hero h1 {
+		font-size: 40px;
+	}
+
+	.feature-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 640px) {
+	.hero {
+		padding: 44px 16px 28px;
+	}
+
+	.hero h1 {
+		font-size: 33px;
+	}
+
+	.feature-section {
+		padding: 16px 16px 56px;
+	}
+
+	.feature-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}

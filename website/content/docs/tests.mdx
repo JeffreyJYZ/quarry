@@ -1,0 +1,39 @@
+---
+title: Tests
+description: The Tests dock: list, filter, sort, run all or failed only, and copy failures out.
+---
+
+# Tests
+
+Tests are a dock tab, not a terminal scroll. Discovery and execution come from the project's own
+toolchain.
+
+## The list
+
+Each test carries its binary, its name and its last result. The dock can:
+
+- filter by binary
+- filter by result: all, failed, passed, not run
+- sort the list
+- run everything in the current filter, or only what failed
+
+## Failures
+
+A failed row expands to its output. From there:
+
+- **copy name** copies the test's name
+- **copy output** copies the expanded failure
+- **copy failures** writes one `path::test_name` line per failed test and is disabled when nothing
+  failed
+
+That last action is the one you want on the clipboard when you hand a failure to someone else: it is
+already in the form `cargo test` takes.
+
+## Running from the dock
+
+A run starts the test binary with the selected test's filter and streams progress back into the list.
+The dock stays put between runs; the filter and sort survive switching tabs.
+
+## Next
+
+[Source control](/docs/source-control) covers the rest of the repository work.

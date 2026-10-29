@@ -1,0 +1,870 @@
+[
+	{
+		"title": "Overview",
+		"section": "Getting started",
+		"href": "/docs",
+		"heading": "Overview",
+		"body": "quarry is a desktop IDE for Rust and C/C++ only, built to match CLion on the loop you run every day: open a project, navigate it, read the errors, fix them, build, run a test, start the debugger, look at memory. It is not a general editor, and it does not try to match CLion's feature count. The three things a CLion user would miss after moving — clangd-grade C/C++ insight, rust-analyzer-grade Rust insight, and an LLDB debugger with variables, watchpoints, disassembly and a hex memory view — are exactly what it is built around. Those engines already exist; quarry is the IDE around them. quarry probes PATH and then xcrun for rust-analyzer, clangd, lldb-dap, rustfmt, clang-format, cargo, cmake and ninja. Nothing is vendored, so the versions you debug with are the versions your project builds "
+	},
+	{
+		"title": "Overview",
+		"section": "Getting started",
+		"href": "/docs",
+		"heading": "What works today",
+		"body": "Projects — open a folder, detect Cargo.toml, CMakeLists.txt or compilecommands.json, browse a lazily expanded tree, restore the last project, tabs and layout on launch. Editing — CodeMirror 6 with Rust and C/C++ highlighting, a breakpoint gutter, diagnostics as squiggles and gutter markers, format on save, rename, code actions, signature help, inlay hints, occurrence highlighting and multi-cursor. Insight — rust-analyzer and clangd, one session per server kind per project root, with hover, completion, go to definition, references, document highlights, symbols, type hierarchy and calls. Build and run — cargo build --message-format=json, CMake, or plain clang; Debug and Release profiles; run configurations with program, args, cwd and environment. Debugging — raw DAP against lldb-dap: breakpo"
+	},
+	{
+		"title": "Overview",
+		"section": "Getting started",
+		"href": "/docs",
+		"heading": "What it deliberately leaves out",
+		"body": "Remote development, embedded targets, CPU and memory profilers, databases, Docker, AI assistance, plugin APIs and every language other than Rust and C/C++. Naming them here is the point: a focused IDE is defined as much by what it refuses as by what it adds."
+	},
+	{
+		"title": "Overview",
+		"section": "Getting started",
+		"href": "/docs",
+		"heading": "Where to next",
+		"body": "Install quarry and open a project. Keyboard shortcuts if you already know the IDE you are coming from. Architecture if you want to know how the shell and the servers fit together."
+	},
+	{
+		"title": "Install",
+		"section": "Getting started",
+		"href": "/docs/install",
+		"heading": "Install",
+		"body": "quarry ships as a signed macOS app, and builds from source with Bun and Cargo. There is no Windows or Linux build yet. Thing Why macOS 14 or later Tauri 2 webview and xcrun are assumed Xcode CLT clang, clang-format and lldb-dap come from xcrun Rust (rustup) the backend compiles with Cargo, and rustfmt formats Rust Bun the frontend, scripts and tests CMake and Ninja optional, for C/C++ projects that use them Install the optional pair with Homebrew: brew install cmake ninja. bun run tauri dev builds the Rust side, starts Vite, and opens the app window. bun run dev alone starts only the browser UI, which is useful for layout work but has no project access. A release build is bun run tauri build; it produces quarry.app and a dmg under src-tauri/target/release/bundle/. Every alpha is a universa"
+	},
+	{
+		"title": "Install",
+		"section": "Getting started",
+		"href": "/docs/install",
+		"heading": "Requirements",
+		"body": "Thing Why macOS 14 or later Tauri 2 webview and xcrun are assumed Xcode CLT clang, clang-format and lldb-dap come from xcrun Rust (rustup) the backend compiles with Cargo, and rustfmt formats Rust Bun the frontend, scripts and tests CMake and Ninja optional, for C/C++ projects that use them"
+	},
+	{
+		"title": "Install",
+		"section": "Getting started",
+		"href": "/docs/install",
+		"heading": "Requirements",
+		"body": "Install the optional pair with Homebrew: brew install cmake ninja."
+	},
+	{
+		"title": "Install",
+		"section": "Getting started",
+		"href": "/docs/install",
+		"heading": "Run from source",
+		"body": "bun run tauri dev builds the Rust side, starts Vite, and opens the app window. bun run dev alone starts only the browser UI, which is useful for layout work but has no project access."
+	},
+	{
+		"title": "Install",
+		"section": "Getting started",
+		"href": "/docs/install",
+		"heading": "Run from source",
+		"body": "A release build is bun run tauri build; it produces quarry.app and a dmg under src-tauri/target/release/bundle/."
+	},
+	{
+		"title": "Install",
+		"section": "Getting started",
+		"href": "/docs/install",
+		"heading": "Take a signed alpha",
+		"body": "Every alpha is a universal macOS build with an updater manifest:"
+	},
+	{
+		"title": "Install",
+		"section": "Getting started",
+		"href": "/docs/install",
+		"heading": "Take a signed alpha",
+		"body": "releases: github.com/JeffreyJYZ/quarry/releases the app checks for a newer alpha at launch and offers Update now"
+	},
+	{
+		"title": "Install",
+		"section": "Getting started",
+		"href": "/docs/install",
+		"heading": "Take a signed alpha",
+		"body": "The updater installs into the bundle it is running from. If two copies of quarry.app exist — one in /Applications and one inside the repository — only the copy you launch moves forward. Check the version in the title bar if an update seems to do nothing."
+	},
+	{
+		"title": "Install",
+		"section": "Getting started",
+		"href": "/docs/install",
+		"heading": "Check what was found",
+		"body": "quarry never bundles a toolchain. It looks on PATH first, then in /opt/homebrew/bin, /usr/local/bin and ~/.cargo/bin, and asks xcrun for anything Apple ships. A GUI launch inherits launchd's short PATH, which is why the extra directories and xcrun are probed at all."
+	},
+	{
+		"title": "Install",
+		"section": "Getting started",
+		"href": "/docs/install",
+		"heading": "Check what was found",
+		"body": "Settings shows which tools were found and which are missing. A formatter that is absent is named when it matters, rather than failing silently: formatting a TOML file without taplo says no formatter for .toml: install taplo-cli."
+	},
+	{
+		"title": "Install",
+		"section": "Getting started",
+		"href": "/docs/install",
+		"heading": "Check what was found",
+		"body": "Cargo installs its binaries into ~/.cargo/bin, and Homebrew's rustup puts shims in /opt/homebrew/opt/rustup/bin. Both are probed, so neither has to be on the PATH a Dock launch receives."
+	},
+	{
+		"title": "Install",
+		"section": "Getting started",
+		"href": "/docs/install",
+		"heading": "Next",
+		"body": "Open a project and let quarry detect what it is."
+	},
+	{
+		"title": "Projects",
+		"section": "Getting started",
+		"href": "/docs/projects",
+		"heading": "Projects",
+		"body": "quarry is built around one open project at a time. The project is a directory; everything else — buffers, layout, sessions — hangs off it. Use the project switcher in the title bar, or the recent-projects list beneath it. A remembered root that no longer exists is reported and skipped rather than opened into an error. On launch quarry reopens the last project along with the tabs that were open, the left column's view, the dock tab and the panel sizes, all from the global settings file. Nothing about a project's source is stored outside the project. Signal What it turns on Cargo.toml rust-analyzer, cargo builds, Rust tests CMakeLists.txt clangd, CMake configure and build compilecommands.json clangd with the compile database A .c / .cpp file with no build system clangd, and a plain clang bui"
+	},
+	{
+		"title": "Projects",
+		"section": "Getting started",
+		"href": "/docs/projects",
+		"heading": "Opening a project",
+		"body": "Use the project switcher in the title bar, or the recent-projects list beneath it. A remembered root that no longer exists is reported and skipped rather than opened into an error."
+	},
+	{
+		"title": "Projects",
+		"section": "Getting started",
+		"href": "/docs/projects",
+		"heading": "Opening a project",
+		"body": "On launch quarry reopens the last project along with the tabs that were open, the left column's view, the dock tab and the panel sizes, all from the global settings file. Nothing about a project's source is stored outside the project."
+	},
+	{
+		"title": "Projects",
+		"section": "Getting started",
+		"href": "/docs/projects",
+		"heading": "What gets detected",
+		"body": "Signal What it turns on Cargo.toml rust-analyzer, cargo builds, Rust tests CMakeLists.txt clangd, CMake configure and build compilecommands.json clangd with the compile database A .c / .cpp file with no build system clangd, and a plain clang build"
+	},
+	{
+		"title": "Projects",
+		"section": "Getting started",
+		"href": "/docs/projects",
+		"heading": "What gets detected",
+		"body": "Both language servers can run at once: a repository with a Rust crate and a C++ test harness in the same tree gets rust-analyzer for the crate and clangd for the C++ file, each rooted where its own signal was found."
+	},
+	{
+		"title": "Projects",
+		"section": "Getting started",
+		"href": "/docs/projects",
+		"heading": "What gets detected",
+		"body": "Signals are looked for to a bounded depth, skipping target, nodemodules, .git, build and out, so a monorepo root still finds the crates inside it without walking the whole tree."
+	},
+	{
+		"title": "Projects",
+		"section": "Getting started",
+		"href": "/docs/projects",
+		"heading": "Language-server sessions",
+		"body": "A session is keyed by server kind and root: rust::/path/to/project and clang::/path/to/project. Every request names its session, and a file is only offered to a server that serves its extension — rust-analyzer never sees Cargo.toml, clangd never sees a .rs file. That gate is what makes the status chip honest about what is actually running."
+	},
+	{
+		"title": "Projects",
+		"section": "Getting started",
+		"href": "/docs/projects",
+		"heading": "Per-project settings",
+		"body": "A project can carry its own overrides in .quarry/settings.json at its root. The file is optional; whatever it omits falls back to the global settings. It is the right place for a root that needs a different font size or dock layout from the rest of your projects."
+	},
+	{
+		"title": "Projects",
+		"section": "Getting started",
+		"href": "/docs/projects",
+		"heading": "Per-project settings",
+		"body": "quarry writes nothing else into a project directory. There is no index, no cache and no build database of its own; the toolchains keep their own."
+	},
+	{
+		"title": "Projects",
+		"section": "Getting started",
+		"href": "/docs/projects",
+		"heading": "Next",
+		"body": "Editor covers what the window does once a project is open."
+	},
+	{
+		"title": "Editor",
+		"section": "Using quarry",
+		"href": "/docs/editor",
+		"heading": "Editor",
+		"body": "The editing surface is CodeMirror 6 with Rust and C/C++ grammars, wired to the project's language server, formatter and debugger. Files open in tabs across the top of the editor column; a dirty file is marked in its tab. Saving is Cmd + S , saving everything is Cmd + Alt + S , and formatting the active file is Cmd + Alt + L . Format on save is a setting. A failed save earns a slot in the notice line; a successful one says nothing. Cmd + F searches the active file. Cmd + Alt + F searches the project through rg, with case and regex toggles, glob filters, include and exclude patterns, and a results list that opens a hit at its line. Cmd + G moves to the next match. Cmd + P opens files by name: file-name matches rank above path matches, word and path-segment boundaries are preferred, and recen"
+	},
+	{
+		"title": "Editor",
+		"section": "Using quarry",
+		"href": "/docs/editor",
+		"heading": "Tabs, saving and formatting",
+		"body": "Files open in tabs across the top of the editor column; a dirty file is marked in its tab. Saving is"
+	},
+	{
+		"title": "Editor",
+		"section": "Using quarry",
+		"href": "/docs/editor",
+		"heading": "Tabs, saving and formatting",
+		"body": "Cmd + S , saving everything is Cmd + Alt + S , and formatting the active file is Cmd + Alt + L . Format on save is a setting."
+	},
+	{
+		"title": "Editor",
+		"section": "Using quarry",
+		"href": "/docs/editor",
+		"heading": "Tabs, saving and formatting",
+		"body": "A failed save earns a slot in the notice line; a successful one says nothing."
+	},
+	{
+		"title": "Editor",
+		"section": "Using quarry",
+		"href": "/docs/editor",
+		"heading": "Search",
+		"body": "Cmd + F searches the active file. Cmd + Alt + F searches the project through rg, with case and regex toggles, glob filters, include and exclude patterns, and a results list that opens a hit at its line. Cmd + G moves to the next match. Cmd + P opens files by name: file-name matches rank above path matches, word and path-segment boundaries are preferred, and recent files appear in their own group."
+	},
+	{
+		"title": "Editor",
+		"section": "Using quarry",
+		"href": "/docs/editor",
+		"heading": "Multi-cursor",
+		"body": "Occurrences of the symbol under the caret are highlighted as you move."
+	},
+	{
+		"title": "Editor",
+		"section": "Using quarry",
+		"href": "/docs/editor",
+		"heading": "Multi-cursor",
+		"body": "Cmd + D selects the word, then adds the next unselected occurrence each press, wrapping once and stopping when everything is selected. Cmd + Shift + L selects every occurrence at once. Cmd + U drops the most recently added range."
+	},
+	{
+		"title": "Editor",
+		"section": "Using quarry",
+		"href": "/docs/editor",
+		"heading": "Multi-cursor",
+		"body": "Every range is a real editor selection, so one edit replaces them all in a single undo step."
+	},
+	{
+		"title": "Editor",
+		"section": "Using quarry",
+		"href": "/docs/editor",
+		"heading": "Folding, comments and indentation",
+		"body": "The editor's keymap follows IntelliJ's Mac conventions: Cmd for navigation, and comments, folds and indentation on the chords an IDEA user already knows."
+	},
+	{
+		"title": "Editor",
+		"section": "Using quarry",
+		"href": "/docs/editor",
+		"heading": "Config files are languages too",
+		"body": "Cargo.toml, taplo-formatted TOML, JSON and YAML are recognised by extension and by the names that carry no extension of their own: Cargo.lock, Cargo.toml.orig, Gopkg.lock, Pipfile, poetry.lock, uv.lock and .cargo/config. The status bar reads the same table, so the language it shows and the formatter it runs cannot disagree."
+	},
+	{
+		"title": "Editor",
+		"section": "Using quarry",
+		"href": "/docs/editor",
+		"heading": "Config files are languages too",
+		"body": "Formatting is dispatched per language and never silent:"
+	},
+	{
+		"title": "Editor",
+		"section": "Using quarry",
+		"href": "/docs/editor",
+		"heading": "Config files are languages too",
+		"body": "JSON is formatted in the frontend, keeping the file's own indent and trailing newline. Invalid JSON is left exactly as it is. TOML needs taplo or taplo-cli on the probed paths; without one the app says no formatter for .toml: install taplo-cli. YAML names the gap instead of pretending. Rust goes through rustfmt, C/C++ through clang-format with the nearest .clang-format and AllowShort: Never, so a one-line body never survives a format."
+	},
+	{
+		"title": "Editor",
+		"section": "Using quarry",
+		"href": "/docs/editor",
+		"heading": "Breakpoints and blame",
+		"body": "The gutter carries breakpoints: click to toggle, and a conditional or log breakpoint is drawn differently from an unconditional one. Blame annotations sit at the end of the line and come from the same gitblame data the Source Control view shows."
+	},
+	{
+		"title": "Editor",
+		"section": "Using quarry",
+		"href": "/docs/editor",
+		"heading": "Next",
+		"body": "Language servers covers what happens when you hover, complete or rename."
+	},
+	{
+		"title": "Language servers",
+		"section": "Using quarry",
+		"href": "/docs/language-servers",
+		"heading": "Language servers",
+		"body": "quarry speaks LSP directly over a framed pipe. There is no plugin layer: a server is started for a project root, given the files it serves, and asked the questions the editor needs. A session is keyed kind::root and started only when the root carries that kind's signal: rust-analyzer for a Cargo.toml, clangd for a compilecommands.json, CMakeLists.txt or a C/C++ source. Both can be running at once. Servers only ever receive files they serve. rust-analyzer gets .rs; clangd gets .c, .h, .cc, .cpp, .cxx, .hh, .hpp. An unserved path is never opened, changed or closed against a server, which is what keeps a .cpp file in a Rust-only project from being reported as a clangd error. Action How to reach it Hover rest the pointer on a symbol — shows the server's markdown docs Completion type, or Cmd + "
+	},
+	{
+		"title": "Language servers",
+		"section": "Using quarry",
+		"href": "/docs/language-servers",
+		"heading": "Sessions",
+		"body": "A session is keyed kind::root and started only when the root carries that kind's signal: rust-analyzer for a Cargo.toml, clangd for a compilecommands.json, CMakeLists.txt or a C/C++ source. Both can be running at once."
+	},
+	{
+		"title": "Language servers",
+		"section": "Using quarry",
+		"href": "/docs/language-servers",
+		"heading": "Sessions",
+		"body": "Servers only ever receive files they serve. rust-analyzer gets .rs; clangd gets .c, .h, .cc, .cpp, .cxx, .hh, .hpp. An unserved path is never opened, changed or closed against a server, which is what keeps a .cpp file in a Rust-only project from being reported as a clangd error."
+	},
+	{
+		"title": "Language servers",
+		"section": "Using quarry",
+		"href": "/docs/language-servers",
+		"heading": "What the editor asks for",
+		"body": "Action How to reach it Hover rest the pointer on a symbol — shows the server's markdown docs Completion type, or Cmd + Space Definition F12 , or Cmd +click References Shift + F12 Signature help Cmd + Shift + Space Code actions Alt + Enter , and the Fix button on a problem Inlay hints on by default after a pause in typing Type hierarchy Shift + Alt + T"
+	},
+	{
+		"title": "Language servers",
+		"section": "Using quarry",
+		"href": "/docs/language-servers",
+		"heading": "What the editor asks for",
+		"body": "Rename is a dialog, not an inline prompt, so a long list of edits is reviewed before it is applied."
+	},
+	{
+		"title": "Language servers",
+		"section": "Using quarry",
+		"href": "/docs/language-servers",
+		"heading": "What the editor asks for",
+		"body": "Hover popups are drawn inside the editor pane and flip above the caret when the pane's own room below runs out — never over the panels underneath."
+	},
+	{
+		"title": "Language servers",
+		"section": "Using quarry",
+		"href": "/docs/language-servers",
+		"heading": "Diagnostics",
+		"body": "Diagnostics stream in from both servers and from builds. They are drawn as squiggles in the editor and as gutter markers, and collected in the Problems dock:"
+	},
+	{
+		"title": "Language servers",
+		"section": "Using quarry",
+		"href": "/docs/language-servers",
+		"heading": "Diagnostics",
+		"body": "grouped by file, with severity, line and message severity counts in the dock header are toggles: errors, warnings and info can be hidden independently \"group by file\" switches to a flat list ordered by severity, then path, then line each row copies as path:line:col severity: message the empty state distinguishes \"no diagnostics\" from \"everything filtered out\""
+	},
+	{
+		"title": "Language servers",
+		"section": "Using quarry",
+		"href": "/docs/language-servers",
+		"heading": "Diagnostics",
+		"body": "Cargo build diagnostics merge into the same list, so a type error that rust-analyzer has not caught yet still appears in the same place as one that it has."
+	},
+	{
+		"title": "Language servers",
+		"section": "Using quarry",
+		"href": "/docs/language-servers",
+		"heading": "Outline, breadcrumb and calls",
+		"body": "The document outline and the breadcrumb both come from textDocument/documentSymbol, so the tree and the path under the title agree by construction. Call hierarchy is a panel of its own: callers and callees are fetched per level, arrow keys move, Enter opens, and a symbol with no hierarchy says so instead of erroring."
+	},
+	{
+		"title": "Language servers",
+		"section": "Using quarry",
+		"href": "/docs/language-servers",
+		"heading": "Known limits",
+		"body": "Sync is full-document. Incremental sync is not implemented; it is worth doing only when a stall is measured, not in advance. evaluate is still broken for Rust through lldb-dap, which is why watch expressions are pinned variables rather than arbitrary expressions. See Debugging."
+	},
+	{
+		"title": "Language servers",
+		"section": "Using quarry",
+		"href": "/docs/language-servers",
+		"heading": "Next",
+		"body": "Build and run takes the project from clean to executing."
+	},
+	{
+		"title": "Build and run",
+		"section": "Using quarry",
+		"href": "/docs/build-run",
+		"heading": "Build and run",
+		"body": "quarry builds the project it has open, merges the compiler's diagnostics into Problems, and runs the binary it produced. Project What runs Cargo cargo build --message-format=json, diagnostics parsed from the JSON CMake configure, then build with the selected configuration C/C++ with no build system a plain clang compile of the sources Builds are available in Debug and Release. The profile is remembered for the session and passed through to the build command. A single-config generator ignores --config at build time. If the project was configured without -DCMAKEBUILDTYPE, the binary has no debug information, lldb resolves no breakpoint, and the debugger looks broken. Configure the project with a build type — Debug for the debugger — and the same sources stop on the line you set. A run config"
+	},
+	{
+		"title": "Build and run",
+		"section": "Using quarry",
+		"href": "/docs/build-run",
+		"heading": "Builds",
+		"body": "Project What runs Cargo cargo build --message-format=json, diagnostics parsed from the JSON CMake configure, then build with the selected configuration C/C++ with no build system a plain clang compile of the sources"
+	},
+	{
+		"title": "Build and run",
+		"section": "Using quarry",
+		"href": "/docs/build-run",
+		"heading": "Builds",
+		"body": "Builds are available in Debug and Release. The profile is remembered for the session and passed through to the build command."
+	},
+	{
+		"title": "Build and run",
+		"section": "Using quarry",
+		"href": "/docs/build-run",
+		"heading": "Builds",
+		"body": "A single-config generator ignores --config at build time. If the project was configured without -DCMAKEBUILDTYPE, the binary has no debug information, lldb resolves no breakpoint, and the debugger looks broken. Configure the project with a build type — Debug for the debugger — and the same sources stop on the line you set."
+	},
+	{
+		"title": "Build and run",
+		"section": "Using quarry",
+		"href": "/docs/build-run",
+		"heading": "Run configurations",
+		"body": "A run configuration is the whole form: program, arguments, working directory and environment. The form validates as you type — a relative working directory is refused, and the argv preview shows exactly what will be executed."
+	},
+	{
+		"title": "Build and run",
+		"section": "Using quarry",
+		"href": "/docs/build-run",
+		"heading": "Run configurations",
+		"body": "Opening a project prefills the form: cargo metadata names the Cargo binary, and a CMake project gets its conventional output path, named even before the first build. Configurations can be saved under a name, updated and deleted. Empty and duplicate names are refused. The run log offers Copy output (ANSI-stripped), Copy argv, and Re-run with the same program, arguments, working directory and environment."
+	},
+	{
+		"title": "Build and run",
+		"section": "Using quarry",
+		"href": "/docs/build-run",
+		"heading": "The terminal",
+		"body": "The embedded terminal is a real PTY, so interactive programs, progress bars and full-screen editors behave. Placement, font family and size are settings; the default places it beside the editor."
+	},
+	{
+		"title": "Build and run",
+		"section": "Using quarry",
+		"href": "/docs/build-run",
+		"heading": "The terminal",
+		"body": "Use the terminal for commands you type. A program you will debug should start through its run configuration, so the debugger launches the exact binary and arguments the app just built."
+	},
+	{
+		"title": "Build and run",
+		"section": "Using quarry",
+		"href": "/docs/build-run",
+		"heading": "Tests are a build too",
+		"body": "Test discovery and execution come from the same toolchain: Cargo tests are listed from the crate metadata, run individually or as a group. See Tests."
+	},
+	{
+		"title": "Build and run",
+		"section": "Using quarry",
+		"href": "/docs/build-run",
+		"heading": "Next",
+		"body": "Debugging starts the built binary under lldb."
+	},
+	{
+		"title": "Debugging",
+		"section": "Using quarry",
+		"href": "/docs/debugging",
+		"heading": "Debugging",
+		"body": "quarry speaks raw DAP to lldb-dap, the adapter Xcode ships. One client drives Rust and C/C++, because both are LLDB targets underneath. Debugging launches the binary the build just produced, with the arguments and working directory from the selected run configuration. The launch is made against the real path of the project directory; /var/… and /private/var/… are different strings to lldb, and a mismatch leaves every breakpoint unverified. Line breakpoints — click the gutter. Set them before a session starts; they are applied when the adapter launches. Conditional and log breakpoints — a condition is evaluated by lldb, a log message prints without stopping. Data breakpoints (watchpoints) — watch a variable's address and stop when it is written. LLDB reports the store's line, which is often"
+	},
+	{
+		"title": "Debugging",
+		"section": "Using quarry",
+		"href": "/docs/debugging",
+		"heading": "Starting a session",
+		"body": "Debugging launches the binary the build just produced, with the arguments and working directory from the selected run configuration. The launch is made against the real path of the project directory; /var/… and /private/var/… are different strings to lldb, and a mismatch leaves every breakpoint unverified."
+	},
+	{
+		"title": "Debugging",
+		"section": "Using quarry",
+		"href": "/docs/debugging",
+		"heading": "Breakpoints",
+		"body": "Line breakpoints — click the gutter. Set them before a session starts; they are applied when the adapter launches. Conditional and log breakpoints — a condition is evaluated by lldb, a log message prints without stopping. Data breakpoints (watchpoints) — watch a variable's address and stop when it is written. LLDB reports the store's line, which is often the line after the assignment you had in mind."
+	},
+	{
+		"title": "Debugging",
+		"section": "Using quarry",
+		"href": "/docs/debugging",
+		"heading": "Breakpoints",
+		"body": "evaluate is broken for Rust through this adapter — it falls back to Objective-C++ and errors. Watch entries are therefore pinned variables, re-read on every stop, plus memory views. Arbitrary expressions are not available until a different adapter is measured."
+	},
+	{
+		"title": "Debugging",
+		"section": "Using quarry",
+		"href": "/docs/debugging",
+		"heading": "Frames, scopes and stepping",
+		"body": "The debug dock lists threads and their frames; selecting a frame shows its scopes and variables in a tree, with lazy expansion for deep structures. Stepping is F7 into, F8 over and"
+	},
+	{
+		"title": "Debugging",
+		"section": "Using quarry",
+		"href": "/docs/debugging",
+		"heading": "Frames, scopes and stepping",
+		"body": "Shift + F8 out; F9 resumes and Cmd + F10 runs to the caret."
+	},
+	{
+		"title": "Debugging",
+		"section": "Using quarry",
+		"href": "/docs/debugging",
+		"heading": "Frames, scopes and stepping",
+		"body": "The debugger imports LLDB's Rust formatter script at session start, so Vec, String and friends arrive as values rather than as raw structs. Without it they silently print as internals."
+	},
+	{
+		"title": "Debugging",
+		"section": "Using quarry",
+		"href": "/docs/debugging",
+		"heading": "Memory",
+		"body": "The memory view reads the target by address, paged, and renders a hex band with an ASCII column. Unmapped regions are drawn as such rather than as zeroes. It is available while the target is stopped, and it works regardless of whether the adapter advertises memory references."
+	},
+	{
+		"title": "Debugging",
+		"section": "Using quarry",
+		"href": "/docs/debugging",
+		"heading": "Disassembly",
+		"body": "The disassembly pane follows the selected frame and shows instructions around its instruction pointer. It opens beside the editor as a split, so source and instructions stay on screen together."
+	},
+	{
+		"title": "Debugging",
+		"section": "Using quarry",
+		"href": "/docs/debugging",
+		"heading": "Next",
+		"body": "Tests covers running and filtering the test suite."
+	},
+	{
+		"title": "Tests",
+		"section": "Using quarry",
+		"href": "/docs/tests",
+		"heading": "Tests",
+		"body": "Tests are a dock tab, not a terminal scroll. Discovery and execution come from the project's own toolchain. Each test carries its binary, its name and its last result. The dock can: filter by binary filter by result: all, failed, passed, not run sort the list run everything in the current filter, or only what failed A failed row expands to its output. From there: copy name copies the test's name copy output copies the expanded failure copy failures writes one path::testname line per failed test and is disabled when nothing failed That last action is the one you want on the clipboard when you hand a failure to someone else: it is already in the form cargo test takes. A run starts the test binary with the selected test's filter and streams progress back into the list. The dock stays put betw"
+	},
+	{
+		"title": "Tests",
+		"section": "Using quarry",
+		"href": "/docs/tests",
+		"heading": "The list",
+		"body": "Each test carries its binary, its name and its last result. The dock can:"
+	},
+	{
+		"title": "Tests",
+		"section": "Using quarry",
+		"href": "/docs/tests",
+		"heading": "The list",
+		"body": "filter by binary filter by result: all, failed, passed, not run sort the list run everything in the current filter, or only what failed"
+	},
+	{
+		"title": "Tests",
+		"section": "Using quarry",
+		"href": "/docs/tests",
+		"heading": "Failures",
+		"body": "A failed row expands to its output. From there:"
+	},
+	{
+		"title": "Tests",
+		"section": "Using quarry",
+		"href": "/docs/tests",
+		"heading": "Failures",
+		"body": "copy name copies the test's name copy output copies the expanded failure copy failures writes one path::testname line per failed test and is disabled when nothing failed"
+	},
+	{
+		"title": "Tests",
+		"section": "Using quarry",
+		"href": "/docs/tests",
+		"heading": "Failures",
+		"body": "That last action is the one you want on the clipboard when you hand a failure to someone else: it is already in the form cargo test takes."
+	},
+	{
+		"title": "Tests",
+		"section": "Using quarry",
+		"href": "/docs/tests",
+		"heading": "Running from the dock",
+		"body": "A run starts the test binary with the selected test's filter and streams progress back into the list. The dock stays put between runs; the filter and sort survive switching tabs."
+	},
+	{
+		"title": "Tests",
+		"section": "Using quarry",
+		"href": "/docs/tests",
+		"heading": "Next",
+		"body": "Source control covers the rest of the repository work."
+	},
+	{
+		"title": "Source control",
+		"section": "Using quarry",
+		"href": "/docs/source-control",
+		"heading": "Source control",
+		"body": "The left column's second view is the repository. The rail's Source control button and the title bar's branch chip both open it. Changes are grouped into staged and unstaged, with a count beside each group. Selecting a file opens a unified diff beside the tree; the same view renders a commit's diff when you pick one from history. Stage and unstage work per group. Discard asks first — a two-step confirmation, because discarding is the one action in this view that loses work. The commit box takes a message and commits the staged changes. Amend rewrites the last commit and validates the message: empty and oversized messages are refused before anything runs. The branch dropdown lists local branches and checks one out. The History tab lists recent commits; a selected commit shows its diff, and i"
+	},
+	{
+		"title": "Source control",
+		"section": "Using quarry",
+		"href": "/docs/source-control",
+		"heading": "Status and diffs",
+		"body": "Changes are grouped into staged and unstaged, with a count beside each group. Selecting a file opens a unified diff beside the tree; the same view renders a commit's diff when you pick one from history."
+	},
+	{
+		"title": "Source control",
+		"section": "Using quarry",
+		"href": "/docs/source-control",
+		"heading": "Status and diffs",
+		"body": "Stage and unstage work per group. Discard asks first — a two-step confirmation, because discarding is the one action in this view that loses work."
+	},
+	{
+		"title": "Source control",
+		"section": "Using quarry",
+		"href": "/docs/source-control",
+		"heading": "Commit",
+		"body": "The commit box takes a message and commits the staged changes. Amend rewrites the last commit and validates the message: empty and oversized messages are refused before anything runs."
+	},
+	{
+		"title": "Source control",
+		"section": "Using quarry",
+		"href": "/docs/source-control",
+		"heading": "Branches and history",
+		"body": "The branch dropdown lists local branches and checks one out. The History tab lists recent commits; a selected commit shows its diff, and its hash copies with one action."
+	},
+	{
+		"title": "Source control",
+		"section": "Using quarry",
+		"href": "/docs/source-control",
+		"heading": "Blame",
+		"body": "in the editor, at the end of the line, for the file you are reading in its own tab, grouped by commit, so a file's history reads as a list"
+	},
+	{
+		"title": "Source control",
+		"section": "Using quarry",
+		"href": "/docs/source-control",
+		"heading": "Blame",
+		"body": "Annotations come from the same gitblame data; the editor view and the tab cannot disagree."
+	},
+	{
+		"title": "Source control",
+		"section": "Using quarry",
+		"href": "/docs/source-control",
+		"heading": "Blame",
+		"body": "Copy actions on change rows, history rows and blame groups stop propagation, so copying a path does not also open the file underneath it."
+	},
+	{
+		"title": "Source control",
+		"section": "Using quarry",
+		"href": "/docs/source-control",
+		"heading": "Next",
+		"body": "Settings and themes covers what the window remembers."
+	},
+	{
+		"title": "Settings and themes",
+		"section": "Using quarry",
+		"href": "/docs/settings",
+		"heading": "Settings and themes",
+		"body": "Settings are split in two: the app's own file, and an optional per-project override. Scope Path Global ~/Library/Application Support/land.jyz.quarry/settings.json Project /.quarry/settings.json The global file holds the last project, open tabs, the left column's view, the dock tab, panel sizes, editor and terminal fonts, and the theme. The project file overrides what it mentions and inherits everything else. Eight themes ship with the app: One Dark (the default), One Light, Ayu Dark, Catppuccin Mocha, Gruvbox Dark, Nord, Solarized Dark and Tokyo Night. Every theme fills the same token set — surfaces (bg, panel, rail, chrome), line, text, muted, accent, hover, danger, warn, good, the editor's syntax colours, and the lint colours. A token a custom theme leaves out keeps the default, so a par"
+	},
+	{
+		"title": "Settings and themes",
+		"section": "Using quarry",
+		"href": "/docs/settings",
+		"heading": "Where things live",
+		"body": "Scope Path Global ~/Library/Application Support/land.jyz.quarry/settings.json Project /.quarry/settings.json"
+	},
+	{
+		"title": "Settings and themes",
+		"section": "Using quarry",
+		"href": "/docs/settings",
+		"heading": "Where things live",
+		"body": "The global file holds the last project, open tabs, the left column's view, the dock tab, panel sizes, editor and terminal fonts, and the theme. The project file overrides what it mentions and inherits everything else."
+	},
+	{
+		"title": "Settings and themes",
+		"section": "Using quarry",
+		"href": "/docs/settings",
+		"heading": "Themes",
+		"body": "Eight themes ship with the app: One Dark (the default), One Light, Ayu Dark, Catppuccin Mocha, Gruvbox Dark, Nord, Solarized Dark and Tokyo Night."
+	},
+	{
+		"title": "Settings and themes",
+		"section": "Using quarry",
+		"href": "/docs/settings",
+		"heading": "Themes",
+		"body": "Every theme fills the same token set — surfaces (bg, panel, rail, chrome), line, text, muted, accent, hover, danger, warn, good, the editor's syntax colours, and the lint colours. A token a custom theme leaves out keeps the default, so a partial theme is valid rather than broken."
+	},
+	{
+		"title": "Settings and themes",
+		"section": "Using quarry",
+		"href": "/docs/settings",
+		"heading": "Themes",
+		"body": "a Zed theme file ({ name, themes: [{ name, style, … }] }), which may carry several themes a quarry theme object ({ name, tokens })"
+	},
+	{
+		"title": "Settings and themes",
+		"section": "Using quarry",
+		"href": "/docs/settings",
+		"heading": "Themes",
+		"body": "Parsing never throws: a bad file reports what is wrong. Old settings files load with the default theme rather than failing."
+	},
+	{
+		"title": "Settings and themes",
+		"section": "Using quarry",
+		"href": "/docs/settings",
+		"heading": "Themes",
+		"body": "Before any theme is applied, the window paints from a hard-coded One Dark fallback, so there is no white flash between launch and the first render."
+	},
+	{
+		"title": "Settings and themes",
+		"section": "Using quarry",
+		"href": "/docs/settings",
+		"heading": "Panels and layout",
+		"body": "Panel sizes are draggable and remembered: the explorer's width, the outline's height under the tree, the dock's height, and the terminal's width when it is placed beside the editor. Panel placement, fonts and the terminal's own font size live in the same settings file."
+	},
+	{
+		"title": "Keyboard shortcuts",
+		"section": "Reference",
+		"href": "/docs/shortcuts",
+		"heading": "Keyboard shortcuts",
+		"body": "The window's accelerators are registered on the capture phase, so they work wherever focus sits — except where a text field or the terminal owns the key, which is the point. Keys Action Cmd + B Toggle the left column Cmd + Shift + G Toggle source control Cmd + J Toggle the bottom dock Cmd + Shift + D Show the debugger Alt + F12 Toggle the terminal Cmd + K Shortcut sheet Cmd + , Settings ? Shortcut sheet (outside the editor) Keys Action Cmd + S Save the active file Cmd + Alt + S Save every dirty file Cmd + Alt + L Format the active file Cmd + / Toggle a line comment Cmd + ] / Cmd + [ Indent / outdent Cmd + D Select the word, then the next occurrence Cmd + Shift + L Select every occurrence Cmd + U Drop the last added range Keys Action Cmd + P Quick open by file name Cmd + Shift + P Command p"
+	},
+	{
+		"title": "Keyboard shortcuts",
+		"section": "Reference",
+		"href": "/docs/shortcuts",
+		"heading": "Project and view",
+		"body": "Keys Action Cmd + B Toggle the left column Cmd + Shift + G Toggle source control Cmd + J Toggle the bottom dock Cmd + Shift + D Show the debugger Alt + F12 Toggle the terminal Cmd + K Shortcut sheet Cmd + , Settings ? Shortcut sheet (outside the editor)"
+	},
+	{
+		"title": "Keyboard shortcuts",
+		"section": "Reference",
+		"href": "/docs/shortcuts",
+		"heading": "Editing",
+		"body": "Keys Action Cmd + S Save the active file Cmd + Alt + S Save every dirty file Cmd + Alt + L Format the active file Cmd + / Toggle a line comment Cmd + ] / Cmd + [ Indent / outdent Cmd + D Select the word, then the next occurrence Cmd + Shift + L Select every occurrence Cmd + U Drop the last added range"
+	},
+	{
+		"title": "Keyboard shortcuts",
+		"section": "Reference",
+		"href": "/docs/shortcuts",
+		"heading": "Navigation and insight",
+		"body": "Keys Action Cmd + P Quick open by file name Cmd + Shift + P Command palette Cmd + F Find in file Cmd + Alt + F Find in project Cmd + G Next match F12 / Cmd +click Go to definition Shift + F12 Find references Cmd + Space Completion Cmd + Shift + Space Signature help Alt + Enter Code actions at the caret Shift + Alt + T Type hierarchy Cmd + Shift + E Reveal the active file in the explorer"
+	},
+	{
+		"title": "Keyboard shortcuts",
+		"section": "Reference",
+		"href": "/docs/shortcuts",
+		"heading": "Build, run and debug",
+		"body": "Keys Action Shift + F10 / Ctrl + R Run the selected target Shift + F9 / Ctrl + D Debug the selected target Ctrl + F2 Stop Cmd + R Re-run Cmd + F8 Toggle a breakpoint on the caret line Cmd + F10 Run to cursor F7 / F8 / Shift + F8 Step into / over / out F9 Resume"
+	},
+	{
+		"title": "Keyboard shortcuts",
+		"section": "Reference",
+		"href": "/docs/shortcuts",
+		"heading": "Build, run and debug",
+		"body": "IntelliJ's Mac keymap keeps Cmd for navigation and hands run and debug to Ctrl . quarry follows that split, and also accepts the Shift + F9 {\" \"} / F10 pair from Windows habits."
+	},
+	{
+		"title": "Keyboard shortcuts",
+		"section": "Reference",
+		"href": "/docs/shortcuts",
+		"heading": "Next",
+		"body": "Architecture if you want to see how these are wired."
+	},
+	{
+		"title": "Architecture",
+		"section": "Reference",
+		"href": "/docs/architecture",
+		"heading": "Architecture",
+		"body": "quarry is a Tauri 2 application: a Rust process that owns projects, processes and protocol clients, and a React 19 frontend that renders them. Layer Lives in Owns Shell src-tauri/ files, git, cargo, CMake, LSP, DAP, PTYs, settings, updates Frontend src/ editor, panels, docks, dialogs, themes, keymaps The frontend never shells out. Every action that touches the machine is a command on the Rust side, so the same logic serves the menu, the palette and the rail. src/lib — logic: the LSP and DAP models, the project buffer, settings, themes, formatting dispatch, ranking, test filters. Pure enough to unit test with bun test. src/ui — rendering: the editor surface, docks, overlays and styles. The feature directory is kept on both sides, so lib/editor/theme.ts and ui/editor/Editor.tsx are obviously"
+	},
+	{
+		"title": "Architecture",
+		"section": "Reference",
+		"href": "/docs/architecture",
+		"heading": "The two halves",
+		"body": "Layer Lives in Owns Shell src-tauri/ files, git, cargo, CMake, LSP, DAP, PTYs, settings, updates Frontend src/ editor, panels, docks, dialogs, themes, keymaps"
+	},
+	{
+		"title": "Architecture",
+		"section": "Reference",
+		"href": "/docs/architecture",
+		"heading": "The two halves",
+		"body": "The frontend never shells out. Every action that touches the machine is a command on the Rust side, so the same logic serves the menu, the palette and the rail."
+	},
+	{
+		"title": "Architecture",
+		"section": "Reference",
+		"href": "/docs/architecture",
+		"heading": "Frontend layout",
+		"body": "src/lib — logic: the LSP and DAP models, the project buffer, settings, themes, formatting dispatch, ranking, test filters. Pure enough to unit test with bun test. src/ui — rendering: the editor surface, docks, overlays and styles. The feature directory is kept on both sides, so lib/editor/theme.ts and ui/editor/Editor.tsx are obviously the same feature."
+	},
+	{
+		"title": "Architecture",
+		"section": "Reference",
+		"href": "/docs/architecture",
+		"heading": "Frontend layout",
+		"body": "The editor is CodeMirror 6, loaded lazily so its language packages stay out of the first bundle. Panels that are not on screen — the debugger, the terminal, search, quick open, the palette — are lazy as well."
+	},
+	{
+		"title": "Architecture",
+		"section": "Reference",
+		"href": "/docs/architecture",
+		"heading": "Protocols",
+		"body": "Protocol Client Notes LSP hand-written, over a pipe one session per server kind per project root DAP raw, against lldb-dap one client for Rust and C/C++ PTY portable-pty a real terminal per session, not a line parser"
+	},
+	{
+		"title": "Architecture",
+		"section": "Reference",
+		"href": "/docs/architecture",
+		"heading": "Protocols",
+		"body": "Language servers are started by the backend, keyed by kind and root. Every request names its session, and a file is only sent to a server that serves its extension."
+	},
+	{
+		"title": "Architecture",
+		"section": "Reference",
+		"href": "/docs/architecture",
+		"heading": "Where the seams are",
+		"body": "The expensive-looking pieces are deliberately separate:"
+	},
+	{
+		"title": "Architecture",
+		"section": "Reference",
+		"href": "/docs/architecture",
+		"heading": "Where the seams are",
+		"body": "Formatter dispatch is per language. JSON is formatted in the frontend; TOML needs taplo; Rust and C/C++ keep their toolchain formatters. Nothing falls back silently. Diagnostics have three sources — rust-analyzer, clangd, and cargo's JSON output — merged into one model, so Problems does not care which produced a message. Themes fill one token set. A token the theme omits keeps the default, and the first paint uses a hard-coded fallback rather than the settings file."
+	},
+	{
+		"title": "Architecture",
+		"section": "Reference",
+		"href": "/docs/architecture",
+		"heading": "Testing",
+		"body": "The Rust side has cargo test and clippy. The frontend has bun test over the pure helpers: ranking, argument splitting, hex, buffers, blame, search, test filters. Anything that needs a real language server or debugger lives in scripts/-smoke.ts, which only run by hand."
+	},
+	{
+		"title": "Architecture",
+		"section": "Reference",
+		"href": "/docs/architecture",
+		"heading": "Next",
+		"body": "Contributing has the gate those tests belong to."
+	},
+	{
+		"title": "Contributing",
+		"section": "Reference",
+		"href": "/docs/contributing",
+		"heading": "Contributing",
+		"body": "quarry is a personal project with a narrow scope: an IDE for Rust and C/C++ that matches CLion on the daily loop. Changes that widen the scope — another language, a plugin API, remote development — are out of scope by design, not by accident. Nine steps, all of them required: file size, types, formatting, lint, frontend tests, and the four Rust steps (cargo fmt --check, cargo check --all-targets, cargo test, cargo clippy -D warnings). One invocation reports the whole picture; a failing step prints its own tail. Step Command Types bun check (Bun's checker, nearest tsconfig per file) Format bun fmt --check (tabs, 4 wide, 100 columns) Lint biome lint . Tests bun test over the pure helpers Rust cargo fmt --check, check --all-targets, test, clippy No file over 200 lines. scripts/check-file-size"
+	},
+	{
+		"title": "Contributing",
+		"section": "Reference",
+		"href": "/docs/contributing",
+		"heading": "The gate",
+		"body": "Nine steps, all of them required: file size, types, formatting, lint, frontend tests, and the four Rust steps (cargo fmt --check, cargo check --all-targets, cargo test, cargo clippy -D warnings). One invocation reports the whole picture; a failing step prints its own tail."
+	},
+	{
+		"title": "Contributing",
+		"section": "Reference",
+		"href": "/docs/contributing",
+		"heading": "The gate",
+		"body": "Step Command Types bun check (Bun's checker, nearest tsconfig per file) Format bun fmt --check (tabs, 4 wide, 100 columns) Lint biome lint . Tests bun test over the pure helpers Rust cargo fmt --check, check --all-targets, test, clippy"
+	},
+	{
+		"title": "Contributing",
+		"section": "Reference",
+		"href": "/docs/contributing",
+		"heading": "House rules",
+		"body": "No file over 200 lines. scripts/check-file-size.ts fails on a new offender and on a stale exception in docs/refactor/oversized.txt, so the list only shrinks. Split Rust by module directories and stylesheets with bun scripts/split-css.ts. src/ only, with @/ mapped to ./src/. Logic in src/lib, rendering in src/ui, and the feature name kept on both sides. Bun only. No npm, and bun run only where the name collides with a builtin. A formatter is never a gate. bun fmt writes; bun fmt --check verifies. Never a measured number in a commit message. Name the gates, not their totals."
+	},
+	{
+		"title": "Contributing",
+		"section": "Reference",
+		"href": "/docs/contributing",
+		"heading": "Smoke scripts",
+		"body": "The language servers and the debugger are only exercised by hand:"
+	},
+	{
+		"title": "Contributing",
+		"section": "Reference",
+		"href": "/docs/contributing",
+		"heading": "Smoke scripts",
+		"body": "They need a real rust-analyzer, lldb-dap and clangd, which is why CI does not run them."
+	},
+	{
+		"title": "Contributing",
+		"section": "Reference",
+		"href": "/docs/contributing",
+		"heading": "Releasing",
+		"body": "release:local refuses a commit whose CI run failed or was cancelled, runs the gate itself, signs the bundle, publishes the release and then fetches the public manifest to prove it serves the version it just published."
+	},
+	{
+		"title": "Contributing",
+		"section": "Reference",
+		"href": "/docs/contributing",
+		"heading": "Releasing",
+		"body": "Installed apps trust the public key baked into the build. Rotating it orphans every installed copy, so the key is generated once and never regenerated."
+	}
+]

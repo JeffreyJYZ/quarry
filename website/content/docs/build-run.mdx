@@ -1,0 +1,59 @@
+---
+title: Build and run
+description: cargo builds with machine-readable diagnostics, CMake and plain clang, run configurations and the embedded terminal.
+---
+
+# Build and run
+
+quarry builds the project it has open, merges the compiler's diagnostics into Problems, and runs the
+binary it produced.
+
+## Builds
+
+| Project                    | What runs                                                             |
+| -------------------------- | --------------------------------------------------------------------- |
+| Cargo                      | `cargo build --message-format=json`, diagnostics parsed from the JSON |
+| CMake                      | configure, then build with the selected configuration                 |
+| C/C++ with no build system | a plain clang compile of the sources                                  |
+
+Builds are available in **Debug** and **Release**. The profile is remembered for the session and
+passed through to the build command.
+
+<Callout tone="warn" title="CMake needs its build type at configure time">
+	A single-config generator ignores `--config` at build time. If the project was configured
+	without `-DCMAKE_BUILD_TYPE`, the binary has no debug information, lldb resolves no breakpoint,
+	and the debugger looks broken. Configure the project with a build type — `Debug` for the
+	debugger — and the same sources stop on the line you set.
+</Callout>
+
+## Run configurations
+
+A run configuration is the whole form: program, arguments, working directory and environment. The
+form validates as you type — a relative working directory is refused, and the argv preview shows
+exactly what will be executed.
+
+- Opening a project prefills the form: `cargo metadata` names the Cargo binary, and a CMake project
+  gets its conventional output path, named even before the first build.
+- Configurations can be saved under a name, updated and deleted. Empty and duplicate names are
+  refused.
+- The run log offers **Copy output** (ANSI-stripped), **Copy argv**, and **Re-run** with the same
+  program, arguments, working directory and environment.
+
+## The terminal
+
+The embedded terminal is a real PTY, so interactive programs, progress bars and full-screen editors
+behave. Placement, font family and size are settings; the default places it beside the editor.
+
+<Callout tone="tip" title="Terminal for the shell, Run for the program">
+	Use the terminal for commands you type. A program you will debug should start through its run
+	configuration, so the debugger launches the exact binary and arguments the app just built.
+</Callout>
+
+## Tests are a build too
+
+Test discovery and execution come from the same toolchain: Cargo tests are listed from the crate
+metadata, run individually or as a group. See [Tests](/docs/tests).
+
+## Next
+
+[Debugging](/docs/debugging) starts the built binary under lldb.

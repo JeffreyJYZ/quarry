@@ -1,0 +1,156 @@
+/* The sticky top bar: brand, version, then the search, source and theme controls. */
+.site-header {
+	position: sticky;
+	top: 0;
+	z-index: 40;
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	height: var(--header-h);
+	padding: 0 20px;
+	border-bottom: 1px solid var(--line);
+	background: color-mix(in srgb, var(--chrome) 88%, transparent);
+	backdrop-filter: saturate(1.2) blur(10px);
+}
+
+.brand {
+	display: inline-flex;
+	align-items: center;
+	gap: 9px;
+	color: var(--text);
+	text-decoration: none;
+}
+
+.brand:hover {
+	text-decoration: none;
+}
+
+.brand-mark {
+	flex: 0 0 auto;
+	color: var(--accent);
+}
+
+.brand-name {
+	font-family: var(--mono);
+	font-size: 15px;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+}
+
+.brand-version {
+	margin-left: 2px;
+	padding: 1px 6px;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: 0.04em;
+	color: var(--muted);
+}
+
+.header-spacer {
+	flex: 1 1 auto;
+}
+
+.header-links {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.header-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 30px;
+	padding: 0 10px;
+	border: 1px solid transparent;
+	border-radius: var(--radius);
+	background: transparent;
+	color: var(--muted);
+	font-family: var(--ui);
+	font-size: 12.5px;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.header-link:hover {
+	background: var(--hover);
+	color: var(--text);
+	text-decoration: none;
+}
+
+.header-search {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 200px;
+	height: 30px;
+	padding: 0 8px 0 10px;
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	background: var(--bg);
+	color: var(--muted);
+	font-family: var(--ui);
+	font-size: 12.5px;
+	cursor: pointer;
+}
+
+.header-search:hover {
+	border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+	color: var(--text);
+}
+
+.kbd {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 4px;
+	border: 1px solid var(--line);
+	border-radius: 4px;
+	background: var(--panel);
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10.5px;
+	line-height: 1;
+}
+
+.header-search .kbd {
+	margin-left: auto;
+}
+
+.menu-button {
+	display: none;
+}
+
+@media (max-width: 1023px) {
+	.header-search {
+		min-width: 0;
+		width: 32px;
+		padding: 0;
+		justify-content: center;
+	}
+
+	.header-search span,
+	.header-search .kbd {
+		display: none;
+	}
+
+	.menu-button {
+		display: inline-flex;
+	}
+}
+
+@media (max-width: 560px) {
+	.site-header {
+		padding: 0 12px;
+		gap: 8px;
+	}
+
+	.brand-version,
+	.header-github span {
+		display: none;
+	}
+}

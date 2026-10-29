@@ -1,0 +1,89 @@
+/* Code blocks: shiki paints the tokens, this file owns the frame, the scroll and the copy button. */
+.prose figure[data-rehype-pretty-code-figure] {
+	position: relative;
+	margin: 20px 0;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--code-bg);
+	overflow: hidden;
+}
+
+.prose figure[data-rehype-pretty-code-figure] figcaption {
+	padding: 8px 14px;
+	border-bottom: 1px solid var(--line);
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+}
+
+.prose pre {
+	margin: 0;
+	padding: 14px 16px;
+	overflow-x: auto;
+	font-size: 13px;
+	line-height: 1.65;
+	tab-size: 4;
+}
+
+.prose pre code {
+	display: grid;
+	background: transparent;
+	font-size: inherit;
+}
+
+.prose pre [data-line] {
+	display: block;
+	padding: 0 2px;
+}
+
+.prose pre [data-highlighted-line] {
+	background: color-mix(in srgb, var(--accent) 12%, transparent);
+	box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* Dual shiki themes: each token carries both, the document's theme picks one. */
+:root[data-theme="dark"] .prose pre span,
+:root[data-theme="dark"] .prose pre code {
+	color: var(--shiki-dark, inherit);
+}
+
+:root[data-theme="light"] .prose pre span,
+:root[data-theme="light"] .prose pre code {
+	color: var(--shiki-light, inherit);
+}
+
+.code-copy {
+	position: absolute;
+	top: 7px;
+	right: 7px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 24px;
+	padding: 0;
+	border: 1px solid var(--line);
+	border-radius: 5px;
+	background: var(--panel);
+	color: var(--muted);
+	opacity: 0;
+	cursor: pointer;
+	transition: opacity 120ms ease;
+}
+
+figure[data-rehype-pretty-code-figure]:hover .code-copy,
+.code-copy:focus-visible {
+	opacity: 1;
+}
+
+.code-copy:hover {
+	color: var(--text);
+	border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+
+.code-copy.copied {
+	color: var(--good);
+	border-color: color-mix(in srgb, var(--good) 45%, var(--line));
+}
