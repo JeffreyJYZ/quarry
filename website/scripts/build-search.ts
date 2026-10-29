@@ -9,7 +9,7 @@
  * Usage: bun scripts/build-search.ts
  */
 
-import { copyFileSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NAV, PAGES } from "../src/lib/nav";
@@ -110,6 +110,8 @@ for (const file of files) {
 	}
 }
 
-copyFileSync(join(ROOT, "../assets/icon.svg"), join(OUT, "icon.svg"));
+const icon = join(ROOT, "../assets/icon.svg");
+if (existsSync(icon)) copyFileSync(icon, join(OUT, "icon.svg"));
+else console.warn(`no icon at ${icon}`);
 writeFileSync(join(OUT, "search-index.json"), `${JSON.stringify(entries, null, "\t")}\n`);
 console.log(`search index: ${entries.length} entries from ${mdxFiles(DOCS).length} pages`);

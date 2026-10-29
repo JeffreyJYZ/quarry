@@ -1,6 +1,6 @@
 {
 	"$schema": "https://openapi.vercel.sh/vercel.json",
-	"buildCommand": "pwd && ls -1a . | head -40 && echo --- && ls -1a website | head -20 && cd website && bun run build",
+	"buildCommand": "ls -1 assets; ls -1 src/lib/themes; cd website && bun run build",
 	"installCommand": "cd website && bun install",
 	"outputDirectory": "website/out",
 	"framework": null
