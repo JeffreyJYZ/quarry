@@ -10,6 +10,7 @@ import {
 import "@/ui/settings/settings.css";
 import { ProjectTab } from "./ProjectTab";
 import { UserTab } from "./UserTab";
+import { useSettingsSearch } from "./settingsSearch";
 
 export type SettingsPageProps = {
 	open: boolean;
@@ -50,6 +51,7 @@ export default function SettingsPage({
 	// updates/version now live in UpdatesSection
 	const panelRef = useRef<HTMLDivElement>(null);
 	const openerRef = useRef<HTMLElement | null>(null);
+	const { query, setQuery, bodyRef, matches } = useSettingsSearch(open, tab);
 	const effective = effectivePreferences(user, project);
 	const projectEmpty = project === null || projectSettingsAreEmpty(project);
 
@@ -119,6 +121,14 @@ export default function SettingsPage({
 					<span className="label" id="settings-title">
 						settings
 					</span>
+					<input
+						className="settings-search"
+						type="search"
+						placeholder="Search settings"
+						aria-label="Search settings"
+						value={query}
+						onChange={(event) => setQuery(event.target.value)}
+					/>
 					<button type="button" className="settings-close" onClick={onClose}>
 						close
 					</button>
@@ -147,7 +157,7 @@ export default function SettingsPage({
 					</button>
 				</div>
 
-				<div className="settings-body">
+				<div className="settings-body" ref={bodyRef}>
 					{tab === "user" ? (
 						<UserTab user={user} onChange={setUser} onResetPanels={onResetPanels} />
 					) : (
@@ -160,6 +170,9 @@ export default function SettingsPage({
 							onClear={() => onProjectChange(null)}
 						/>
 					)}
+					{query.trim() !== "" && matches === 0 ? (
+						<p className="settings-empty">No setting matches this search</p>
+					) : null}
 				</div>
 
 				<footer className="settings-foot">

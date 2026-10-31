@@ -1,0 +1,26 @@
+/* The settings search field and the states it drives. */
+
+.settings-search {
+	height: 22px;
+	min-width: 180px;
+	font: inherit;
+	background: transparent;
+	border: 1px solid var(--line);
+	outline: none;
+}
+
+.settings-search:focus {
+	border-color: var(--accent);
+}
+
+/* A hidden row must actually disappear: both carry a display the attribute cannot override. */
+.settings-section[hidden],
+.settings-row[hidden] {
+	display: none;
+}
+
+.settings-empty {
+	margin: 4px 0 0;
+	font-size: 11px;
+	color: var(--muted);
+}
