@@ -48,6 +48,9 @@ export default function EditorColumn({ model }: { model: ShellModel }) {
 				active={model.active}
 				activePath={model.activePath}
 				buffers={workspace.buffers}
+				recentRoots={workspace.recentRoots}
+				onOpenRecent={(root) => void workspace.openRoot(root)}
+				onOpenProject={() => void workspace.handleOpenProject()}
 				saving={workspace.saving}
 				confirmClose={workspace.confirmClose}
 				cursor={overlays.cursor}

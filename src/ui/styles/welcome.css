@@ -1,0 +1,62 @@
+/* The welcome screen's way back in: recent projects, and the folder picker. */
+
+.welcome-recent {
+	margin: 0 0 20px;
+}
+
+.welcome-recent ul {
+	margin: 6px 0 0;
+	padding: 0;
+	list-style: none;
+	border-top: 1px solid var(--line);
+}
+
+.welcome-recent li {
+	border-bottom: 1px solid var(--line);
+}
+
+.welcome-recent-row {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	width: 100%;
+	padding: 7px 2px;
+	border: 0;
+	background: transparent;
+	color: var(--text);
+	text-align: left;
+	cursor: pointer;
+}
+
+.welcome-recent-row:hover {
+	background: var(--hover);
+}
+
+.welcome-recent-name {
+	font-family: var(--mono);
+	font-size: 12px;
+}
+
+.welcome-recent-path {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10.5px;
+}
+
+.welcome-open {
+	padding: 5px 12px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: transparent;
+	color: var(--text);
+	font: inherit;
+	cursor: pointer;
+}
+
+.welcome-open:hover {
+	border-color: var(--accent);
+}

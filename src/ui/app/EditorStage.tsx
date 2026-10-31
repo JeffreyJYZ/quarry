@@ -27,6 +27,10 @@ export type EditorStageProps = {
 	active: FileBuffer | null;
 	activePath: string | null;
 	buffers: FileBuffer[];
+	/** Projects opened before, newest first, for the welcome screen. */
+	recentRoots: string[];
+	onOpenRecent: (root: string) => void;
+	onOpenProject: () => void;
 	saving: ReadonlySet<string>;
 	confirmClose: string | null;
 	cursor: { line: number; character: number } | null;
@@ -61,7 +65,15 @@ export type EditorStageProps = {
  */
 export default function EditorStage(props: EditorStageProps) {
 	const active = props.active;
-	if (active === null) return <Welcome project={props.project} />;
+	if (active === null)
+		return (
+			<Welcome
+				project={props.project}
+				recent={props.recentRoots}
+				onOpenRecent={props.onOpenRecent}
+				onOpenProject={props.onOpenProject}
+			/>
+		);
 
 	return (
 		<>
