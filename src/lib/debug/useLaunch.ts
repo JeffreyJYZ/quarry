@@ -5,13 +5,12 @@ import {
 	type LaunchConfig,
 	type LaunchPreset,
 	type ExceptionFilter,
-	defaultLaunchConfig,
-	readLaunchConfig,
-	resolveLaunchConfig,
 } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
+import { runPresetBuild } from "./buildCommand";
 import type { BuildProfile } from "@/lib/debug/profile";
-import { CARGO_DEFAULT, CARGO_STOP_ON_ENTRY, type StopView, asksForBuild } from "./sessionTypes";
+import { type StopView, asksForBuild } from "./sessionTypes";
+import { useLaunchConfigs } from "./useLaunchConfigs";
 
 type Setter<T> = (updater: T | ((current: T) => T)) => void;
 
@@ -133,15 +132,15 @@ export function useLaunch(deps: LaunchDeps) {
 		],
 	);
 
-	/** The one place a select value becomes a configuration; a preset and Cargo differ. */
-	const resolveConfig = useCallback(async (root: string, name: string) => {
-		if (name === CARGO_DEFAULT) return defaultLaunchConfig(root, CARGO_STOP_ON_ENTRY);
-		return resolveLaunchConfig(root, name);
-	}, []);
+	const { resolveConfig, refreshPresets } = useLaunchConfigs({
+		rootRef,
+		setPresets,
+		setConfigError,
+	});
 
 	/**
-	 * Launch the selected configuration. A missing binary offers one build; every other rejection
-	 * is a plain error line.
+	 * Launch the selected configuration: its own build command first, then the adapter. A missing
+	 * binary offers one build; every other rejection is a plain error line.
 	 */
 	const launch = useCallback(
 		async (offerBuild = true, programOverride: string | null = null) => {
@@ -157,6 +156,16 @@ export function useLaunch(deps: LaunchDeps) {
 			}
 			if (sessionRef.current !== null) {
 				setError("A debug session is already running");
+				return;
+			}
+			if (
+				!(await runPresetBuild({
+					root: rootNow,
+					name,
+					setError,
+					setBuilding: deps.setBuilding,
+				}))
+			) {
 				return;
 			}
 			let config: LaunchConfig;
@@ -179,18 +188,6 @@ export function useLaunch(deps: LaunchDeps) {
 		},
 		[deps, resolveConfig, rootRef, presetRef, sessionRef, setError, start],
 	);
-
-	/** Re-read launch.json and keep the selection when the file still names it. */
-	const refreshPresets = useCallback(async () => {
-		const rootNow = rootRef.current;
-		if (rootNow === null) return;
-		try {
-			const file: { configurations: LaunchPreset[] } = await readLaunchConfig(rootNow);
-			setPresets(file.configurations);
-		} catch (reason) {
-			setConfigError(`Launch config: ${describeError(reason)}`);
-		}
-	}, [rootRef, setPresets, setConfigError]);
 
 	return { launch, launchConfig: start, refreshPresets };
 }

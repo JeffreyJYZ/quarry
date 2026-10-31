@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { ptyResize } from "@/lib/project/api";
 import { DEFAULT_PREFERENCES } from "@/lib/settings/model";
 import type { TerminalCursorStyle } from "@/lib/settings/terminal";
+import { registerTerminalLinks } from "@/ui/terminal/terminalLinks";
 import {
 	applyXtermAppearance,
 	type XtermAppearance,
@@ -130,6 +131,7 @@ export function useXterm(options: {
 		term.loadAddon(fit);
 		term.open(host);
 		const data = term.onData((chunk) => onDataRef.current(chunk));
+		const links = registerTerminalLinks(term);
 		termRef.current = term;
 		fitRef.current = fit;
 		applySize();
@@ -147,6 +149,7 @@ export function useXterm(options: {
 				timer.current = null;
 			}
 			data.dispose();
+			links.dispose();
 			term.dispose();
 			termRef.current = null;
 			fitRef.current = null;
