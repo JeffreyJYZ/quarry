@@ -25,5 +25,5 @@
 		"@types/react-dom": "^19.3.0",
 		"typescript": "^7.0.2"
 	},
-	"version": "0.1.0-alpha.51"
+	"version": "0.1.0-alpha.52"
 }
