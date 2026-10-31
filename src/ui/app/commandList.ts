@@ -10,7 +10,7 @@ import { navigationCommands } from "./navigationCommands";
  */
 export function buildCommands(context: CommandContext): Command[] {
 	const { root, activePath, cursor, building, formatting, running, debugging } = context;
-	return [
+	const list: Command[] = [
 		{
 			id: "open-project",
 			label: "Open project",
@@ -22,6 +22,7 @@ export function buildCommands(context: CommandContext): Command[] {
 			label: "Build",
 			hint: "",
 			disabled: root === null || building,
+			disabledReason: building ? "A build is already running" : undefined,
 			run: context.build,
 		},
 		{
@@ -29,6 +30,7 @@ export function buildCommands(context: CommandContext): Command[] {
 			label: "Run",
 			hint: "Shift+F10",
 			disabled: root === null || running !== null,
+			disabledReason: running === null ? undefined : "A run is in progress",
 			run: context.run,
 		},
 		{
@@ -36,6 +38,7 @@ export function buildCommands(context: CommandContext): Command[] {
 			label: "Debug",
 			hint: "Shift+F9",
 			disabled: root === null || running !== null,
+			disabledReason: running === null ? undefined : "A run is in progress",
 			run: context.debug,
 		},
 		{
@@ -43,6 +46,7 @@ export function buildCommands(context: CommandContext): Command[] {
 			label: "Stop",
 			hint: "Cmd+F2",
 			disabled: running === null,
+			disabledReason: "Nothing is running",
 			run: context.stop,
 		},
 		{
@@ -71,6 +75,7 @@ export function buildCommands(context: CommandContext): Command[] {
 			label: "Save",
 			hint: "Cmd+S",
 			disabled: root === null || activePath === null,
+			disabledReason: "Open a file first",
 			run: context.save,
 		},
 		{
@@ -85,6 +90,7 @@ export function buildCommands(context: CommandContext): Command[] {
 			label: "Format file",
 			hint: "Cmd+Alt+L",
 			disabled: root === null || activePath === null || formatting,
+			disabledReason: formatting ? "A format is already running" : "Open a file first",
 			run: context.format,
 		},
 		{
@@ -132,6 +138,7 @@ export function buildCommands(context: CommandContext): Command[] {
 			label: "Run to cursor",
 			hint: "Cmd+F10",
 			disabled: activePath === null || cursor === null,
+			disabledReason: "Put the caret in a file first",
 			run: () => {
 				if (activePath !== null && cursor !== null) {
 					context.runToCursor(activePath, cursor.line + 1);
@@ -176,4 +183,14 @@ export function buildCommands(context: CommandContext): Command[] {
 			cursor: cursor !== null,
 		}),
 	];
+	// One cause covers most of the list: with no project open, every project action is unavailable for
+	// the same reason, so the palette can say it rather than only greying the row.
+	if (root === null) {
+		return list.map((command) =>
+			command.disabled === true && command.disabledReason === undefined
+				? { ...command, disabledReason: "Open a project first" }
+				: command,
+		);
+	}
+	return list;
 }
