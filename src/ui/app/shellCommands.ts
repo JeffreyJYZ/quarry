@@ -45,6 +45,7 @@ export function shellCommands(options: {
 		building: build.building,
 		formatting: panels.formatting,
 		running: runs.running,
+		debugging: debug.sessionId !== null,
 		panelExpanded,
 		openProject: () => void workspace.handleOpenProject(),
 		build: () => void build.build(),

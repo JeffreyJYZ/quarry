@@ -5,6 +5,8 @@ export type CommandContext = {
 	building: boolean;
 	formatting: boolean;
 	running: string | null;
+	/** True when a debug session exists, so the disassembly command has something to show. */
+	debugging: boolean;
 	panelExpanded: boolean;
 	openProject: () => void;
 	build: () => void;

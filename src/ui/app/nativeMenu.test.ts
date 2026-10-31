@@ -17,6 +17,7 @@ const IDLE_CONTEXT: CommandContext = {
 	building: false,
 	formatting: false,
 	running: null,
+	debugging: false,
 	panelExpanded: false,
 	openProject: noop,
 	build: noop,

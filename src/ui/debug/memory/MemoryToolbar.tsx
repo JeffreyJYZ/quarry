@@ -72,7 +72,7 @@ export default function MemoryToolbar({
 				disabled={address === null}
 				onClick={onToggleFollow}
 			>
-				Follow pointer
+				Follow frame
 			</button>
 			<button
 				type="button"

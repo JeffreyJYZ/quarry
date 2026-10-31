@@ -9,7 +9,7 @@ import { navigationCommands } from "./navigationCommands";
  * and its accelerator, and disabling follows whatever the action needs.
  */
 export function buildCommands(context: CommandContext): Command[] {
-	const { root, activePath, cursor, building, formatting, running } = context;
+	const { root, activePath, cursor, building, formatting, running, debugging } = context;
 	return [
 		{
 			id: "open-project",
@@ -56,7 +56,7 @@ export function buildCommands(context: CommandContext): Command[] {
 			id: "show-disassembly",
 			label: "Show disassembly",
 			hint: "",
-			disabled: root === null,
+			disabled: root === null || !debugging,
 			run: context.showDisassembly,
 		},
 		{
