@@ -40,25 +40,26 @@ export default function DebugDockBody({
 
 	return (
 		<div className="dock-debug">
-			{offer === null && session === null ? null : (
-				<div
-					className={debug.error === null ? "dock-debug-strip" : "dock-debug-strip error"}
-				>
-					<span className="dock-debug-strip-text" title={offer ?? undefined}>
-						{offer ?? session}
-					</span>
-					{debug.buildNeeded === null ? null : (
-						<button
-							type="button"
-							className="dock-action"
-							disabled={debug.building}
-							onClick={debug.buildNow}
-						>
-							{debug.building ? "Building…" : "Build now"}
-						</button>
-					)}
-				</div>
-			)}
+			{/*
+			 * The strip is always drawn, empty or not. It is the row that shifts every column below it,
+			 * so a version that only appeared on an error or a session made the column headers jump the
+			 * moment a stop arrived or the tab was revisited.
+			 */}
+			<div className={debug.error === null ? "dock-debug-strip" : "dock-debug-strip error"}>
+				<span className="dock-debug-strip-text" title={offer ?? undefined}>
+					{offer ?? session ?? "no debug session"}
+				</span>
+				{debug.buildNeeded === null ? null : (
+					<button
+						type="button"
+						className="dock-action"
+						disabled={debug.building}
+						onClick={debug.buildNow}
+					>
+						{debug.building ? "Building…" : "Build now"}
+					</button>
+				)}
+			</div>
 			<div className="dock-debug-grid">
 				<TransportRail debug={debug} activePath={activePath} cursor={cursor} />
 
