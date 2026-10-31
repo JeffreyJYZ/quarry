@@ -29,6 +29,8 @@ export type KeybindingContext = {
 	setCallsOpen: (open: boolean) => void;
 	setTypeHierarchyCursor: (cursor: Cursor) => void;
 	setTypeHierarchyOpen: (open: boolean) => void;
+	/** Step the editor font, or reset it when the step is zero. */
+	zoomEditor: (delta: number) => void;
 };
 
 function inEditor(): boolean {
@@ -148,8 +150,36 @@ export function useKeybindings(context: KeybindingContext): void {
 		context.setGitOpen,
 	]);
 
-	/** Cmd+Shift+P opens the command palette. */
+	/**
+	 * Cmd+= and Cmd+- step the editor font, Cmd+0 puts it back.
+	 *
+	 * Swallowed even inside the editor: a webview's own zoom would scale the whole window and leave
+	 * the settings page claiming a font size the editor is not using.
+	 */
 	useEffect(() => {
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (!event.metaKey || event.ctrlKey || event.altKey) return;
+			const key = event.key;
+			if (key === "=" || key === "+") {
+				event.preventDefault();
+				context.zoomEditor(1);
+				return;
+			}
+			if (key === "-" || key === "_") {
+				event.preventDefault();
+				context.zoomEditor(-1);
+				return;
+			}
+			if (key === "0") {
+				event.preventDefault();
+				context.zoomEditor(0);
+			}
+		};
+		window.addEventListener("keydown", handleKeyDown, true);
+		return () => window.removeEventListener("keydown", handleKeyDown, true);
+	}, [context.zoomEditor]);
+
+	/** Cmd+Shift+P opens the command palette. */ useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (!event.metaKey || event.ctrlKey || event.altKey || !event.shiftKey) return;
 			if (event.key.toLowerCase() !== "p") return;

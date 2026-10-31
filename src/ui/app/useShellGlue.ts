@@ -19,6 +19,7 @@ import { useKeybindings } from "@/ui/app/useKeybindings";
 import { useShellEffects } from "@/ui/app/useShellEffects";
 import { useSelectionKeybindings } from "@/ui/app/useSelectionKeybindings";
 import { useSessionPersistence } from "@/ui/app/useSessionPersistence";
+import { zoomPreferences } from "@/lib/editor/zoom";
 import { normalizePreferences } from "@/lib/settings/model";
 
 export type GlueOptions = {
@@ -78,6 +79,8 @@ export function useShellGlue(options: GlueOptions) {
 		setCallsOpen: overlays.setCallsOpen,
 		setTypeHierarchyCursor: overlays.setTypeHierarchyCursor,
 		setTypeHierarchyOpen: overlays.setTypeHierarchyOpen,
+		zoomEditor: (delta) =>
+			settings.setPreferences((current) => zoomPreferences(current, delta)),
 	});
 
 	useSelectionKeybindings({

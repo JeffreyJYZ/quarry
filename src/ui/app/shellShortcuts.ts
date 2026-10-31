@@ -39,6 +39,9 @@ export const SHORTCUT_GROUPS = [
 			{ keys: ["Cmd", "Shift", "\\"], action: "Jump to the matching bracket" },
 			{ keys: ["Cmd", "Shift", "["], action: "Fold the block" },
 			{ keys: ["Cmd", "Shift", "]"], action: "Unfold the block" },
+			{ keys: ["Cmd", "="], action: "Increase the editor font size" },
+			{ keys: ["Cmd", "-"], action: "Decrease the editor font size" },
+			{ keys: ["Cmd", "0"], action: "Reset the editor font size" },
 		],
 	},
 	{
