@@ -11,6 +11,7 @@ export type Session = {
 	ptyId: string | null;
 	pid: number | null;
 	cwd: string;
+	title: string | null;
 	lines: string[];
 	dropped: number;
 	exited: number | null;
@@ -25,6 +26,7 @@ export function emptySession(id: number, cwd: string, fontSize = DEFAULT_FONT_SI
 		ptyId: null,
 		pid: null,
 		cwd,
+		title: null,
 		lines: [],
 		dropped: 0,
 		exited: null,
@@ -61,6 +63,11 @@ export function shortCwd(cwd: string): string {
 	const parts = cwd.split("/").filter((p) => p.length > 0);
 	const tail = parts.slice(-2).join("/");
 	return `…/${tail}`;
+}
+
+/** Visible tab name: a user rename wins, otherwise the directory's short form. */
+export function tabLabel(session: Session): string {
+	return session.title ?? shortCwd(session.cwd);
 }
 
 /** The PTY's grid size for a host element, with the minimums a shell needs. */

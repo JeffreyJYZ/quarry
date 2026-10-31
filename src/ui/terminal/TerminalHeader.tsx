@@ -1,6 +1,7 @@
-import type { KeyboardEvent, ReactNode } from "react";
+import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { decreaseFontSize, increaseFontSize, scrollbackText } from "@/lib/terminal/fontSize";
-import { describe, type Session, shortCwd } from "@/lib/terminal/sessions";
+import { describe, type Session, shortCwd, tabLabel } from "@/lib/terminal/sessions";
+import TabRename from "@/ui/terminal/TabRename";
 import {
 	CopyIcon,
 	FontDownIcon,
@@ -10,7 +11,6 @@ import {
 	TerminalIcon,
 	TrashIcon,
 } from "@/ui/terminal/TerminalIcons";
-
 type HeaderProps = {
 	sessions: Session[];
 	active: Session | null;
@@ -21,7 +21,6 @@ type HeaderProps = {
 	onRestart: () => void;
 	updateSession: (id: number, updater: (s: Session) => Session) => void;
 };
-
 /** Icon-only action button: the label lives in `title` and `aria-label`, never on screen. */
 function IconButton(props: {
 	label: string;
@@ -41,7 +40,6 @@ function IconButton(props: {
 		</button>
 	);
 }
-
 /** One header row: session tabs on the left, terminal actions on the right. */
 export default function TerminalHeader({
 	sessions,
@@ -53,6 +51,8 @@ export default function TerminalHeader({
 	onRestart,
 	updateSession,
 }: HeaderProps) {
+	const [editingId, setEditingId] = useState<number | null>(null);
+	const closedAt = useRef(0);
 	return (
 		<div className="terminal-chrome">
 			<div
@@ -77,7 +77,8 @@ export default function TerminalHeader({
 				}}
 			>
 				{sessions.map((s) => {
-					const label = shortCwd(s.cwd);
+					const label = tabLabel(s);
+					const editing = editingId === s.id;
 					return (
 						<div
 							key={s.id}
@@ -90,13 +91,32 @@ export default function TerminalHeader({
 							<span className="terminal-tab-glyph">
 								<TerminalIcon />
 							</span>
-							<button
-								type="button"
-								className="terminal-tab-label"
-								onClick={() => onSelect(s.id)}
-							>
-								{label}
-							</button>
+							{editing ? (
+								<TabRename
+									value={label}
+									session={s}
+									updateSession={updateSession}
+									onDone={() => {
+										closedAt.current = Date.now();
+										setEditingId(null);
+									}}
+								/>
+							) : (
+								<button
+									type="button"
+									className="terminal-tab-label"
+									onClick={() => onSelect(s.id)}
+									onDoubleClick={() => {
+										if (
+											editingId === null &&
+											Date.now() - closedAt.current >= 300
+										)
+											setEditingId(s.id);
+									}}
+								>
+									{label}
+								</button>
+							)}
 							<button
 								type="button"
 								className="terminal-tab-close"

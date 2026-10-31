@@ -181,3 +181,16 @@
 	overflow: hidden;
 	background: var(--panel);
 }
+
+.terminal-tab-rename {
+	font: inherit;
+	letter-spacing: inherit;
+	color: inherit;
+	background: transparent;
+	border: 0;
+	border-bottom: 1px solid var(--accent);
+	outline: none;
+	min-width: 8ch;
+	padding: 0;
+	box-sizing: border-box;
+}
