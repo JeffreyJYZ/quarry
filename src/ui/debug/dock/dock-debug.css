@@ -62,10 +62,15 @@
 }
 
 .dock-debug-grid {
-	display: grid;
-	grid-template-columns: 34px 25% minmax(0, 1fr) 24%;
+	display: flex;
+	flex-direction: row;
 	flex: 1 1 auto;
 	min-height: 0;
+	min-width: 0;
+}
+
+.dock-debug-rail {
+	flex: 0 0 34px;
 }
 
 .dock-debug-rail {

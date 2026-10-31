@@ -12,7 +12,9 @@ export function useMemoryHistory(navigate: (next: bigint) => void) {
 				if (base.length > 0 && base[base.length - 1] === next) {
 					return previous;
 				}
-				const nextHistory = [...base, next];
+				// Drop any earlier occurrence so the list stays deduped.
+				const deduped = base.filter((entry) => entry !== next);
+				const nextHistory = [...deduped, next];
 				const sliced =
 					nextHistory.length > 20
 						? nextHistory.slice(nextHistory.length - 20)

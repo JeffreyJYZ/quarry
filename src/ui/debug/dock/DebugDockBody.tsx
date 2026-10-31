@@ -4,6 +4,8 @@ import EvaluateField from "@/ui/debug/dock/EvaluateField";
 import VariablesSection from "@/ui/debug/VariablesSection";
 import { PinsSection, WatchPointsSection } from "@/ui/debug/WatchSections";
 import TransportRail from "@/ui/debug/dock/TransportRail";
+import Splitter from "@/ui/layout/Splitter";
+import { useDebugDockWidths } from "@/ui/debug/dock/dockWidths";
 import type { DebugController } from "@/lib/debug/session";
 
 /**
@@ -25,6 +27,8 @@ export default function DebugDockBody({
 }) {
 	const view = debug.stopView;
 	const top = view === null ? null : (view.frames[0] ?? null);
+	const { framesWidth, setFramesWidth, breakpointsWidth, setBreakpointsWidth } =
+		useDebugDockWidths();
 	const canAddBreakpoint = debug.status === "stopped" && top !== null && top.source !== null;
 	const offer = debug.error ?? debug.profileMismatch ?? debug.buildNeeded;
 	const session =
@@ -58,7 +62,11 @@ export default function DebugDockBody({
 			<div className="dock-debug-grid">
 				<TransportRail debug={debug} activePath={activePath} cursor={cursor} />
 
-				<section className="dock-debug-col" aria-label="Frames">
+				<section
+					className="dock-debug-col"
+					aria-label="Frames"
+					style={{ flex: "0 0 auto", width: `${framesWidth}px` }}
+				>
 					<header className="dock-debug-head">
 						<span className="dock-debug-label">frames</span>
 						<span className="dock-debug-count">
@@ -70,7 +78,20 @@ export default function DebugDockBody({
 					</div>
 				</section>
 
-				<section className="dock-debug-col" aria-label="Variables and watches">
+				<Splitter
+					axis="x"
+					value={framesWidth}
+					min={120}
+					max={420}
+					label="Resize frames"
+					onChange={setFramesWidth}
+				/>
+
+				<section
+					className="dock-debug-col"
+					aria-label="Variables and watches"
+					style={{ flex: "1 1 auto", minWidth: 0 }}
+				>
 					<header className="dock-debug-head">
 						<span className="dock-debug-label">variables</span>
 						<span className="dock-debug-count">
@@ -91,7 +112,21 @@ export default function DebugDockBody({
 					</div>
 				</section>
 
-				<section className="dock-debug-col" aria-label="Breakpoints">
+				<Splitter
+					axis="x"
+					value={breakpointsWidth}
+					min={160}
+					max={420}
+					invert
+					label="Resize breakpoints"
+					onChange={setBreakpointsWidth}
+				/>
+
+				<section
+					className="dock-debug-col"
+					aria-label="Breakpoints"
+					style={{ flex: "0 0 auto", width: `${breakpointsWidth}px` }}
+				>
 					<header className="dock-debug-head">
 						<span className="dock-debug-label">breakpoints</span>
 						<button

@@ -26,14 +26,25 @@ export default function CallStackList({
 	const [navigated, setNavigated] = useState<{ source: string; line: number } | null>(null);
 	const [menu, setMenu] = useState<{ x: number; y: number; frame: DapFrame } | null>(null);
 	const framesRef = useRef(view?.frames);
+	const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 	// Clear the navigation marker whenever a new stop arrives (frames array changes), so a stale
 	// frame never stays marked; selecting a frame keeps its array identity and the marker survives.
 	useEffect(() => {
 		if (framesRef.current !== view?.frames) {
 			framesRef.current = view?.frames;
 			setNavigated(null);
+			buttonRefs.current = [];
 		}
 	}, [view]);
+
+	const frameId = view?.frameId;
+	const frames = view?.frames;
+	// Focus the selected frame on a new stop, so arrow keys continue from where the stop landed.
+	useEffect(() => {
+		if (frames === undefined || frameId === undefined) return;
+		const index = frames.findIndex((frame) => frame.id === frameId);
+		if (index >= 0) buttonRefs.current[index]?.focus();
+	}, [frames, frameId]);
 
 	if (view === null) {
 		return <p className="debug-note">Not stopped</p>;
@@ -66,7 +77,7 @@ export default function CallStackList({
 			{view.frames.length === 0 ? (
 				<p className="debug-note">No frames</p>
 			) : (
-				view.frames.map((frame) => {
+				view.frames.map((frame, index) => {
 					const navigable = frame.source !== null && frame.line > 0;
 					const marked =
 						navigated !== null &&
@@ -96,12 +107,41 @@ export default function CallStackList({
 					const source = frame.source;
 					return (
 						<button
+							ref={(element) => {
+								buttonRefs.current[index] = element;
+							}}
 							key={frame.id}
 							type="button"
 							className={className}
 							title={source ?? undefined}
 							style={marked ? { opacity: 0.55 } : undefined}
 							onContextMenu={onContextMenu}
+							onKeyDown={(event) => {
+								const frames = view.frames;
+								if (event.key === "ArrowDown") {
+									event.preventDefault();
+									const next = Math.min(index + 1, frames.length - 1);
+									buttonRefs.current[next]?.focus();
+									const nextFrame = frames[next];
+									if (nextFrame !== undefined) debug.selectFrame(nextFrame.id);
+									return;
+								}
+								if (event.key === "ArrowUp") {
+									event.preventDefault();
+									const prev = Math.max(index - 1, 0);
+									buttonRefs.current[prev]?.focus();
+									const prevFrame = frames[prev];
+									if (prevFrame !== undefined) debug.selectFrame(prevFrame.id);
+									return;
+								}
+								if (event.key === "Enter") {
+									event.preventDefault();
+									debug.selectFrame(frame.id);
+									if (source === null || !navigable) return;
+									setNavigated({ source, line: frame.line });
+									onNavigate?.(source, frame.line - 1, 0);
+								}
+							}}
 							onClick={() => {
 								debug.selectFrame(frame.id);
 								if (source === null || !navigable) return;

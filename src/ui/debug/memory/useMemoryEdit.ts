@@ -26,6 +26,20 @@ export function useMemoryEdit({
 
 	const range = useMemoryRange({ session, setError, refresh, editMode });
 
+	const startRange = (cell: bigint) => {
+		range.setRangeAnchor(cell);
+		range.setRangeEnd(cell);
+		setSelected(null);
+	};
+
+	const extendRange = (cell: bigint) => {
+		if (range.rangeAnchor === null) {
+			return;
+		}
+		range.setRangeEnd(cell);
+		setSelected(null);
+	};
+
 	const commitEdit = async (cell: bigint) => {
 		if (!session) {
 			setEditing(null);
@@ -120,6 +134,7 @@ export function useMemoryEdit({
 		},
 		commitEdit,
 		onSelect: select,
+		rangeAnchor: range.rangeAnchor,
 		rangeStart: range.rangeStart,
 		rangeFinish: range.rangeFinish,
 		rangeLabel: range.rangeLabel,
@@ -129,5 +144,7 @@ export function useMemoryEdit({
 		onEditChange: handleEditChange,
 		onEditKeyDown: handleEditKeyDown,
 		onBeginEdit: beginEdit,
+		onRangeStart: startRange,
+		onRangeExtend: extendRange,
 	};
 }

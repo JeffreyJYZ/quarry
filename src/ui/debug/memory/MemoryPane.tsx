@@ -1,22 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-	buildRows,
-	formatAddress,
-	type Interpreted,
-	interpretAt,
-	parseAddress,
-	ROW_BYTES,
-} from "@/lib/debug/memory/hex";
+import { useCallback, useEffect, useState } from "react";
+import { formatAddress, parseAddress } from "@/lib/debug/memory/hex";
 import type { MemoryCellApi } from "@/ui/debug/memory/MemoryCell";
-import MemoryHexView from "@/ui/debug/memory/MemoryHexView";
+import MemoryBody from "@/ui/debug/memory/MemoryBody";
 import MemoryToolbar from "@/ui/debug/memory/MemoryToolbar";
-import MemoryValueView from "@/ui/debug/memory/MemoryValueView";
-import { DEFAULT_PAGE, type Loaded, type Request, requestFor } from "@/ui/debug/memory/parts";
+import {
+	DEFAULT_PAGE,
+	type Loaded,
+	type Request,
+	requestFor,
+	storedPageSize,
+	storedRowWidth,
+	storePageSize,
+	storeRowWidth,
+} from "@/ui/debug/memory/parts";
 import { resolveAddress } from "@/lib/debug/memory/resolve";
 import { useMemoryClipboard } from "@/ui/debug/memory/useMemoryClipboard";
 import { useMemoryEdit } from "@/ui/debug/memory/useMemoryEdit";
 import { useMemoryHistory } from "@/ui/debug/memory/useMemoryHistory";
 import { useMemoryRead } from "@/ui/debug/memory/useMemoryRead";
+import { useMemoryRows } from "@/ui/debug/memory/useMemoryRows";
 import "@/ui/debug/memory/memory.css";
 
 export type MemoryPaneProps = {
@@ -34,10 +36,14 @@ export type MemoryPaneProps = {
  * "no session" line, so nothing from an ended session lingers on screen.
  */
 export default function MemoryPane({ session, address, frameId }: MemoryPaneProps) {
-	const [request, setRequest] = useState<Request | null>(() => requestFor(address));
+	const [request, setRequest] = useState<Request | null>(() => {
+		const base = requestFor(address);
+		if (base === null) return null;
+		return { ...base, size: storedPageSize() };
+	});
 	const [input, setInput] = useState(() => formatAddress(parseAddress(address)));
 	const [followed, setFollowed] = useState(true);
-	const [rowWidth, setRowWidth] = useState(ROW_BYTES);
+	const [rowWidth, setRowWidth] = useState(() => storedRowWidth());
 	const [loaded, setLoaded] = useState<Loaded | null>(null);
 	const [selected, setSelected] = useState<bigint | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -54,7 +60,7 @@ export default function MemoryPane({ session, address, frameId }: MemoryPaneProp
 		setError(null);
 		setRequest((previous) => ({
 			start: next,
-			size: previous?.size ?? DEFAULT_PAGE,
+			size: previous?.size ?? storedPageSize(),
 			serial: (previous?.serial ?? 0) + 1,
 		}));
 	}, []);
@@ -85,7 +91,7 @@ export default function MemoryPane({ session, address, frameId }: MemoryPaneProp
 				return previous;
 			}
 			recordVisit(next);
-			return { start: next, size: previous?.size ?? DEFAULT_PAGE, serial: 0 };
+			return { start: next, size: previous?.size ?? storedPageSize(), serial: 0 };
 		});
 	}, [address, followed, recordVisit]);
 
@@ -119,28 +125,29 @@ export default function MemoryPane({ session, address, frameId }: MemoryPaneProp
 	};
 
 	const changeSize = (size: number) => {
+		storePageSize(size);
 		setRequest((previous) =>
 			previous === null ? null : { ...previous, size, serial: previous.serial + 1 },
 		);
 	};
 
-	const rows = useMemo(
-		() => (loaded === null ? [] : buildRows(loaded.base, loaded.bytes, rowWidth)),
-		[loaded, rowWidth],
-	);
-
-	const interpreted = useMemo<Interpreted[] | null>(() => {
-		if (loaded === null || selected === null) {
-			return null;
-		}
-		const values = interpretAt(loaded.bytes, Number(selected - loaded.base));
-		return values.length === 0 ? null : values;
-	}, [loaded, selected]);
-
-	const selectedLabel = selected === null ? "" : formatAddress(selected);
-
 	const edit = useMemoryEdit({ session: liveSession, loaded, setError, setSelected, refresh });
-	const clipboard = useMemoryClipboard({ loaded, setError });
+	const editRangeStart = edit.rangeStart;
+	const editRangeFinish = edit.rangeFinish;
+	const clipboard = useMemoryClipboard({
+		loaded,
+		setError,
+		rangeStart: editRangeStart,
+		rangeFinish: editRangeFinish,
+	});
+
+	const { rows, interpreted, selectedLabel } = useMemoryRows({
+		loaded,
+		rowWidth,
+		selected,
+		rangeStart: editRangeStart,
+		rangeFinish: editRangeFinish,
+	});
 
 	const api: MemoryCellApi = { ...edit, selected };
 
@@ -154,7 +161,10 @@ export default function MemoryPane({ session, address, frameId }: MemoryPaneProp
 				}}
 				onCommit={commit}
 				rowWidth={rowWidth}
-				onRowWidthChange={setRowWidth}
+				onRowWidthChange={(value) => {
+					storeRowWidth(value);
+					setRowWidth(value);
+				}}
 				pageSize={pageSize}
 				onSizeChange={changeSize}
 				onCopy={() => void clipboard.copyHex()}
@@ -171,30 +181,20 @@ export default function MemoryPane({ session, address, frameId }: MemoryPaneProp
 				rangeInput={edit.rangeInput}
 				busy={busy || resolving}
 			/>
-			{error !== null && (
-				<p className="memory-error" role="alert">
-					{error}
-				</p>
-			)}
-			{clipboard.copied !== null && (
-				<p className="memory-muted">{`Copied ${clipboard.copied}`}</p>
-			)}
-			{session === null ? (
-				<p className="memory-empty">No session: launch or attach to read memory</p>
-			) : request === null ? (
-				<p className="memory-empty">Enter an address to read memory</p>
-			) : loaded === null ? (
-				<p className="memory-empty">{busy ? "Reading memory…" : "No bytes loaded"}</p>
-			) : (
-				<MemoryHexView
-					rows={rows}
-					api={api}
-					rowWidth={rowWidth}
-					pageStart={loaded.base}
-					onCopyAddress={(target) => void clipboard.copyAddress(target)}
-				/>
-			)}
-			<MemoryValueView selectedLabel={selectedLabel} interpreted={interpreted} />
+			<MemoryBody
+				session={session}
+				hasRequest={request !== null}
+				loaded={loaded}
+				busy={busy}
+				error={error}
+				copied={clipboard.copied}
+				rows={rows}
+				api={api}
+				rowWidth={rowWidth}
+				selectedLabel={selectedLabel}
+				interpreted={interpreted}
+				onCopyAddress={(target) => void clipboard.copyAddress(target)}
+			/>
 		</div>
 	);
 }
