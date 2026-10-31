@@ -6,6 +6,7 @@ import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
 import type { ServerKind } from "@/lib/lsp/served";
 import { caretSymbolIndex, filterSymbolIndices } from "@/lib/outline/model";
 import { kindLabel } from "./outlineKinds";
+import "./outline.css";
 
 const CAP = 400;
 
@@ -128,6 +129,12 @@ export default function Outline({ root, activePath, onNavigate, cursor }: Outlin
 							placeholder="filter symbols"
 							value={filter}
 							onChange={(event) => setFilter(event.target.value)}
+							onKeyDown={(event) => {
+								if (event.key === "Escape") {
+									event.preventDefault();
+									setFilter("");
+								}
+							}}
 						/>
 					</div>
 					{loading && symbols.length === 0 ? (
@@ -137,7 +144,7 @@ export default function Outline({ root, activePath, onNavigate, cursor }: Outlin
 					) : symbols.length === 0 ? (
 						<p className="empty">No symbols.</p>
 					) : shownSymbols.length === 0 ? (
-						<p className="empty">No symbols match</p>
+						<p className="empty">No symbol matches</p>
 					) : (
 						<ul className="outline-list">
 							{shownSymbols.map((symbol, i) => {

@@ -5,6 +5,7 @@ import { isInsideRoot } from "@/lib/lsp/paths";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
 import type { ServerKind } from "@/lib/lsp/served";
 import "@/ui/goto/goto.css";
+import GotoList from "@/ui/goto/GotoList";
 import { type GotoMode, type Row, TITLES, fileNameOf, filterRows } from "./gotoModel";
 export type { GotoMode } from "./gotoModel";
 export { filterRows } from "./gotoModel";
@@ -162,6 +163,15 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose, onNoti
 							setActive((current) => Math.max(current - 1, 0));
 							return;
 						}
+						if (event.key === "Tab") {
+							event.preventDefault();
+							if (event.shiftKey) {
+								setActive((current) => Math.max(current - 1, 0));
+							} else {
+								setActive((current) => Math.min(current + 1, visible.length - 1));
+							}
+							return;
+						}
 						if (event.key === "Enter") {
 							event.preventDefault();
 							const row = visible[active];
@@ -172,28 +182,17 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose, onNoti
 						}
 					}}
 				/>
-				<ul className="goto-list" ref={listRef}>
-					{visible.length === 0 ? (
-						<li className="goto-empty">{loading ? "Searching…" : "Nothing matches"}</li>
-					) : (
-						visible.map((row, index) => (
-							<li key={row.key}>
-								<button
-									type="button"
-									className={index === active ? "goto-row active" : "goto-row"}
-									onMouseEnter={() => setActive(index)}
-									onClick={() => {
-										onOpen(row.path, row.line, row.character);
-										onClose();
-									}}
-								>
-									<span className="goto-label">{row.label}</span>
-									<span className="goto-detail">{row.detail}</span>
-								</button>
-							</li>
-						))
-					)}
-				</ul>
+				<GotoList
+					rows={visible}
+					active={active}
+					loading={loading}
+					listRef={listRef}
+					onHover={setActive}
+					onPick={(row) => {
+						onOpen(row.path, row.line, row.character);
+						onClose();
+					}}
+				/>
 			</div>
 		</div>
 	);

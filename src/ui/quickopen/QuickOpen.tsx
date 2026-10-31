@@ -11,7 +11,7 @@ export type Props = {
 };
 
 export default function QuickOpen({ root, openPaths, onOpen, onClose }: Props) {
-	const quick = useQuickOpen({ root, onOpen, onClose });
+	const quick = useQuickOpen({ root, openPaths, onOpen, onClose });
 
 	return (
 		<div className="search-palette" role="dialog" aria-label="Quick open">
@@ -38,6 +38,11 @@ export default function QuickOpen({ root, openPaths, onOpen, onClose }: Props) {
 						if (event.key === "ArrowUp") {
 							event.preventDefault();
 							quick.move(-1);
+							return;
+						}
+						if (event.key === "Tab") {
+							event.preventDefault();
+							quick.move(event.shiftKey ? -1 : 1);
 							return;
 						}
 						if (event.key === "Home") {

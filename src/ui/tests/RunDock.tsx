@@ -59,13 +59,25 @@ export default function RunDock({ runs }: { runs: RunControls }) {
 					lines={runs.lines}
 					exited={runs.exited}
 					argv={runs.argv}
+					cwd={runs.cwd}
 					running={running}
 					onRerun={() => void runs.run()}
 					onClear={runs.clearLog}
 				/>
 			) : null}
 			{showEmpty ? (
-				<p className="run-dock-empty">No run yet. Press Run in the title bar.</p>
+				<div className="run-dock-empty">
+					<p className="run-dock-empty">No run yet. Press Run in the title bar.</p>
+					<p className="run-dock-empty">
+						program: {runs.program === "" ? "(none)" : runs.program}
+					</p>
+					<p className="run-dock-empty">
+						args: {runs.args === "" ? "(none)" : runs.args}
+					</p>
+					<p className="run-dock-empty">
+						cwd: {runs.cwd === "" ? "(project root)" : runs.cwd}
+					</p>
+				</div>
 			) : null}
 		</div>
 	);

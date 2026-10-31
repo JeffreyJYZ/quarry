@@ -67,18 +67,36 @@ export function matchPositions(haystack: string, needle: string): number[] | nul
 
 type Tier = 0 | 1 | 2 | 3 | 4 | 5;
 
+export type RankContext = {
+	recent?: string[];
+	currentPath?: string | null;
+};
+
 type Scored = {
 	path: string;
 	tier: Tier;
+	recent: number;
+	sameDir: number;
 	boundaries: number;
 	sumPos: number;
 };
 
-export function rankFiles(paths: string[], query: string): string[] {
+export function rankFiles(paths: string[], query: string, context?: RankContext): string[] {
 	const q = query.trim().toLowerCase();
 	if (q === "") {
 		return [];
 	}
+	const recentSet = new Set(context?.recent ?? []);
+	const currentDir =
+		context?.currentPath === null || context?.currentPath === undefined
+			? null
+			: context.currentPath.slice(
+					0,
+					Math.max(
+						context.currentPath.lastIndexOf("/"),
+						context.currentPath.lastIndexOf("\\"),
+					),
+				);
 	const scored: Scored[] = [];
 	for (const path of paths) {
 		const base = basename(path);
@@ -121,12 +139,22 @@ export function rankFiles(paths: string[], query: string): string[] {
 				sumPos = (q.length * idx + (q.length * (q.length - 1)) / 2) | 0;
 			}
 		}
-		scored.push({ path, tier, boundaries, sumPos });
+		const dir = path.slice(0, Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")));
+		scored.push({
+			path,
+			tier,
+			recent: recentSet.has(path) ? 0 : 1,
+			sameDir: currentDir !== null && dir === currentDir ? 0 : 1,
+			boundaries,
+			sumPos,
+		});
 	}
 	return scored
 		.sort(
 			(a, b) =>
 				a.tier - b.tier ||
+				a.recent - b.recent ||
+				a.sameDir - b.sameDir ||
 				b.boundaries - a.boundaries ||
 				a.sumPos - b.sumPos ||
 				a.path.length - b.path.length ||

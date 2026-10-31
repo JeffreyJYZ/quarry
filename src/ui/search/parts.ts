@@ -10,17 +10,17 @@ export const searchSession = {
 };
 
 export function invalidQuery(query: string, options: SearchOptions, wholeWord: boolean): boolean {
-	if (!wholeWord) {
-		return false;
-	}
 	const trimmedQuery = query.trim();
 	if (trimmedQuery === "") {
 		return false;
 	}
-	try {
-		new RegExp(transformQuery(trimmedQuery, options));
-		return false;
-	} catch {
-		return true;
+	if (options.regex || wholeWord) {
+		try {
+			new RegExp(transformQuery(trimmedQuery, options));
+			return false;
+		} catch {
+			return true;
+		}
 	}
+	return false;
 }

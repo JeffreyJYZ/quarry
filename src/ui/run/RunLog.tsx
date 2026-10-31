@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { exitStatusText } from "@/lib/run/exitStatus";
 
 /** One console line; the id makes a repeated line a distinct row. */
 export type RunLine = { id: number; stream: "stdout" | "stderr"; line: string };
@@ -8,6 +9,7 @@ export type RunLogProps = {
 	exited: { code: number | null; killed?: boolean } | null;
 	onClear: () => void;
 	argv: string;
+	cwd?: string;
 	running: boolean;
 	onRerun: () => void;
 };
@@ -19,7 +21,15 @@ function stripAnsi(text: string): string {
 	return text.replace(ANSI_RE, "");
 }
 
-export default function RunLog({ lines, exited, onClear, argv, running, onRerun }: RunLogProps) {
+export default function RunLog({
+	lines,
+	exited,
+	onClear,
+	argv,
+	cwd,
+	running,
+	onRerun,
+}: RunLogProps) {
 	const ref = useRef<HTMLDivElement | null>(null);
 	const stickRef = useRef(true);
 	const [copyStatus, setCopyStatus] = useState<string | null>(null);
@@ -91,17 +101,17 @@ export default function RunLog({ lines, exited, onClear, argv, running, onRerun 
 		[],
 	);
 
-	const exitText =
-		exited === null
-			? null
-			: exited.killed === true || exited.code === null
-				? "killed"
-				: `exited with code ${exited.code}`;
+	const exitText = exited === null ? null : exitStatusText(exited);
 
 	return (
 		<section className="run-log" aria-label="Run output">
 			<div className="run-log-head">
 				<span className="label">run</span>
+				{cwd === undefined || cwd === "" ? null : (
+					<span className="run-copy-status" title={cwd}>
+						cwd {cwd}
+					</span>
+				)}
 				{copyStatus === null ? null : <span className="run-copy-status">{copyStatus}</span>}
 				<div className="run-log-actions">
 					<button type="button" className="dock-action" onClick={() => void copyOutput()}>

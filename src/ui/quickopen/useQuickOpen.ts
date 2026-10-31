@@ -31,10 +31,12 @@ export type QuickOpenController = {
 
 export function useQuickOpen({
 	root,
+	openPaths,
 	onOpen,
 	onClose,
 }: {
 	root: string;
+	openPaths?: ReadonlySet<string>;
 	onOpen: (path: string) => void;
 	onClose: () => void;
 }): QuickOpenController {
@@ -78,8 +80,14 @@ export function useQuickOpen({
 		void fetchFiles(stale);
 	}, [root, fetchFiles]);
 
+	const openerRef = useRef<HTMLElement | null>(null);
 	useEffect(() => {
+		openerRef.current =
+			document.activeElement instanceof HTMLElement ? document.activeElement : null;
 		inputRef.current?.focus();
+		return () => {
+			openerRef.current?.focus();
+		};
 	}, []);
 
 	useEffect(() => {
@@ -105,19 +113,20 @@ export function useQuickOpen({
 	const { primary, filter } = splitQueryRank(query);
 	const isFilterActive = query.includes(" ") && filter.length > 0;
 
+	const currentPath = openPaths !== undefined && openPaths.size > 0 ? [...openPaths][0] : null;
 	const ranked = useMemo(() => {
 		const q = primary.trim();
 		if (q === "") {
 			const recentPaths = recent.filter((path) => files.includes(path));
 			return recentPaths.slice(0, RECENT_LIMIT);
 		}
-		let result = rankFiles(files, q);
+		let result = rankFiles(files, q, { recent, currentPath });
 		if (filter.trim() !== "") {
 			const f = filter.trim().toLowerCase();
 			result = result.filter((path) => path.toLowerCase().includes(f));
 		}
 		return result;
-	}, [files, primary, filter]);
+	}, [files, primary, filter, currentPath]);
 
 	const mainList = useMemo(() => {
 		if (primary.trim() !== "") return ranked;

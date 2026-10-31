@@ -81,10 +81,14 @@ export function useRunProcess(onNotice: (message: string) => void): {
 		async (program: string, args: string[], cwd: string, env: EnvVar[]) => {
 			setLines([]);
 			setExited(null);
+			runningRef.current = null;
 			try {
 				const id = await runProgram(program, args, cwd, env.length === 0 ? undefined : env);
+				runningRef.current = id;
 				setRunning(id);
 			} catch (error) {
+				runningRef.current = null;
+				setRunning(null);
 				onNotice(describeError(error));
 			}
 		},
@@ -94,13 +98,14 @@ export function useRunProcess(onNotice: (message: string) => void): {
 	const stop = useCallback(async () => {
 		const id = running;
 		if (id === null) return;
+		runningRef.current = null;
+		setRunning(null);
+		setExited((current) => (current === null ? { code: null, killed: true } : current));
 		try {
 			await stopProgram(id);
 		} catch (error) {
 			onNotice(describeError(error));
 		}
-		setExited((current) => (current === null ? { code: null, killed: true } : current));
-		setRunning(null);
 	}, [running, onNotice]);
 
 	const clear = useCallback(() => {

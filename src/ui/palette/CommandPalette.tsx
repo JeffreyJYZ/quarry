@@ -1,3 +1,4 @@
+import CommandRow from "@/ui/palette/CommandRow";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export type Command = {
@@ -5,6 +6,7 @@ export type Command = {
 	label: string;
 	hint?: string;
 	disabled?: boolean;
+	disabledReason?: string;
 	run: () => void;
 };
 
@@ -58,8 +60,14 @@ export default function CommandPalette({
 	}, [open, onClose]);
 
 	const ordered = useMemo(() => {
-		const recentSet = new Set(recent);
-		const recentItems = recent
+		const seen = new Set<string>();
+		const dedupedRecent = recent.filter((id) => {
+			if (seen.has(id)) return false;
+			seen.add(id);
+			return true;
+		});
+		const recentSet = new Set(dedupedRecent);
+		const recentItems = dedupedRecent
 			.map((id) => commands.find((command) => command.id === id))
 			.filter((command): command is Command => command !== undefined);
 		const rest = commands.filter((command) => !recentSet.has(command.id));
@@ -142,6 +150,11 @@ export default function CommandPalette({
 							move(-1);
 							return;
 						}
+						if (event.key === "Tab") {
+							event.preventDefault();
+							move(event.shiftKey ? -1 : 1);
+							return;
+						}
 						if (event.key === "Enter") {
 							event.preventDefault();
 							const command = filtered[active];
@@ -154,24 +167,14 @@ export default function CommandPalette({
 			</div>
 			<div className="command-list" ref={listRef}>
 				{filtered.map((command, index) => (
-					<button
-						type="button"
+					<CommandRow
 						key={command.id}
-						className={
-							command.disabled === true
-								? "command-row disabled"
-								: index === active
-									? "command-row active"
-									: "command-row"
-						}
-						data-index={index}
-						disabled={command.disabled === true}
-						onClick={() => runCommand(command)}
-						onMouseEnter={() => setActive(index)}
-					>
-						<span className="command-label">{command.label}</span>
-						{command.hint ? <span className="command-hint">{command.hint}</span> : null}
-					</button>
+						command={command}
+						index={index}
+						active={index === active}
+						onRun={() => runCommand(command)}
+						onHover={() => setActive(index)}
+					/>
 				))}
 				{filtered.length === 0 ? <p className="command-empty">No commands.</p> : null}
 			</div>

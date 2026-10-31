@@ -1,0 +1,20 @@
+.outline-filter-wrap {
+	padding: 6px 10px;
+	border-bottom: 1px solid var(--line);
+}
+
+.outline-filter {
+	width: 100%;
+	padding: 3px 6px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: var(--bg);
+	color: var(--text);
+	font-family: var(--mono);
+	font-size: 11px;
+	outline: none;
+}
+
+.outline-filter:focus {
+	border-color: var(--accent);
+}

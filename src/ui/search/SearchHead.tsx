@@ -47,6 +47,11 @@ export function SearchHead({
 						onMove(-1);
 						return;
 					}
+					if (event.key === "Tab") {
+						event.preventDefault();
+						onMove(event.shiftKey ? -1 : 1);
+						return;
+					}
 					if (event.key === "Enter") {
 						event.preventDefault();
 						onSubmit();
