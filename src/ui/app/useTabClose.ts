@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { rememberClosed } from "@/lib/editor/closedTabs";
 import { type FileBuffer, isDirty } from "@/lib/project/buffer";
 
 /**
@@ -23,6 +24,8 @@ export function useTabClose(options: {
 			setBuffers((current) => {
 				const index = current.findIndex((buffer) => buffer.path === path);
 				if (index === -1) return current;
+				const gone = current[index];
+				if (gone !== undefined) rememberClosed(gone);
 				const remaining = current.filter((buffer) => buffer.path !== path);
 				if (activePathRef.current === path) {
 					const neighbour = remaining[index] ?? remaining[index - 1] ?? null;

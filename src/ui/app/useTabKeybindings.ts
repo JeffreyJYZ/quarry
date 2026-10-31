@@ -9,12 +9,20 @@ import { useEffect } from "react";
 export function useTabKeybindings({
 	closeActiveTab,
 	cycleTab,
+	reopenClosedTab,
 }: {
 	closeActiveTab: () => void;
 	cycleTab: (step: number) => void;
+	reopenClosedTab: () => void;
 }) {
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.metaKey && !event.ctrlKey && !event.altKey && event.shiftKey) {
+				if (event.key.toLowerCase() !== "t") return;
+				event.preventDefault();
+				reopenClosedTab();
+				return;
+			}
 			if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) {
 				if (event.key.toLowerCase() !== "w") return;
 				event.preventDefault();
@@ -28,5 +36,5 @@ export function useTabKeybindings({
 		};
 		window.addEventListener("keydown", handleKeyDown, true);
 		return () => window.removeEventListener("keydown", handleKeyDown, true);
-	}, [closeActiveTab, cycleTab]);
+	}, [closeActiveTab, cycleTab, reopenClosedTab]);
 }

@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import type { FileBuffer } from "@/lib/project/buffer";
+import { takeClosed } from "@/lib/editor/closedTabs";
 import { nextTabPath } from "@/lib/editor/tabs";
 
 /**
@@ -12,6 +13,7 @@ export function useTabKeys(workspace: {
 	buffers: FileBuffer[];
 	activePath: string | null;
 	setActivePath: (path: string | null) => void;
+	setBuffers: (updater: (current: FileBuffer[]) => FileBuffer[]) => void;
 	handleClose: (path: string) => void;
 }) {
 	const closeActiveTab = useCallback(() => {
@@ -26,5 +28,14 @@ export function useTabKeys(workspace: {
 		[workspace.buffers, workspace.activePath, workspace.setActivePath],
 	);
 
-	return { closeActiveTab, cycleTab };
+	const reopenClosedTab = useCallback(() => {
+		const buffer = takeClosed();
+		if (buffer === null) return;
+		workspace.setBuffers((current) =>
+			current.some((entry) => entry.path === buffer.path) ? current : [...current, buffer],
+		);
+		workspace.setActivePath(buffer.path);
+	}, [workspace.setBuffers, workspace.setActivePath]);
+
+	return { closeActiveTab, cycleTab, reopenClosedTab };
 }

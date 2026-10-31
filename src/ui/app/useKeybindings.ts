@@ -34,6 +34,7 @@ export type KeybindingContext = {
 	zoomEditor: (delta: number) => void;
 	closeActiveTab: () => void;
 	cycleTab: (step: number) => void;
+	reopenClosedTab: () => void;
 };
 
 function inEditor(): boolean {
@@ -58,7 +59,11 @@ function inInput(): boolean {
  */
 export function useKeybindings(context: KeybindingContext): void {
 	const { root, activePath, panelExpanded, saveActive, saveAll, formatActive } = context;
-	useTabKeybindings({ closeActiveTab: context.closeActiveTab, cycleTab: context.cycleTab });
+	useTabKeybindings({
+		closeActiveTab: context.closeActiveTab,
+		cycleTab: context.cycleTab,
+		reopenClosedTab: context.reopenClosedTab,
+	});
 
 	/** Cmd+S saves, Cmd+Alt+S saves everything, Cmd+Alt+L formats, Cmd+F finds in project. */
 	useEffect(() => {
@@ -155,10 +160,8 @@ export function useKeybindings(context: KeybindingContext): void {
 	]);
 
 	/**
-	 * Cmd+= and Cmd+- step the editor font, Cmd+0 puts it back.
-	 *
-	 * Swallowed even inside the editor: a webview's own zoom would scale the whole window and leave
-	 * the settings page claiming a font size the editor is not using.
+	 * Cmd+= and Cmd+- step the editor font, Cmd+0 puts it back. Swallowed even inside the editor: a
+	 * webview's own zoom scales the whole window and leaves the settings page claiming another size.
 	 */
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {

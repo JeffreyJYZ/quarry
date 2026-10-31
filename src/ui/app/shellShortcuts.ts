@@ -88,6 +88,7 @@ export const SHORTCUT_GROUPS = [
 		entries: [
 			{ keys: ["Cmd", "B"], action: "Toggle left rail" },
 			{ keys: ["Cmd", "W"], action: "Close the active tab" },
+			{ keys: ["Cmd", "Shift", "T"], action: "Reopen the last closed tab" },
 			{ keys: ["Ctrl", "Tab"], action: "Next tab" },
 			{ keys: ["Ctrl", "Shift", "Tab"], action: "Previous tab" },
 			{ keys: ["Cmd", "J"], action: "Toggle bottom dock" },
