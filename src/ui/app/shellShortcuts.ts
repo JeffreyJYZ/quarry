@@ -18,6 +18,7 @@ export const SHORTCUT_GROUPS = [
 			{ keys: ["Cmd", "F"], action: "Find in file" },
 			{ keys: ["Cmd", "Alt", "F"], action: "Find in project" },
 			{ keys: ["Cmd", "G"], action: "Next match" },
+			{ keys: ["Cmd", "L"], action: "Go to line" },
 			{ keys: ["Cmd", "Alt", "L"], action: "Format active file" },
 			{ keys: ["Alt", "Enter"], action: "Code actions at the caret" },
 		],

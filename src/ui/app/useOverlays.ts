@@ -30,6 +30,7 @@ export function useOverlays() {
 	const [recentCommands, setRecentCommands] = useState<string[]>([]);
 	const [gotoMode, setGotoMode] = useState<GotoMode | null>(null);
 	const [generateOpen, setGenerateOpen] = useState(false);
+	const [lineOpen, setLineOpen] = useState(false);
 
 	return {
 		cursor,
@@ -62,6 +63,8 @@ export function useOverlays() {
 		setRecentCommands,
 		gotoMode,
 		setGotoMode,
+		lineOpen,
+		setLineOpen,
 		generateOpen,
 		setGenerateOpen,
 	};

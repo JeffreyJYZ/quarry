@@ -70,6 +70,13 @@ export default function OverlaysMount({ model }: { model: ShellModel }) {
 			gotoMode={overlays.gotoMode}
 			gotoRecent={workspace.recentFiles}
 			onCloseGoto={() => overlays.setGotoMode(null)}
+			lineOpen={overlays.lineOpen && model.activePath !== null}
+			lineTotal={active === null ? 0 : active.text.split("\n").length}
+			onGoLine={(line) => {
+				if (model.activePath !== null)
+					model.workspace.handleNavigate(model.activePath, line - 1, 0);
+			}}
+			onCloseLine={() => overlays.setLineOpen(false)}
 			generateOpen={overlays.generateOpen && active !== null}
 			generateItems={
 				active === null ? [] : generateItems(active.path, active.text, cursor?.line ?? 0)

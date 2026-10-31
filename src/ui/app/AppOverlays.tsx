@@ -4,6 +4,7 @@ import type { Preferences, ProjectSettings } from "@/lib/settings/model";
 import type { GotoMode } from "@/ui/goto/gotoModel";
 import DiffView from "@/ui/git/DiffView";
 import Goto from "@/ui/goto/Goto";
+import LinePrompt from "@/ui/goto/LinePrompt";
 import Generate from "@/ui/generate/Generate";
 import NewProject from "@/ui/projects/NewProject";
 import RefsPanel from "@/ui/components/RefsPanel";
@@ -60,6 +61,10 @@ export type OverlaysProps = {
 	onResetPanels: () => void;
 
 	gotoMode: GotoMode | null;
+	lineOpen: boolean;
+	lineTotal: number;
+	onGoLine: (line: number) => void;
+	onCloseLine: () => void;
 	gotoRecent: string[];
 	onCloseGoto: () => void;
 
@@ -152,6 +157,13 @@ export default function AppOverlays(props: OverlaysProps) {
 					recent={props.gotoRecent}
 					onOpen={props.onNavigate}
 					onClose={props.onCloseGoto}
+				/>
+			) : null}
+			{props.lineOpen ? (
+				<LinePrompt
+					total={props.lineTotal}
+					onGo={props.onGoLine}
+					onClose={props.onCloseLine}
 				/>
 			) : null}
 			{props.generateOpen ? (

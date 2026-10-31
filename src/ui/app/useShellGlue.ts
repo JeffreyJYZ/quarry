@@ -12,15 +12,11 @@ import type { useSaveBuffers } from "@/ui/app/useSaveBuffers";
 import type { useSettings } from "@/ui/app/useSettings";
 import type { useWorkspace } from "@/ui/app/useWorkspace";
 import { shellCommands } from "@/ui/app/shellCommands";
+import { useShellKeymaps } from "@/ui/app/useShellKeymaps";
 import { makeLspCommandHandlers } from "@/ui/app/lspCommandHandlers";
 import { useRunDebug } from "@/ui/app/useRunDebug";
-import { useClionKeymap } from "@/ui/app/useClionKeymap";
-import { useKeybindings } from "@/ui/app/useKeybindings";
 import { useShellEffects } from "@/ui/app/useShellEffects";
-import { useSelectionKeybindings } from "@/ui/app/useSelectionKeybindings";
 import { useSessionPersistence } from "@/ui/app/useSessionPersistence";
-import { zoomPreferences } from "@/lib/editor/zoom";
-import { useTabKeys } from "@/ui/app/useTabKeys";
 import { normalizePreferences } from "@/lib/settings/model";
 
 export type GlueOptions = {
@@ -55,53 +51,6 @@ export function useShellGlue(options: GlueOptions) {
 		options;
 	const { debug, root, activePath, cursor, panelExpanded, snapshotRef, onNotice } = options;
 
-	const tabKeys = useTabKeys(workspace);
-
-	useKeybindings({
-		root,
-		activePath,
-		cursor,
-		panelExpanded,
-		activePathRef: workspace.activePathRef,
-		railCollapsed: panels.railCollapsed,
-		gitOpen: panels.gitOpen,
-		runToCursor: debug.runToCursor,
-		saveActive: save.saveActive,
-		saveAll: save.saveAll,
-		formatActive: save.formatActive,
-		setShortcutsOpen: overlays.setShortcutsOpen,
-		setRailCollapsed: panels.setRailCollapsed,
-		setPanelOpen: panels.setPanelOpen,
-		showDebugger: panels.showDebugger,
-		setGitOpen: panels.setGitOpen,
-		setCommandPaletteOpen: overlays.setCommandPaletteOpen,
-		setFileRevealToken: panels.setFileRevealToken,
-		setQuickOpenOpen: overlays.setQuickOpenOpen,
-		setSearchOpen: overlays.setSearchOpen,
-		setCallsCursor: overlays.setCallsCursor,
-		setCallsOpen: overlays.setCallsOpen,
-		setTypeHierarchyCursor: overlays.setTypeHierarchyCursor,
-		setTypeHierarchyOpen: overlays.setTypeHierarchyOpen,
-		...tabKeys,
-		zoomEditor: (delta) =>
-			settings.setPreferences((current) => zoomPreferences(current, delta)),
-	});
-
-	useSelectionKeybindings({
-		root,
-		activePath,
-		cursor,
-		activePathRef: workspace.activePathRef,
-		runToCursor: debug.runToCursor,
-		setFileRevealToken: panels.setFileRevealToken,
-		setRailCollapsed: panels.setRailCollapsed,
-		setQuickOpenOpen: overlays.setQuickOpenOpen,
-		setCallsCursor: overlays.setCallsCursor,
-		setCallsOpen: overlays.setCallsOpen,
-		setTypeHierarchyCursor: overlays.setTypeHierarchyCursor,
-		setTypeHierarchyOpen: overlays.setTypeHierarchyOpen,
-	});
-
 	const lspCommands = makeLspCommandHandlers({
 		workspace,
 		overlays: { setGotoMode: overlays.setGotoMode },
@@ -121,30 +70,23 @@ export function useShellGlue(options: GlueOptions) {
 		onNotice: (message) => onNotice?.(message),
 	});
 
-	useClionKeymap({
+	useShellKeymaps({
+		workspace,
+		overlays,
+		panels,
+		settings,
+		save,
+		runs,
+		debug,
+		editorActions,
+		lsp: lspCommands,
+		runDebug: { run: runDebug.run, debugNow: runDebug.debugNow, stop: runDebug.stop },
 		root,
 		activePath,
 		cursor,
-		running: runs.running,
-		debug,
-		run: runDebug.run,
-		debugNow: runDebug.debugNow,
-		stop: runDebug.stop,
-		toggleBreakpoint: debug.toggleBreakpoint,
-		organizeImports: () => editorActions.organizeRef.current(),
-		openRunPanel: runs.openPanel,
-		showDebugger: panels.showDebugger,
-		setGotoMode: overlays.setGotoMode,
-		setGenerateOpen: overlays.setGenerateOpen,
-		setQuickOpenOpen: overlays.setQuickOpenOpen,
-		setRailCollapsed: panels.setRailCollapsed,
-		setTerminalOpen: panels.setTerminalOpen,
-		setSettingsOpen: panels.setSettingsOpen,
-		setSettingsTab: panels.setSettingsTab,
-		gotoImplementation: lspCommands.gotoImplementation,
-		gotoTypeDefinition: lspCommands.gotoTypeDefinition,
-		quickDoc: lspCommands.quickDoc,
+		panelExpanded,
 	});
+
 	const commands = shellCommands({
 		root,
 		activePath,
