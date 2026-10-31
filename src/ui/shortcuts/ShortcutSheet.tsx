@@ -98,11 +98,18 @@ export default function ShortcutSheet({ groups, onClose }: ShortcutSheetProps) {
 						<section className="shortcut-group" key={group.title}>
 							<h2 className="shortcut-group-title">{group.title}</h2>
 							<ul className="shortcut-list">
+								{/* Two rows can name one action with different keys, so the keys are part of the id. */}
 								{group.entries.map((entry) => (
-									<li className="shortcut-row" key={entry.action}>
+									<li
+										className="shortcut-row"
+										key={`${entry.action}:${entry.keys.join("+")}`}
+									>
 										<span className="shortcut-keys">
 											{entry.keys.map((key) => (
-												<kbd className="shortcut-key" key={key}>
+												<kbd
+													className="shortcut-key"
+													key={`${key}-${entry.keys.indexOf(key)}`}
+												>
 													{key}
 												</kbd>
 											))}

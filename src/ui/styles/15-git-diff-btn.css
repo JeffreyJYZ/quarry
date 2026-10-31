@@ -114,7 +114,9 @@
 
 .shortcut-sheet {
 	width: min(520px, calc(100% - 32px));
-	max-height: calc(100% - 48px);
+	/* Against the viewport, not the grid area: a percentage of an auto-sized grid row is ignored, and
+	   the sheet then ran past the window with the lower half unreachable. */
+	max-height: calc(100vh - 48px);
 	display: flex;
 	flex-direction: column;
 	border: 1px solid var(--line);
