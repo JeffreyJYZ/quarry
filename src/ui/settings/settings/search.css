@@ -1,12 +1,16 @@
 /* The settings search field and the states it drives. */
 
 .settings-search {
+	/* A fixed box: in a flex header the input would otherwise take every spare pixel. */
+	flex: 0 0 240px;
+	width: 240px;
 	height: 22px;
-	min-width: 180px;
 	font: inherit;
 	background: transparent;
 	border: 1px solid var(--line);
 	outline: none;
+	box-shadow: none;
+	appearance: none;
 }
 
 .settings-search:focus {
