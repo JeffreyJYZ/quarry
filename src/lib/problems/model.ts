@@ -40,13 +40,31 @@ export function filterDiagnostics(
 	return diagnostics.filter((diagnostic) => allowed.has(diagnostic.severity));
 }
 
+export function matchesProblemText(
+	diagnostic: Diagnostic,
+	path: string,
+	name: string,
+	query: string,
+): boolean {
+	const needle = query.trim().toLowerCase();
+	if (needle === "") return true;
+	const haystack =
+		`${path} ${name} ${diagnostic.message} ${diagnostic.source ?? ""}`.toLowerCase();
+	return haystack.includes(needle);
+}
+
 export function filterProblemFiles(
 	files: ProblemFile[],
 	allowed: ReadonlySet<number>,
+	query: string = "",
 ): ProblemFile[] {
 	const result: ProblemFile[] = [];
 	for (const file of files) {
-		const diagnostics = filterDiagnostics(file.diagnostics, allowed);
+		const diagnostics = file.diagnostics.filter(
+			(diagnostic) =>
+				allowed.has(diagnostic.severity) &&
+				matchesProblemText(diagnostic, file.path, file.name, query),
+		);
 		if (diagnostics.length > 0) {
 			result.push({ path: file.path, name: file.name, diagnostics });
 		}
@@ -56,11 +74,16 @@ export function filterProblemFiles(
 
 export type FlatProblem = { path: string; name: string; diagnostic: Diagnostic };
 
-export function flatProblems(files: ProblemFile[], allowed: ReadonlySet<number>): FlatProblem[] {
+export function flatProblems(
+	files: ProblemFile[],
+	allowed: ReadonlySet<number>,
+	query: string = "",
+): FlatProblem[] {
 	const rows: FlatProblem[] = [];
 	for (const file of files) {
 		for (const diagnostic of file.diagnostics) {
 			if (!allowed.has(diagnostic.severity)) continue;
+			if (!matchesProblemText(diagnostic, file.path, file.name, query)) continue;
 			rows.push({ path: file.path, name: file.name, diagnostic });
 		}
 	}

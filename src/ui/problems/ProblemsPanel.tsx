@@ -3,8 +3,16 @@ import { filterProblemFiles, flatProblems, type ProblemFile } from "@/lib/proble
 import { FlatProblems } from "./FlatProblems";
 import { ProblemsHead } from "./ProblemsHead";
 import { ProblemsList } from "./ProblemsList";
-import { storeGrouping, storedGrouping } from "./parts";
+import {
+	storeAllowed,
+	storeGrouping,
+	storeTextFilter,
+	storedAllowed,
+	storedGrouping,
+	storedTextFilter,
+} from "./parts";
 import { useProblemActions } from "./useProblemActions";
+import "./problems.css";
 
 export type ProblemsPanelProps = {
 	files: ProblemFile[];
@@ -38,8 +46,9 @@ export default function ProblemsPanel({
 	const total = files.reduce((sum, file) => sum + file.diagnostics.length, 0);
 	const other = total - errors - warnings;
 
-	const [allowed, setAllowed] = useState<Set<number>>(() => new Set([1, 2, 3, 4]));
+	const [allowed, setAllowed] = useState<Set<number>>(() => storedAllowed());
 	const [groupByFile, setGroupByFile] = useState(storedGrouping);
+	const [textFilter, setTextFilter] = useState(storedTextFilter);
 
 	const chooseGrouping = (grouped: boolean) => {
 		setGroupByFile(grouped);
@@ -55,12 +64,18 @@ export default function ProblemsPanel({
 			} else {
 				for (const severity of severities) next.add(severity);
 			}
+			storeAllowed(next);
 			return next;
 		});
 	};
 
-	const filteredFiles = filterProblemFiles(files, allowed);
-	const flat = flatProblems(files, allowed);
+	const changeTextFilter = (value: string) => {
+		setTextFilter(value);
+		storeTextFilter(value);
+	};
+
+	const filteredFiles = filterProblemFiles(files, allowed, textFilter);
+	const flat = flatProblems(files, allowed, textFilter);
 	const actions = useProblemActions({ root, buffers, setBuffers });
 
 	if (!open) {
@@ -98,9 +113,11 @@ export default function ProblemsPanel({
 				other={other}
 				allowed={allowed}
 				groupByFile={groupByFile}
+				textFilter={textFilter}
 				onToggle={onToggle}
 				onToggleSeverity={toggleSeverity}
 				onChooseGrouping={chooseGrouping}
+				onChangeTextFilter={changeTextFilter}
 			/>
 			{actions.applied !== null ? (
 				<div className="problems-applied">Applied: {actions.applied}</div>
@@ -112,7 +129,10 @@ export default function ProblemsPanel({
 				{files.length === 0 ? (
 					<p className="problems-empty">No problems</p>
 				) : filteredFiles.length === 0 ? (
-					<p className="problems-empty">No problems match the filter</p>
+					<p className="problems-empty">
+						No problems match the filter
+						{textFilter.trim() !== "" ? ` "${textFilter.trim()}"` : ""}
+					</p>
 				) : groupByFile ? (
 					<ProblemsList
 						files={filteredFiles}

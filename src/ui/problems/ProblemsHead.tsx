@@ -4,18 +4,22 @@ export function ProblemsHead({
 	other,
 	allowed,
 	groupByFile,
+	textFilter,
 	onToggle,
 	onToggleSeverity,
 	onChooseGrouping,
+	onChangeTextFilter,
 }: {
 	errors: number;
 	warnings: number;
 	other: number;
 	allowed: ReadonlySet<number>;
 	groupByFile: boolean;
+	textFilter: string;
 	onToggle: () => void;
 	onToggleSeverity: (severities: number[]) => void;
 	onChooseGrouping: (grouped: boolean) => void;
+	onChangeTextFilter: (value: string) => void;
 }) {
 	return (
 		<div className="problems-head">
@@ -28,6 +32,14 @@ export function ProblemsHead({
 				<span className="problems-caret open" aria-hidden="true" />
 				<span className="problems-title">Problems</span>
 			</button>
+			<input
+				type="search"
+				className="problems-text-filter"
+				value={textFilter}
+				onChange={(event) => onChangeTextFilter(event.target.value)}
+				placeholder="filter"
+				aria-label="Filter problems"
+			/>
 			<span className="problems-counts">
 				<button
 					type="button"

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type GitCommitEntry, gitAmend, gitCommit } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
+import { readDraft, readHistory, rememberMessage, writeDraft, writeHistory } from "./commitHistory";
 
 type CommitOptions = {
 	root: string;
@@ -24,7 +25,9 @@ export function useCommit({
 	onDiff,
 	onCommitDiff,
 }: CommitOptions) {
-	const [message, setMessage] = useState("");
+	const [message, setMessageState] = useState(() => readDraft(root));
+	const [messageHistory, setMessageHistory] = useState<string[]>(() => readHistory(root));
+	const [recallIndex, setRecallIndex] = useState(-1);
 	const [amendMode, setAmendMode] = useState(false);
 	const [amendMessage, setAmendMessage] = useState("");
 	const [amendError, setAmendError] = useState<string | null>(null);
@@ -41,7 +44,12 @@ export function useCommit({
 		setCommitError(null);
 		try {
 			const hash = await gitCommit(root, trimmed);
-			setMessage("");
+			const nextHistory = rememberMessage(messageHistory, trimmed);
+			setMessageHistory(nextHistory);
+			writeHistory(root, nextHistory);
+			setMessageState("");
+			writeDraft(root, "");
+			setRecallIndex(-1);
 			setCommitted(hash);
 			if (committedTimer.current !== null) {
 				window.clearTimeout(committedTimer.current);
@@ -69,11 +77,16 @@ export function useCommit({
 		onCommitDiff,
 		loadHistory,
 		historyLimit,
+		messageHistory,
 	]);
 
 	const amend = useCallback(async () => {
 		const trimmed = amendMessage.trim();
 		if (trimmed === "" || amending) return;
+		if (stagedCount === 0) {
+			setAmendError("Nothing is staged; amend needs staged changes.");
+			return;
+		}
 		setAmending(true);
 		setAmendError(null);
 		try {
@@ -97,12 +110,42 @@ export function useCommit({
 		} finally {
 			setAmending(false);
 		}
-	}, [amendMessage, amending, root, refresh, loadHistory, historyLimit, onDiff, onCommitDiff]);
+	}, [
+		amendMessage,
+		amending,
+		root,
+		refresh,
+		loadHistory,
+		historyLimit,
+		onDiff,
+		onCommitDiff,
+		stagedCount,
+	]);
 
-	const changeMessage = useCallback((value: string) => {
-		setMessage(value);
-		setCommitError(null);
-	}, []);
+	const changeMessage = useCallback(
+		(value: string) => {
+			setMessageState(value);
+			writeDraft(root, value);
+			setRecallIndex(-1);
+			setCommitError(null);
+		},
+		[root],
+	);
+
+	const recall = useCallback(
+		(direction: "up" | "down") => {
+			if (messageHistory.length === 0) return;
+			let next = recallIndex;
+			if (direction === "up") next = Math.min(recallIndex + 1, messageHistory.length - 1);
+			else next = Math.max(recallIndex - 1, -1);
+			setRecallIndex(next);
+			const value =
+				next === -1 ? "" : (messageHistory[messageHistory.length - 1 - next] ?? "");
+			setMessageState(value);
+			writeDraft(root, value);
+		},
+		[messageHistory, recallIndex, root],
+	);
 
 	const beginAmend = useCallback(() => {
 		setAmendMode(true);
@@ -130,6 +173,9 @@ export function useCommit({
 	return {
 		message,
 		changeMessage,
+		recall,
+		recallIndex,
+		messageHistory,
 		amendMode,
 		amendMessage,
 		amendError,

@@ -1,0 +1,21 @@
+.git-amend-notice {
+	margin: 4px 0;
+	color: var(--fg-muted, #9aa);
+	font-size: 12px;
+}
+
+.git-hunk-nav {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin: 0 8px;
+}
+
+.git-hunk-counter {
+	font-size: 12px;
+	color: var(--fg-muted, #9aa);
+}
+
+.git-diff-hunk-active {
+	outline: 1px solid var(--accent, #4a9eff);
+}

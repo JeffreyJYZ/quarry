@@ -36,6 +36,7 @@ export default function ChangesPane({
 			<CommitBox
 				message={commit.message}
 				onMessage={commit.changeMessage}
+				onRecall={commit.recall}
 				commitError={commit.commitError}
 				committed={commit.committed}
 				committing={commit.committing}

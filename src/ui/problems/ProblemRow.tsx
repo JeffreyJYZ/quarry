@@ -9,11 +9,18 @@ export function ProblemRow({
 	diagnostic,
 	actions,
 	onSelect,
+	selected,
+	rowRef,
+	onKeyDown,
 }: {
 	path: string;
 	diagnostic: Diagnostic;
 	actions: ProblemActions;
 	onSelect: (path: string, line?: number, character?: number) => void;
+	selected?: boolean;
+	rowRef?: (element: HTMLButtonElement | null) => void;
+	/** Arrow-key navigation, owned by the list that knows the row order. */
+	onKeyDown?: (event: React.KeyboardEvent<HTMLButtonElement>) => void;
 }) {
 	const { line, character } = diagnostic.range.start;
 	const key = cacheKey(path, line, character);
@@ -22,10 +29,12 @@ export function ProblemRow({
 		<li className="problems-item">
 			<button
 				type="button"
-				className="problems-row"
+				ref={rowRef}
+				className={selected ? "problems-row selected" : "problems-row"}
 				title={diagnostic.message}
 				onClick={() => onSelect(path, line, character)}
 				onKeyDown={(event) => {
+					onKeyDown?.(event);
 					if (event.altKey && event.key === "Enter") {
 						event.preventDefault();
 						void actions.openMenu(path, line, character);

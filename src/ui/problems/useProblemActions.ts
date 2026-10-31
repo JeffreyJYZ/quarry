@@ -60,11 +60,11 @@ export function useProblemActions({
 				return cached;
 			}
 			if (root === null) {
-				return [];
+				throw new Error("No project root: open a project to get quick fixes");
 			}
 			const session = sessionForContext(path);
 			if (session === null) {
-				return [];
+				throw new Error("No language server for this file: quick fixes unavailable");
 			}
 			const actions = await lspCodeActions(session, path, line, character);
 			cache.current.set(key, actions);
@@ -85,6 +85,7 @@ export function useProblemActions({
 				const actions = await fetchActions(path, line, character);
 				setMenuActions(actions);
 				if (actions.length === 0) {
+					setMenuError("No code actions available for this diagnostic");
 					setMenuKey(null);
 				}
 			} catch (error) {

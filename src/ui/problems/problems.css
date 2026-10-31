@@ -1,0 +1,30 @@
+.problems-text-filter {
+	flex: 0 0 120px;
+	height: 18px;
+	padding: 0 6px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: var(--panel);
+	color: var(--text);
+	font-family: var(--mono);
+	font-size: 10px;
+	outline: none;
+}
+
+.problems-text-filter:focus {
+	border-color: var(--accent);
+}
+
+.problems-row.selected {
+	background: var(--hover);
+	outline: 1px solid var(--accent);
+	outline-offset: -1px;
+}
+
+.problems-list-root:focus-visible {
+	outline: none;
+}
+
+.problems-list-root {
+	outline: none;
+}
