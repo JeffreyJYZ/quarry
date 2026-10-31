@@ -37,6 +37,8 @@ export default function EditorColumn({ model }: { model: ShellModel }) {
 								session: model.debug.sessionId,
 								address: disasmAddressOf(model.debug),
 								frameId: activeFrame(model.debug.stopView)?.id ?? null,
+								width: panels.disasmWidth,
+								onWidthChange: panels.setDisasmWidth,
 								onClose: () => panels.setDisasmOpen(false),
 							}
 						: null

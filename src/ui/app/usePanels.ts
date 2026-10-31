@@ -17,6 +17,8 @@ export function usePanels() {
 	const [terminalOpen, setTerminalOpen] = useState(false);
 	/** The assembly split beside the editor; its address follows the selected frame. */
 	const [disasmOpen, setDisasmOpen] = useState(false);
+	/** Width of the assembly split in px; the handle between it and the editor owns the value. */
+	const [disasmWidth, setDisasmWidth] = useState(520);
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	/** Which settings tab a shortcut asked for. */
 	const [settingsTab, setSettingsTab] = useState<"user" | "project">("user");
@@ -54,6 +56,8 @@ export function usePanels() {
 		setTerminalOpen,
 		disasmOpen,
 		setDisasmOpen,
+		disasmWidth,
+		setDisasmWidth,
 		settingsOpen,
 		setSettingsOpen,
 		settingsTab,

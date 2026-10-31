@@ -2,11 +2,11 @@
 
 .editor-split {
 	display: flex;
-	flex: 0 0 46%;
+	flex: 0 0 auto;
 	flex-direction: column;
 	min-width: 0;
 	min-height: 0;
-	border-left: 1px solid var(--line);
+	border-left: 0;
 	background: var(--panel);
 }
 
@@ -56,7 +56,8 @@
 	overflow: hidden;
 }
 
-/* The split owns its width and the editor takes the rest. */
-.editor-pane > .editor-split {
-	flex: 0 0 46%;
+/* The split owns the width the handle sets; the editor takes the rest. */
+.editor-pane > .editor-split,
+.editor-pane > .splitter {
+	flex: 0 0 auto;
 }

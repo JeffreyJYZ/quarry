@@ -7,6 +7,7 @@ import LazyEditor from "@/ui/editor/LazyEditor";
 import TabStrip from "@/ui/components/TabStrip";
 import Welcome from "@/ui/components/Welcome";
 import DisasmPane from "@/ui/debug/memory/DisasmPane";
+import Splitter from "@/ui/layout/Splitter";
 import type { Location, ProjectInfo } from "@/lib/project/api";
 import type { RefObject } from "react";
 
@@ -16,6 +17,9 @@ export type EditorStageProps = {
 		session: string | null;
 		address: string | null;
 		frameId: number | null;
+		/** Split width in px, owned by the shell so the handle and the pane agree. */
+		width: number;
+		onWidthChange: (next: number) => void;
 		onClose: () => void;
 	} | null;
 	project: ProjectInfo | null;
@@ -105,27 +109,42 @@ export default function EditorStage(props: EditorStageProps) {
 					}
 				/>
 				{props.disasm === null ? null : (
-					<aside className="editor-split" aria-label="Disassembly">
-						<header className="editor-split-head">
-							<span className="editor-split-title">{active.name} (assembly)</span>
-							<button
-								type="button"
-								className="editor-split-close"
-								aria-label="Close disassembly"
-								title="Close disassembly"
-								onClick={props.disasm.onClose}
-							>
-								×
-							</button>
-						</header>
-						<div className="editor-split-body">
-							<DisasmPane
-								session={props.disasm.session}
-								address={props.disasm.address}
-								frameId={props.disasm.frameId}
-							/>
-						</div>
-					</aside>
+					<>
+						<Splitter
+							axis="x"
+							invert
+							value={props.disasm.width}
+							min={240}
+							max={1200}
+							label="Resize disassembly"
+							onChange={props.disasm.onWidthChange}
+						/>
+						<aside
+							className="editor-split"
+							aria-label="Disassembly"
+							style={{ width: `${props.disasm.width}px` }}
+						>
+							<header className="editor-split-head">
+								<span className="editor-split-title">{active.name} (assembly)</span>
+								<button
+									type="button"
+									className="editor-split-close"
+									aria-label="Close disassembly"
+									title="Close disassembly"
+									onClick={props.disasm.onClose}
+								>
+									×
+								</button>
+							</header>
+							<div className="editor-split-body">
+								<DisasmPane
+									session={props.disasm.session}
+									address={props.disasm.address}
+									frameId={props.disasm.frameId}
+								/>
+							</div>
+						</aside>
+					</>
 				)}
 			</div>
 		</>
