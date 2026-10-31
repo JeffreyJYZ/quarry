@@ -16,10 +16,8 @@ import { useInlayHints } from "@/ui/editor/useInlayHints";
 import { useOccurrenceHighlights } from "@/ui/editor/useOccurrenceHighlights";
 import { useRenamePanel } from "@/ui/editor/useRenamePanel";
 import { useSignatureHelp } from "@/ui/editor/useSignatureHelp";
-import CodeActionMenu from "@/ui/editor/surface/CodeActionMenu";
-import RenameBar from "@/ui/editor/surface/RenameBar";
-import SearchBar from "@/ui/editor/surface/SearchBar";
-import SignatureHelpView from "@/ui/editor/surface/SignatureHelp";
+import EditorSurface from "@/ui/editor/surface/EditorSurface";
+import { useEditorContextMenu } from "@/ui/editor/useEditorContextMenu";
 
 import type { EditorHandle, EditorProps } from "@/ui/editor/editorTypes";
 export type { EditorHandle, EditorProps } from "@/ui/editor/editorTypes";
@@ -76,7 +74,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		lastCursorRef,
 	} = refs;
 	const search = useEditorSearch(viewRef);
-	const { searchOpen, open: openSearch, close: closeSearch, step: stepMatch } = search;
+	const { open: openSearch, close: closeSearch, step: stepMatch } = search;
 	const searchOpenRef = search.searchOpenRef;
 	const recompute = search.recompute;
 	const openSearchRef = useRef<(replace: boolean) => void>(() => undefined);
@@ -94,7 +92,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		onNotice: onNoticeRef,
 		onApplyEdits: onApplyEditsRef,
 	});
-	const { renameOpen, setRenameOpen, renameValue, setRenameValue, submit: submitRename } = rename;
+	const { renameOpen, setRenameOpen, setRenameValue } = rename;
 	const {
 		codeActions,
 		setCodeActions,
@@ -103,7 +101,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		apply: applyCodeAction,
 	} = useCodeActionMenu({ onApplyEdits: onApplyEditsRef, rootRef, onNotice: onNoticeRef });
 	const sig = useSignatureHelp({ viewRef, rootRef, pathRef });
-	const { sigHelp, sigCoords, hideSig, runSig, scheduleSig } = sig;
+	const { hideSig, runSig, scheduleSig } = sig;
 	const inlay = useInlayHints({ viewRef, rootRef, pathRef });
 	const { hintsVisibleRef, inlayHintsRef, inlayTimerRef, inlaySeqRef, applyInlay, runInlay } =
 		inlay;
@@ -113,6 +111,12 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 
 	const runFormatText = useFormatDocument({ viewRef, rootRef, pathRef, onNotice: onNoticeRef });
 	useEditorHandle({ ref, viewRef, latestRef, runFormatText });
+	const menu = useEditorContextMenu({
+		viewRef,
+		onToggleBreakpoint,
+		onFormat: () => void runFormatText(),
+		onNotice: (message) => onNoticeRef.current?.(message),
+	});
 
 	const { deps, behaviour } = useEditorBindings({
 		refs,
@@ -176,23 +180,14 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 	});
 
 	return (
-		<div className="editor-host" ref={hostRef} style={{ position: "relative" }}>
-			{searchOpen ? <SearchBar search={search} /> : null}
-			{renameOpen ? (
-				<RenameBar
-					value={renameValue}
-					onChange={setRenameValue}
-					onSubmit={submitRename}
-					onCancel={() => setRenameOpen(false)}
-				/>
-			) : null}
-			{codeMenuOpen && codeActions.length > 0 ? (
-				<CodeActionMenu actions={codeActions} onPick={applyCodeAction} />
-			) : null}
-			{sigHelp !== null && sigCoords !== null ? (
-				<SignatureHelpView help={sigHelp} anchor={sigCoords} />
-			) : null}
-		</div>
+		<EditorSurface
+			hostRef={hostRef}
+			search={search}
+			rename={rename}
+			code={{ codeActions, codeMenuOpen, apply: applyCodeAction }}
+			sig={sig}
+			menu={menu}
+		/>
 	);
 });
 
