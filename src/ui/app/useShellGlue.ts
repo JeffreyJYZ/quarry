@@ -20,6 +20,7 @@ import { useShellEffects } from "@/ui/app/useShellEffects";
 import { useSelectionKeybindings } from "@/ui/app/useSelectionKeybindings";
 import { useSessionPersistence } from "@/ui/app/useSessionPersistence";
 import { zoomPreferences } from "@/lib/editor/zoom";
+import { useTabKeys } from "@/ui/app/useTabKeys";
 import { normalizePreferences } from "@/lib/settings/model";
 
 export type GlueOptions = {
@@ -54,6 +55,8 @@ export function useShellGlue(options: GlueOptions) {
 		options;
 	const { debug, root, activePath, cursor, panelExpanded, snapshotRef, onNotice } = options;
 
+	const tabKeys = useTabKeys(workspace);
+
 	useKeybindings({
 		root,
 		activePath,
@@ -79,6 +82,7 @@ export function useShellGlue(options: GlueOptions) {
 		setCallsOpen: overlays.setCallsOpen,
 		setTypeHierarchyCursor: overlays.setTypeHierarchyCursor,
 		setTypeHierarchyOpen: overlays.setTypeHierarchyOpen,
+		...tabKeys,
 		zoomEditor: (delta) =>
 			settings.setPreferences((current) => zoomPreferences(current, delta)),
 	});

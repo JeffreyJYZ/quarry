@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { inTerminal } from "@/ui/app/focusGuard";
+import { useTabKeybindings } from "@/ui/app/useTabKeybindings";
 
 type Cursor = { line: number; character: number } | null;
 
@@ -31,6 +32,8 @@ export type KeybindingContext = {
 	setTypeHierarchyOpen: (open: boolean) => void;
 	/** Step the editor font, or reset it when the step is zero. */
 	zoomEditor: (delta: number) => void;
+	closeActiveTab: () => void;
+	cycleTab: (step: number) => void;
 };
 
 function inEditor(): boolean {
@@ -55,6 +58,7 @@ function inInput(): boolean {
  */
 export function useKeybindings(context: KeybindingContext): void {
 	const { root, activePath, panelExpanded, saveActive, saveAll, formatActive } = context;
+	useTabKeybindings({ closeActiveTab: context.closeActiveTab, cycleTab: context.cycleTab });
 
 	/** Cmd+S saves, Cmd+Alt+S saves everything, Cmd+Alt+L formats, Cmd+F finds in project. */
 	useEffect(() => {
