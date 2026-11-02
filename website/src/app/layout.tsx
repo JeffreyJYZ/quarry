@@ -110,6 +110,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 						<a href={`${SITE.repo}/releases`} target="_blank" rel="noreferrer">
 							Releases
 						</a>
+						<span className="dot">·</span>
+						<a href="https://jyz.land">jyz.land</a>
 					</div>
 				</footer>
 				<SearchDialog />
