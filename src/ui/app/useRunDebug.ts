@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef } from "react";
 import type { LaunchConfig } from "@/lib/project/api";
 import type { BuildProfile } from "@/lib/debug/profile";
 import type { DebugController } from "@/lib/debug/session";
+import type { LaunchFailure } from "@/lib/run/failureLines";
+import type { LaunchSource } from "@/lib/run/useRunLauncher";
 import type { RunControls } from "@/ui/app/runControlsTypes";
 import { useRunLauncher } from "@/lib/run/useRunLauncher";
 import { useRunTargets } from "@/lib/run/useRunTargets";
@@ -39,9 +41,10 @@ export function useRunDebug(options: {
 	onReveal: (path: string, line: number, character: number) => void;
 	onOpenDebug: () => void;
 	onOpenRun: () => void;
-	onNotice: (message: string) => void;
+	/** A build or target that stopped a launch, with the button that asked for it. */
+	onLaunchFailure: (failure: LaunchFailure, source: LaunchSource) => void;
 }): RunDebug {
-	const { root, profile, runs, debug, onReveal, onOpenDebug, onOpenRun, onNotice } = options;
+	const { root, profile, runs, debug, onReveal, onOpenDebug, onOpenRun } = options;
 	const targets = useRunTargets(root);
 
 	const onRun = useCallback(
@@ -65,7 +68,7 @@ export function useRunDebug(options: {
 		targetId: targets.selected,
 		onRun,
 		onDebug,
-		onNotice,
+		onFailure: options.onLaunchFailure,
 	});
 
 	// A session that starts with the column closed would run invisibly.
@@ -82,13 +85,15 @@ export function useRunDebug(options: {
 	}, [sessionId, onOpenDebug]);
 
 	// A run's output is the dock's Run tab: a process that started while the dock was closed, or
-	// while another tab was up, would run where nobody is reading it.
+	// while another tab was up, would run where nobody is reading it. A failed build writes into
+	// the same console without a process, so it opens the tab too.
 	const runLive = runs.running !== null;
 	const runFormOpen = runs.panelOpen;
+	const consoleOpen = runs.consoleOpen;
 	useEffect(() => {
-		if (!runLive && !runFormOpen) return;
+		if (!runLive && !runFormOpen && !consoleOpen) return;
 		onOpenRun();
-	}, [runLive, runFormOpen, onOpenRun]);
+	}, [runLive, runFormOpen, consoleOpen, onOpenRun]);
 
 	// Every stop moves the editor to the frame that stopped, the way a debugger is expected to.
 	const top = debug.stopView?.frames[0] ?? null;

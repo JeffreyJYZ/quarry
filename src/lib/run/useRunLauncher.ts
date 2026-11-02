@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { buildProject, type LaunchConfig, resolveRunTarget } from "@/lib/project/api";
 import { buildThenResolve } from "@/lib/run/buildThenRun";
+import type { LaunchFailure } from "@/lib/run/failureLines";
 
-const NOTICE_PREFIX: Record<"build" | "resolve", string> = {
-	build: "Build failed",
-	resolve: "Launch failed",
-};
+/** Which button asked for the launch. Run has a console; Debug reports somewhere else. */
+export type LaunchSource = "run" | "debug";
 
 /**
  * The Run and Debug buttons: build, resolve, hand the configuration to the shell.
@@ -14,6 +13,10 @@ const NOTICE_PREFIX: Record<"build" | "resolve", string> = {
  * and this hook stays free of the title bar. Both buttons pass `stopOnEntry: false`: the adapter
  * stops where the user put breakpoints, and a launch that halts on entry is what makes the debug
  * button look broken on a project with no breakpoint yet.
+ *
+ * A failure goes out whole — the compiler's diagnostics included — and names which button asked,
+ * because a run's failure belongs in the console where its output would have been while a debug
+ * launch has none to print into.
  */
 export function useRunLauncher(options: {
 	root: string | null;
@@ -21,9 +24,9 @@ export function useRunLauncher(options: {
 	targetId: string | null;
 	onRun: (config: LaunchConfig) => void;
 	onDebug: (config: LaunchConfig) => void;
-	onNotice: (message: string) => void;
+	onFailure: (failure: LaunchFailure, source: LaunchSource) => void;
 }): { run: () => Promise<void>; debug: () => Promise<void>; busy: boolean } {
-	const { root, profile, targetId, onRun, onDebug, onNotice } = options;
+	const { root, profile, targetId, onRun, onDebug, onFailure } = options;
 	const [busy, setBusy] = useState(false);
 	const inFlight = useRef(false);
 	const generation = useRef(0);
@@ -37,7 +40,7 @@ export function useRunLauncher(options: {
 	}, []);
 
 	const launch = useCallback(
-		async (start: (config: LaunchConfig) => void) => {
+		async (start: (config: LaunchConfig) => void, source: LaunchSource) => {
 			if (root === null || targetId === null || inFlight.current) return;
 			inFlight.current = true;
 			const mine = generation.current;
@@ -52,18 +55,28 @@ export function useRunLauncher(options: {
 					resolve: resolveRunTarget,
 				});
 				if (generation.current !== mine) return;
-				if (result.ok) start(result.config);
-				else onNotice(`${NOTICE_PREFIX[result.stage]}: ${result.message}`);
+				if (result.ok) {
+					start(result.config);
+					return;
+				}
+				onFailure(
+					{
+						stage: result.stage,
+						message: result.message,
+						diagnostics: result.diagnostics,
+					},
+					source,
+				);
 			} finally {
 				inFlight.current = false;
 				if (generation.current === mine) setBusy(false);
 			}
 		},
-		[root, targetId, profile, onNotice],
+		[root, targetId, profile, onFailure],
 	);
 
-	const run = useCallback(() => launch(onRun), [launch, onRun]);
-	const debug = useCallback(() => launch(onDebug), [launch, onDebug]);
+	const run = useCallback(() => launch(onRun, "run"), [launch, onRun]);
+	const debug = useCallback(() => launch(onDebug, "debug"), [launch, onDebug]);
 
 	return { run, debug, busy };
 }

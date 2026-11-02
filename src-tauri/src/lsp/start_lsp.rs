@@ -144,7 +144,11 @@ pub async fn start_lsp_session(
     }));
 
     let pump_session = Arc::clone(&session);
-    let pump_root = root.clone();
+    // The event's root is the project the window has open, not the session id: the frontend drops
+    // every publish whose root is not the canonical project root, so a session id here silenced the
+    // whole diagnostics pipeline. It is also the canonical path (`/private/var` over `/var`), which
+    // is what `open_project` reported to the window in the first place.
+    let pump_root = info.root.clone();
     thread::Builder::new()
         .name("quarry-lsp-pump".to_string())
         .spawn(move || pump(app, pump_root, frames, pump_session))

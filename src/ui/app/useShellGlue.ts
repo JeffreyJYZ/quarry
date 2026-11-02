@@ -18,6 +18,7 @@ import { useRunDebug } from "@/ui/app/useRunDebug";
 import { useShellEffects } from "@/ui/app/useShellEffects";
 import { useSessionPersistence } from "@/ui/app/useSessionPersistence";
 import { normalizePreferences } from "@/lib/settings/model";
+import { launchFailureLines } from "@/lib/run/failureLines";
 
 export type GlueOptions = {
 	workspace: ReturnType<typeof useWorkspace>;
@@ -47,8 +48,18 @@ export type GlueOptions = {
  * whole shell rather than growing its own.
  */
 export function useShellGlue(options: GlueOptions) {
-	const { workspace, overlays, panels, settings, git, runs, save, build, editorActions } =
-		options;
+	const {
+		workspace,
+		overlays,
+		panels,
+		settings,
+		git,
+		runs,
+		save,
+		build,
+		editorActions,
+		diagnostics,
+	} = options;
 	const { debug, root, activePath, cursor, panelExpanded, snapshotRef, onNotice } = options;
 
 	const lspCommands = makeLspCommandHandlers({
@@ -67,7 +78,19 @@ export function useShellGlue(options: GlueOptions) {
 		onReveal: workspace.handleNavigate,
 		onOpenDebug: panels.showDebugger,
 		onOpenRun: panels.showRun,
-		onNotice: (message) => onNotice?.(message),
+		// A failed build reported findings, so they join the list the Problems tab and the editor
+		// markers already read. Where the message goes depends on the button: a run prints it where
+		// its output would have been, a debug launch has no console and keeps the notice.
+		onLaunchFailure: (failure, source) => {
+			if (failure.stage === "build") diagnostics.setBuildReport(failure.diagnostics);
+			if (source === "run") {
+				runs.appendLog(launchFailureLines(failure, root));
+				return;
+			}
+			onNotice?.(
+				`${failure.stage === "build" ? "Build" : "Launch"} failed: ${failure.message}`,
+			);
+		},
 	});
 
 	useShellKeymaps({

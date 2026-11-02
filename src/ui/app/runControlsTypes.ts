@@ -5,6 +5,8 @@ export type RunExit = { code: number | null; killed?: boolean };
 
 export type RunControls = {
 	panelOpen: boolean;
+	/** The console holds something to read even though no process is running. */
+	consoleOpen: boolean;
 	openPanel: () => void;
 	closePanel: () => void;
 	running: string | null;
@@ -30,5 +32,7 @@ export type RunControls = {
 	runConfig: (config: LaunchConfig) => Promise<void>;
 	stop: () => Promise<void>;
 	clearLog: () => void;
+	/** Write lines into the console and open it: a failed build never started a process. */
+	appendLog: (lines: string[]) => void;
 	replaceConfigurations: (next: RunConfiguration[]) => void;
 };

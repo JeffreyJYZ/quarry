@@ -77,8 +77,41 @@ describe("buildThenResolve", () => {
 			ok: false,
 			stage: "build",
 			message: "error[E0308]: mismatched types",
+			diagnostics: [],
 		});
 		expect(resolvedCalls).toBe(0);
+	});
+
+	test("a failed build keeps the compiler's own findings", async () => {
+		const diagnostic = {
+			path: "/work/demo/src/main.rs",
+			range: {
+				start: { line: 3, character: 4 },
+				end: { line: 3, character: 9 },
+			},
+			severity: 1 as const,
+			message: "cannot find value `foo` in this scope",
+			source: "rustc",
+		};
+		const result = await buildThenResolve({
+			root: "/work/demo",
+			targetId: "cargo:demo:demo",
+			profile: "debug",
+			stopOnEntry: false,
+			build: async () => ({
+				success: false,
+				summary: "could not compile",
+				diagnostics: [diagnostic],
+			}),
+			resolve: async () => resolved,
+		});
+
+		expect(result).toEqual({
+			ok: false,
+			stage: "build",
+			message: "could not compile",
+			diagnostics: [diagnostic],
+		});
 	});
 
 	test("a rejected build is a build failure, not an exception", async () => {
@@ -97,6 +130,7 @@ describe("buildThenResolve", () => {
 			ok: false,
 			stage: "build",
 			message: "cargo is not installed",
+			diagnostics: [],
 		});
 	});
 
@@ -116,6 +150,7 @@ describe("buildThenResolve", () => {
 			ok: false,
 			stage: "resolve",
 			message: "unknown run target: cargo:demo:demo",
+			diagnostics: [],
 		});
 	});
 });

@@ -29,6 +29,8 @@ export function useRunControls(options: {
 	const [env, setEnv] = useState<EnvVar[]>([]);
 	const [configurations, setConfigurations] = useState<RunConfiguration[]>(initialConfigurations);
 	const [selected, setSelected] = useState<string | null>(null);
+	/** Something wants the console read even though no process is running (a failed build). */
+	const [consoleOpen, setConsoleOpen] = useState(false);
 
 	const proc = useRunProcess(onNotice);
 	const { running, lines, exited } = proc;
@@ -83,9 +85,10 @@ export function useRunControls(options: {
 			onNotice("Working directory must be an absolute path");
 			return;
 		}
-		await proc.start(program, splitArgs(args), directory, env);
+		const started = await proc.start(program, splitArgs(args), directory, env);
+		// The reason a process never started is written into the console, so the panel comes up.
+		if (!started) setPanelOpen(true);
 	}, [root, running, program, args, cwd, env, onNotice, proc]);
-
 	/**
 	 * Run one resolved configuration: the detected target's binary, or a preset's.
 	 *
@@ -98,7 +101,13 @@ export function useRunControls(options: {
 			setProgram(config.program);
 			setArgs(joinArgs(config.args));
 			setCwd(config.cwd);
-			await proc.start(config.program, config.args, runCwd(config.cwd, root), env);
+			const started = await proc.start(
+				config.program,
+				config.args,
+				runCwd(config.cwd, root),
+				env,
+			);
+			if (!started) setPanelOpen(true);
 		},
 		[root, running, env, proc],
 	);
@@ -107,6 +116,7 @@ export function useRunControls(options: {
 		panelOpen,
 		openPanel: () => setPanelOpen(true),
 		closePanel: () => setPanelOpen(false),
+		consoleOpen,
 		running,
 		lines,
 		exited,
@@ -129,6 +139,11 @@ export function useRunControls(options: {
 		runConfig,
 		stop: proc.stop,
 		clearLog: proc.clear,
+		/** Write into the console and bring it up: a failed build never started a process. */
+		appendLog: (lines: string[]) => {
+			setConsoleOpen(true);
+			proc.append(lines);
+		},
 		replaceConfigurations: (next: RunConfiguration[]) => setConfigurations(next),
 	};
 }
