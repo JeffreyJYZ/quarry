@@ -10,15 +10,26 @@
 const CAST = /^\((?:[^()]|\([^()]*\))*\)\s*/;
 
 /**
+ * lldb-dap prints an expression as `<type> $N = <value>`, and a pointer's value is a hex address:
+ * `(int *) $0 = 0x00000001feb30180`. Only a hex assignment is taken, because a scalar's `= 2` names
+ * a number rather than a location and the pane says so instead of reading address 2.
+ */
+const HEX_ASSIGNMENT = /=\s*(0x[0-9a-fA-F]+)\s*$/;
+
+/**
  * The address a debugger value names, or `null` when it names none.
  *
- * The whole value has to be the literal: `&x` answers `0x000000016fdfe9a8` and a typed pointer the
- * same shape, with an optional cast in front. A scalar's value (`2`) is a number, not a location,
- * and a struct dump can carry a hex field that must not be mistaken for one, so anything with more
- * than the literal is `null` and the pane explains what it got.
+ * Both shapes the adapter uses are accepted — the bare literal (`0x…`, a typed pointer without an
+ * assignment) and the assigned one above. A struct dump can carry a hex field that must not be
+ * mistaken for an address, so anything that is not one of those shapes is `null` and the pane
+ * explains what it got.
  */
 export function addressFromValue(value: string): bigint | null {
 	let rest = value.trim();
+	const assigned = HEX_ASSIGNMENT.exec(rest);
+	if (assigned !== null) {
+		rest = assigned[1];
+	}
 	let stripped = true;
 	while (stripped) {
 		const next = rest.replace(CAST, "");
