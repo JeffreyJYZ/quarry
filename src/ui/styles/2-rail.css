@@ -5,6 +5,9 @@
 	flex-direction: column;
 	min-width: 0;
 	min-height: 0;
+	/* The panel never paints outside its own column: the outline under the tree is sized in pixels,
+	   and on a short window that height plus the header is more than the column can hold. */
+	overflow: hidden;
 	border-right: 1px solid var(--line);
 	background: var(--rail);
 }

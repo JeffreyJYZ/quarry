@@ -73,7 +73,11 @@ export default function Outline({ root, activePath, onNavigate, cursor }: Outlin
 
 	const visibleIndices = filterSymbolIndices(symbols, filter);
 
-	const shownSymbols = visibleIndices.map((i) => symbols[i]);
+	// The cap is on what is drawn, not only on what the "+N more" line counts: a C file with a few
+	// hundred symbols would otherwise render every row and shout about a limit it never applied.
+	const cappedIndices = filter.trim() === "" ? visibleIndices.slice(0, CAP) : visibleIndices;
+
+	const shownSymbols = cappedIndices.map((i) => symbols[i]);
 
 	useEffect(() => {
 		setKbIndex((current) =>
@@ -82,7 +86,7 @@ export default function Outline({ root, activePath, onNavigate, cursor }: Outlin
 	}, [shownSymbols.length]);
 
 	const caretIndex = caretSymbolIndex(symbols, cursor ?? null);
-	const caretVisibleIndex = caretIndex >= 0 ? visibleIndices.indexOf(caretIndex) : -1;
+	const caretVisibleIndex = caretIndex >= 0 ? cappedIndices.indexOf(caretIndex) : -1;
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: the scroll target depends on the visible set
 	useEffect(() => {
