@@ -162,28 +162,16 @@ export function TreeLevel({
 								changes={changes}
 							/>
 						) : null}
-						{entry.isDir &&
-						isOpen &&
-						showCreateInput &&
-						editing !== null &&
-						"parent" in editing &&
-						editing.parent === entry.path ? (
-							<CreateInputRow
-								depth={depth + 1}
-								parent={entry.path}
-								kind={editing.kind}
-								onCommit={onCommitEdit}
-								onCancel={onCancelEdit}
-							/>
-						) : null}
 					</li>
 				);
 			})}
+			{/* The row for this level's own new file or folder. It used to be drawn only when the
+			    level was empty, so "New file" on a folder that already had entries created nothing
+			    visible and looked like a dead menu item. */}
 			{showCreateInput &&
 			editing !== null &&
 			"parent" in editing &&
-			editing.parent === path &&
-			state.entries.length === 0 ? (
+			editing.parent === path ? (
 				<li>
 					<CreateInputRow
 						depth={depth}
