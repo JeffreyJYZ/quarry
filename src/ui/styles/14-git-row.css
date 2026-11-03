@@ -120,7 +120,7 @@
 }
 
 .git-status-added {
-	color: #7fbf7f;
+	color: var(--good);
 }
 
 .git-status-deleted {

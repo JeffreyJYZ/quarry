@@ -131,7 +131,7 @@
 	margin: 0;
 	font-family: var(--mono);
 	font-size: 11px;
-	color: var(--error, #d33);
+	color: var(--danger);
 }
 
 .git-committed {

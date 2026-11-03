@@ -18,7 +18,7 @@
 }
 
 .tab-choice:hover:not(:disabled) {
-	border-color: #363c46;
+	border-color: var(--line);
 	color: var(--text);
 }
 

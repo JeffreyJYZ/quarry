@@ -10,7 +10,7 @@
 
 .rename-input {
 	background: #2a2a2a;
-	color: #ddd;
+	color: var(--text);
 	border: 1px solid #444;
 	font-family: monospace;
 }
@@ -97,7 +97,7 @@
 .dock-seg.active {
 	color: var(--text);
 	background: var(--hover);
-	border-color: #363c46;
+	border-color: var(--line);
 }
 
 .dock-seg:disabled {

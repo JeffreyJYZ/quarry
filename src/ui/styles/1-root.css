@@ -39,7 +39,7 @@
 * {
 	box-sizing: border-box;
 	scrollbar-width: thin;
-	scrollbar-color: #4e5661 transparent;
+	scrollbar-color: var(--line) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -124,7 +124,7 @@ body {
 
 .button:hover:not(:disabled) {
 	background: var(--hover);
-	border-color: #363c46;
+	border-color: var(--line);
 }
 
 .button:disabled {

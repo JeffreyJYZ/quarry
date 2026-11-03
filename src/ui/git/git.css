@@ -1,6 +1,6 @@
 .git-amend-notice {
 	margin: 4px 0;
-	color: var(--fg-muted, #9aa);
+	color: var(--muted);
 	font-size: 12px;
 }
 
@@ -13,7 +13,7 @@
 
 .git-hunk-counter {
 	font-size: 12px;
-	color: var(--fg-muted, #9aa);
+	color: var(--muted);
 }
 
 .git-diff-hunk-active {

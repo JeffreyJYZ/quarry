@@ -1,8 +1,8 @@
 /* Hex and disassembly panes. Dark only; colours come from the shell's root variables. */
 
 .memory-pane {
-	--memory-hover: #363c46;
-	--memory-selected: #3e4451;
+	--memory-hover: var(--hover);
+	--memory-selected: var(--line);
 
 	display: flex;
 	flex-direction: column;
