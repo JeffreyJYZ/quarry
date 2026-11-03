@@ -72,6 +72,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		onCursorRef,
 		onApplyEditsRef,
 		lastCursorRef,
+		emittedRef,
 	} = refs;
 	const search = useEditorSearch(viewRef);
 	const { open: openSearch, close: closeSearch, step: stepMatch } = search;
@@ -154,7 +155,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 	});
 	useEditorMount({ refs, deps, behaviour });
 
-	useDocumentSync({ viewRef, value });
+	useDocumentSync({ viewRef, value, emittedRef });
 	useBreakpointGutter({
 		viewRef,
 		breakpointLines,
