@@ -25,7 +25,7 @@ export type DapBreakpoint = {
 	message: string | null;
 	source: string | null;
 };
-export type MemoryDump = { address: string; bytes: number[] };
+export type MemoryDump = { address: string; bytes: number[]; unreadableBytes: number };
 export type DapEvaluation = {
 	result: string;
 	typeName: string | null;

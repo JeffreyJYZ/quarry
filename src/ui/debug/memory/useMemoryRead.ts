@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { dapReadMemory } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
 import { CHUNK_BYTES, formatAddress, mergeChunk, parseAddress } from "@/lib/debug/memory/hex";
+import { readFailureReason } from "@/lib/debug/memory/readFailure";
 import type { Loaded, Request } from "@/ui/debug/memory/parts";
 
 /** Reads one page in 256-byte chunks, guarding against stale replies. */
@@ -52,7 +53,7 @@ export function useMemoryRead({
 					const origin = parseAddress(dump.address) ?? chunk;
 					const placed = mergeChunk(bytes, start, origin, dump.bytes);
 					if (dump.bytes.length < length || placed < dump.bytes.length) {
-						failures.push(`short read at ${formatAddress(chunk)}`);
+						failures.push(readFailureReason(chunk, dump.unreadableBytes));
 					}
 				} catch (failure) {
 					if (!live || ticket !== sequence.current) {
