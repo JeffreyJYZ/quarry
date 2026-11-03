@@ -10,10 +10,12 @@
 	border-top: 1px solid var(--line);
 }
 
-/* The outline's slice of the rail, sized by the splitter above it. */
+/* The outline's slice of the rail, sized by the splitter above it. It may shrink below that size on a
+   short window and scroll inside instead: a fixed height that cannot fit used to spill the list over
+   the status bar. */
 .outline-fixed {
 	display: flex;
-	flex: 0 0 auto;
+	flex: 0 1 auto;
 	flex-direction: column;
 	min-height: 0;
 	overflow: hidden;

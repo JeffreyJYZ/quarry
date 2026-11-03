@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
 	type LspStatus,
 	lspChangeDocument,
@@ -87,14 +87,19 @@ export function useLspServers(
 		clangOverrides.path ?? "",
 		clangOverrides.args ?? [],
 	);
-	const out: LspStatusMap = {};
-	if (rustEnabled) {
-		out["rust-analyzer"] = rustStatus;
-	}
-	if (clangEnabled) {
-		out.clangd = clangStatus;
-	}
-	return out;
+	// A stable map: `useDocumentSync` keys its open/close effect on it, so a fresh object each render
+	// would close and reopen the document on every render — and a close publishes empty diagnostics,
+	// which clears the very findings the reopen brings back.
+	return useMemo(() => {
+		const out: LspStatusMap = {};
+		if (rustEnabled) {
+			out["rust-analyzer"] = rustStatus;
+		}
+		if (clangEnabled) {
+			out.clangd = clangStatus;
+		}
+		return out;
+	}, [rustEnabled, clangEnabled, rustStatus, clangStatus]);
 }
 
 export type DocumentSyncOptions = {
@@ -117,19 +122,16 @@ export function useDocumentSync({
 	const latest = useRef({ text, report });
 	latest.current = { text, report };
 	const opened = useRef<{ root: string; path: string; text: string } | null>(null);
+	// One value per running server, not the map's identity: the effects below open and close the
+	// document, and a close publishes empty diagnostics for the file.
+	const kind = serverKindForPath(path);
+	const status = kind === null ? null : (statuses[kind] ?? null);
 
 	useEffect(() => {
-		if (root === null || path === null || !ready) {
-			return;
-		}
-		const kind = serverKindForPath(path);
-		if (kind === null) {
+		if (root === null || path === null || kind === null || status === null || !ready) {
 			return;
 		}
 		const sessionId = makeSessionId(kind, root);
-		if (statuses[kind] === undefined || statuses[kind] === null) {
-			return;
-		}
 		const initial = latest.current.text;
 		let live = true;
 		lspOpenDocument(sessionId, path, initial).then(
@@ -157,18 +159,13 @@ export function useDocumentSync({
 				});
 			}
 		};
-	}, [root, path, ready, statuses]);
+	}, [root, path, kind, status, ready]);
 
 	useEffect(() => {
-		if (root === null || path === null) {
+		if (root === null || path === null || kind === null || status === null) {
 			return;
 		}
-		const kind = serverKindForPath(path);
-		if (kind === null) return;
 		const sessionId = makeSessionId(kind, root);
-		if (statuses[kind] === undefined || statuses[kind] === null) {
-			return;
-		}
 		const open = opened.current;
 		if (open !== null && open.root === root && open.path === path && open.text === text) {
 			return;
@@ -191,5 +188,5 @@ export function useDocumentSync({
 			);
 		}, CHANGE_DEBOUNCE_MS);
 		return () => clearTimeout(timer);
-	}, [root, path, text, statuses]);
+	}, [root, path, text, kind, status]);
 }
