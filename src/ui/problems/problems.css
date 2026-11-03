@@ -15,10 +15,34 @@
 	border-color: var(--accent);
 }
 
+/* A list's selected row is marked the way the outline marks its own: a full-bleed tint plus a 2px
+   left bar. A box drawn around the row put its edges on the panel's borders, which read as a
+   doubled line, and the bar also says which row is current at a glance. */
 .problems-row.selected {
 	background: var(--hover);
-	outline: 1px solid var(--accent);
-	outline-offset: -1px;
+	box-shadow: inset 2px 0 0 0 var(--accent);
+}
+
+/* The transient lines above the list: what a quick fix did, and why it could not run. They wrap
+   instead of running past the panel's edge, and the error reads as an error. */
+.problems-applied,
+.problems-error {
+	flex: 0 0 auto;
+	padding: 4px 12px;
+	border-bottom: 1px solid var(--line);
+	font-family: var(--mono);
+	font-size: 10.5px;
+	line-height: 1.45;
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
+.problems-applied {
+	color: var(--muted);
+}
+
+.problems-error {
+	color: var(--danger);
 }
 
 .problems-list-root:focus-visible {

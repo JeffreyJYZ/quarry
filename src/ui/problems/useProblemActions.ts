@@ -5,6 +5,9 @@ import { sessionForContext } from "@/lib/lsp/context";
 import { applyFileEdits } from "@/lib/refactor/apply";
 import { cacheKey } from "./parts";
 
+/** How long a line above the list stays: long enough to read, short enough not to stick. */
+const TRANSIENT_MS = 5000;
+
 export type ProblemActions = {
 	menuKey: string | null;
 	menuActions: CodeAction[];
@@ -35,10 +38,12 @@ export function useProblemActions({
 	const [menuIndex, setMenuIndex] = useState(0);
 	const [applied, setApplied] = useState<string | null>(null);
 	const appliedTimer = useRef<number | null>(null);
+	const errorTimer = useRef<number | null>(null);
 
 	useEffect(
 		() => () => {
 			if (appliedTimer.current !== null) window.clearTimeout(appliedTimer.current);
+			if (errorTimer.current !== null) window.clearTimeout(errorTimer.current);
 		},
 		[],
 	);
@@ -49,7 +54,21 @@ export function useProblemActions({
 		appliedTimer.current = window.setTimeout(() => {
 			appliedTimer.current = null;
 			setApplied(null);
-		}, 4000);
+		}, TRANSIENT_MS);
+	}, []);
+
+	/**
+	 * A failure is shown the way "Applied" is: it replaces itself and goes on its own. Left as a
+	 * permanent line it became a message with no dismiss — the menu that would have closed it is
+	 * already gone by then, so nothing could clear it.
+	 */
+	const showError = useCallback((message: string) => {
+		setMenuError(message);
+		if (errorTimer.current !== null) window.clearTimeout(errorTimer.current);
+		errorTimer.current = window.setTimeout(() => {
+			errorTimer.current = null;
+			setMenuError(null);
+		}, TRANSIENT_MS);
 	}, []);
 
 	const fetchActions = useCallback(
@@ -85,22 +104,26 @@ export function useProblemActions({
 				const actions = await fetchActions(path, line, character);
 				setMenuActions(actions);
 				if (actions.length === 0) {
-					setMenuError("No code actions available for this diagnostic");
+					showError("No code actions available for this diagnostic");
 					setMenuKey(null);
 				}
 			} catch (error) {
-				setMenuError(error instanceof Error ? error.message : String(error));
+				showError(error instanceof Error ? error.message : String(error));
 				setMenuKey(null);
 			} finally {
 				setMenuLoading(false);
 			}
 		},
-		[fetchActions],
+		[fetchActions, showError],
 	);
 
 	const closeMenu = useCallback(() => {
 		setMenuKey(null);
 		setMenuActions([]);
+		if (errorTimer.current !== null) {
+			window.clearTimeout(errorTimer.current);
+			errorTimer.current = null;
+		}
 		setMenuError(null);
 		setMenuLoading(false);
 	}, []);
@@ -116,10 +139,10 @@ export function useProblemActions({
 				await applyFileEdits(action.edits, buffers, setBuffers);
 				showApplied(action.title);
 			} catch (error) {
-				setMenuError(error instanceof Error ? error.message : String(error));
+				showError(error instanceof Error ? error.message : String(error));
 			}
 		},
-		[buffers, setBuffers, closeMenu, showApplied],
+		[buffers, setBuffers, closeMenu, showApplied, showError],
 	);
 
 	return {
