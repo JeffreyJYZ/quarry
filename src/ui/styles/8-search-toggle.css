@@ -15,7 +15,7 @@
 .search-toggle.active {
 	color: var(--text);
 	background: var(--hover);
-	border-color: #363c46;
+	border-color: var(--line);
 }
 
 .search-toggle:focus-visible {

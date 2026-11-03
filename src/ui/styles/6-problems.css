@@ -98,7 +98,7 @@
 .problems-filter-option.active {
 	color: var(--text);
 	background: var(--hover);
-	border-color: #2a313a;
+	border-color: var(--line);
 }
 
 .problems-filter-option:focus-visible {
@@ -182,7 +182,7 @@
 
 .problems-counts .sep {
 	margin: 0 1px;
-	color: #4e5661;
+	color: var(--muted);
 }
 
 .problems-counts .count.error {

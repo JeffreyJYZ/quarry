@@ -68,7 +68,7 @@
 
 .editor-host .cm-search-bar button.active {
 	background: var(--accent);
-	color: #fff;
+	color: var(--bg);
 }
 
 .editor-host .cm-search-bar .search-error {
@@ -121,7 +121,7 @@
 
 .editor-host .cm-codeactions button {
 	background: transparent;
-	color: #ddd;
+	color: var(--text);
 	border: none;
 	cursor: pointer;
 	font-family: monospace;

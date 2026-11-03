@@ -50,7 +50,7 @@
 .type-hierarchy-action:hover:not(:disabled),
 .type-hierarchy-close:hover {
 	color: var(--text);
-	border-color: #2b333d;
+	border-color: var(--line);
 }
 
 .type-hierarchy-action:disabled {
@@ -106,7 +106,7 @@
 }
 
 .type-hierarchy-row.active {
-	background: #16202e;
+	background: var(--line);
 }
 
 .type-hierarchy-expand {

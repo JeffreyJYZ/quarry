@@ -34,7 +34,9 @@
 	padding: 0;
 	border: 1px solid transparent;
 	border-radius: 5px;
-	color: #f4f6f8;
+	/* The fill is a fixed saturated green or red, so the glyph is fixed too: white reads on both,
+	   whatever the theme does to --text. */
+	color: #fff;
 	cursor: pointer;
 }
 

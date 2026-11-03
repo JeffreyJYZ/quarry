@@ -66,16 +66,16 @@
 }
 
 .file-icon.rust {
-	color: #dec184;
+	color: var(--warn);
 }
 
 .file-icon.c,
 .file-icon.cpp {
-	color: #74ade8;
+	color: var(--accent);
 }
 
 .file-icon.toml {
-	color: #a1c181;
+	color: var(--good);
 }
 
 .file-icon.json {
@@ -83,7 +83,7 @@
 }
 
 .file-icon.markdown {
-	color: #74ade8;
+	color: var(--accent);
 }
 
 .file-icon.lock,
@@ -92,5 +92,5 @@
 }
 
 .file-icon.git {
-	color: #d07277;
+	color: var(--danger);
 }
