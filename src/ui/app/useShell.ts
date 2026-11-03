@@ -16,7 +16,7 @@ import { useRunControls } from "@/ui/app/useRunControls";
 import { useSaveBuffers } from "@/ui/app/useSaveBuffers";
 import { useSettings } from "@/ui/app/useSettings";
 import { useShellSnapshot } from "@/ui/app/useShellSnapshot";
-import { useAutoOpenDock } from "@/ui/app/useAutoOpenDock";
+
 import { resetProjectState } from "@/ui/app/projectReset";
 import { useShellGlue } from "@/ui/app/useShellGlue";
 import { useWorkspace } from "@/ui/app/useWorkspace";
@@ -104,7 +104,6 @@ export function useShell() {
 		runningRef: lspRunningRef,
 	});
 	const debug = useDebugSession(root, settings.buildProfile);
-
 	const diagnostics = useDiagnosticsState({ root, onError: reportNotice });
 	const build = useBuild({
 		root,
@@ -127,13 +126,13 @@ export function useShell() {
 		},
 	});
 	const tests = useTests(root);
-	const panelExpanded = panels.panelOpen ?? diagnostics.counts.errors > 0;
+	// The dock stays where the user put it: an error appearing is not a reason to move a panel they
+	// are not looking at. Only Run and the debugger open it, because those output to it.
+	const panelExpanded = panels.panelOpen ?? false;
 	const missingTools =
 		settings.report?.tools.filter((tool) => tool.source === "missing").length ?? 0;
 	/** Only a failed save earns a slot in the bar; a successful one is not news. */
 	const saveError = panels.saveStatus?.failed === true ? panels.saveStatus.text : null;
-
-	useAutoOpenDock({ errorCount: diagnostics.counts.errors, onOpen: panels.setPanelOpen });
 
 	// Everything that belonged to the previous project, cleared when a new one opens.
 	projectOpenedRef.current = () => resetProjectState({ git, panels, overlays, diagnostics });

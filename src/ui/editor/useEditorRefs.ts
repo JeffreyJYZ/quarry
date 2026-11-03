@@ -26,8 +26,20 @@ export function useEditorRefs(props: EditorProps) {
 	}>({ view: null, lines: [], unverified: new Set() });
 	const pathRef = useRef<string | null>(path);
 	pathRef.current = path;
+	/**
+	 * The text this view last produced. `useDocumentSync` compares against it so a keystroke does not
+	 * serialize the whole document to prove the view already holds it.
+	 */
+	const emittedRef = useRef<string | null>(null);
 	const latestRef = useRef({ path, value, onChange });
-	latestRef.current = { path, value, onChange };
+	latestRef.current = {
+		path,
+		value,
+		onChange: (text: string) => {
+			emittedRef.current = text;
+			onChange(text);
+		},
+	};
 	const toggleRef = useRef<((line: number) => void) | null>(props.onToggleBreakpoint ?? null);
 	toggleRef.current = props.onToggleBreakpoint ?? null;
 	const rootRef = useRef<string | null>(props.root ?? null);
@@ -70,6 +82,7 @@ export function useEditorRefs(props: EditorProps) {
 		onApplyEditsRef,
 		lastCursorRef,
 		revealTokenRef,
+		emittedRef,
 	};
 }
 
