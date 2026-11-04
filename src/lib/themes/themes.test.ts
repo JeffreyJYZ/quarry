@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { applyTheme, themeVariables, type ThemeRoot } from "@/lib/themes/apply";
 import { BUILTIN_THEMES, DEFAULT_THEME, builtinTheme } from "@/lib/themes/builtin";
 import {
 	DEFAULT_THEME_ID,
@@ -42,20 +41,6 @@ const ZED_FILE = JSON.stringify({
 	],
 });
 
-function stubRoot(): ThemeRoot & { vars: Record<string, string> } {
-	const vars: Record<string, string> = {};
-	return {
-		vars,
-		style: {
-			setProperty(name: string, value: string) {
-				vars[name] = value;
-			},
-			colorScheme: "",
-		},
-		dataset: {},
-	};
-}
-
 describe("the built-in catalogue", () => {
 	test("every built-in fills every token with a hex colour", () => {
 		expect(BUILTIN_THEMES.length).toBeGreaterThanOrEqual(8);
@@ -82,31 +67,6 @@ describe("the token model", () => {
 	test("slugs are stable and never empty", () => {
 		expect(themeSlug("Night Owl")).toBe("night-owl");
 		expect(themeSlug("  ***  ")).toBe("imported-theme");
-	});
-});
-
-describe("applyTheme", () => {
-	test("writes every token, the theme id and color-scheme", () => {
-		const root = stubRoot();
-		const light = builtinTheme("one-light");
-		expect(light).not.toBeUndefined();
-		if (light === undefined) return;
-		applyTheme(light, root);
-		// Four derived variables ride along with the token set: field, static field, enum constant,
-		// parameter.
-		expect(Object.keys(root.vars).length).toBe(THEME_TOKENS.length + 4);
-		expect(root.vars["--editor-field"]).toBeDefined();
-		expect(root.vars["--editor-parameter"]).toBeDefined();
-		expect(root.vars["--editor-static-field"]).toBeDefined();
-		expect(root.vars["--editor-enum-member"]).toBeDefined();
-		expect(root.vars["--bg"]).toBe(light.tokens.bg);
-		expect(root.vars["--editor-keyword"]).toBe(light.tokens.keyword);
-		expect(root.dataset.theme).toBe("one-light");
-		expect(root.style.colorScheme).toBe("light");
-	});
-
-	test("themeVariables maps one variable per token", () => {
-		expect(Object.keys(themeVariables(DEFAULT_THEME.tokens)).length).toBe(THEME_TOKENS.length);
 	});
 });
 

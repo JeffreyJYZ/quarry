@@ -29,13 +29,16 @@ export function applyTheme(theme: Theme, target: ThemeRoot = document.documentEl
 	for (const token of THEME_TOKENS) {
 		target.style.setProperty(themeVar(token), theme.tokens[token]);
 	}
-	// Kinds no theme names: a field, a static field, an enum constant and a parameter must never look
-	// like a local variable, which is the one thing CLion never does.
+	// Kinds no theme names: a field, a static field, an enum constant, a constant, a global and a
+	// parameter must never look like a local variable, which is the one thing CLion never does.
 	const derived = derivedEditorColours(theme.tokens);
 	target.style.setProperty("--editor-field", derived.field);
 	target.style.setProperty("--editor-parameter", derived.parameter);
 	target.style.setProperty("--editor-static-field", derived.staticField);
 	target.style.setProperty("--editor-enum-member", derived.enumMember);
+	target.style.setProperty("--editor-constant", derived.constant);
+	target.style.setProperty("--editor-global", derived.global);
+	target.style.setProperty("--editor-label", derived.label);
 	target.dataset.theme = theme.id;
 	target.style.colorScheme = theme.appearance;
 }

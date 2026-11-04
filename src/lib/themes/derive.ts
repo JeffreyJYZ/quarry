@@ -73,27 +73,37 @@ export function rotateHue(hex: string, degrees: number, minSaturation = 0.35): s
 }
 
 /**
- * The two token kinds the app highlights but no theme names.
+ * Editor colours no theme names, derived from the ones it does.
  *
- * The base is the theme's `type` colour, which is a real hue in every shipped theme; the two
- * rotations are far apart from each other and from the base, so field, parameter and type are three
- * distinguishable colours whatever the palette.
+ * The base is the theme's `type` colour, which is a real hue in every shipped theme. The rotations
+ * are spread round the wheel, so every category stays a distinguishable colour whatever the palette,
+ * and none of them can collapse into the plain identifier colour.
+ *
+ * The categories are CLion's: an instance field, a static field, an enum constant, a constant, a
+ * global variable, a parameter and a label are seven different things in its C/C++ colour settings,
+ * and clangd reports enough to tell all seven apart.
  */
 export function derivedEditorColours(tokens: { type: string; identifier: string }): {
 	field: string;
 	parameter: string;
 	staticField: string;
 	enumMember: string;
+	constant: string;
+	global: string;
+	label: string;
 } {
 	const base = hexToHsl(tokens.type);
 	const baseHsl = base !== null && base.s > 0.12 ? tokens.type : tokens.identifier;
+	// One wheel, forty degrees apart, so no two categories can land on each other in any palette —
+	// deriving one of them from a second base colour put a static field 15° from a declaration in
+	// One Dark and an enum constant 1° from it in Nord.
 	return {
-		field: rotateHue(baseHsl, 118),
-		parameter: rotateHue(baseHsl, -96),
-		// CLion splits a member three ways — instance field, static field, enum constant — and clangd
-		// says which through the token's kind and its `static` modifier. Each gets its own hue rather
-		// than a shade, so they are told apart at a glance, not by comparing brightness.
-		staticField: rotateHue(baseHsl, 178),
 		enumMember: rotateHue(baseHsl, 40),
+		global: rotateHue(baseHsl, 80),
+		field: rotateHue(baseHsl, 120),
+		label: rotateHue(baseHsl, 160),
+		staticField: rotateHue(baseHsl, 200),
+		constant: rotateHue(baseHsl, 240),
+		parameter: rotateHue(baseHsl, 280),
 	};
 }
