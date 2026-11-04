@@ -132,3 +132,23 @@
 .tree-badge.deleted {
 	color: var(--danger);
 }
+
+/* Renaming a row and naming a new one: the same field the app uses elsewhere, a full row tall. */
+.tree-input {
+	width: 100%;
+	min-width: 0;
+	height: 22px;
+	padding: 0 6px;
+	border: 1px solid var(--accent);
+	border-radius: 3px;
+	background: var(--bg);
+	color: var(--text);
+	font-family: var(--mono);
+	font-size: 11px;
+	outline: none;
+}
+
+.tree-input::placeholder {
+	color: var(--muted);
+	opacity: 0.7;
+}

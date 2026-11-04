@@ -90,6 +90,22 @@ export function TreeLevel({
 
 	return (
 		<ul className="tree">
+			{/* The new-file row sits at the top of the folder it is being made in, where CLion and VS
+			    Code put it; at the bottom it landed screens away from the folder that was right-clicked. */}
+			{showCreateInput &&
+			editing !== null &&
+			"parent" in editing &&
+			editing.parent === path ? (
+				<li>
+					<CreateInputRow
+						depth={depth}
+						parent={path}
+						kind={editing.kind}
+						onCommit={onCommitEdit}
+						onCancel={onCancelEdit}
+					/>
+				</li>
+			) : null}
 			{state.entries.map((entry) => {
 				const isOpen = entry.isDir && expanded.has(entry.path);
 				const status = changes[entry.path];
@@ -165,23 +181,6 @@ export function TreeLevel({
 					</li>
 				);
 			})}
-			{/* The row for this level's own new file or folder. It used to be drawn only when the
-			    level was empty, so "New file" on a folder that already had entries created nothing
-			    visible and looked like a dead menu item. */}
-			{showCreateInput &&
-			editing !== null &&
-			"parent" in editing &&
-			editing.parent === path ? (
-				<li>
-					<CreateInputRow
-						depth={depth}
-						parent={path}
-						kind={editing.kind}
-						onCommit={onCommitEdit}
-						onCancel={onCancelEdit}
-					/>
-				</li>
-			) : null}
 		</ul>
 	);
 }

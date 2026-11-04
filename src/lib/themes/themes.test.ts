@@ -92,7 +92,10 @@ describe("applyTheme", () => {
 		expect(light).not.toBeUndefined();
 		if (light === undefined) return;
 		applyTheme(light, root);
-		expect(Object.keys(root.vars).length).toBe(THEME_TOKENS.length);
+		// Two derived variables ride along with the token set: field and parameter.
+		expect(Object.keys(root.vars).length).toBe(THEME_TOKENS.length + 2);
+		expect(root.vars["--editor-field"]).toBeDefined();
+		expect(root.vars["--editor-parameter"]).toBeDefined();
 		expect(root.vars["--bg"]).toBe(light.tokens.bg);
 		expect(root.vars["--editor-keyword"]).toBe(light.tokens.keyword);
 		expect(root.dataset.theme).toBe("one-light");
