@@ -15,13 +15,22 @@ describe("derive", () => {
 		expect(delta).toBeGreaterThan(60);
 	});
 
-	test("field, parameter and type are three different colours", () => {
-		const colours = derivedEditorColours({ type: "#e5c07b", identifier: "#c8ccd4" });
-		const hues = [colours.field, colours.parameter, "#e5c07b"].map((hex) => hexToHsl(hex)!.h);
-		for (let i = 0; i < hues.length; i += 1) {
-			for (let j = i + 1; j < hues.length; j += 1) {
-				const delta = Math.abs(((hues[i] - hues[j] + 540) % 360) - 180);
-				expect(delta).toBeGreaterThan(60);
+	test("every derived category is its own hue, in every palette", () => {
+		const palettes = [
+			{ type: "#e5c07b", identifier: "#c8ccd4" },
+			{ type: "#8fbcbb", identifier: "#d8dee9" },
+			{ type: "#a626a4", identifier: "#383a42" },
+		];
+		for (const palette of palettes) {
+			const colours = derivedEditorColours(palette);
+			const entries = Object.entries({ ...colours, type: palette.type });
+			for (let i = 0; i < entries.length; i += 1) {
+				for (let j = i + 1; j < entries.length; j += 1) {
+					const a = hexToHsl(entries[i][1])!.h;
+					const b = hexToHsl(entries[j][1])!.h;
+					const delta = Math.abs(((a - b + 540) % 360) - 180);
+					expect(delta).toBeGreaterThan(30);
+				}
 			}
 		}
 	});

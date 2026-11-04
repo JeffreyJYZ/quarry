@@ -32,3 +32,19 @@
 .cm-sem-enum {
 	color: var(--editor-enum-member, #d19a66);
 }
+
+.cm-sem-constant {
+	color: var(--editor-constant, #e5c07b);
+}
+
+.cm-sem-global {
+	color: var(--editor-global, #98c379);
+}
+
+.cm-sem-label {
+	color: var(--editor-label, #c678dd);
+}
+
+.cm-sem-function-decl {
+	color: var(--editor-function);
+}

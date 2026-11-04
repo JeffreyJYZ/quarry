@@ -17,13 +17,23 @@ const REFRESH_MS = 400;
  *
  * Keywords, comments, strings and numbers are the syntax highlighter's job; a semantic token only
  * earns a class where the grammar cannot know: a name is a function, a type, a macro, a parameter or
- * a field. Colouring everything here would make the file louder, not clearer.
+ * one of the several kinds of variable. Colouring everything here would make the file louder, not
+ * clearer.
+ *
+ * The categories are CLion's, and the modifiers clangd sends are enough to fill them: `classScope`
+ * is a member, `static` is the storage a member was declared with, `readonly` is a constant, and
+ * `functionScope`/`fileScope`/`globalScope` are where a variable lives. Measured against clangd's
+ * own legend and tokens, not assumed.
  */
 export function semanticClass(token: SemanticToken): string | null {
+	const modifiers = token.modifiers;
+	// clangd answers `auto` with an `enum` token carrying `deduced`. Painting a placeholder keyword
+	// like an enum constant would be worse than leaving it to the grammar.
+	if (token.kind === "enum" && modifiers.includes("deduced")) return null;
 	switch (token.kind) {
 		case "function":
 		case "method":
-			return "cm-sem-function";
+			return modifiers.includes("declaration") ? "cm-sem-function-decl" : "cm-sem-function";
 		case "type":
 		case "class":
 		case "struct":
@@ -38,11 +48,22 @@ export function semanticClass(token: SemanticToken): string | null {
 			return "cm-sem-macro";
 		case "parameter":
 			return "cm-sem-parameter";
+		case "label":
+			return "cm-sem-label";
 		case "property":
-			// A static member is a different thing in CLion, and clangd marks it as such.
-			return token.modifiers.includes("static") ? "cm-sem-static-field" : "cm-sem-property";
+			// An instance member; clangd reports a static member as a variable, below.
+			return "cm-sem-property";
 		case "variable":
-			// A parameter and a field are told apart above; a local keeps the base identifier colour.
+			// A constant is a variable that cannot be written to, at any scope; a static member is a
+			// variable at class scope; a global or file-scope variable is neither. A local keeps the
+			// base identifier colour, which is what a grammar would have drawn anyway.
+			if (modifiers.includes("readonly")) return "cm-sem-constant";
+			if (modifiers.includes("static") && modifiers.includes("classScope")) {
+				return "cm-sem-static-field";
+			}
+			if (modifiers.includes("globalScope") || modifiers.includes("fileScope")) {
+				return "cm-sem-global";
+			}
 			return null;
 		default:
 			return null;
