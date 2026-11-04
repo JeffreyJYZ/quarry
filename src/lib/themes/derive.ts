@@ -82,11 +82,18 @@ export function rotateHue(hex: string, degrees: number, minSaturation = 0.35): s
 export function derivedEditorColours(tokens: { type: string; identifier: string }): {
 	field: string;
 	parameter: string;
+	staticField: string;
+	enumMember: string;
 } {
 	const base = hexToHsl(tokens.type);
 	const baseHsl = base !== null && base.s > 0.12 ? tokens.type : tokens.identifier;
 	return {
 		field: rotateHue(baseHsl, 118),
 		parameter: rotateHue(baseHsl, -96),
+		// CLion splits a member three ways — instance field, static field, enum constant — and clangd
+		// says which through the token's kind and its `static` modifier. Each gets its own hue rather
+		// than a shade, so they are told apart at a glance, not by comparing brightness.
+		staticField: rotateHue(baseHsl, 178),
+		enumMember: rotateHue(baseHsl, 40),
 	};
 }
