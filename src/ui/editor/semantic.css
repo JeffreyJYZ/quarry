@@ -1,50 +1,67 @@
 /*
  * Semantic tokens: what the grammar cannot tell apart, the language server can.
  *
- * A parameter and a field are both names to a grammar, so their colours are derived from the
- * identifier colour rather than given their own hex — a theme switch recolours them with everything
- * else, and no theme needs a new token.
+ * The `span` twin of each selector is load-bearing. CodeMirror nests the grammar's own highlight
+ * span *inside* the decoration's, and injects that style at runtime — after this stylesheet and at
+ * the same specificity — so a plain `.cm-sem-function` lost the cascade: the wrapper was coloured
+ * and the text painted inside it was not. That is why an out-of-line `A::DefFnOut` rendered as plain
+ * text while an in-class declaration looked right. Descending one class deep, behind the content
+ * prefix that outranks the injected rule, puts the colour back on the element that is painted.
+ *
+ * Every colour comes from a theme variable: a theme switch recolours all of them, and no theme needs
+ * a new token.
  */
-.cm-sem-function {
+.cm-content .cm-sem-function,
+.cm-content .cm-sem-function span {
 	color: var(--editor-function);
 }
 
-.cm-sem-type {
+.cm-content .cm-sem-function-decl,
+.cm-content .cm-sem-function-decl span {
+	color: var(--editor-function);
+}
+
+.cm-content .cm-sem-type,
+.cm-content .cm-sem-type span {
 	color: var(--editor-type);
 }
 
-.cm-sem-macro {
+.cm-content .cm-sem-macro,
+.cm-content .cm-sem-macro span {
 	color: var(--editor-macro);
 }
 
-.cm-sem-parameter {
+.cm-content .cm-sem-parameter,
+.cm-content .cm-sem-parameter span {
 	color: var(--editor-parameter, #82aaff);
 }
 
-.cm-sem-property {
+.cm-content .cm-sem-property,
+.cm-content .cm-sem-property span {
 	color: var(--editor-field, #c792ea);
 }
 
-.cm-sem-static-field {
+.cm-content .cm-sem-static-field,
+.cm-content .cm-sem-static-field span {
 	color: var(--editor-static-field, #56b6c2);
 }
 
-.cm-sem-enum {
+.cm-content .cm-sem-enum,
+.cm-content .cm-sem-enum span {
 	color: var(--editor-enum-member, #d19a66);
 }
 
-.cm-sem-constant {
+.cm-content .cm-sem-constant,
+.cm-content .cm-sem-constant span {
 	color: var(--editor-constant, #e5c07b);
 }
 
-.cm-sem-global {
+.cm-content .cm-sem-global,
+.cm-content .cm-sem-global span {
 	color: var(--editor-global, #98c379);
 }
 
-.cm-sem-label {
+.cm-content .cm-sem-label,
+.cm-content .cm-sem-label span {
 	color: var(--editor-label, #c678dd);
-}
-
-.cm-sem-function-decl {
-	color: var(--editor-function);
 }
