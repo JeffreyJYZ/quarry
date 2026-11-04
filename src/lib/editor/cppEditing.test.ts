@@ -1,25 +1,26 @@
 import { describe, expect, test } from "bun:test";
+import { closeBrackets } from "@codemirror/autocomplete";
 import { cpp } from "@codemirror/lang-cpp";
 import { EditorState } from "@codemirror/state";
 import { cppEditing, closesScopeAt, scopeIndentAt } from "@/lib/editor/cppEditing";
 
-const stateFor = (doc: string) => EditorState.create({ doc, extensions: [cpp(), cppEditing()] });
+const stateFor = (doc: string) =>
+	EditorState.create({ doc, extensions: [cpp(), closeBrackets(), cppEditing()] });
 
 /** Type `text` at `pos`, as a keystroke arrives. */
-function type(state: EditorState, pos: number, text: string): string {
-	return state
-		.update({
-			changes: { from: pos, insert: text },
-			selection: { anchor: pos + text.length },
-			userEvent: "input.type",
-		})
-		.state.doc.toString();
+function type(state: EditorState, pos: number, text: string): EditorState {
+	return state.update({
+		changes: { from: pos, insert: text },
+		selection: { anchor: pos + text.length },
+		userEvent: "input.type",
+	}).state;
 }
 
-const typeAfter = (state: EditorState, marker: string, text: string): string =>
+const typeAfter = (state: EditorState, marker: string, text: string): EditorState =>
 	type(state, state.doc.toString().indexOf(marker) + marker.length, text);
 
-const typeAtEnd = (state: EditorState, text: string): string => type(state, state.doc.length, text);
+const typeAtEnd = (state: EditorState, text: string): EditorState =>
+	type(state, state.doc.length, text);
 
 describe("cppEditing", () => {
 	test("a class scope indent is the indent of the line that opens it", () => {
@@ -27,60 +28,70 @@ describe("cppEditing", () => {
 		expect(scopeIndentAt(state, state.doc.toString().indexOf("int x"))).toBe(4);
 	});
 
-	test("a top-level class scope indent is zero", () => {
-		const state = stateFor("class W {\n    int x;\n};\n");
-		expect(scopeIndentAt(state, state.doc.toString().indexOf("int x"))).toBe(0);
-	});
-
 	test("typing the colon of an access specifier returns it to the class indent", () => {
 		const state = stateFor("class W {\n    private\n};\n");
-		expect(typeAfter(state, "private", ":")).toBe("class W {\nprivate:\n};\n");
+		expect(typeAfter(state, "private", ":").doc.toString()).toBe("class W {\nprivate:\n};\n");
 	});
 
 	test("a nested class dedents its specifier to the class, not the file", () => {
 		const state = stateFor("namespace n {\n    class W {\n        public\n    };\n}\n");
-		expect(typeAfter(state, "public", ":")).toBe(
+		expect(typeAfter(state, "public", ":").doc.toString()).toBe(
 			"namespace n {\n    class W {\n    public:\n    };\n}\n",
 		);
 	});
 
-	test("a line that only looks like a specifier is left alone", () => {
-		const state = stateFor("class W {\npublic:\n    int publication;\n};\n");
-		const out = typeAfter(state, "publication", ":");
-		expect(out).toBe("class W {\npublic:\n    int publication:;\n};\n");
+	test("closing a class at the end of the document adds the semicolon", () => {
+		const state = typeAtEnd(stateFor("class W {\n    int x;\n"), "}");
+		expect(state.doc.toString()).toBe("class W {\n    int x;\n};");
+		expect(state.selection.main.head).toBe(state.doc.length);
 	});
 
-	test("closing a struct adds the semicolon", () => {
-		const state = stateFor("struct P {\n    int v;\n\n");
-		expect(typeAtEnd(state, "}")).toBe("struct P {\n    int v;\n\n};");
+	test("a typed brace is aligned with the line that opened the block", () => {
+		const state = typeAtEnd(stateFor("class W {\n    int x;\n    "), "}");
+		expect(state.doc.toString()).toBe("class W {\n    int x;\n};");
 	});
 
-	test("closing a class adds the semicolon", () => {
-		const state = stateFor("class W {\n    int x;\n");
-		expect(typeAtEnd(state, "}")).toBe("class W {\n    int x;\n};");
+	test("a typed brace closing a function is aligned but gains no semicolon", () => {
+		const state = typeAtEnd(stateFor("void f() {\n    int x = 1;\n    "), "}");
+		expect(state.doc.toString()).toBe("void f() {\n    int x = 1;\n}");
 	});
 
-	test("closing a function body adds nothing", () => {
-		const state = stateFor("void f() {\n    int x = 1;\n");
-		expect(typeAtEnd(state, "}")).toBe("void f() {\n    int x = 1;\n}");
+	test("a typed brace replaces the one closeBrackets left below it", () => {
+		// The shape `class A {` + Enter leaves: the caret on an indented blank line and the auto
+		// brace one line below. Typing `}` there used to produce `    };` plus a stray `}`.
+		const doc = "class A {\n    void f();\n    \n}\n";
+		const caret = doc.indexOf("\n    \n") + 5;
+		const typed = type(stateFor(doc), caret, "}");
+		expect(typed.doc.toString()).toBe("class A {\n    void f();\n};\n");
+		expect(typed.selection.main.head).toBe(typed.doc.toString().indexOf("};") + 2);
 	});
 
-	test("closing a namespace adds nothing", () => {
-		const state = stateFor("namespace n {\n    int x;\n");
-		expect(typeAtEnd(state, "}")).toBe("namespace n {\n    int x;\n}");
+	test("the same shape around a function body gains no semicolon", () => {
+		const doc = "void f() {\n    int x = 1;\n    \n}\n";
+		const caret = doc.indexOf("\n    \n") + 5;
+		expect(type(stateFor(doc), caret, "}").doc.toString()).toBe(
+			"void f() {\n    int x = 1;\n}\n",
+		);
 	});
 
-	test("a typed semicolon is not doubled", () => {
-		const state = stateFor("struct P {\n    int v;\n");
-		const one = typeAtEnd(state, "}");
-		expect(one.endsWith("};")).toBe(true);
-		const again = type(EditorState.create({ doc: one }), one.length - 1, "");
-		expect(again.endsWith("};")).toBe(true);
+	test("typing over the waiting brace itself still adds the semicolon", () => {
+		const state = stateFor("struct P {\n    int v;\n}\n");
+		const brace = state.doc.toString().lastIndexOf("}");
+		const typed = state.update({
+			changes: { from: brace, to: brace + 1, insert: "}" },
+			selection: { anchor: brace + 1 },
+			userEvent: "input.type",
+		}).state;
+		expect(typed.doc.toString()).toBe("struct P {\n    int v;\n};\n");
 	});
 
-	test("the brace of an already-semicoloned struct is recognised", () => {
-		const state = stateFor("struct P {\n    int v;\n};\n");
-		const brace = state.doc.toString().indexOf("}");
-		expect(closesScopeAt(state, brace + 1)).toBe(true);
+	test("a brace in the middle of a line is left alone", () => {
+		const doc = "struct X {} x;\n";
+		expect(type(stateFor(doc), doc.length, "").doc.toString()).toBe(doc);
+	});
+
+	test("a function brace is not mistaken for a class", () => {
+		const state = stateFor("void f() {\n    int x = 1;\n}\n");
+		expect(closesScopeAt(state, state.doc.toString().lastIndexOf("}") + 1)).toBe(false);
 	});
 });

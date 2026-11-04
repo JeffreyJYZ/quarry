@@ -4,10 +4,11 @@ import { EditorState, type Extension, type Transaction } from "@codemirror/state
 /**
  * The C/C++ typing rules a grammar does not give you.
  *
- * Two things CLion does that the Lezer grammar has no opinion about: an access specifier belongs at
- * the class's own indent rather than one level in with the members, and a class, struct, union or
- * enum ends with a semicolon, which is easy to forget because every other brace pair in the language
- * does not.
+ * CLion puts an access specifier at the class's own indent, aligns a closing brace with the line that
+ * opened it, and ends a class, struct, union or enum with a semicolon. `closeBrackets` also leaves a
+ * `}` waiting one line below the caret, so a typed `}` on the indented blank line would duplicate it
+ * rather than close the class; here the typed brace and the whitespace before the waiting one cancel
+ * out, leaving a single brace at the right indent.
  */
 
 /** Access specifiers, including the Qt spellings that mean the same thing. */
@@ -20,82 +21,146 @@ const SCOPE_SPECIFIERS = new Set([
 	"EnumSpecifier",
 ]);
 
+/** A `}` one line below the caret, with nothing but whitespace in between. */
+const WAITING_BRACE = /^[ \t]*\r?\n?[ \t]*\}/;
+
+type Node = ReturnType<ReturnType<typeof syntaxTree>["resolveInner"]>;
+
+function walk(pos: number, state: EditorState, side: -1 | 1): Node {
+	return syntaxTree(state).resolveInner(Math.min(pos, state.doc.length), side);
+}
+
+const lineIndent = (state: EditorState, pos: number): number => {
+	const line = state.doc.lineAt(pos);
+	return line.text.length - line.text.trimStart().length;
+};
+
 /** The indentation of the class-like scope a position sits in, or null when it sits in none. */
 export function scopeIndentAt(state: EditorState, pos: number): number | null {
-	let node: ReturnType<typeof syntaxTree>["topNode"] | null = syntaxTree(state).resolveInner(
-		Math.min(pos, state.doc.length),
-		1,
-	);
-	for (; node !== null; node = node.parent) {
-		if (!SCOPE_SPECIFIERS.has(node.name)) continue;
-		const line = state.doc.lineAt(node.from);
-		return line.text.length - line.text.trimStart().length;
+	for (let node: Node | null = walk(pos, state, 1); node !== null; node = node.parent) {
+		if (SCOPE_SPECIFIERS.has(node.name)) return lineIndent(state, node.from);
 	}
 	return null;
 }
 
 /** Whether a `}` at `pos` (just past the brace) is the one that closes a class-like scope. */
 export function closesScopeAt(state: EditorState, pos: number): boolean {
-	let node: ReturnType<typeof syntaxTree>["topNode"] | null = syntaxTree(state).resolveInner(
-		pos - 1,
-		-1,
-	);
-	for (; node !== null; node = node.parent) {
-		if (!SCOPE_SPECIFIERS.has(node.name)) continue;
-		return node.to === pos;
+	for (let node: Node | null = walk(pos - 1, state, -1); node !== null; node = node.parent) {
+		if (SCOPE_SPECIFIERS.has(node.name)) return node.to === pos;
 	}
 	return false;
 }
 
+/** The indent of the line holding the `{` that a `}` just past `brace` closes. */
+export function openerIndentAt(state: EditorState, brace: number): number | null {
+	for (let node: Node | null = walk(brace - 1, state, -1); node !== null; node = node.parent) {
+		if (state.doc.sliceString(node.from, node.from + 1) === "{")
+			return lineIndent(state, node.from);
+	}
+	return null;
+}
+
 type Edit = { from: number; to?: number; insert: string };
 
+/** The edits a typing transaction implies, and where the caret should end up. */
+export type CppPlan = { edits: Edit[]; selection?: number };
+
+function planForBrace(state: EditorState, typedAt: number): CppPlan | null {
+	const typed = typedAt - 1;
+	if (state.doc.sliceString(typed, typedAt) !== "}") return null;
+	const line = state.doc.lineAt(typedAt);
+	const beforeCaret = state.doc.sliceString(line.from, typed);
+	const waiting = WAITING_BRACE.exec(state.doc.sliceString(typedAt));
+
+	// The closing brace is already below: the typed brace and the gap disappear, and the waiting one
+	// takes the class's indent. The typed brace is the one the parser paired, so both the indent and
+	// the semicolon are read from it — the waiting brace sits outside the recovered tree.
+	if (waiting !== null && beforeCaret.trim() === "") {
+		const brace = typedAt + waiting[0].length - 1;
+		const indent = openerIndentAt(state, typedAt) ?? lineIndent(state, line.from);
+		const semicolon = closesScopeAt(state, typedAt) ? ";" : "";
+		return {
+			edits: [
+				{
+					from: line.from,
+					to: brace + 1,
+					insert: `${" ".repeat(indent)}${semicolon === "" ? "}" : "};"}`,
+				},
+			],
+			selection: line.from + indent + 1 + semicolon.length,
+		};
+	}
+
+	// Otherwise align the brace with the line that opened the block, as CLion does. A brace typed in
+	// the middle of a line is part of an expression (`struct X {} x;`) and is left alone.
+	const indent = openerIndentAt(state, typedAt);
+	const rest = state.doc.sliceString(typedAt, line.to);
+	const edits: Edit[] = [];
+	if (beforeCaret.trim() !== "" || rest.trim() !== "") return { edits };
+	const aligned = indent ?? beforeCaret.length;
+	if (aligned !== beforeCaret.length) {
+		edits.push({ from: line.from, to: typed, insert: " ".repeat(aligned) });
+	}
+	const brace = line.from + aligned;
+	if (!closesScopeAt(state, typedAt)) return { edits, selection: brace + 1 };
+	if (state.doc.sliceString(typedAt, typedAt + 1) === ";") return { edits, selection: brace + 1 };
+	edits.push({ from: typedAt, insert: ";" });
+	return { edits, selection: brace + 2 };
+}
+
 /**
- * The edits one typed change implies beyond the character itself.
+ * The edits one typing transaction implies beyond the character itself.
  *
  * A re-indent replaces the line's leading whitespace instead of inserting before it, so repeated
- * typing cannot stack spaces. The semicolon is only added when nothing but whitespace follows the
- * brace, which leaves `struct X { } x;` and an already-typed `};` alone.
+ * typing cannot stack spaces.
  */
-export function cppEdits(transaction: Transaction): Edit[] {
-	if (!transaction.docChanged) return [];
+export function cppPlan(transaction: Transaction): CppPlan {
 	const state = transaction.state;
 	const edits: Edit[] = [];
+	let selection: number | undefined;
 	const seen = new Set<number>();
+
 	transaction.changes.iterChanges((_fromA, _toA, fromB, toB, inserted) => {
 		const text = inserted.toString();
-
-		if (text === "}") {
-			const after = toB;
-			if (closesScopeAt(state, after) && state.doc.sliceString(after, after + 1) !== ";") {
-				edits.push({ from: after, insert: ";" });
+		for (const plan of [text === "}" ? planForBrace(state, toB) : null]) {
+			if (plan !== null && plan.edits.length > 0) {
+				edits.push(...plan.edits);
+				selection = plan.selection ?? selection;
 			}
 		}
-
 		if (!text.includes(":")) return;
 		const line = state.doc.lineAt(fromB);
 		if (seen.has(line.from)) return;
 		const match = ACCESS_SPECIFIER.exec(line.text);
 		if (match === null) return;
 		const indent = scopeIndentAt(state, line.from);
-		if (indent === null) return;
-		const current = match[1].length;
-		if (current === indent) return;
+		if (indent === null || match[1].length === indent) return;
 		seen.add(line.from);
-		edits.push({ from: line.from, to: line.from + current, insert: " ".repeat(indent) });
+		edits.push({
+			from: line.from,
+			to: line.from + match[1].length,
+			insert: " ".repeat(indent),
+		});
 	});
-	return edits;
+	return { edits, selection };
 }
 
-/** Access-specifier alignment and auto-semicolons, applied to typing only. */
+/**
+ * Access-specifier alignment, brace alignment and auto-semicolons, applied to typing only.
+ *
+ * A stepped-over brace arrives as a change that rewrites the character with itself, so a typed `}`
+ * is recognised from the inserted text rather than from the document changing size.
+ */
 export function cppEditing(): Extension {
 	return EditorState.transactionFilter.of((transaction) => {
-		if (!transaction.docChanged || !transaction.isUserEvent("input.type")) return transaction;
-		const edits = cppEdits(transaction);
-		if (edits.length === 0) return transaction;
+		if (!transaction.isUserEvent("input.type")) return transaction;
+		const plan = cppPlan(transaction);
+		if (plan.edits.length === 0) return transaction;
 		return [
 			transaction,
 			{
-				changes: edits,
+				changes: plan.edits,
+				selection: plan.selection === undefined ? undefined : { anchor: plan.selection },
 				sequential: true,
 			},
 		];
