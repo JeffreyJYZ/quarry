@@ -66,12 +66,53 @@ pub fn one_line(text: &str) -> String {
 
 /// Client capabilities this IDE advertises. Only what the navigation requests need is declared;
 /// everything else keeps the specification's default.
+/// The client side of the semantic-token legend. The *server's* own legend is what its indices
+/// refer to, so this list is advisory only; `handshake` reads the real one back.
+const SEMANTIC_TOKEN_TYPES: [&str; 19] = [
+    "namespace",
+    "type",
+    "class",
+    "enum",
+    "interface",
+    "struct",
+    "typeParameter",
+    "parameter",
+    "variable",
+    "property",
+    "enumMember",
+    "event",
+    "function",
+    "method",
+    "macro",
+    "keyword",
+    "modifier",
+    "comment",
+    "string",
+];
+
+const SEMANTIC_TOKEN_MODIFIERS: [&str; 8] = [
+    "declaration",
+    "definition",
+    "readonly",
+    "static",
+    "deprecated",
+    "abstract",
+    "async",
+    "modification",
+];
+
 pub fn client_capabilities() -> Value {
     json!({
         "textDocument": {
             "hover": { "contentFormat": ["markdown", "plaintext"] },
             "completion": { "completionItem": { "snippetSupport": false } },
-            "definition": { "linkSupport": true }
+            "definition": { "linkSupport": true },
+            "semanticTokens": {
+                "requests": { "full": true, "range": false },
+                "tokenTypes": SEMANTIC_TOKEN_TYPES,
+                "tokenModifiers": SEMANTIC_TOKEN_MODIFIERS,
+                "formats": ["relative"]
+            }
         }
     })
 }

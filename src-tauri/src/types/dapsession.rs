@@ -113,6 +113,8 @@ impl Default for BreakpointSpec {
 pub struct MemoryDump {
     pub address: String,
     pub bytes: Vec<u8>,
+    /// Bytes the adapter refused to read, so a page of zeroes and an unmapped page stay distinct.
+    pub unreadable_bytes: u32,
 }
 
 #[derive(Serialize, Clone, Debug)]

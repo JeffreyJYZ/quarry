@@ -75,8 +75,18 @@ pub async fn dap_read_memory(
 
     let data = body.get("data").and_then(Value::as_str).unwrap_or_default();
     let bytes = base64_decode(data).map_err(|error| format!("readMemory at {address}: {error}"))?;
+    // An unmapped page answers with no `data` and an `unreadableBytes` count — not an error, and not
+    // an empty page either.
+    let unreadable_bytes = body
+        .get("unreadableBytes")
+        .and_then(Value::as_u64)
+        .unwrap_or(0) as u32;
 
-    Ok(MemoryDump { address, bytes })
+    Ok(MemoryDump {
+        address,
+        bytes,
+        unreadable_bytes,
+    })
 }
 
 #[tauri::command]

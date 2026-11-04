@@ -1,0 +1,26 @@
+/*
+ * Semantic tokens: what the grammar cannot tell apart, the language server can.
+ *
+ * A parameter and a field are both names to a grammar, so their colours are derived from the
+ * identifier colour rather than given their own hex — a theme switch recolours them with everything
+ * else, and no theme needs a new token.
+ */
+.cm-sem-function {
+	color: var(--editor-function);
+}
+
+.cm-sem-type {
+	color: var(--editor-type);
+}
+
+.cm-sem-macro {
+	color: var(--editor-macro);
+}
+
+.cm-sem-parameter {
+	color: color-mix(in srgb, var(--editor-identifier) 62%, var(--muted));
+}
+
+.cm-sem-property {
+	color: color-mix(in srgb, var(--editor-identifier) 55%, var(--editor-type));
+}

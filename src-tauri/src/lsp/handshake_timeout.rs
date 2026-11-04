@@ -76,6 +76,10 @@ pub struct Session {
     pub(crate) type_hierarchy_items: HashMap<String, Value>,
     /// Set when the pump thread can no longer talk to the server; later commands fail fast.
     pub(crate) dead: bool,
+    /// The server's semantic-token legend, in index order, so a token's number becomes a name.
+    pub(crate) semantic_types: Vec<String>,
+    /// The server's modifier legend, in bit order, for the same reason as the types.
+    pub(crate) semantic_modifiers: Vec<String>,
 }
 
 /// One request that is waiting for its answer.

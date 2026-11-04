@@ -99,6 +99,9 @@ pub use lsp_signature_help::*;
 mod parse_inlay_hint;
 pub use parse_inlay_hint::*;
 
+mod lsp_semantic_tokens;
+pub use lsp_semantic_tokens::*;
+
 mod call_hierarchy_node_from_item;
 pub use call_hierarchy_node_from_item::*;
 

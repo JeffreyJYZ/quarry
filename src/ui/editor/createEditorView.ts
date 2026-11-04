@@ -26,6 +26,7 @@ import { occurrencesField } from "@/lib/editor/occurrences";
 import { searchDecorations, searchField } from "@/lib/editor/search";
 import { quarryTheme } from "@/lib/editor/theme";
 import { quarryHighlightStyle } from "@/lib/editor/themeSyntax";
+import { semanticTokens } from "@/lib/editor/semanticTokens";
 import { type BehaviourDeps, behaviourExtensions } from "@/ui/editor/extensionsBehaviour";
 import { completionBindings } from "@/ui/editor/keymapCompletion";
 import { editingBindings } from "@/ui/editor/keymapEditing";
@@ -83,6 +84,14 @@ export function createEditorView(options: {
 				language.of(languageForPath(initialPath)),
 				quarryTheme,
 				syntaxHighlighting(quarryHighlightStyle),
+				semanticTokens({
+					pathRef: {
+						get current() {
+							return options.deps.latestRef.current.path;
+						},
+					},
+					enabled: true,
+				}),
 				EditorView.contentAttributes.of({ "aria-label": "Editor", spellcheck: "false" }),
 				...behaviourExtensions(options.behaviourDeps),
 			],

@@ -53,7 +53,6 @@ export function useRunDebug(options: {
 		},
 		[runs],
 	);
-
 	const onDebug = useCallback(
 		(config: LaunchConfig) => {
 			onOpenDebug();
@@ -116,8 +115,16 @@ export function useRunDebug(options: {
 		canRun,
 		busy: launcher.busy || debug.building,
 		live,
-		run: () => void launcher.run(),
-		debugNow: () => void launcher.debug(),
+		// The dock comes up as the button is pressed, not when the process finally starts: a build
+		// takes a moment, and a click that changes nothing on screen reads as a dead button.
+		run: () => {
+			onOpenRun();
+			void launcher.run();
+		},
+		debugNow: () => {
+			onOpenDebug();
+			void launcher.debug();
+		},
 		stop: () => {
 			if (debug.sessionId !== null) debug.stop();
 			else void runs.stop();
