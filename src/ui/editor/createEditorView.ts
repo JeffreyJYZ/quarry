@@ -20,6 +20,7 @@ import { closeBrackets } from "@codemirror/autocomplete";
 import { history } from "@codemirror/commands";
 import { blameField } from "@/lib/editor/blame";
 import { breakpointGutter } from "@/lib/editor/breakpoints";
+import { cppEditing } from "@/lib/editor/cppEditing";
 import { inlayHintsField } from "@/lib/editor/inlayHints";
 import { languageForPath } from "@/lib/editor/languages";
 import { occurrencesField } from "@/lib/editor/occurrences";
@@ -70,6 +71,7 @@ export function createEditorView(options: {
 				bracketMatching(),
 				closeBrackets(),
 				indentOnInput(),
+				cppEditing(),
 				codeFolding(),
 				foldGutter(),
 				indentation.of([
