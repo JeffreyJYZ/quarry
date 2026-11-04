@@ -18,9 +18,9 @@
 }
 
 .cm-sem-parameter {
-	color: color-mix(in srgb, var(--editor-identifier) 62%, var(--muted));
+	color: var(--editor-parameter, #82aaff);
 }
 
 .cm-sem-property {
-	color: color-mix(in srgb, var(--editor-identifier) 55%, var(--editor-type));
+	color: var(--editor-field, #c792ea);
 }

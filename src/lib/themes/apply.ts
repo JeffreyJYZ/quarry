@@ -1,3 +1,4 @@
+import { derivedEditorColours } from "@/lib/themes/derive";
 import { themeVar, THEME_TOKENS, type Theme, type ThemeTokens } from "@/lib/themes/model";
 
 /**
@@ -28,6 +29,10 @@ export function applyTheme(theme: Theme, target: ThemeRoot = document.documentEl
 	for (const token of THEME_TOKENS) {
 		target.style.setProperty(themeVar(token), theme.tokens[token]);
 	}
+	// Two kinds no theme names: a class field and a parameter must never look like a local.
+	const derived = derivedEditorColours(theme.tokens);
+	target.style.setProperty("--editor-field", derived.field);
+	target.style.setProperty("--editor-parameter", derived.parameter);
 	target.dataset.theme = theme.id;
 	target.style.colorScheme = theme.appearance;
 }
