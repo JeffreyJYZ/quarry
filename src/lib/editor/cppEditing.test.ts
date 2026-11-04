@@ -91,6 +91,45 @@ describe("cppEditing", () => {
 		expect(state.selection.main.head).toBe(state.doc.length);
 	});
 
+	test("the semicolon arrives with the brace closeBrackets fills in", () => {
+		// The shape nobody escapes: `{` is typed once and its `}` is auto-filled, so this is where the
+		// semicolon has to appear — the user never types the closing brace.
+		const state = stateFor("class A ");
+		const typed = state.update({
+			changes: { from: 8, insert: "{}" },
+			selection: { anchor: 9 },
+			userEvent: "input.type",
+		}).state;
+		expect(typed.doc.toString()).toBe("class A {};");
+		expect(typed.selection.main.head).toBe(9);
+	});
+
+	test("an auto-closed enum and struct earn the semicolon as well", () => {
+		for (const header of ["enum class Mode ", "struct Plain ", "union U "]) {
+			const state = stateFor(header);
+			const at = header.length;
+			const typed = state.update({
+				changes: { from: at, insert: "{}" },
+				selection: { anchor: at + 1 },
+				userEvent: "input.type",
+			}).state;
+			expect(typed.doc.toString()).toBe(`${header.trimEnd()} {};`);
+		}
+	});
+
+	test("an auto-closed function and namespace earn nothing", () => {
+		for (const header of ["void f() ", "namespace n "]) {
+			const state = stateFor(header);
+			const at = header.length;
+			const typed = state.update({
+				changes: { from: at, insert: "{}" },
+				selection: { anchor: at + 1 },
+				userEvent: "input.type",
+			}).state;
+			expect(typed.doc.toString()).toBe(`${header.trimEnd()} {}`);
+		}
+	});
+
 	test("stepping over the auto-filled brace on the same line adds the semicolon", () => {
 		const doc = "class A {}";
 		const brace = doc.indexOf("}");

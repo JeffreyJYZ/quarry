@@ -109,6 +109,23 @@ function planForBrace(state: EditorState, typedAt: number): CppPlan | null {
 }
 
 /**
+ * The semicolon a class header earns the moment its closing brace is auto-filled.
+ *
+ * `closeBrackets` puts the `}` there when `{` is typed, and that brace is usually the one that stays:
+ * nobody types it a second time at the end of the class. So the `;` has to arrive with it, at the
+ * moment the pair is complete. Returns the position after the brace, or null when the pair is not a
+ * class-like scope, so a function or namespace body stays untouched.
+ */
+export function autoClosedScopeEnd(state: EditorState, caret: number): number | null {
+	if (state.doc.sliceString(caret - 1, caret) !== "{") return null;
+	if (state.doc.sliceString(caret, caret + 1) !== "}") return null;
+	const after = caret + 1;
+	if (!closesScopeAt(state, after)) return null;
+	if (state.doc.sliceString(after, after + 1) === ";") return null;
+	return state.doc.sliceString(after, state.doc.lineAt(after).to).trim() === "" ? after : null;
+}
+
+/**
  * The edits one typing transaction implies beyond the character itself.
  *
  * A re-indent replaces the line's leading whitespace instead of inserting before it, so repeated
@@ -122,6 +139,12 @@ export function cppPlan(transaction: Transaction): CppPlan {
 
 	transaction.changes.iterChanges((_fromA, _toA, fromB, toB, inserted) => {
 		const text = inserted.toString();
+		if (text.endsWith("{") || text.endsWith("{}")) {
+			// `closeBrackets` inserts the pair as one `{}` change, so the caret sits between them.
+			const caret = text.endsWith("{}") ? toB - 1 : toB;
+			const end = autoClosedScopeEnd(state, caret);
+			if (end !== null) edits.push({ from: end, insert: ";" });
+		}
 		for (const plan of [text === "}" ? planForBrace(state, toB) : null]) {
 			if (plan !== null && plan.edits.length > 0) {
 				edits.push(...plan.edits);
