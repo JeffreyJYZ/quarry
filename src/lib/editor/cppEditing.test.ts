@@ -85,6 +85,23 @@ describe("cppEditing", () => {
 		expect(typed.doc.toString()).toBe("struct P {\n    int v;\n};\n");
 	});
 
+	test("a class closed inline gets its semicolon too", () => {
+		const state = typeAtEnd(stateFor("class A {"), "}");
+		expect(state.doc.toString()).toBe("class A {};");
+		expect(state.selection.main.head).toBe(state.doc.length);
+	});
+
+	test("stepping over the auto-filled brace on the same line adds the semicolon", () => {
+		const doc = "class A {}";
+		const brace = doc.indexOf("}");
+		const typed = stateFor(doc).update({
+			changes: { from: brace, to: brace + 1, insert: "}" },
+			selection: { anchor: brace + 1 },
+			userEvent: "input.type",
+		}).state;
+		expect(typed.doc.toString()).toBe("class A {};");
+	});
+
 	test("a brace in the middle of a line is left alone", () => {
 		const doc = "struct X {} x;\n";
 		expect(type(stateFor(doc), doc.length, "").doc.toString()).toBe(doc);

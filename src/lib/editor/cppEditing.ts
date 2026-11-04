@@ -21,8 +21,8 @@ const SCOPE_SPECIFIERS = new Set([
 	"EnumSpecifier",
 ]);
 
-/** A `}` one line below the caret, with nothing but whitespace in between. */
-const WAITING_BRACE = /^[ \t]*\r?\n?[ \t]*\}/;
+/** A `}` below the caret, with nothing but whitespace (up to two blank line breaks) in between. */
+const WAITING_BRACE = /^[ \t]*(?:\r?\n[ \t]*){0,2}\}/;
 
 type Node = ReturnType<ReturnType<typeof syntaxTree>["resolveInner"]>;
 
@@ -91,17 +91,17 @@ function planForBrace(state: EditorState, typedAt: number): CppPlan | null {
 		};
 	}
 
-	// Otherwise align the brace with the line that opened the block, as CLion does. A brace typed in
-	// the middle of a line is part of an expression (`struct X {} x;`) and is left alone.
+	// Otherwise the brace ends its line: align it with the opener when it stands alone, and give the
+	// scope its semicolon — inline after `class A {` is the same closing brace as one on its own line.
 	const indent = openerIndentAt(state, typedAt);
 	const rest = state.doc.sliceString(typedAt, line.to);
 	const edits: Edit[] = [];
-	if (beforeCaret.trim() !== "" || rest.trim() !== "") return { edits };
+	if (rest.trim() !== "") return { edits };
 	const aligned = indent ?? beforeCaret.length;
-	if (aligned !== beforeCaret.length) {
+	if (beforeCaret.trim() === "" && aligned !== beforeCaret.length) {
 		edits.push({ from: line.from, to: typed, insert: " ".repeat(aligned) });
 	}
-	const brace = line.from + aligned;
+	const brace = line.from + (beforeCaret.trim() === "" ? aligned : beforeCaret.length);
 	if (!closesScopeAt(state, typedAt)) return { edits, selection: brace + 1 };
 	if (state.doc.sliceString(typedAt, typedAt + 1) === ";") return { edits, selection: brace + 1 };
 	edits.push({ from: typedAt, insert: ";" });
