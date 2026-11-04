@@ -24,3 +24,11 @@
 .cm-sem-property {
 	color: var(--editor-field, #c792ea);
 }
+
+.cm-sem-static-field {
+	color: var(--editor-static-field, #56b6c2);
+}
+
+.cm-sem-enum {
+	color: var(--editor-enum-member, #d19a66);
+}

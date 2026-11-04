@@ -29,16 +29,18 @@ export function semanticClass(token: SemanticToken): string | null {
 		case "struct":
 		case "enum":
 		case "interface":
-		case "enumMember":
 		case "namespace":
 		case "typeParameter":
 			return "cm-sem-type";
+		case "enumMember":
+			return "cm-sem-enum";
 		case "macro":
 			return "cm-sem-macro";
 		case "parameter":
 			return "cm-sem-parameter";
 		case "property":
-			return "cm-sem-property";
+			// A static member is a different thing in CLion, and clangd marks it as such.
+			return token.modifiers.includes("static") ? "cm-sem-static-field" : "cm-sem-property";
 		case "variable":
 			// A parameter and a field are told apart above; a local keeps the base identifier colour.
 			return null;
