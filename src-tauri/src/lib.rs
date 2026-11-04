@@ -63,6 +63,7 @@ pub fn run() {
             lsp::lsp_code_actions,
             lsp::lsp_execute_command,
             lsp::lsp_signature_help,
+            lsp::lsp_semantic_tokens,
             lsp::lsp_inlay_hints,
             lsp::lsp_call_hierarchy_prepare,
             lsp::lsp_call_hierarchy_calls,

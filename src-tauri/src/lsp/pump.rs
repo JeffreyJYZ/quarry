@@ -26,7 +26,17 @@ use super::*;
 ///
 /// While waiting, server-to-client requests are answered, because a server that asks about
 /// configuration before replying would otherwise deadlock against our own wait.
-pub fn handshake(pipe: &mut ProcessPipe, root_uri: &str, name: &str) -> Result<(), String> {
+/// The server's semantic-token legend: the names its token numbers and bits refer to.
+pub struct SemanticLegend {
+    pub types: Vec<String>,
+    pub modifiers: Vec<String>,
+}
+
+pub fn handshake(
+    pipe: &mut ProcessPipe,
+    root_uri: &str,
+    name: &str,
+) -> Result<SemanticLegend, String> {
     let params = json!({
         "processId": std::process::id(),
         "rootUri": root_uri,
@@ -36,6 +46,8 @@ pub fn handshake(pipe: &mut ProcessPipe, root_uri: &str, name: &str) -> Result<(
     pipe.send(&request(INITIALIZE_ID, "initialize", params))
         .map_err(|error| format!("cannot send initialize: {error}"))?;
 
+    // The server's own legend, in the order its token indices refer to. Semantic highlighting is
+    // useless without it: the numbers in a token are positions in *this* list.
     let deadline = Instant::now() + HANDSHAKE_TIMEOUT;
     loop {
         let remaining = deadline.saturating_duration_since(Instant::now());
@@ -53,7 +65,13 @@ pub fn handshake(pipe: &mut ProcessPipe, root_uri: &str, name: &str) -> Result<(
                     if let Some(error) = message.get("error") {
                         return Err(format!("rejected initialize: {error}"));
                     }
-                    break;
+                    let legend = SemanticLegend {
+                        types: legend_field(&message, "tokenTypes"),
+                        modifiers: legend_field(&message, "tokenModifiers"),
+                    };
+                    pipe.send(&notification("initialized", json!({})))
+                        .map_err(|error| format!("cannot send initialized: {error}"))?;
+                    return Ok(legend);
                 }
                 if !is_response && message.get("id").is_some() {
                     let _ = pipe.send(&server_request_response(&message));
@@ -73,9 +91,25 @@ pub fn handshake(pipe: &mut ProcessPipe, root_uri: &str, name: &str) -> Result<(
             }
         }
     }
+}
 
-    pipe.send(&notification("initialized", json!({})))
-        .map_err(|error| format!("cannot send initialized: {error}"))
+/// One array of the semantic-token legend out of an `initialize` response.
+fn legend_field(message: &Value, key: &str) -> Vec<String> {
+    message
+        .get("result")
+        .and_then(|result| result.get("capabilities"))
+        .and_then(|capabilities| capabilities.get("semanticTokensProvider"))
+        .and_then(|provider| provider.get("legend"))
+        .and_then(|legend| legend.get(key))
+        .and_then(Value::as_array)
+        .map(|names| {
+            names
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
 }
 /// Read frames until the child goes away, forwarding diagnostics and keeping the server unblocked.
 pub fn pump(

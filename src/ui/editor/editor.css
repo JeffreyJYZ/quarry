@@ -1,5 +1,7 @@
 @import "./hoverMarkdown.css";
 
+@import "./semantic.css";
+
 .editor-host {
 	height: 100%;
 	min-height: 0;

@@ -121,12 +121,15 @@ pub async fn start_lsp_session(
 
     // The handshake runs on the receiver before any session exists, so no mutex is held while it
     // waits for the server.
-    if let Err(reason) = handshake(&mut pipe, &root_uri, &info.name) {
-        // The child is already gone, so its stderr ends within a moment; wait for it briefly so
-        // the message can carry the server's own reason.
-        let said = stderr.wait(STDERR_WAIT);
-        return Err(format_start_failure(server, &reason, &said));
-    }
+    let legend = match handshake(&mut pipe, &root_uri, &info.name) {
+        Ok(types) => types,
+        Err(reason) => {
+            // The child is already gone, so its stderr ends within a moment; wait for it briefly so
+            // the message can carry the server's own reason.
+            let said = stderr.wait(STDERR_WAIT);
+            return Err(format_start_failure(server, &reason, &said));
+        }
+    };
 
     let frames = pipe.take_frames();
     let session = Arc::new(Mutex::new(Session {
@@ -141,6 +144,8 @@ pub async fn start_lsp_session(
         call_hierarchy_items: HashMap::new(),
         type_hierarchy_items: HashMap::new(),
         dead: false,
+        semantic_types: legend.types,
+        semantic_modifiers: legend.modifiers,
     }));
 
     let pump_session = Arc::clone(&session);
