@@ -22,6 +22,12 @@ export function navigationCommands(
 			run: context.workspaceSymbol,
 		},
 		{
+			id: "release-notes",
+			label: "Release notes",
+			hint: "",
+			run: context.openNotes,
+		},
+		{
 			id: "goto-implementation",
 			label: "Go to implementation",
 			hint: "Cmd+Alt+B",

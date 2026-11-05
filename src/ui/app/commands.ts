@@ -33,6 +33,7 @@ export type CommandContext = {
 	quickDoc: () => void;
 	refreshGit: () => void;
 	restartLsp: () => void;
+	openNotes: () => void;
 	toggleBlame: () => void;
 	newProject: () => void;
 	checkUpdates: () => void;

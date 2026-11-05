@@ -3,10 +3,13 @@ import AppTopBar from "@/ui/app/AppTopBar";
 import OverlaysMount from "@/ui/app/OverlaysMount";
 import RunDebugWidget from "@/ui/app/RunDebugWidget";
 import UpdateSlot from "@/ui/updates/UpdateSlot";
+import { useWhatsNew } from "@/ui/updates/useWhatsNew";
 import type { ShellModel } from "@/ui/app/useShell";
 
 /** The shell's frame: title bar, notice line, the workspace, and everything floating over it. */
 export default function AppView({ model }: { model: ShellModel }) {
+	useWhatsNew(() => model.overlays.setNotesOpen(true));
+
 	return (
 		<div className="shell">
 			<AppTopBar
