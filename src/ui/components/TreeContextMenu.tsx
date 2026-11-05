@@ -15,6 +15,7 @@ export default function TreeContextMenu({
 	y,
 	onOpen,
 	onSelect,
+	onRestartLsp,
 	onClose,
 }: {
 	entry: FileEntry;
@@ -22,6 +23,7 @@ export default function TreeContextMenu({
 	y: number;
 	onOpen: (entry: FileEntry) => void;
 	onSelect: (entry: FileEntry, action: TreeAction) => void;
+	onRestartLsp?: () => void;
 	onClose: () => void;
 }) {
 	const items: MenuItem[] = [];
@@ -40,6 +42,9 @@ export default function TreeContextMenu({
 		onSelect: () => onSelect(entry, "rename"),
 	});
 	items.push({ label: "Delete", danger: true, onSelect: () => onSelect(entry, "delete") });
+	if (onRestartLsp !== undefined) {
+		items.push({ label: "Restart language server", separated: true, onSelect: onRestartLsp });
+	}
 
 	return <ContextMenu x={x} y={y} items={items} onClose={onClose} />;
 }

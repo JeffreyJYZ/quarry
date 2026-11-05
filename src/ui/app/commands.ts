@@ -32,6 +32,7 @@ export type CommandContext = {
 	gotoTypeDefinition: () => void;
 	quickDoc: () => void;
 	refreshGit: () => void;
+	restartLsp: () => void;
 	toggleBlame: () => void;
 	newProject: () => void;
 	checkUpdates: () => void;

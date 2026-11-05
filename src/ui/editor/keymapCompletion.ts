@@ -16,7 +16,9 @@ export function completionBindings(_deps: KeymapDeps): KeyBinding[] {
 		{
 			key: "Enter",
 			run: (currentView) =>
-				expandBracketPair(currentView) || insertNewlineAndIndent(currentView),
+				completionStatus(currentView.state) === "active"
+					? acceptCompletion(currentView)
+					: expandBracketPair(currentView) || insertNewlineAndIndent(currentView),
 		},
 		{
 			key: "Tab",

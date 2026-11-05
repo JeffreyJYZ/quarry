@@ -46,6 +46,7 @@ export default function AppBody({ model }: { model: ShellModel }) {
 				)}
 				diffPath={panels.gitDiffPath}
 				onOpenFile={workspace.handleOpenFile}
+				onRestartLsp={model.restartLsp}
 				onOpenGitFile={(path) => void workspace.openPath(path, fileName(path))}
 				onFileRenamed={(oldPath, newPath) => {
 					workspace.setBuffers((current) =>

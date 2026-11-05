@@ -28,6 +28,7 @@ export type SideRailProps = {
 	>;
 	diffPath: string | null;
 	onOpenFile: (entry: FileEntry) => void;
+	onRestartLsp: () => void;
 	onOpenGitFile: (path: string) => void;
 	onFileRenamed: (oldPath: string, newPath: string) => void;
 	onFileDeleted: (path: string) => void;
@@ -84,6 +85,7 @@ export default function SideRail(props: SideRailProps) {
 						onFileDeleted={props.onFileDeleted}
 						revealToken={props.revealToken}
 						changes={props.changes}
+						onRestartLsp={props.onRestartLsp}
 					/>
 					<Splitter
 						axis="y"

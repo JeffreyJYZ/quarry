@@ -10,6 +10,8 @@ export type LspWiringOptions = {
 	activeText: string;
 	report: (message: string) => void;
 	overrides: Partial<Record<ServerKind, { path?: string; args?: string[] }>>;
+	/** Bumped by the restart command: every server for this root stops and starts again. */
+	restartToken: number;
 	/** Kept in a ref so the editor guards read the live set without re-rendering. */
 	runningRef: MutableRefObject<ReadonlySet<ServerKind>>;
 };
@@ -20,7 +22,13 @@ export type LspWiringOptions = {
  */
 export function useLspWiring(options: LspWiringOptions): LspStatusMap {
 	const signals = useRootSignals(options.root);
-	const statuses = useLspServers(options.root, signals, options.report, options.overrides);
+	const statuses = useLspServers(
+		options.root,
+		signals,
+		options.report,
+		options.overrides,
+		options.restartToken,
+	);
 	const running = useMemo(
 		() =>
 			new Set(

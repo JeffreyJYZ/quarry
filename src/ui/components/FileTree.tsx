@@ -71,6 +71,7 @@ export default function FileTree(props: FileTreeProps) {
 					y={menu.y}
 					onOpen={openFile}
 					onSelect={handleAction}
+					onRestartLsp={props.onRestartLsp}
 					onClose={() => setMenu(null)}
 				/>
 			)}
