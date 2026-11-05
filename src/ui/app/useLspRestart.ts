@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { RESTART_NOTICE } from "@/lib/lsp/restart";
 
 /**
  * The counter the restart command bumps.
@@ -14,7 +15,7 @@ export function useLspRestart(reportNotice: (message: string) => void): {
 	const [token, setToken] = useState(0);
 	const restart = useCallback(() => {
 		setToken((current) => current + 1);
-		reportNotice("Restarting language server");
+		reportNotice(RESTART_NOTICE);
 	}, [reportNotice]);
 	return { token, restart };
 }

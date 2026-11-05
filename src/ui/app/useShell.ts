@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { useDebugSession } from "@/lib/debug/session";
 import { lspOverridesFrom } from "@/ui/app/lspOverrides";
+import { RESTART_NOTICE } from "@/lib/lsp/restart";
 import { useLspRestart } from "@/ui/app/useLspRestart";
 import { useLspWiring } from "@/ui/app/useLspWiring";
 import type { ServerKind } from "@/lib/lsp/served";
@@ -97,6 +98,7 @@ export function useShell() {
 		activeText: active?.text ?? "",
 		report: reportNotice,
 		overrides: lspOverrides,
+		onRestarted: () => setNotice((current) => (current === RESTART_NOTICE ? null : current)),
 		runningRef: lspRunningRef,
 		restartToken: lspRestart.token,
 	});
