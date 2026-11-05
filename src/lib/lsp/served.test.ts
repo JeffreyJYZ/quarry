@@ -8,7 +8,7 @@ import {
 } from "@/lib/lsp/served";
 
 const RUST_TABLE = [".rs"];
-const CLANG_TABLE = [".c", ".h", ".cc", ".cpp", ".cxx", ".hh", ".hpp"];
+const CLANG_TABLE = [".c", ".h", ".cc", ".cpp", ".cxx", ".hh", ".hpp", ".hxx"];
 
 describe("servedExtensions", () => {
 	test("one table per server", () => {

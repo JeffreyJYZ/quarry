@@ -5,8 +5,7 @@ import { StreamLanguage } from "@codemirror/language";
 import { toml } from "@codemirror/legacy-modes/mode/toml";
 import { yaml } from "@codemirror/legacy-modes/mode/yaml";
 import type { Extension } from "@codemirror/state";
-
-const CPP_EXTENSIONS = new Set(["c", "h", "cc", "cpp", "hpp", "cxx", "hh"]);
+import { isCppExtension, isRustExtension } from "@/lib/consts/extensions";
 
 const TOML_FILENAMES = new Set([
 	"cargo.lock",
@@ -31,8 +30,8 @@ export function languageNameForPath(path: string | null): string | null {
 	const dot = base.lastIndexOf(".");
 	const extension = dot === -1 ? "" : base.slice(dot + 1);
 	if (extension === "toml") return "toml";
-	if (extension === "rs") return "rust";
-	if (CPP_EXTENSIONS.has(extension)) return "c++";
+	if (isRustExtension(extension)) return "rust";
+	if (isCppExtension(extension)) return "c++";
 	if (extension === "json" || extension === "jsonc" || extension === "json5") return "json";
 	if (extension === "yaml" || extension === "yml") return "yaml";
 	return null;

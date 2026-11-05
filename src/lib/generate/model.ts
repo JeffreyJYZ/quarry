@@ -5,6 +5,8 @@
  * inserted automatically; the caller applies the chosen item.
  */
 
+import { isCppPath, isRustPath } from "@/lib/consts/extensions";
+
 export type GenerateItem = {
 	id: string;
 	label: string;
@@ -153,13 +155,13 @@ function cppMain(text: string): GenerateItem | null {
 export function generateItems(path: string, text: string, caretLine: number): GenerateItem[] {
 	const lines = text.split("\n");
 	const items: (GenerateItem | null)[] = [];
-	if (path.endsWith(".rs")) {
+	if (isRustPath(path)) {
 		const struct = enclosingStruct(lines, caretLine);
 		if (struct !== null) items.push(rustImpl(struct, text));
 		items.push(rustTests(text));
 		return items.filter((item): item is GenerateItem => item !== null);
 	}
-	if (/\.(c|h|cc|cpp|cxx|hh|hpp)$/.test(path)) {
+	if (isCppPath(path)) {
 		const klass = enclosingClass(lines, caretLine);
 		if (klass !== null) items.push(cppConstructor(klass, text));
 		items.push(cppMain(text));
