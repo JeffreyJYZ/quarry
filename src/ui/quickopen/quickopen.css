@@ -14,3 +14,55 @@
 .quick-open-dot {
 	margin-right: 4px;
 }
+
+/*
+ * A quick-open row is name-then-directory in one line, so it cannot borrow `.search-row`: that one is
+ * a two-column grid whose first column is a 64px line-number cell, and a file name wider than 64px
+ * spilled straight over the directory beside it.
+ */
+.quick-open-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	height: 22px;
+	padding: 0 12px;
+	border: 0;
+	background: none;
+	color: var(--text);
+	font-family: var(--mono);
+	font-size: 11px;
+	text-align: left;
+	cursor: pointer;
+}
+
+.quick-open-row:hover {
+	background: var(--hover);
+}
+
+.quick-open-row.active {
+	background: var(--line);
+}
+
+.quick-open-row:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: -1px;
+}
+
+.quick-open-row .search-file-name {
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.quick-open-row .search-file-dir {
+	flex: 1 1 auto;
+	min-width: 0;
+	font-size: 10px;
+	color: var(--muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
