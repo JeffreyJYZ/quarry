@@ -7,6 +7,7 @@ import {
 	startLsp,
 	stopLsp,
 } from "@/lib/project/api";
+import { isMissingSessionError } from "@/lib/lsp/errors";
 import { describeError } from "@/lib/project/errors";
 import {
 	serverKindForPath,
@@ -53,6 +54,7 @@ function useOneServer(
 			live = false;
 			setStatus(null);
 			stopLsp(sessionId).catch((error: unknown) => {
+				if (isMissingSessionError(error)) return;
 				reportRef.current(`${kind} stop: ${describeError(error)}`);
 			});
 		};
@@ -159,6 +161,7 @@ export function useDocumentSync({
 			if (open !== null && open.root === root && open.path === path) {
 				opened.current = null;
 				lspCloseDocument(sessionId, path).catch((error) => {
+					if (isMissingSessionError(error)) return;
 					latest.current.report(`Close document: ${describeError(error)}`);
 				});
 			}
