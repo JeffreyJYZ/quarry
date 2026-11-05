@@ -32,7 +32,7 @@ export function QuickOpenRow({
 	return (
 		<button
 			type="button"
-			className={active ? "search-row active" : "search-row"}
+			className={active ? "quick-open-row active" : "quick-open-row"}
 			data-index={index}
 			title={path}
 			onClick={onSelect}
