@@ -9,11 +9,7 @@ export type Row = {
 	character: number;
 };
 
-export const TITLES: Record<GotoMode, string> = {
-	class: "Go to class",
-	symbol: "Go to symbol in file",
-	recent: "Recent files",
-};
+export { TITLES } from "@/lib/consts/goto";
 
 export function fileNameOf(path: string): string {
 	const cut = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));

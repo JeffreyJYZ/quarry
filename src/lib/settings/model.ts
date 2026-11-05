@@ -6,6 +6,7 @@
  * resolves a project's optional overrides against the user's preferences.
  */
 
+import { DEFAULT_PREFERENCES, FONT_SIZE_RANGE } from "@/lib/consts/settings";
 import { clampPanelSizes, type PanelSizes } from "@/lib/layout/model";
 import type { TerminalCursorStyle } from "@/lib/settings/terminal";
 import {
@@ -13,19 +14,19 @@ import {
 	effectiveTerminalPreferences,
 	normalizeTerminalPreferences,
 } from "@/lib/settings/terminal";
-import {
-	DEFAULT_THEME_PREFERENCES,
-	normalizeThemePreferences,
-	type ThemePreferences,
-} from "@/lib/themes/preferences";
+import { normalizeThemePreferences, type ThemePreferences } from "@/lib/themes/preferences";
 
 export type BuildProfile = "debug" | "release";
 export type TerminalPlacement = "bottom" | "right";
 export type TabSize = 2 | 4 | 8;
 
-export const TAB_SIZES: TabSize[] = [2, 4, 8];
-export const BUILD_PROFILES: BuildProfile[] = ["debug", "release"];
-export const FONT_SIZE_RANGE = { min: 9, max: 24 } as const;
+export {
+	BUILD_PROFILES,
+	DEFAULT_PREFERENCES,
+	DEFAULT_PROJECT_SETTINGS,
+	FONT_SIZE_RANGE,
+	TAB_SIZES,
+} from "@/lib/consts/settings";
 
 /** `theme` and `customThemes` are optional on disk, so an old settings file still loads. */
 export type Preferences = ThemePreferences & {
@@ -77,30 +78,6 @@ export type EffectivePreferences = ThemePreferences & {
 	clangdPath: string;
 	clangdArgs: string;
 	panelSizes: PanelSizes;
-};
-
-export const DEFAULT_PREFERENCES: Preferences = {
-	...DEFAULT_THEME_PREFERENCES,
-	editorFontSize: 13,
-	editorTabSize: 4,
-	terminalFontSize: 13,
-	...DEFAULT_TERMINAL_PREFERENCES,
-	formatOnSave: false,
-	buildProfile: "debug",
-	terminalPlacement: "bottom",
-	editorFontFamily: "",
-	terminalFontFamily: "",
-	rustAnalyzerPath: "",
-	rustAnalyzerArgs: "",
-	clangdPath: "",
-	clangdArgs: "",
-	panelSizes: clampPanelSizes(null),
-};
-
-export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
-	editorTabSize: null,
-	formatOnSave: null,
-	buildProfile: null,
 };
 
 export function clampFontSize(value: unknown, fallback: number): number {

@@ -1,7 +1,8 @@
 import type { ProcessInfo } from "@/lib/project/api";
 
-/** Rows the process picker renders at once; the filter is how the rest are reached. */
-export const PROCESS_LIMIT = 50;
+import { PROCESS_LIMIT } from "@/lib/consts/debug";
+
+export { PROCESS_LIMIT } from "@/lib/consts/debug";
 
 /** Stable name-then-pid order, so a refresh never reshuffles the list under the cursor. */
 export function sortProcesses(processes: ProcessInfo[]): ProcessInfo[] {

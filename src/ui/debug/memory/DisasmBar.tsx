@@ -1,5 +1,6 @@
-/** Instruction counts the disassembly pane offers. */
-export const DISASM_COUNTS = [16, 64, 128];
+import { DISASM_COUNTS } from "@/lib/consts/memory";
+
+export { DISASM_COUNTS } from "@/lib/consts/memory";
 
 /** The disassembly bar: its own address field, the instruction count, refresh and copy. */
 export default function DisasmBar({

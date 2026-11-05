@@ -1,8 +1,19 @@
 export type TerminalCursorStyle = "block" | "bar" | "underline";
-export const TERMINAL_CURSOR_STYLES: TerminalCursorStyle[] = ["block", "bar", "underline"];
-export const TERMINAL_LINE_HEIGHT_RANGE = { min: 1, max: 2 } as const;
-export const TERMINAL_LETTER_SPACING_RANGE = { min: -2, max: 4 } as const;
-export const TERMINAL_SCROLLBACK_RANGE = { min: 500, max: 50000 } as const;
+
+import {
+	DEFAULT_TERMINAL_PREFERENCES,
+	TERMINAL_LETTER_SPACING_RANGE,
+	TERMINAL_LINE_HEIGHT_RANGE,
+	TERMINAL_SCROLLBACK_RANGE,
+} from "@/lib/consts/terminal";
+
+export {
+	DEFAULT_TERMINAL_PREFERENCES,
+	TERMINAL_CURSOR_STYLES,
+	TERMINAL_LETTER_SPACING_RANGE,
+	TERMINAL_LINE_HEIGHT_RANGE,
+	TERMINAL_SCROLLBACK_RANGE,
+} from "@/lib/consts/terminal";
 
 export function clampLineHeight(value: unknown, fallback: number): number {
 	if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
@@ -28,14 +39,6 @@ export function clampScrollback(value: unknown, fallback: number): number {
 		Math.max(TERMINAL_SCROLLBACK_RANGE.min, Math.round(value)),
 	);
 }
-
-export const DEFAULT_TERMINAL_PREFERENCES = {
-	terminalLineHeight: 1.2,
-	terminalCursorStyle: "block" as TerminalCursorStyle,
-	terminalCursorBlink: true,
-	terminalScrollback: 5000,
-	terminalLetterSpacing: 0,
-};
 
 export function normalizeTerminalPreferences(
 	source: Record<string, unknown>,

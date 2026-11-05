@@ -1,7 +1,6 @@
-export const DEFAULT_FONT_SIZE = 11.5;
-export const MIN_FONT_SIZE = 9;
-export const MAX_FONT_SIZE = 20;
-export const FONT_STEP = 1;
+import { DEFAULT_FONT_SIZE, FONT_STEP, MAX_FONT_SIZE, MIN_FONT_SIZE } from "@/lib/consts/terminal";
+
+export { DEFAULT_FONT_SIZE, FONT_STEP, MAX_FONT_SIZE, MIN_FONT_SIZE } from "@/lib/consts/terminal";
 
 export function clampFontSize(value: number): number {
 	if (!Number.isFinite(value)) return DEFAULT_FONT_SIZE;

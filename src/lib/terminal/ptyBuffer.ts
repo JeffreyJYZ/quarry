@@ -10,12 +10,9 @@ import { appendData, type Session } from "@/lib/terminal/sessions";
  * the id.
  */
 
-/** A chatty shell may emit faster than the handshake completes; keep the newest output. */
-export const MAX_CHUNKS = 64;
-export const MAX_CHARS = 64 * 1024;
+import { MAX_CHARS, MAX_CHUNKS, MAX_IDS } from "@/lib/consts/terminal";
 
-/** Abandoned ids are never claimed again, so the map itself is capped too. */
-export const MAX_IDS = 8;
+export { MAX_CHARS, MAX_CHUNKS, MAX_IDS } from "@/lib/consts/terminal";
 
 /** Applies one PTY chunk to a session: scrollback first, then the OSC 7 cwd trail. */
 export function withChunk(session: Session, data: string): Session {

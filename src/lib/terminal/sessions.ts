@@ -3,8 +3,9 @@ import { DEFAULT_FONT_SIZE } from "@/lib/terminal/fontSize";
 
 /** Session bookkeeping for the terminal panel: pure helpers, no React. */
 
-/** Scrollback cap; older lines are dropped and counted. */
-export const MAX_LINES = 4000;
+import { MAX_LINES } from "@/lib/consts/terminal";
+
+export { MAX_LINES } from "@/lib/consts/terminal";
 
 export type Session = {
 	id: number;

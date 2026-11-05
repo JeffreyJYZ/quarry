@@ -1,8 +1,10 @@
 import { directoryOf, fileName } from "@/lib/problems/model";
 import type { SearchMatch, SearchReport } from "@/lib/project/api";
 
+import { SEARCH_RENDER_LIMIT } from "@/lib/consts/search";
+
 /** Rows the palette renders no matter how many matches the backend returned. */
-export const SEARCH_RENDER_LIMIT = 300;
+export { SEARCH_RENDER_LIMIT } from "@/lib/consts/search";
 
 /** How much of one matched line a row keeps; CSS clamps it to the real palette width. */
 const LINE_CLIP = 240;
@@ -94,7 +96,9 @@ export function resultSummary(report: SearchReport, rendered: number, fileCount:
 }
 
 /** Cap on preview lines. */
-export const PREVIEW_LIMIT = 200;
+import { PREVIEW_LIMIT } from "@/lib/consts/search";
+
+export { PREVIEW_LIMIT } from "@/lib/consts/search";
 
 export type PreviewLine = {
 	path: string;

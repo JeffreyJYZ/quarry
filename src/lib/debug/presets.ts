@@ -1,15 +1,9 @@
 import type { LaunchPreset } from "@/lib/project/api";
 import { splitArgs } from "@/lib/run/splitArgs";
 
-export const PRESET_FIELDS = [
-	"name",
-	"program",
-	"args",
-	"cwd",
-	"build",
-	"stopOnEntry",
-	"initCommands",
-] as const;
+import { PRESET_FIELDS } from "@/lib/consts/debug";
+
+export { PRESET_FIELDS } from "@/lib/consts/debug";
 
 /**
  * The editor's fields as the text controls hold them: `args` is one line, `initCommands` is one
