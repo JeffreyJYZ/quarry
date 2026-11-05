@@ -3,6 +3,13 @@
 	color: var(--muted);
 }
 
+.update-slot {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
 .update-slot-restart {
 	border: 1px solid var(--accent);
 	background: none;
@@ -11,4 +18,100 @@
 	color: var(--accent);
 	cursor: pointer;
 	border-radius: 4px;
+}
+
+.update-slot-notes-toggle {
+	border: 0;
+	background: none;
+	padding: 2px 0;
+	font-size: 11px;
+	color: var(--muted);
+	cursor: pointer;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.update-slot-notes-toggle:hover {
+	color: var(--text);
+}
+
+/* The inline list under the update prompt: an expander, not a panel, so it keeps the slot's width. */
+.notes-inline {
+	position: absolute;
+	top: 100%;
+	right: 0;
+	z-index: 30;
+	width: 320px;
+	max-height: 320px;
+	overflow: auto;
+	margin-top: 6px;
+	padding: 8px 10px;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: var(--panel);
+	box-shadow: 0 12px 32px rgb(0 0 0 / 35%);
+}
+
+.notes-empty {
+	margin: 0;
+	font-size: 11px;
+	color: var(--muted);
+}
+
+.notes-list {
+	margin: 0;
+	padding-left: 16px;
+	font-size: 11px;
+	line-height: 1.5;
+	color: var(--text);
+}
+
+.notes-list li + li {
+	margin-top: 3px;
+}
+
+.notes-scrim {
+	position: fixed;
+	inset: 0;
+	z-index: 80;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgb(0 0 0 / 45%);
+}
+
+.notes-panel {
+	width: min(560px, 80vw);
+	max-height: 70vh;
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+	box-shadow: 0 24px 60px rgb(0 0 0 / 45%);
+}
+
+.notes-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 10px 14px;
+	border-bottom: 1px solid var(--line);
+}
+
+.notes-title {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.notes-panel .notes-list,
+.notes-panel .notes-empty {
+	padding: 12px 16px 16px;
+	overflow: auto;
+}
+
+.notes-panel .notes-list {
+	padding-left: 30px;
 }

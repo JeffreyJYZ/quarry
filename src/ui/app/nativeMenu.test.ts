@@ -47,6 +47,7 @@ const IDLE_CONTEXT: CommandContext = {
 	gotoTypeDefinition: noop,
 	quickDoc: noop,
 	restartLsp: noop,
+	openNotes: noop,
 };
 
 /** Read a repo file, failing the test with its name instead of an opaque fs error. */

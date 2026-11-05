@@ -123,10 +123,22 @@ function fail(message: string): never {
 	process.exit(1);
 }
 
-function notesFromGit(tag: string): string {
+/**
+ * The notes published with a release, taken from the commits since the last tag.
+ *
+ * The tag being cut lives on the server until `gh release create` makes it, so it cannot anchor the
+ * range: the previous tag reachable from HEAD does, and the commits after it are this release.
+ * Version bumps are dropped because they say nothing about the change.
+ */
+function notesFromGit(): string {
 	try {
-		const previous = run("git", ["describe", "--tags", "--abbrev=0", `${tag}^`]).trim();
-		return run("git", ["log", "--no-merges", "--pretty=format:- %s", `${previous}..${tag}`]);
+		const previous = run("git", ["describe", "--tags", "--abbrev=0", "HEAD"]).trim();
+		const log = run("git", ["log", "--no-merges", "--pretty=format:%s", `${previous}..HEAD`])
+			.split("\n")
+			.map((line) => line.trim())
+			.filter((line) => line !== "" && !/^chore: bump to /.test(line));
+		if (log.length === 0) return `No user-visible changes since ${previous}.`;
+		return [`Changes since ${previous}:`, "", ...log.map((line) => `- ${line}`)].join("\n");
 	} catch {
 		return "Local alpha build.";
 	}
@@ -276,7 +288,7 @@ async function main(): Promise<number> {
 	writeFileSync(LATEST, `${JSON.stringify(latest, null, 2)}\n`);
 
 	if (arg("--notes") === null) {
-		const notes = notesFromGit(tag);
+		const notes = notesFromGit();
 		latest.notes = notes;
 		writeFileSync(LATEST, `${JSON.stringify(latest, null, 2)}\n`);
 	}

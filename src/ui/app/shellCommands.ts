@@ -74,6 +74,7 @@ export function shellCommands(options: {
 		quickDoc: lsp.quickDoc,
 		refreshGit: () => git.setRefreshToken((current) => current + 1),
 		restartLsp: options.restartLsp,
+		openNotes: () => overlays.setNotesOpen(true),
 		toggleBlame: () => git.setBlameOn((current) => !current),
 		newProject: () => panels.setNewProjectOpen(true),
 		checkUpdates: () => {

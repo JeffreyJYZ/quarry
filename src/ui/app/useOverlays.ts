@@ -26,6 +26,7 @@ export function useOverlays() {
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [quickOpenOpen, setQuickOpenOpen] = useState(false);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
+	const [notesOpen, setNotesOpen] = useState(false);
 	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 	const [recentCommands, setRecentCommands] = useState<string[]>([]);
 	const [gotoMode, setGotoMode] = useState<GotoMode | null>(null);
@@ -56,6 +57,8 @@ export function useOverlays() {
 		quickOpenOpen,
 		setQuickOpenOpen,
 		shortcutsOpen,
+		notesOpen,
+		setNotesOpen,
 		setShortcutsOpen,
 		commandPaletteOpen,
 		setCommandPaletteOpen,
