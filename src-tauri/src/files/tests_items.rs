@@ -54,7 +54,7 @@ pub mod tests {
 
     #[test]
     fn ignored_set_covers_every_skipped_name() {
-        for name in ["target", "node_modules", "dist", ".git", ".quarry"] {
+        for name in ignore::DIRS {
             assert!(ignore::is_dir(name), "{name} should be ignored");
         }
         assert!(!ignore::is_dir("src"));
@@ -117,6 +117,36 @@ pub mod tests {
         }
         let result = collect(&fixture.path, 2).expect("collect");
         assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn collect_skips_generated_cmake_output() {
+        let fixture = Fixture::new("cmake");
+        fixture.dir("CMakeFiles");
+        fixture.file("CMakeFiles/main.dir/main.cpp.o", "x");
+        fixture.file("CMakeCache.txt", "x");
+        fixture.file("cmake_install.cmake", "x");
+        fixture.dir("cmake-build-debug");
+        fixture.file("cmake-build-debug/build.ninja", "x");
+        fixture.dir(".cache/clangd/index");
+        fixture.file(".cache/clangd/index/main.cpp.idx", "x");
+        fixture.dir("src");
+        fixture.file("src/main.cpp", "x");
+
+        let result = collect(&fixture.path, MAX_FILES).expect("collect");
+        assert_eq!(result.len(), 1);
+        assert!(result[0].ends_with("src/main.cpp"));
+    }
+
+    #[test]
+    fn collect_skips_ignored_files() {
+        let fixture = Fixture::new("ignored-file");
+        fixture.file(".DS_Store", "x");
+        fixture.file("kept.rs", "x");
+
+        let result = collect(&fixture.path, MAX_FILES).expect("collect");
+        assert_eq!(result.len(), 1);
+        assert!(result[0].ends_with("kept.rs"));
     }
 
     #[test]

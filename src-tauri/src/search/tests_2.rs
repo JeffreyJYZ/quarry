@@ -42,29 +42,25 @@ pub mod tests_group_2 {
             .get_args()
             .map(|a| a.to_string_lossy().into_owned())
             .collect();
-        assert_eq!(
-            args,
-            vec![
-                "--json",
-                "--line-number",
-                "--smart-case",
-                "--no-heading",
-                "--color=never",
-                "-g",
-                "!target",
-                "-g",
-                "!node_modules",
-                "-g",
-                "!dist",
-                "-g",
-                "!.git",
-                "-g",
-                "!.quarry",
-                "-e",
-                "needle",
-                "/projects/demo",
-            ]
-        );
+        let mut expected = vec![
+            "--json".to_string(),
+            "--line-number".to_string(),
+            "--smart-case".to_string(),
+            "--no-heading".to_string(),
+            "--color=never".to_string(),
+        ];
+        // The exact globs are pinned in `ignore`; here only their placement matters, so search and
+        // quick open read the same set without this test restating it.
+        for excluded in crate::ignore::ripgrep_excludes() {
+            expected.push("-g".to_string());
+            expected.push(excluded);
+        }
+        expected.extend([
+            "-e".to_string(),
+            "needle".to_string(),
+            "/projects/demo".to_string(),
+        ]);
+        assert_eq!(args, expected);
     }
 
     #[test]

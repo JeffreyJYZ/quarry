@@ -1,7 +1,7 @@
 //! Fast file listing for quick-open.
 //!
-//! Contract: list project files once, honour the same ignore set as search, and never walk into
-//! `target`, `node_modules`, `dist`, `.git` or `.quarry`.
+//! Contract: list project files once, honour the same ignore set as search, and never walk into an
+//! ignored directory or list an ignored file — `crate::ignore` is the one list both read.
 
 #![allow(unused_imports)]
 /// Directories that are never descended into (shared with the rest of the crate).
