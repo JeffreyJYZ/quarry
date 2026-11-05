@@ -62,6 +62,10 @@ pub fn walk(dir: &Path, files: &mut Vec<String>, cap: usize) {
             }
             walk(&path, files, cap);
         } else if metadata.is_file() && files.len() < cap {
+            let name = entry.file_name();
+            if ignore::is_file(name.to_string_lossy().as_ref()) {
+                continue;
+            }
             files.push(path.to_string_lossy().into_owned());
         }
     }
