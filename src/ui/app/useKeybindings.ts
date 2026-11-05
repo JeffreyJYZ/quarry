@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { inTerminal } from "@/ui/app/focusGuard";
+import { useMetaShortcuts } from "@/ui/app/useMetaShortcuts";
 import { useTabKeybindings } from "@/ui/app/useTabKeybindings";
 
 type Cursor = { line: number; character: number } | null;
@@ -35,6 +36,8 @@ export type KeybindingContext = {
 	closeActiveTab: () => void;
 	cycleTab: (step: number) => void;
 	reopenClosedTab: () => void;
+	/** Stop every running server for the root and start it again. */
+	restartLsp: () => void;
 };
 
 function inEditor(): boolean {
@@ -186,14 +189,8 @@ export function useKeybindings(context: KeybindingContext): void {
 		return () => window.removeEventListener("keydown", handleKeyDown, true);
 	}, [context.zoomEditor]);
 
-	/** Cmd+Shift+P opens the command palette. */ useEffect(() => {
-		const handleKeyDown = (event: KeyboardEvent) => {
-			if (!event.metaKey || event.ctrlKey || event.altKey || !event.shiftKey) return;
-			if (event.key.toLowerCase() !== "p") return;
-			event.preventDefault();
-			context.setCommandPaletteOpen(true);
-		};
-		window.addEventListener("keydown", handleKeyDown, true);
-		return () => window.removeEventListener("keydown", handleKeyDown, true);
-	}, [context.setCommandPaletteOpen]);
+	useMetaShortcuts({
+		restartLsp: context.restartLsp,
+		setCommandPaletteOpen: context.setCommandPaletteOpen,
+	});
 }

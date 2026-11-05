@@ -43,10 +43,11 @@ export function useShellKeymaps(options: {
 	activePath: string | null;
 	cursor: Cursor;
 	panelExpanded: boolean;
+	restartLsp: () => void;
 }) {
 	const { workspace, overlays, panels, settings, save, runs, debug, editorActions, lsp } =
 		options;
-	const { runDebug, root, activePath, cursor, panelExpanded } = options;
+	const { runDebug, root, activePath, cursor, panelExpanded, restartLsp } = options;
 	const tabKeys = useTabKeys(workspace);
 	useGotoLineKey({ activePath, open: () => overlays.setLineOpen(true) });
 
@@ -55,6 +56,7 @@ export function useShellKeymaps(options: {
 		activePath,
 		cursor,
 		panelExpanded,
+		restartLsp,
 		activePathRef: workspace.activePathRef,
 		railCollapsed: panels.railCollapsed,
 		gitOpen: panels.gitOpen,

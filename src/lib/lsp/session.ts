@@ -27,6 +27,7 @@ function useOneServer(
 	report: (message: string) => void,
 	path: string,
 	args: string[],
+	restartToken: number,
 ): LspStatus | null {
 	const [status, setStatus] = useState<LspStatus | null>(null);
 	const reportRef = useRef(report);
@@ -55,7 +56,7 @@ function useOneServer(
 				reportRef.current(`${kind} stop: ${describeError(error)}`);
 			});
 		};
-	}, [root, kind, enabled, path, args.join(" ")]);
+	}, [root, kind, enabled, path, args.join(" "), restartToken]);
 
 	return status;
 }
@@ -65,6 +66,7 @@ export function useLspServers(
 	signals: RootSignals | null,
 	report: (message: string) => void,
 	overrides: Partial<Record<ServerKind, { path?: string; args?: string[] }>> = {},
+	restartToken = 0,
 ): LspStatusMap {
 	const kinds = signals === null ? [] : serversForRoot(signals);
 	const rustEnabled = kinds.includes("rust-analyzer");
@@ -78,6 +80,7 @@ export function useLspServers(
 		report,
 		rustOverrides.path ?? "",
 		rustOverrides.args ?? [],
+		restartToken,
 	);
 	const clangStatus = useOneServer(
 		root,
@@ -86,6 +89,7 @@ export function useLspServers(
 		report,
 		clangOverrides.path ?? "",
 		clangOverrides.args ?? [],
+		restartToken,
 	);
 	// A stable map: `useDocumentSync` keys its open/close effect on it, so a fresh object each render
 	// would close and reopen the document on every render — and a close publishes empty diagnostics,

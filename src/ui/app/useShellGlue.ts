@@ -38,6 +38,7 @@ export type GlueOptions = {
 	cursor: { line: number; character: number } | null;
 	onNotice?: (message: string | null) => void;
 	panelExpanded: boolean;
+	restartLsp: () => void;
 	snapshotRef: { current: SessionSnapshot };
 };
 
@@ -60,7 +61,8 @@ export function useShellGlue(options: GlueOptions) {
 		editorActions,
 		diagnostics,
 	} = options;
-	const { debug, root, activePath, cursor, panelExpanded, snapshotRef, onNotice } = options;
+	const { debug, root, activePath, cursor, panelExpanded, snapshotRef, onNotice, restartLsp } =
+		options;
 
 	const lspCommands = makeLspCommandHandlers({
 		workspace,
@@ -108,6 +110,7 @@ export function useShellGlue(options: GlueOptions) {
 		activePath,
 		cursor,
 		panelExpanded,
+		restartLsp,
 	});
 
 	const commands = shellCommands({
@@ -126,6 +129,7 @@ export function useShellGlue(options: GlueOptions) {
 		lsp: lspCommands,
 		run: runDebug.run,
 		debugNow: runDebug.debugNow,
+		restartLsp,
 	});
 
 	useSessionPersistence({

@@ -1,9 +1,10 @@
 import { useCallback, useRef, useState } from "react";
 import { useDebugSession } from "@/lib/debug/session";
+import { lspOverridesFrom } from "@/ui/app/lspOverrides";
+import { useLspRestart } from "@/ui/app/useLspRestart";
 import { useLspWiring } from "@/ui/app/useLspWiring";
 import type { ServerKind } from "@/lib/lsp/served";
 import type { RunConfiguration } from "@/lib/project/api";
-import { splitArgs } from "@/lib/run/splitArgs";
 import { useTests } from "@/lib/tests/useTests";
 import { useBuild } from "@/ui/app/useBuild";
 import { useDiagnosticsState } from "@/ui/app/useDiagnosticsState";
@@ -88,13 +89,8 @@ export function useShell() {
 
 	const reportNotice = useCallback((message: string) => setNotice(message), []);
 	const active = workspace.buffers.find((buffer) => buffer.path === activePath) ?? null;
-	const lspOverrides = {
-		"rust-analyzer": {
-			path: effective.rustAnalyzerPath,
-			args: splitArgs(effective.rustAnalyzerArgs),
-		},
-		clangd: { path: effective.clangdPath, args: splitArgs(effective.clangdArgs) },
-	};
+	const lspOverrides = lspOverridesFrom(effective);
+	const lspRestart = useLspRestart(reportNotice);
 	const lspStatuses = useLspWiring({
 		root,
 		activePath: active?.path ?? null,
@@ -102,6 +98,7 @@ export function useShell() {
 		report: reportNotice,
 		overrides: lspOverrides,
 		runningRef: lspRunningRef,
+		restartToken: lspRestart.token,
 	});
 	const debug = useDebugSession(root, settings.buildProfile);
 	const diagnostics = useDiagnosticsState({ root, onError: reportNotice });
@@ -164,6 +161,7 @@ export function useShell() {
 		panelExpanded,
 		snapshotRef,
 		onNotice: setNotice,
+		restartLsp: lspRestart.restart,
 	});
 
 	return {
@@ -180,6 +178,7 @@ export function useShell() {
 		debug,
 		tests,
 		lspStatuses,
+		restartLsp: lspRestart.restart,
 		notice,
 		setNotice,
 		commands,

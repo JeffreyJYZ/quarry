@@ -34,6 +34,7 @@ export function shellCommands(options: {
 	lsp: LspCommandHandlers;
 	run: () => void;
 	debugNow: () => void;
+	restartLsp: () => void;
 }): Command[] {
 	const { root, activePath, cursor, panelExpanded, workspace, overlays, panels } = options;
 	const { git, save, build, runs, debug, lsp } = options;
@@ -72,6 +73,7 @@ export function shellCommands(options: {
 		gotoTypeDefinition: lsp.gotoTypeDefinition,
 		quickDoc: lsp.quickDoc,
 		refreshGit: () => git.setRefreshToken((current) => current + 1),
+		restartLsp: options.restartLsp,
 		toggleBlame: () => git.setBlameOn((current) => !current),
 		newProject: () => panels.setNewProjectOpen(true),
 		checkUpdates: () => {

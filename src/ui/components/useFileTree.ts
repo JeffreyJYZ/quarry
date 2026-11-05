@@ -12,6 +12,8 @@ export type FileTreeProps = {
 	onFileRenamed?: (oldPath: string, newPath: string) => void;
 	onFileDeleted?: (path: string) => void;
 	onNotice?: (message: string) => void;
+	/** Right-click action: stop and start the language server for the open project. */
+	onRestartLsp?: () => void;
 	changes?: Record<string, import("@/lib/project/api").GitStatusEntry["status"]>;
 	revealToken?: number;
 };

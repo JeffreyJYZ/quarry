@@ -46,6 +46,7 @@ const IDLE_CONTEXT: CommandContext = {
 	gotoImplementation: noop,
 	gotoTypeDefinition: noop,
 	quickDoc: noop,
+	restartLsp: noop,
 };
 
 /** Read a repo file, failing the test with its name instead of an opaque fs error. */
@@ -93,5 +94,27 @@ describe("native menu contract", () => {
 		expect(extractShellIds(readSource(SHELL_GLUE)).filter((id) => !menuIds.has(id))).toEqual(
 			[],
 		);
+	});
+});
+
+describe("restart language server", () => {
+	test("is a palette row that is disabled with no project", () => {
+		const command = buildCommands(IDLE_CONTEXT).find((entry) => entry.id === "restart-lsp");
+		expect(command?.label).toBe("Restart language server");
+		expect(command?.disabled).toBe(true);
+	});
+
+	test("is enabled and runs the restart once a project is open", () => {
+		let restarted = 0;
+		const command = buildCommands({
+			...IDLE_CONTEXT,
+			root: "/p",
+			restartLsp: () => {
+				restarted += 1;
+			},
+		}).find((entry) => entry.id === "restart-lsp");
+		expect(command?.disabled).toBe(false);
+		command?.run();
+		expect(restarted).toBe(1);
 	});
 });

@@ -1,5 +1,6 @@
 import type { Command } from "@/ui/palette/CommandPalette";
 import type { CommandContext } from "./commands";
+import { lspCommands } from "./lspPaletteCommand";
 import { navigationCommands } from "./navigationCommands";
 
 /**
@@ -158,6 +159,7 @@ export function buildCommands(context: CommandContext): Command[] {
 			disabled: root === null,
 			run: context.refreshGit,
 		},
+		...lspCommands(context),
 		{
 			id: "toggle-blame",
 			label: "Toggle blame annotations",
