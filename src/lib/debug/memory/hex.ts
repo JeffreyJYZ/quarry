@@ -1,16 +1,8 @@
 /** Address parsing and formatting shared by the hex and disassembly panes. */
 
-/** Bytes rendered per row when no width has been chosen. */
-export const ROW_BYTES = 16;
+import { OFFSET_DIGITS, ROW_BYTES } from "@/lib/consts/memory";
 
-/** Row widths the hex pane offers, in bytes. */
-export const ROW_WIDTHS = [8, 16, 32];
-
-/** Hex digits the offset column is padded to. */
-export const OFFSET_DIGITS = 4;
-
-/** Largest count one `readMemory` call may ask for. */
-export const CHUNK_BYTES = 256;
+export { CHUNK_BYTES, OFFSET_DIGITS, ROW_BYTES, ROW_WIDTHS } from "@/lib/consts/memory";
 
 /**
  * Parse an address that may arrive bare (`16fdfdcbc`), prefixed (`0x1000014B8`), or in the data

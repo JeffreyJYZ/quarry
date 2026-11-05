@@ -15,10 +15,7 @@ export type ThemePreferences = {
 	customThemes: Theme[];
 };
 
-export const DEFAULT_THEME_PREFERENCES: ThemePreferences = {
-	theme: DEFAULT_THEME_ID,
-	customThemes: [],
-};
+export { DEFAULT_THEME_PREFERENCES } from "@/lib/consts/themes";
 
 /** A stale or misspelled id resolves to the default instead of leaving the app unpainted. */
 export function normalizeThemePreferences(source: Record<string, unknown>): ThemePreferences {

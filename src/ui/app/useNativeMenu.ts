@@ -1,29 +1,9 @@
 import { useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 
-export const MENU_COMMAND_IDS: ReadonlySet<string> = new Set([
-	"check-updates",
-	"open-settings",
-	"new-project",
-	"open-project",
-	"save",
-	"save-all",
-	"find-in-project",
-	"quick-open",
-	"toggle-rail",
-	"toggle-dock",
-	"toggle-terminal",
-	"toggle-source-control",
-	"toggle-debug",
-	"toggle-blame",
-	"show-shortcuts",
-	"build",
-	"run",
-	"stop-run",
-	"run-to-cursor",
-	"refresh-git",
-	"reveal-active-file",
-]);
+import { MENU_COMMAND_IDS } from "@/lib/consts/app";
+
+export { MENU_COMMAND_IDS } from "@/lib/consts/app";
 
 export function isMenuCommand(id: string): boolean {
 	return MENU_COMMAND_IDS.has(id);

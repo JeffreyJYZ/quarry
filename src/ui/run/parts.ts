@@ -1,6 +1,7 @@
 import type { EnvVar } from "@/lib/project/api";
+import { NAME_RE } from "@/lib/consts/run";
 
-export const NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+export { NAME_RE } from "@/lib/consts/run";
 
 export function envProblem(env: EnvVar[]): string | null {
 	let problem: string | null = null;

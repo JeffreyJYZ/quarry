@@ -13,14 +13,7 @@ export type DebugStatus = "idle" | "launching" | "running" | "stopped";
 
 export type StepKind = "next" | "stepIn" | "stepOut";
 
-/** Select value of the preset-free Cargo launch; no preset file is expected to define this name. */
-export const CARGO_DEFAULT = "cargo:no-preset";
-
-/** The label the Cargo entry carries in the select. */
-export const CARGO_LABEL = "Cargo binary (no preset)";
-
-/** The preset-free launch runs like a preset that does not stop on entry. */
-export const CARGO_STOP_ON_ENTRY = false;
+export { CARGO_DEFAULT, CARGO_LABEL, CARGO_STOP_ON_ENTRY } from "@/lib/consts/debug";
 
 /** One row of the launch select: the Cargo entry first when the project can resolve one. */
 export type PresetEntry = { value: string; label: string };

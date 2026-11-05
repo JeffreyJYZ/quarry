@@ -1,5 +1,4 @@
-export const STALE_MS = 30_000;
-export const RECENT_LIMIT = 30;
+export { RECENT_LIMIT, STALE_MS } from "@/lib/consts/quickopen";
 
 export type CacheEntry = { files: string[]; fetchedAt: number };
 

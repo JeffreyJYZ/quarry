@@ -6,6 +6,8 @@
  * hand-edited file must never produce a zero-width rail or a dock taller than the window.
  */
 
+import { DEFAULT_PANEL_SIZES, PANEL_LIMITS } from "@/lib/consts/layout";
+
 export type PanelSizes = {
 	railWidth: number;
 	dockHeight: number;
@@ -17,21 +19,12 @@ export type PanelSizes = {
 
 export type PanelName = keyof PanelSizes;
 
-export const DEFAULT_PANEL_SIZES: PanelSizes = {
-	railWidth: 240,
-	dockHeight: 260,
-	terminalHeight: 180,
-	terminalWidth: 380,
-	outlineHeight: 200,
-};
-
-export const PANEL_LIMITS: Record<PanelName, { min: number; max: number }> = {
-	railWidth: { min: 160, max: 560 },
-	dockHeight: { min: 120, max: 900 },
-	terminalHeight: { min: 100, max: 900 },
-	terminalWidth: { min: 240, max: 900 },
-	outlineHeight: { min: 80, max: 600 },
-};
+export {
+	DEFAULT_PANEL_SIZES,
+	PANEL_LIMITS,
+	PANEL_STEP,
+	PANEL_STEP_LARGE,
+} from "@/lib/consts/layout";
 
 export function clampPanel(name: PanelName, value: number): number {
 	if (!Number.isFinite(value)) return DEFAULT_PANEL_SIZES[name];
@@ -62,7 +55,3 @@ export function clampPanelSizes(input: unknown): PanelSizes {
 export function resizePanel(sizes: PanelSizes, name: PanelName, px: number): PanelSizes {
 	return { ...sizes, [name]: clampPanel(name, px) };
 }
-
-/** Keyboard steps for a separator: a small nudge, and a page-sized jump with Shift. */
-export const PANEL_STEP = 8;
-export const PANEL_STEP_LARGE = 32;

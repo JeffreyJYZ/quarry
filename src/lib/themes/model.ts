@@ -6,37 +6,10 @@
  * `src/lib/editor/theme.ts` reads, so a switch repaints the editor without rebuilding its styles.
  */
 
-export const THEME_TOKENS = [
-	"bg",
-	"panel",
-	"rail",
-	"chrome",
-	"line",
-	"text",
-	"muted",
-	"accent",
-	"hover",
-	"danger",
-	"warn",
-	"good",
-	"keyword",
-	"type",
-	"string",
-	"comment",
-	"number",
-	"function",
-	"macro",
-	"operator",
-	"identifier",
-	"invalid",
-	"selection",
-	"activeLine",
-	"breakpoint",
-	"error",
-	"warning",
-	"info",
-	"hint",
-] as const;
+import { THEME_TOKENS } from "@/lib/consts/themes";
+
+export { DEFAULT_THEME_ID } from "@/lib/consts/themes";
+export { THEME_TOKENS };
 
 export type ThemeToken = (typeof THEME_TOKENS)[number];
 export type ThemeTokens = Record<ThemeToken, string>;
@@ -51,7 +24,6 @@ export type Theme = {
 };
 
 /** One Dark is the default, and also what `1-root.css` keeps as its first-paint fallback. */
-export const DEFAULT_THEME_ID = "one-dark";
 
 const TOKEN_VARS: Record<ThemeToken, string> = {
 	bg: "--bg",

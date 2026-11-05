@@ -15,8 +15,9 @@ export type Loaded = {
 	bytes: Array<number | null>;
 };
 
-export const PAGE_SIZES = [64, 256, 1024];
-export const DEFAULT_PAGE = 256;
+import { DEFAULT_PAGE } from "@/lib/consts/memory";
+
+export { DEFAULT_PAGE, PAGE_SIZES } from "@/lib/consts/memory";
 
 const ROW_WIDTH_KEY = "quarry.memory.rowWidth";
 const PAGE_SIZE_KEY = "quarry.memory.pageSize";

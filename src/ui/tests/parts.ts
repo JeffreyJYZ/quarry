@@ -2,9 +2,9 @@ import type { TestItem, TestReport } from "@/lib/project/api";
 
 export type DockTab = "problems" | "tests" | "run" | "debugger" | "console" | "memory";
 
-/** Every tab in order; a stored value is validated against this list, not a second copy of it. */
-export const DOCK_TABS: DockTab[] = ["problems", "tests", "run", "debugger", "console", "memory"];
+import { DOCK_TABS, OUTPUT_LINE_CAP } from "@/lib/consts/tests";
 
+export { DOCK_TABS, OUTPUT_LINE_CAP, RUNNING_GLYPH } from "@/lib/consts/tests";
 export function isDockTab(value: unknown): value is DockTab {
 	return typeof value === "string" && (DOCK_TABS as string[]).includes(value);
 }
@@ -25,9 +25,6 @@ export function runTabStatus(input: {
 	}
 	return `exit ${input.exited.code}`;
 }
-
-export const OUTPUT_LINE_CAP = 200;
-export const RUNNING_GLYPH = "◦";
 
 export type TestGroup = {
 	binary: string;

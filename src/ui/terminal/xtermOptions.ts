@@ -1,12 +1,10 @@
 import type { ITerminalOptions, Terminal } from "@xterm/xterm";
 
 import type { TerminalCursorStyle } from "@/lib/settings/terminal";
+import { MONO_STACK } from "@/lib/consts/terminal";
 import { XTERM_THEME } from "@/ui/terminal/xtermTheme";
 
-/** The app token `--mono`, repeated because a canvas cannot inherit a CSS variable. */
-export const MONO_STACK = 'ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace';
-
-export const SCROLLBACK = 5000;
+export { MONO_STACK, SCROLLBACK } from "@/lib/consts/terminal";
 
 /** An empty prop means "the app stack"; the settings page owns any explicit family. */
 export function xtermFontFamily(fontFamily: string): string {
