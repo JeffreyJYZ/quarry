@@ -32,6 +32,8 @@ export type SideRailProps = {
 	onOpenGitFile: (path: string) => void;
 	onFileRenamed: (oldPath: string, newPath: string) => void;
 	onFileDeleted: (path: string) => void;
+	/** Tree actions report a failure here; without it a refused create or rename does nothing at all. */
+	onNotice: (message: string) => void;
 	onReveal: () => void;
 	onRefresh: () => Promise<void>;
 	onDiff: (path: string | null) => void;
@@ -83,6 +85,7 @@ export default function SideRail(props: SideRailProps) {
 						onOpenFile={props.onOpenFile}
 						onFileRenamed={props.onFileRenamed}
 						onFileDeleted={props.onFileDeleted}
+						onNotice={props.onNotice}
 						revealToken={props.revealToken}
 						changes={props.changes}
 						onRestartLsp={props.onRestartLsp}
