@@ -1,32 +1,28 @@
 /** Which language server a project runs, and which files that server actually serves. */
 
+import { CPP_EXTENSIONS, RUST_EXTENSIONS, dotted, extensionOf } from "@/lib/consts/extensions";
+
 export type ServerKind = "rust-analyzer" | "clangd";
 
-const RUST_EXTENSIONS = [".rs"];
-const CLANG_EXTENSIONS = [".c", ".h", ".cc", ".cpp", ".cxx", ".hh", ".hpp"];
-
 const EXTENSIONS: Record<ServerKind, readonly string[]> = {
-	"rust-analyzer": RUST_EXTENSIONS,
-	clangd: CLANG_EXTENSIONS,
+	"rust-analyzer": dotted(RUST_EXTENSIONS),
+	clangd: dotted(CPP_EXTENSIONS),
 };
 
-export function extensionOf(path: string): string {
-	const normalized = path.replace(/\\/g, "/");
-	const lastSlash = normalized.lastIndexOf("/");
-	const base = lastSlash >= 0 ? normalized.slice(lastSlash + 1) : normalized;
-	const dot = base.lastIndexOf(".");
-	if (dot <= 0) {
-		return "";
-	}
-	return base.slice(dot).toLowerCase();
+export { extensionOf };
+
+/** The extension with its dot, which is the form the tables above use. */
+function dottedExtensionOf(path: string): string {
+	const extension = extensionOf(path);
+	return extension === "" ? "" : `.${extension}`;
 }
 
 export function servesPath(kind: ServerKind, path: string | null): boolean {
 	if (path === null || path === "") {
 		return false;
 	}
-	const ext = extensionOf(path);
-	return EXTENSIONS[kind].includes(ext);
+	const ext = dottedExtensionOf(path);
+	return ext !== "" && EXTENSIONS[kind].includes(ext);
 }
 
 export function servedExtensions(kind: ServerKind): readonly string[] {
@@ -69,7 +65,7 @@ export function serverKindForPath(path: string | null): ServerKind | null {
 	if (path === null || path === "") {
 		return null;
 	}
-	const ext = extensionOf(path);
+	const ext = dottedExtensionOf(path);
 	for (const kind of Object.keys(EXTENSIONS) as ServerKind[]) {
 		if (EXTENSIONS[kind].includes(ext)) {
 			return kind;

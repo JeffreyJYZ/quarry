@@ -1,20 +1,11 @@
 import { useEffect, useState } from "react";
+import { isCppPath } from "@/lib/consts/extensions";
 import { listDir } from "@/lib/project/api";
 import type { RootSignals } from "@/lib/lsp/served";
 
 const SKIP_DIRS = new Set(["target", "node_modules", ".git", "build", "out"]);
 const MAX_DEPTH = 4;
 const MAX_DIRS = 64;
-
-const CPP_EXTENSIONS = new Set([".c", ".h", ".cc", ".cpp", ".cxx", ".hh", ".hpp"]);
-
-function extensionOf(name: string): string {
-	const dot = name.lastIndexOf(".");
-	if (dot <= 0) {
-		return "";
-	}
-	return name.slice(dot).toLowerCase();
-}
 
 /** Pure decision: turn gathered facts into RootSignals. */
 export function decideRootSignals(facts: {
@@ -116,7 +107,7 @@ async function scanForCpp(dir: string, depth: number, budget: { count: number })
 	}
 	budget.count += 1;
 	for (const entry of entries) {
-		if (!entry.isDir && CPP_EXTENSIONS.has(extensionOf(entry.name))) {
+		if (!entry.isDir && isCppPath(entry.name)) {
 			return true;
 		}
 	}

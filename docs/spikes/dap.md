@@ -95,11 +95,11 @@ One `initCommands` entry is enough on rustc 1.99.0; that toolchain ships no `lld
 
 Two caveats worth knowing before P3 builds on it. `hitBreakpointIds` is `null` on that stop, so a stop cannot be attributed by id — only by `description` (`"watchpoint 1"`) and by re-reading the watched address. And the reported stop line is `12`, the line _after_ the store on line 11; LLDB reports the post-store PC, so watchpoint stops land one line late in the gutter.
 
-## `evaluate` is broken for Rust
+## `evaluate` without a frame id is broken for Rust — superseded, see the note
 
 > **Superseded (2026-10-27).** The failures below were measured with requests that omitted `frameId`.
-> With the stopped frame's id attached, `watch` evaluates Rust (and C) correctly. See
-> `docs/spikes/evaluate.md`.
+> With the stopped frame's id attached, `watch` evaluates Rust (and C) correctly, so this is not an
+> open gap. See `docs/spikes/evaluate.md`.
 
 `evaluate` with `{"expression": "*raw@8", "context": "watch"}`:
 
@@ -109,7 +109,7 @@ error: <user expression 0>:1:5: expected ';' after expression
 error: <user expression 0>:1:5: definition of class NSNumber must be available to use Objective-C numeric literals
 ```
 
-So a Rust watch/expression pane cannot rely on `evaluate` as-is: lldb-dap falls back to Objective-C++ and fails on Rust syntax.
+So a Rust watch/expression pane cannot rely on `evaluate` **without a frame id**: lldb-dap falls back to Objective-C++ and fails on Rust syntax. Attach the frame id and it works; `docs/spikes/evaluate.md` has the measured behaviour.
 
 ## What this means for P3/P4
 

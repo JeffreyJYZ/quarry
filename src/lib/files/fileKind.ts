@@ -1,24 +1,23 @@
 /** File-type classification for a file name: kinds enough to tell a source file from a manifest at a glance. */
 
+import { CPP_EXTENSIONS, RUST_EXTENSIONS, extensionOf } from "@/lib/consts/extensions";
+
 export type FileKind =
 	"rust" | "c" | "cpp" | "toml" | "json" | "markdown" | "lock" | "git" | "generic";
 
 const EXTENSIONS: Record<string, FileKind> = {
-	rs: "rust",
-	c: "c",
-	h: "c",
-	cc: "cpp",
-	cpp: "cpp",
-	cxx: "cpp",
-	hh: "cpp",
-	hpp: "cpp",
-	hxx: "cpp",
 	toml: "toml",
 	json: "json",
 	md: "markdown",
 	markdown: "markdown",
 	lock: "lock",
 };
+for (const extension of CPP_EXTENSIONS) {
+	EXTENSIONS[extension] = extension === "c" || extension === "h" ? "c" : "cpp";
+}
+for (const extension of RUST_EXTENSIONS) {
+	EXTENSIONS[extension] = "rust";
+}
 
 const NAMES: Record<string, FileKind> = {
 	"cargo.toml": "toml",
@@ -39,7 +38,7 @@ export function fileKind(name: string): FileKind {
 	const named = NAMES[lower];
 	if (named !== undefined) return named;
 	if (lower === "build.rs") return "rust";
-	const dot = lower.lastIndexOf(".");
-	if (dot === -1) return "generic";
-	return EXTENSIONS[lower.slice(dot + 1)] ?? "generic";
+	const extension = extensionOf(lower);
+	if (extension === "") return "generic";
+	return EXTENSIONS[extension] ?? "generic";
 }
