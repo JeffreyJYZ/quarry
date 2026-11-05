@@ -5,8 +5,6 @@
  * The model and the settings module import these, so a new token or theme is added here once.
  */
 
-import type { ITheme } from "@xterm/xterm";
-
 import { ayuDark } from "@/lib/themes/builtin/ayu-dark";
 import { catppuccinMocha } from "@/lib/themes/builtin/catppuccin-mocha";
 import { gruvboxDark } from "@/lib/themes/builtin/gruvbox-dark";
@@ -79,12 +77,43 @@ export const DEFAULT_THEME_PREFERENCES: ThemePreferences = {
 };
 
 /**
+ * The xterm palette shape.
+ *
+ * Declared structurally rather than imported from `@xterm/xterm`: the docs site builds `website/`
+ * against `src/lib` through the `@/` alias and has no xterm dependency, so an import here broke its
+ * type check. `xterm` accepts this structurally where the palette is handed over.
+ */
+export type TerminalPalette = {
+	background: string;
+	foreground: string;
+	cursor: string;
+	cursorAccent: string;
+	selectionBackground: string;
+	black: string;
+	red: string;
+	green: string;
+	yellow: string;
+	blue: string;
+	magenta: string;
+	cyan: string;
+	white: string;
+	brightBlack: string;
+	brightRed: string;
+	brightGreen: string;
+	brightYellow: string;
+	brightBlue: string;
+	brightMagenta: string;
+	brightCyan: string;
+	brightWhite: string;
+};
+
+/**
  * xterm in Zed's One Dark, so the terminal matches the editor beside it.
  *
  * The ANSI names are One Dark's own terminal palette rather than a guess: the bright variants are
  * the ones that theme ships, which is why they are not simply lightened.
  */
-export const XTERM_THEME: ITheme = {
+export const XTERM_THEME: TerminalPalette = {
 	background: "#282c34",
 	foreground: "#abb2bf",
 	cursor: "#74ade8",
