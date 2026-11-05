@@ -11,8 +11,11 @@ export type NotesState = {
 /**
  * The notes for one version.
  *
- * Fetched once per version: the result is kept in a module-level cache so opening the prompt, the
- * panel and the palette row in one session costs a single request.
+ * Fetched once per version: an answer is kept in a module-level cache so opening the prompt, the
+ * panel and the palette row in one session costs a single request. Only a real answer is cached —
+ * a lookup that failed (offline, rate limited, timed out) is retried the next time the panel opens,
+ * because a cached failure would tell the user "No notes for this version" for the rest of the
+ * session over one bad moment on the network.
  */
 const cache = new Map<string, string[] | null>();
 
@@ -33,8 +36,8 @@ export function useReleaseNotes(version: string | null): NotesState {
 		let live = true;
 		const result = fetchReleaseNotes(version);
 		void result.then((notes) => {
-			cache.set(version, notes);
-			if (live) setState(cached(version));
+			if (notes !== null) cache.set(version, notes);
+			if (live) setState({ notes, failed: notes === null });
 		});
 		return () => {
 			live = false;
