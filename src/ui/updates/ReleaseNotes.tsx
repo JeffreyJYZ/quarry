@@ -28,15 +28,23 @@ export default function ReleaseNotes({
 		return () => window.removeEventListener("keydown", handle);
 	}, [variant, onClose]);
 
+	// A body written by release-local opens with "Changes since <tag>:", which is a heading, not
+	// a change: drawn as a bullet it reads like the first entry in its own list.
+	const lead = notes !== null && notes.length > 0 && notes[0].endsWith(":") ? notes[0] : null;
+	const items: string[] = notes === null ? [] : lead === null ? notes : notes.slice(1);
+
 	const body =
 		notes === null ? (
 			<p className="notes-empty">{failed ? "No notes for this version" : "Loading notes…"}</p>
 		) : (
-			<ul className="notes-list">
-				{notes.map((line) => (
-					<li key={line}>{line}</li>
-				))}
-			</ul>
+			<>
+				{lead === null ? null : <p className="notes-lead">{lead}</p>}
+				<ul className="notes-list">
+					{items.map((line) => (
+						<li key={line}>{line}</li>
+					))}
+				</ul>
+			</>
 		);
 
 	if (variant === "inline") {
