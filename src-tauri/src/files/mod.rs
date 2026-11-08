@@ -18,5 +18,8 @@ pub use rename_path::*;
 mod tests_items;
 pub use tests_items::*;
 
+mod tests_symlinks;
+pub use tests_symlinks::*;
+
 mod file_ops_tests_items;
 pub use file_ops_tests_items::*;
