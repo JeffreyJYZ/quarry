@@ -48,6 +48,7 @@ export default function AppBody({ model }: { model: ShellModel }) {
 				onOpenFile={workspace.handleOpenFile}
 				onRestartLsp={model.restartLsp}
 				onOpenGitFile={(path) => void workspace.openPath(path, fileName(path))}
+				onNotice={settings.onNotice}
 				onFileRenamed={(oldPath, newPath) => {
 					workspace.setBuffers((current) =>
 						current.map((buffer) =>
