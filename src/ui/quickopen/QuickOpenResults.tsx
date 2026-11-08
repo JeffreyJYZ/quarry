@@ -29,19 +29,23 @@ export function QuickOpenResults({
 		<div className="search-results" ref={listRef}>
 			{primary.trim() === "" ? (
 				<>
-					<div className="quick-open-group-label">Recent</div>
-					{recentPaths.map((path, index) => (
-						<QuickOpenRow
-							key={`recent-${path}`}
-							path={path}
-							root={root}
-							index={index}
-							active={index === active}
-							isOpen={openPaths.has(path)}
-							onSelect={() => onPick(path)}
-							onHover={() => onActive(index)}
-						/>
-					))}
+					{recentCount === 0 ? null : (
+						<>
+							<div className="quick-open-group-label">Recent</div>
+							{recentPaths.map((path, index) => (
+								<QuickOpenRow
+									key={`recent-${path}`}
+									path={path}
+									root={root}
+									index={index}
+									active={index === active}
+									isOpen={openPaths.has(path)}
+									onSelect={() => onPick(path)}
+									onHover={() => onActive(index)}
+								/>
+							))}
+						</>
+					)}
 					<div className="quick-open-group-label">All files</div>
 					{mainList.map((path, i) => {
 						const globalIndex = recentCount + i;
