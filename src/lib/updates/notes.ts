@@ -46,24 +46,52 @@ export function parseNotes(markdown: string): string[] {
 
 export type NotesFetch = (url: string) => Promise<{ ok: boolean; json: () => Promise<unknown> }>;
 
+/** How long a release lookup may take before the panel is told it failed. */
+export const NOTES_TIMEOUT_MS = 8000;
+
 /** The notes for one version, or `null` when the release or its body cannot be read. */
 export async function fetchReleaseNotes(
 	version: string,
 	fetchImpl: NotesFetch = fetch as unknown as NotesFetch,
+	timeoutMs: number = NOTES_TIMEOUT_MS,
 ): Promise<string[] | null> {
 	const tag = notesTagFor(version);
 	try {
-		const response = await fetchImpl(
-			`https://api.github.com/repos/${REPOSITORY}/releases/tags/${tag}`,
+		const response = await withTimeout(
+			fetchImpl(`https://api.github.com/repos/${REPOSITORY}/releases/tags/${tag}`),
+			timeoutMs,
 		);
 		if (!response.ok) return null;
-		const body = (await response.json()) as { body?: unknown };
+		const body = (await withTimeout(response.json(), timeoutMs)) as { body?: unknown };
 		if (typeof body.body !== "string") return null;
 		const notes = parseNotes(body.body);
 		return notes.length === 0 ? null : notes;
 	} catch {
 		return null;
 	}
+}
+
+/**
+ * `promise`, or a rejection once `ms` has passed.
+ *
+ * A request that stalls never settles, and the panel that awaits it would sit on "Loading notes…" for
+ * the rest of the session: the lookup happens while an update is already offered, so saying "no notes"
+ * after a bounded wait is worth more than an accurate answer that may never arrive.
+ */
+export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+	return new Promise<T>((resolve, reject) => {
+		const timer = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms);
+		promise.then(
+			(value) => {
+				clearTimeout(timer);
+				resolve(value);
+			},
+			(error) => {
+				clearTimeout(timer);
+				reject(error);
+			},
+		);
+	});
 }
 
 export const NOTES_SEEN_KEY = "quarry.releaseNotes.seen";
