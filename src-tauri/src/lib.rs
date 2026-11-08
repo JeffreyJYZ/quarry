@@ -56,6 +56,8 @@ pub fn run() {
             lsp::lsp_hover,
             lsp::lsp_definition,
             lsp::lsp_references,
+            lsp::lsp_implementation,
+            lsp::lsp_type_definition,
             lsp::lsp_completion,
             lsp::lsp_symbols,
             lsp::lsp_workspace_symbols,

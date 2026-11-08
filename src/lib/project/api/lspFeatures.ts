@@ -65,7 +65,9 @@ export function lspExecuteCommand(
 	args: unknown[] = [],
 ): Promise<unknown> {
 	requireSessionId("lsp_execute_command", root);
-	return invoke<unknown>("lsp_execute_command", { root, command, args });
+	// Tauri hands the Rust parameter `arguments` through under its own name; sending `args` left it None,
+	// so every command was executed with an empty argument list.
+	return invoke<unknown>("lsp_execute_command", { root, command, arguments: args });
 }
 
 export function lspReferences(

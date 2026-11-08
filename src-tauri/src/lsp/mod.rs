@@ -84,6 +84,9 @@ pub use hover_contents::*;
 mod parse_completion_item;
 pub use parse_completion_item::*;
 
+mod lsp_navigation;
+pub use lsp_navigation::*;
+
 mod parse_workspace_symbols;
 pub use parse_workspace_symbols::*;
 
