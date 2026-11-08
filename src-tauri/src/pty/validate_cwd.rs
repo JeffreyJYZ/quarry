@@ -99,15 +99,23 @@ pub fn pump(
 ) {
     let mut reader = reader;
     let mut buf = vec![0u8; BUF_SIZE];
+    let mut stream = Utf8Stream::default();
     loop {
         match reader.read(&mut buf) {
             Ok(0) => break,
             Ok(n) => {
-                let data = String::from_utf8_lossy(&buf[..n]).into_owned();
-                let _ = app.emit(OUTPUT_EVENT, output_payload(id, data));
+                // A character can straddle two reads, so the decoder holds its incomplete tail.
+                let data = stream.push(&buf[..n]);
+                if !data.is_empty() {
+                    let _ = app.emit(OUTPUT_EVENT, output_payload(id, data));
+                }
             }
             Err(_) => break,
         }
+    }
+    let rest = stream.finish();
+    if !rest.is_empty() {
+        let _ = app.emit(OUTPUT_EVENT, output_payload(id, rest));
     }
     let code = {
         let mut guard = lock(&child);
