@@ -1,4 +1,5 @@
 import { sessionForContext } from "@/lib/lsp/context";
+import { describeError } from "@/lib/project/errors";
 import { lspHover, lspImplementation, lspTypeDefinition } from "@/lib/project/api";
 import { renderMarkdown } from "@/lib/editor/markdown";
 import type { useWorkspace } from "@/ui/app/useWorkspace";
@@ -32,8 +33,11 @@ export function makeLspCommandHandlers(options: {
 						cursor.line,
 						cursor.character,
 					);
-				} catch {
-					locations = [];
+				} catch (error) {
+					// A refused request is not an empty answer: reporting it as "No implementation found"
+					// hides a missing endpoint behind what looks like a server result.
+					onNotice?.(describeError(error));
+					return;
 				}
 				if (locations.length === 0) {
 					onNotice?.("No implementation found");
@@ -59,8 +63,9 @@ export function makeLspCommandHandlers(options: {
 						cursor.line,
 						cursor.character,
 					);
-				} catch {
-					locations = [];
+				} catch (error) {
+					onNotice?.(describeError(error));
+					return;
 				}
 				if (locations.length === 0) {
 					onNotice?.("No type definition found");
@@ -81,8 +86,9 @@ export function makeLspCommandHandlers(options: {
 				let info: Awaited<ReturnType<typeof lspHover>> = null;
 				try {
 					info = await lspHover(session, activePath, cursor.line, cursor.character);
-				} catch {
-					info = null;
+				} catch (error) {
+					onNotice?.(describeError(error));
+					return;
 				}
 				if (info === null) {
 					onNotice?.("No documentation available");
