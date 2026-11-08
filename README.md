@@ -147,12 +147,12 @@ failures` writes one `path::test_name` line per failed test; per-test failure ou
 
 Still missing, and named here so it is not mistaken for done:
 
-- **No expression evaluation, so no watch expressions from expressions** — Rust expression evaluation cannot be
-  made to work through `lldb-dap` here: `evaluate` returns nothing usable across `repl`/`watch`/`hover`,
-  `settings set target.language rust` changes nothing, and `setExpression` kills the adapter. A watch pane can
-  still watch pinned in-scope variables (re-read on each stop) plus memory views, but not arbitrary
-  expressions, until a different adapter or toolchain is measured (see `docs/spikes/dap.md`, "Evaluate probe
-  (2026-10-22)").
+- **Expression evaluation works, within measured limits** — `evaluate` answers in `watch`, `repl` and
+  `variables` against Xcode's `lldb-dap` as long as the request carries a `frameId`; the dock always sends
+  one, so `n`, `n + 1` and a Rust `String` evaluate. The earlier "broken for Rust" verdict came from
+  requests that omitted `frameId`, where LLDB answers "process is running" (see
+  `docs/spikes/evaluate.md`). Not measured: `context: "hover"` and `"clipboard"`, closures, `&mut`
+  borrows, and side effects such as `x += 1`.
 - **No run panel beyond args, cwd, env and output** — `run_program` / `stop_program` stream `run://output`; `src/run/` covers program, args, cwd, environment variables and an argv preview, but there is no richer run configuration UI.
 - **No remote development, embedded targets, profilers, databases, Docker, AI assistance or plugin API.**
 

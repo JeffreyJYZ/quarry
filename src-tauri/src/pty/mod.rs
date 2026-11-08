@@ -12,7 +12,10 @@ pub use std::thread;
 pub use tauri::{AppHandle, Emitter, State};
 
 mod output_event;
+
+mod utf8_stream;
 pub use output_event::*;
+pub use utf8_stream::*;
 
 mod validate_cwd;
 pub use validate_cwd::*;

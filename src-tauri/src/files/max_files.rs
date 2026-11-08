@@ -100,12 +100,41 @@ pub fn validate_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// A path inside `root`, or an error.
+///
+/// The check is on the *resolved* path, not the text of it: `project/external/new.txt` where `external`
+/// is a symlink to somewhere else passes a lexical prefix test while the write lands outside the
+/// project. Every existing component is canonicalised and the part that does not exist yet is appended,
+/// so a symlink cannot be used to step out.
 pub fn ensure_within(root: &Path, target: &Path) -> Result<PathBuf, String> {
     let absolute = std::path::absolute(target).unwrap_or_else(|_| target.to_path_buf());
-    if !absolute.starts_with(root) {
+    let root_real = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    if !resolve_existing(&absolute).starts_with(&root_real) {
         return Err("path is outside the project root".to_string());
     }
     Ok(absolute)
+}
+
+/// `path` with its longest existing prefix canonicalised, plus the components that do not exist yet.
+fn resolve_existing(path: &Path) -> PathBuf {
+    let mut existing = path.to_path_buf();
+    let mut tail: Vec<std::ffi::OsString> = Vec::new();
+    loop {
+        if let Ok(real) = existing.canonicalize() {
+            let mut resolved = real;
+            for part in tail.iter().rev() {
+                resolved.push(part);
+            }
+            return resolved;
+        }
+        match (existing.file_name(), existing.parent()) {
+            (Some(name), Some(parent)) => {
+                tail.push(name.to_os_string());
+                existing = parent.to_path_buf();
+            }
+            _ => return path.to_path_buf(),
+        }
+    }
 }
 
 #[tauri::command]
