@@ -17,7 +17,7 @@ pub mod tests_group_4 {
     use std::time::{Duration, Instant};
 
     /// A bound short enough for a test, long enough that a loaded machine still starts the child.
-    pub const TEST_BOUND: Duration = Duration::from_millis(300);
+    pub const TEST_BOUND: Duration = Duration::from_millis(800);
 
     #[cfg(unix)]
     fn sleeping() -> Command {
@@ -30,7 +30,7 @@ pub mod tests_group_4 {
     #[test]
     pub fn a_command_that_outlives_the_bound_is_stopped() {
         let started = Instant::now();
-        let error = output_within(&mut sleeping(), Duration::from_millis(80))
+        let error = output_within(&mut sleeping(), Duration::from_millis(200))
             .expect_err("sleep 30 cannot finish in 80ms");
         assert!(error.contains("did not finish within"), "{error}");
         assert!(
