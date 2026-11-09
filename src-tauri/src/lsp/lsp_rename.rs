@@ -48,16 +48,10 @@ pub async fn lsp_code_actions(
     path: String,
     line: u32,
     character: u32,
+    diagnostics: Option<Vec<Value>>,
 ) -> Result<Vec<CodeAction>, String> {
     let session = session_for(&state, &root)?;
-    let params = json!({
-        "textDocument": { "uri": path_to_uri(&path) },
-        "range": {
-            "start": { "line": line, "character": character },
-            "end": { "line": line, "character": character },
-        },
-        "context": { "diagnostics": [] },
-    });
+    let params = code_action_params(&path, line, character, &diagnostics.unwrap_or_default());
     let result = send_request(&session, "textDocument/codeAction", params).await?;
     Ok(parse_code_actions(&result))
 }

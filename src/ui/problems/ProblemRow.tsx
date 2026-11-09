@@ -7,6 +7,7 @@ import type { ProblemActions } from "./useProblemActions";
 export function ProblemRow({
 	path,
 	diagnostic,
+	diagnostics,
 	actions,
 	onSelect,
 	selected,
@@ -15,6 +16,8 @@ export function ProblemRow({
 }: {
 	path: string;
 	diagnostic: Diagnostic;
+	/** Every finding in this file, so the request carries the ones at the clicked position. */
+	diagnostics: Diagnostic[];
 	actions: ProblemActions;
 	onSelect: (path: string, line?: number, character?: number) => void;
 	selected?: boolean;
@@ -37,7 +40,7 @@ export function ProblemRow({
 					onKeyDown?.(event);
 					if (event.altKey && event.key === "Enter") {
 						event.preventDefault();
-						void actions.openMenu(path, line, character);
+						void actions.openMenu(path, line, character, diagnostics);
 					}
 					if (event.key === "Escape") {
 						actions.closeMenu();
@@ -61,7 +64,7 @@ export function ProblemRow({
 				className="problem-fix"
 				onClick={(event) => {
 					event.stopPropagation();
-					void actions.openMenu(path, line, character);
+					void actions.openMenu(path, line, character, diagnostics);
 				}}
 			>
 				Fix

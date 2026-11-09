@@ -65,6 +65,15 @@ pub mod tests_group_1 {
     }
 
     #[test]
+    pub fn uri_decoding_covers_a_percent_escape_at_the_very_end() {
+        assert_eq!(
+            uri_to_path("file:///tmp/trailing%20").as_deref(),
+            Some("/tmp/trailing ")
+        );
+        assert_eq!(uri_to_path("file:///tmp/%20").as_deref(), Some("/tmp/ "));
+    }
+
+    #[test]
     pub fn language_id_follows_the_extension() {
         assert_eq!(language_id("/p/src/main.rs"), "rust");
         assert_eq!(language_id("/p/src/MAIN.RS"), "rust");

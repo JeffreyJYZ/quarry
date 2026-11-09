@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
 	combineDiagnostics,
+	codeActionDiagnostics,
 	countSeverities,
 	type DiagnosticMap,
 	diagnosticKey,
@@ -65,6 +66,37 @@ describe("combineDiagnostics", () => {
 			"linker: undefined symbol",
 			"no member named 'x'",
 		]);
+	});
+});
+
+describe("codeActionDiagnostics", () => {
+	test("only the findings whose range holds the caret are sent, and the path is dropped", () => {
+		const here = finding("/p/src/main.cpp", "clangd", "no member named 'x'");
+		const elsewhere: Diagnostic = {
+			...finding("/p/src/main.cpp", "clangd", "missing ';'"),
+			range: { start: { line: 9, character: 0 }, end: { line: 9, character: 1 } },
+		};
+		const sent = codeActionDiagnostics([here, elsewhere], 3, 5);
+		expect(sent).toEqual([
+			{
+				range: here.range,
+				severity: here.severity,
+				message: here.message,
+				source: here.source,
+			},
+		]);
+		expect("path" in (sent[0] ?? {})).toBe(false);
+	});
+
+	test("a caret on the range's end or start still picks the finding up", () => {
+		const here = finding("/p/src/main.rs", "rust-analyzer", "mismatched types");
+		expect(codeActionDiagnostics([here], 3, 4)).toHaveLength(1);
+		expect(codeActionDiagnostics([here], 3, 9)).toHaveLength(1);
+		expect(codeActionDiagnostics([here], 3, 2)).toHaveLength(0);
+	});
+
+	test("no diagnostics is an empty list, which keeps a source-only request working", () => {
+		expect(codeActionDiagnostics([], 0, 0)).toEqual([]);
 	});
 });
 
