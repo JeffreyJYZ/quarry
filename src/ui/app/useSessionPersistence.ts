@@ -72,6 +72,8 @@ export function useSessionPersistence(options: {
 					setters.onProject(next);
 					setters.onBuffers(() => []);
 					setters.onActivePath(null);
+					/** Tabs a read did not give back, named with the reason: a silent skip loses work. */
+					const unreadable: string[] = [];
 					for (const path of settings.openFiles) {
 						if (cancelled) return;
 						const name = fileName(path);
@@ -83,9 +85,16 @@ export function useSessionPersistence(options: {
 									? current
 									: [...current, { path, name, text, loaded: text }],
 							);
-						} catch {
-							/* skip unreadable file */
+						} catch (error) {
+							unreadable.push(`${name}: ${describeError(error)}`);
 						}
+					}
+					if (cancelled) return;
+					if (unreadable.length > 0) {
+						const tabs = unreadable.length === 1 ? "tab" : "tabs";
+						setters.onNotice(
+							`could not reopen ${unreadable.length} ${tabs}: ${unreadable.join("; ")}`,
+						);
 					}
 					if (
 						settings.activeFile !== null &&

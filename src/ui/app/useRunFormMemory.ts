@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { joinArgs } from "@/lib/debug/presets";
 import { type EnvVar, defaultLaunchConfig } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
 
@@ -19,6 +20,11 @@ export type RunFormState = {
  * The restore runs once per root. The handler arrives as an inline closure, so keeping it in a ref
  * is what stops an identity change on every render from refetching the configuration and rewriting
  * the form.
+ *
+ * Every field the user can edit is remembered, `program` included: a hand-set binary that existed
+ * only in the stored args and cwd would be replaced by the detected default on the way back into a
+ * project. The default configuration's argv goes through `joinArgs`, so an argument with a space is
+ * written quoted and `splitArgs` gives it back on the next run.
  */
 export function useRunFormMemory(options: {
 	root: string | null;
@@ -27,7 +33,7 @@ export function useRunFormMemory(options: {
 	onNotice?: (message: string) => void;
 }): void {
 	const { root, form, onRestore, onNotice } = options;
-	const memory = useRef<Map<string, { args: string; cwd: string; env: EnvVar[] }>>(new Map());
+	const memory = useRef<Map<string, RunFormState>>(new Map());
 	const restoreRef = useRef(onRestore);
 	restoreRef.current = onRestore;
 	const reported = useRef<Set<string>>(new Set());
@@ -43,15 +49,15 @@ export function useRunFormMemory(options: {
 					saved === undefined
 						? {
 								program: config.program,
-								args: config.args.join(" "),
+								args: joinArgs(config.args),
 								cwd: config.cwd,
 								env: [],
 							}
 						: {
-								program: config.program,
+								program: saved.program,
 								args: saved.args,
 								cwd: saved.cwd,
-								env: saved.env ?? [],
+								env: saved.env,
 							},
 				);
 			})
@@ -68,6 +74,11 @@ export function useRunFormMemory(options: {
 
 	useEffect(() => {
 		if (root === null) return;
-		memory.current.set(root, { args: form.args, cwd: form.cwd, env: form.env });
+		memory.current.set(root, {
+			program: form.program,
+			args: form.args,
+			cwd: form.cwd,
+			env: form.env,
+		});
 	}, [root, form]);
 }
