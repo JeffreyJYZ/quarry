@@ -55,6 +55,7 @@ pub mod tests_group_3 {
     fn info(root: &Path, name: &str, kind: ProjectKind) -> ProjectInfo {
         ProjectInfo {
             root: root.display().to_string(),
+            opened_root: root.display().to_string(),
             name: name.to_string(),
             kind,
             build_root: root.display().to_string(),

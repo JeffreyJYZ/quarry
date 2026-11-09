@@ -8,7 +8,12 @@ mock.module("@/lib/project/api", () => ({
 	},
 }));
 
-import { probeRootSignals, decideRootSignals } from "@/lib/lsp/rootSignals";
+import {
+	probeRootSignals,
+	decideRootSignals,
+	invalidateRootSignals,
+	marksRootSignals,
+} from "@/lib/lsp/rootSignals";
 import { serversForRoot } from "@/lib/lsp/served";
 
 function setTree(tree: Record<string, any[]>) {
@@ -99,5 +104,72 @@ describe("probeRootSignals", () => {
 		});
 		const s = await probeRootSignals(root);
 		expect(serversForRoot(s)).toEqual(["clangd"]);
+	});
+
+	test("compile_commands.json under build -> clangd, matching the backend", async () => {
+		const root = "/tmp/rs-cc-build";
+		const build = `${root}/build`;
+		setTree({
+			[root]: [{ name: "build", isDir: true, path: build }],
+			[build]: [
+				{
+					name: "compile_commands.json",
+					isDir: false,
+					path: `${build}/compile_commands.json`,
+				},
+			],
+		});
+		const s = await probeRootSignals(root);
+		expect(serversForRoot(s)).toEqual(["clangd"]);
+	});
+
+	test("compile_commands.json under cmake-build-debug -> clangd", async () => {
+		const root = "/tmp/rs-cc-cmake";
+		const build = `${root}/cmake-build-debug`;
+		setTree({
+			[root]: [{ name: "cmake-build-debug", isDir: true, path: build }],
+			[build]: [
+				{
+					name: "compile_commands.json",
+					isDir: false,
+					path: `${build}/compile_commands.json`,
+				},
+			],
+		});
+		const s = await probeRootSignals(root);
+		expect(serversForRoot(s)).toEqual(["clangd"]);
+	});
+
+	test("a marker created after the probe invalidates the cached signals", async () => {
+		const root = "/tmp/rs-invalidate";
+		setTree({ [root]: [{ name: "Cargo.toml", isDir: false, path: `${root}/Cargo.toml` }] });
+		const before = await probeRootSignals(root);
+		expect(serversForRoot(before)).toEqual(["rust-analyzer"]);
+
+		setTree({
+			[root]: [
+				{ name: "Cargo.toml", isDir: false, path: `${root}/Cargo.toml` },
+				{
+					name: "compile_commands.json",
+					isDir: false,
+					path: `${root}/compile_commands.json`,
+				},
+			],
+		});
+		const cached = await probeRootSignals(root);
+		expect(serversForRoot(cached)).toEqual(["rust-analyzer"]);
+
+		invalidateRootSignals(root);
+		const after = await probeRootSignals(root);
+		expect(serversForRoot(after)).toEqual(["rust-analyzer", "clangd"]);
+	});
+});
+
+describe("marksRootSignals", () => {
+	test("only a build marker counts", () => {
+		expect(marksRootSignals(["/p/src/main.rs"])).toBe(false);
+		expect(marksRootSignals(["/p/build/compile_commands.json"])).toBe(true);
+		expect(marksRootSignals(["/p/CMakeLists.txt"])).toBe(true);
+		expect(marksRootSignals(["/p/Cargo.toml"])).toBe(true);
 	});
 });

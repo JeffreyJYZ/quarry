@@ -15,7 +15,10 @@ export type ToolchainReport = {
 export type ProjectKind = "cargo" | "cmake" | "compileCommands" | "unknown";
 
 export type ProjectInfo = {
+	/** Resolved project root: where the build marker is, so build, format and source commands agree. */
 	root: string;
+	/** Directory the user opened; equal to `root` when the marker is at or below it. */
+	openedRoot: string;
 	name: string;
 	kind: ProjectKind;
 	buildRoot: string;

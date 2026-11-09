@@ -48,7 +48,7 @@ pub fn descend(root: &Path) -> Option<Detected> {
     let mut level = vec![canonical.clone()];
     for _ in 0..MAX_DEPTH {
         let dirs = child_directories(&level, &canonical);
-        match marker_at_depth(&dirs) {
+        match marker_at_depth(&dirs, &canonical) {
             AtDepth::Found(detected) => return Some(detected),
             AtDepth::Ambiguous => return None,
             AtDepth::Missing => {}
@@ -98,10 +98,10 @@ fn child_directories(level: &[PathBuf], root: &Path) -> Vec<PathBuf> {
 }
 
 /// Best marker among the directories of one depth.
-fn marker_at_depth(dirs: &[PathBuf]) -> AtDepth {
+fn marker_at_depth(dirs: &[PathBuf], root: &Path) -> AtDepth {
     let mut best: Option<(u8, Detected)> = None;
     for dir in dirs {
-        let Some((rank, detected)) = marker_in(dir) else {
+        let Some((rank, detected)) = marker_in(dir, root) else {
             continue;
         };
         match &best {
@@ -117,13 +117,17 @@ fn marker_at_depth(dirs: &[PathBuf]) -> AtDepth {
 }
 
 /// The marker one directory holds, in the ancestor walk's priority order.
-fn marker_in(dir: &Path) -> Option<(u8, Detected)> {
+///
+/// `root` stays the project root: a marker found below the opened directory names where the build
+/// runs, not where the project starts.
+fn marker_in(dir: &Path, root: &Path) -> Option<(u8, Detected)> {
     let cargo_manifest = dir.join(CARGO_MANIFEST);
     if cargo_manifest.is_file() {
         return Some((
             RANK_CARGO,
             Detected {
                 kind: ProjectKind::Cargo,
+                project_root: root.to_path_buf(),
                 build_root: dir.to_path_buf(),
                 cargo_manifest: Some(cargo_manifest),
             },
@@ -134,6 +138,7 @@ fn marker_in(dir: &Path) -> Option<(u8, Detected)> {
             RANK_CMAKE,
             Detected {
                 kind: ProjectKind::Cmake,
+                project_root: root.to_path_buf(),
                 build_root: dir.to_path_buf(),
                 cargo_manifest: None,
             },
@@ -144,6 +149,7 @@ fn marker_in(dir: &Path) -> Option<(u8, Detected)> {
             RANK_COMPILE_COMMANDS,
             Detected {
                 kind: ProjectKind::CompileCommands,
+                project_root: root.to_path_buf(),
                 build_root: dir.to_path_buf(),
                 cargo_manifest: None,
             },
@@ -155,6 +161,7 @@ fn marker_in(dir: &Path) -> Option<(u8, Detected)> {
             RANK_BUILD_COMPILE_COMMANDS,
             Detected {
                 kind: ProjectKind::CompileCommands,
+                project_root: root.to_path_buf(),
                 build_root,
                 cargo_manifest: None,
             },

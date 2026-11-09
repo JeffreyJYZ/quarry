@@ -40,8 +40,12 @@ pub enum ProjectKind {
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectInfo {
-    /// Absolute path of the opened directory.
+    /// Absolute path of the resolved project root: the directory holding the build marker at or
+    /// above the opened one, so build, format and source commands start where the manifest is.
     pub root: String,
+    /// Absolute path of the directory the user opened; equal to `root` when the marker is at or
+    /// below it.
+    pub opened_root: String,
     /// Directory name, or the Cargo package name when one is available.
     pub name: String,
     pub kind: ProjectKind,

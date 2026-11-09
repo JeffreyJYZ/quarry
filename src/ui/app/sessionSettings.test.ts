@@ -4,7 +4,14 @@ import { settingsFromSnapshot, type SessionSnapshot } from "@/ui/app/sessionSett
 
 function snapshot(): SessionSnapshot {
 	return {
-		project: { root: "/p", name: "p", kind: "cmake", buildRoot: "/p", launchConfig: null },
+		project: {
+			root: "/p",
+			openedRoot: "/p",
+			name: "p",
+			kind: "cmake",
+			buildRoot: "/p",
+			launchConfig: null,
+		},
 		buffers: [
 			{ path: "/p/a.cpp", name: "a.cpp", text: "one", loaded: "one" },
 			{ path: "/p/b.cpp", name: "b.cpp", text: "two", loaded: "two" },
@@ -48,6 +55,7 @@ describe("settingsFromSnapshot", () => {
 		project: (next) => {
 			next.project = {
 				root: "/other",
+				openedRoot: "/other",
 				name: "other",
 				kind: "cmake",
 				buildRoot: "/other",

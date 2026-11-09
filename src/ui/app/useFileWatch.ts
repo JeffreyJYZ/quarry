@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { invalidateRootSignals, marksRootSignals } from "@/lib/lsp/rootSignals";
 import { onFsChanged, startWatch, stopWatch } from "@/lib/project/api";
 import type { WatchBatch } from "@/lib/project/watch";
 
@@ -34,6 +35,9 @@ export function useFileWatch({
 		onFsChanged((event) => {
 			if (!live) return;
 			token.current += 1;
+			// A marker that just appeared or vanished decides which language server this root needs,
+			// and the probe's cache outlives the project, so it has to be dropped here.
+			if (marksRootSignals(event.paths)) invalidateRootSignals(root);
 			setBatch({ token: token.current, paths: event.paths });
 			paths.current(event.paths);
 		})
