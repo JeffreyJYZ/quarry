@@ -28,7 +28,7 @@ export const oneDark: Theme = {
 		keyword: "#b477cf",
 		type: "#6eb4bf",
 		string: "#a1c181",
-		comment: "#6b7480",
+		comment: "#859198",
 		number: "#bf956a",
 		function: "#73ade9",
 		macro: "#b477cf",
