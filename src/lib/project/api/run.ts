@@ -87,8 +87,11 @@ export function runProgram(
 	return invoke<string>("run_program", { program, args, cwd, env: env ?? null });
 }
 
-export function stopProgram(runId: string): Promise<void> {
-	return invoke<void>("stop_program", { runId });
+/** What a stop did: `escalated` marks a group that ignored the polite signal and had to be killed. */
+export type StopReport = { escalated: boolean };
+
+export function stopProgram(runId: string): Promise<StopReport> {
+	return invoke<StopReport>("stop_program", { runId });
 }
 
 export function onRunOutput(handler: (event: RunOutputEvent) => void): Promise<() => void> {

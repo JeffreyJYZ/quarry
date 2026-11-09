@@ -10,8 +10,10 @@
 //!
 //! Waiting rule: `Child::kill` needs `&mut Child`, so a waiter blocked inside `wait()` would make the
 //! child unkillable from `stop_program`. The waiter therefore polls `try_wait` at a short interval
-//! and reaps the child itself; `stop_program` kills and reaps too, and the waiter still reports the
-//! exit, so a stopped run emits the same single event with no code.
+//! and reaps the child itself; `stop_program` takes the child out of the state, signals its whole
+//! process group, and waits for it on a blocking thread under a deadline, so a program that ignores
+//! the polite signal cannot pin the async runtime. The waiter still reports the exit, so a stopped
+//! run emits the same single event with no code.
 //!
 //! Nothing here panics: a failed thread spawn is a command error, a failed emit is ignored, and a
 //! poisoned mutex is recovered rather than unwrapped.
@@ -48,8 +50,14 @@ pub use reap::*;
 mod impl_runstate;
 pub use impl_runstate::*;
 
+mod stop;
+pub use stop::*;
+
 mod tests_items;
 pub use tests_items::*;
 
 mod tests_stream;
 pub use tests_stream::*;
+
+mod tests_stop;
+pub use tests_stop::*;
