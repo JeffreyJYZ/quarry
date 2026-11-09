@@ -125,3 +125,18 @@ function worst(file: ProblemFile): number {
 	}
 	return 3;
 }
+
+/** How many of the rows the panel is showing carry each severity. */
+export function countProblems(rows: FlatProblem[]): {
+	errors: number;
+	warnings: number;
+	other: number;
+} {
+	let errors = 0;
+	let warnings = 0;
+	for (const row of rows) {
+		if (row.diagnostic.severity === 1) errors += 1;
+		else if (row.diagnostic.severity === 2) warnings += 1;
+	}
+	return { errors, warnings, other: rows.length - errors - warnings };
+}

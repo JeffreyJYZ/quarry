@@ -119,11 +119,11 @@ export default function AppOverlays(props: OverlaysProps) {
 			<StatusBar
 				project={props.project}
 				git={props.gitStatus}
-				errors={props.counts.errors}
-				warnings={props.counts.warnings}
 				missingTools={props.missingTools}
 				saveError={props.saveError}
 				caret={props.caret}
+				errors={props.counts.errors}
+				warnings={props.counts.warnings}
 				language={props.language}
 				tabSize={props.tabSize}
 				server={props.server}

@@ -107,8 +107,6 @@ export default function TestsDock({
 					) : tab === "problems" ? (
 						<ProblemsPanel
 							files={problems.files}
-							errors={problems.errors}
-							warnings={problems.warnings}
 							open
 							onToggle={onToggleExpanded}
 							onSelect={problems.onSelect}
