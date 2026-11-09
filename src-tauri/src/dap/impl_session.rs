@@ -140,24 +140,6 @@ impl Session {
             let _ = sender.send(Err(reason.to_string()));
         }
     }
-
-    /// Say goodbye, kill and reap the child, and fail anything still waiting. Idempotent.
-    pub(crate) fn shutdown(&self) {
-        if self.alive.swap(false, Ordering::SeqCst) {
-            let _ = self.write(&json!({
-                "seq": self.next_seq(),
-                "type": "request",
-                "command": "disconnect",
-                "arguments": { "terminateDebuggee": true, "restart": false },
-            }));
-        }
-
-        let pipe = lock(&self.pipe).take();
-        if let Some(mut pipe) = pipe {
-            let _ = pipe.kill();
-        }
-        self.fail_pending("the debug session is closed");
-    }
 }
 
 impl std::fmt::Debug for Session {

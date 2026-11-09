@@ -1,8 +1,14 @@
 import { useCallback } from "react";
-import { dapConfigurationDone, dapRestart, dapSetBreakpointsEx } from "@/lib/project/api";
+import {
+	dapConfigurationDone,
+	dapRestart,
+	dapSetBreakpointsEx,
+	dapSetDataBreakpoints,
+} from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
 import { fileName } from "@/lib/project/paths";
-import type { BreakpointEntry, StopView } from "./sessionTypes";
+import { restartPush } from "./restartPush";
+import type { BreakpointEntry, StopView, WatchRow } from "./sessionTypes";
 
 type Setter<T> = (updater: T | ((current: T) => T)) => void;
 
@@ -13,6 +19,7 @@ type Setter<T> = (updater: T | ((current: T) => T)) => void;
 export function useRestart(options: {
 	sessionRef: { current: string | null };
 	breakpointMapRef: { current: Map<string, Map<number, BreakpointEntry>> };
+	watchRef: { current: WatchRow[] };
 	generationRef: { current: number };
 	restarting: boolean;
 	loadExceptionFilters: (session: string, preserveChecked: boolean) => Promise<void>;
@@ -29,6 +36,7 @@ export function useRestart(options: {
 	const {
 		sessionRef,
 		breakpointMapRef,
+		watchRef,
 		generationRef,
 		restarting,
 		loadExceptionFilters,
@@ -66,27 +74,26 @@ export function useRestart(options: {
 		setSessionId(nextId);
 		setRestarted(true);
 		setExceptionFilters([]);
-		/* Re-push every breakpoint file. */
-		for (const path of [...breakpointMapRef.current.keys()]) {
-			const lines = breakpointMapRef.current.get(path);
-			if (lines === undefined) continue;
-			const rows = [...lines.entries()]
-				.filter(([, entry]) => entry.enabled)
-				.map(([line, entry]) => ({
-					line,
-					condition: entry.condition,
-					hitCondition: entry.hitCondition,
-					logMessage: entry.logMessage,
-					enabled: true,
-				}));
+		/* Re-push every breakpoint file, the exception filters and the watchpoints. */
+		const push = restartPush(breakpointMapRef.current, watchRef.current);
+		for (const file of push.files) {
 			try {
-				await dapSetBreakpointsEx(nextId, path, rows);
+				await dapSetBreakpointsEx(nextId, file.path, file.breakpoints);
 			} catch (reason) {
-				setError(`Breakpoints: ${fileName(path)}: ${describeError(reason)}`);
+				setError(`Breakpoints: ${fileName(file.path)}: ${describeError(reason)}`);
 			}
 			if (sessionRef.current !== nextId) return;
 		}
 		await loadExceptionFilters(nextId, true);
+		if (sessionRef.current !== nextId) return;
+		if (push.dataIds.length > 0) {
+			try {
+				await dapSetDataBreakpoints(nextId, push.dataIds);
+			} catch (reason) {
+				setError(`Watch: ${describeError(reason)}`);
+			}
+			if (sessionRef.current !== nextId) return;
+		}
 		try {
 			await dapConfigurationDone(nextId);
 		} catch (reason) {
@@ -96,6 +103,7 @@ export function useRestart(options: {
 	}, [
 		sessionRef,
 		breakpointMapRef,
+		watchRef,
 		generationRef,
 		restarting,
 		loadExceptionFilters,

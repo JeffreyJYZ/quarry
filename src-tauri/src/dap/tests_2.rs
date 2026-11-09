@@ -135,9 +135,10 @@ pub mod tests_group_2 {
 
     #[test]
     pub fn an_explicit_thread_wins_over_the_recorded_one() {
-        assert_eq!(select_thread(Some(9), 3), 9);
-        assert_eq!(select_thread(None, 3), 3);
-        assert_eq!(select_thread(None, 0), 0);
+        assert_eq!(select_thread("continue", Some(9), 3).expect("explicit"), 9);
+        assert_eq!(select_thread("continue", None, 3).expect("recorded"), 3);
+        let error = select_thread("continue", None, 0).expect_err("no stop recorded");
+        assert!(error.contains("no stopped thread"), "message: {error}");
     }
 
     #[test]

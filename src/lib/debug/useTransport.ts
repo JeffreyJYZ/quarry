@@ -157,6 +157,7 @@ export function useTransport(deps: TransportDeps) {
 	const restart = useRestart({
 		sessionRef,
 		breakpointMapRef,
+		watchRef,
 		generationRef,
 		restarting,
 		loadExceptionFilters,

@@ -147,7 +147,11 @@ pub async fn dap_continue(
     thread_id: Option<u32>,
 ) -> Result<(), String> {
     let session = session_for(&state, &session)?;
-    let thread_id = select_thread(thread_id, session.stopped_thread.load(Ordering::SeqCst));
+    let thread_id = select_thread(
+        "continue",
+        thread_id,
+        session.stopped_thread.load(Ordering::SeqCst),
+    )?;
 
     session
         .request("continue", json!({ "threadId": thread_id }))
@@ -166,24 +170,13 @@ pub async fn dap_step(
 ) -> Result<(), String> {
     let command = step_command(&kind)?;
     let session = session_for(&state, &session)?;
-    let thread_id = select_thread(thread_id, session.stopped_thread.load(Ordering::SeqCst));
+    let thread_id = select_thread(
+        command,
+        thread_id,
+        session.stopped_thread.load(Ordering::SeqCst),
+    )?;
 
     session
         .request(command, json!({ "threadId": thread_id }))
         .map(|_| ())
-}
-
-/// The thread a command acts on: the one the UI named, else the thread that stopped last.
-pub fn select_thread(explicit: Option<u32>, recorded: u32) -> u32 {
-    explicit.unwrap_or(recorded)
-}
-
-#[tauri::command]
-pub async fn dap_threads(
-    state: State<'_, DapState>,
-    session: String,
-) -> Result<Vec<DapThread>, String> {
-    let body = session_for(&state, &session)?.request("threads", json!({}))?;
-
-    Ok(threads_from(&body))
 }

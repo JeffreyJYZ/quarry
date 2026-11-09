@@ -72,11 +72,17 @@ pub use adapter::*;
 mod impl_session;
 pub use impl_session::*;
 
+mod impl_session_shutdown;
+pub use impl_session_shutdown::*;
+
 mod impl_dapstate;
 pub use impl_dapstate::*;
 
 mod dap_configuration_done;
 pub use dap_configuration_done::*;
+
+mod dap_threads;
+pub use dap_threads::*;
 
 mod dap_stack_trace;
 pub use dap_stack_trace::*;
@@ -122,6 +128,9 @@ pub use tests_4::*;
 
 mod tests_5;
 pub use tests_5::*;
+
+mod tests_6;
+pub use tests_6::*;
 
 mod dap_write_memory;
 pub use dap_write_memory::*;
