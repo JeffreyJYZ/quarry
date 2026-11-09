@@ -98,24 +98,24 @@ pub fn read_settings(app: AppHandle) -> Settings {
 /// the last byte leaves an empty or half-written file — and the next launch reads defaults, silently.
 /// A rename is atomic inside one directory, so the file is either the previous one or the new one.
 pub(crate) fn write_atomic(path: &std::path::Path, text: &str) -> Result<(), String> {
-    let temp = path.with_file_name(format!(
-        "{}.tmp",
-        path.file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("settings.json")
-    ));
+    use crate::atomic_write::TempFile;
+
+    // The guard removes the temp on drop, so a failed create, write or flush cannot leave a stray
+    // `.tmp` behind; only a completed rename disarms it.
+    let mut temp = TempFile::sibling(path);
     {
-        let mut file = fs::File::create(&temp)
-            .map_err(|error| format!("cannot create {}: {error}", temp.display()))?;
+        let mut file = temp
+            .create()
+            .map_err(|error| format!("cannot create {}: {error}", temp.path().display()))?;
         std::io::Write::write_all(&mut file, text.as_bytes())
-            .map_err(|error| format!("cannot write {}: {error}", temp.display()))?;
+            .map_err(|error| format!("cannot write {}: {error}", temp.path().display()))?;
         file.sync_all()
-            .map_err(|error| format!("cannot flush {}: {error}", temp.display()))?;
+            .map_err(|error| format!("cannot flush {}: {error}", temp.path().display()))?;
     }
-    fs::rename(&temp, path).map_err(|error| {
-        let _ = fs::remove_file(&temp);
-        format!("cannot replace {}: {error}", path.display())
-    })
+    fs::rename(temp.path(), path)
+        .map_err(|error| format!("cannot replace {}: {error}", path.display()))?;
+    temp.disarm();
+    Ok(())
 }
 
 #[tauri::command]

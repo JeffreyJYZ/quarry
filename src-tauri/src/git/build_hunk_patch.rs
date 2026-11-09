@@ -7,6 +7,11 @@ pub use std::fs;
 pub use std::path::Path;
 pub use std::process::Command;
 
+use crate::atomic_write::TempDir;
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::path::PathBuf;
+
 use super::*;
 
 /// Splits a unified diff into (header, body) hunk tuples.
@@ -62,6 +67,47 @@ pub fn build_hunk_patch(diff: &str, id: &str) -> Option<String> {
     None
 }
 
+/// The patch file inside its private directory.
+pub const PATCH_FILE_NAME: &str = "hunk.patch";
+
+/// A patch file that owns the private directory holding it, so dropping it removes both.
+pub struct HunkPatchFile {
+    directory: TempDir,
+}
+
+impl HunkPatchFile {
+    pub fn path(&self) -> PathBuf {
+        self.directory.path().join(PATCH_FILE_NAME)
+    }
+
+    /// The private directory that owns the patch; it no longer exists after a drop.
+    #[cfg(test)]
+    pub fn directory(&self) -> &Path {
+        self.directory.path()
+    }
+}
+
+/// Writes the patch into a fresh private directory, never to a name another process can predict.
+///
+/// The directory is created with `create_dir`, which refuses an existing path, and the file with
+/// `create_new`, so a symlink planted at a shared temp name can neither receive the write nor be
+/// read back by git.
+pub fn write_hunk_patch(patch: &str) -> Result<HunkPatchFile, String> {
+    let directory =
+        TempDir::create("quarry-hunk").map_err(|error| format!("cannot write patch: {error}"))?;
+    let path = directory.path().join(PATCH_FILE_NAME);
+    let mut file = OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&path)
+        .map_err(|error| format!("cannot write patch: {error}"))?;
+    file.write_all(patch.as_bytes())
+        .map_err(|error| format!("cannot write patch: {error}"))?;
+    file.sync_all()
+        .map_err(|error| format!("cannot write patch: {error}"))?;
+    Ok(HunkPatchFile { directory })
+}
+
 #[tauri::command]
 pub async fn git_stage_hunk(root: String, path: String, hunk_id: String) -> Result<(), String> {
     let validated = validate_path(&root, &path)?;
@@ -108,17 +154,18 @@ pub fn stage_hunk(root: &str, path: &str, id: &str, reverse: bool) -> Result<(),
             );
         }
     };
-    // Write patch to temp file
-    let tmp = std::env::temp_dir().join(format!("quarry-hunk-{}.patch", id));
-    std::fs::write(&tmp, patch.as_bytes()).map_err(|e| format!("cannot write patch: {e}"))?;
+    // Write patch to a file nothing else can name: a private directory per call, and a path that
+    // must not exist, so a planted symlink cannot redirect the write.
+    let patch_file = write_hunk_patch(&patch)?;
     let mut args = vec!["apply".to_string(), "--cached".to_string()];
     if reverse {
         args.push("-R".to_string());
     }
-    args.push(tmp.to_string_lossy().into_owned());
+    args.push(patch_file.path().to_string_lossy().into_owned());
     let borrowed: Vec<&str> = args.iter().map(String::as_str).collect();
     let result = run(&program, root, &borrowed);
-    let _ = std::fs::remove_file(&tmp);
+    // Dropping the guard removes the directory and the patch on every exit path below.
+    drop(patch_file);
     let output = result?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
