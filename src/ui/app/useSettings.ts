@@ -17,6 +17,7 @@ import {
 } from "@/lib/settings/model";
 import type { BuildProfile } from "@/ui/app/shellShortcuts";
 import { useTheme } from "@/ui/app/useTheme";
+import { startupMark } from "@/lib/startupMarks";
 
 /**
  * Preferences and this project's overrides.
@@ -39,10 +40,16 @@ export function useSettings(options: {
 		let cancelled = false;
 		toolchains().then(
 			(next) => {
-				if (!cancelled) setReport(next);
+				if (!cancelled) {
+					setReport(next);
+					startupMark("toolchains-done");
+				}
 			},
 			() => {
-				if (!cancelled) setReport(null);
+				if (!cancelled) {
+					setReport(null);
+					startupMark("toolchains-done");
+				}
 			},
 		);
 		return () => {

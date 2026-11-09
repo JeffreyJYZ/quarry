@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { startupMark } from "@/lib/startupMarks";
 import { type FileEdit, type ProjectInfo, openProject, rememberRoot } from "@/lib/project/api";
 import type { FileBuffer } from "@/lib/project/buffer";
 import { describeError } from "@/lib/project/errors";
@@ -69,6 +70,7 @@ export function useWorkspace(options: WorkspaceOptions) {
 				} catch {
 					/* the recents list is a convenience, not a dependency */
 				}
+				startupMark("project-open");
 			} catch (error) {
 				options.onNotice(`Could not open ${nextRoot}: ${describeError(error)}`);
 				setRecentRoots((current) => current.filter((entry) => entry !== nextRoot));
