@@ -152,6 +152,10 @@ pub struct TextEdit {
 pub struct FileEdit {
     pub path: String,
     pub edits: Vec<TextEdit>,
+    /// Document version the server computed these edits against, when it declared one; a
+    /// `changes` edit carries no version, so a stale one cannot be told from a current one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<i64>,
 }
 
 #[derive(Serialize, Clone, Debug)]

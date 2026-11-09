@@ -55,7 +55,12 @@ export type WorkspaceSymbol = {
 };
 
 export type TextEdit = { range: Range; newText: string };
-export type FileEdit = { path: string; edits: TextEdit[] };
+export type FileEdit = {
+	path: string;
+	edits: TextEdit[];
+	/** Document version the server computed these edits against, when it declared one. */
+	version?: number | null;
+};
 export type CodeAction = {
 	title: string;
 	kind: string | null;

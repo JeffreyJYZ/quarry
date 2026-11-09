@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FileBuffer } from "@/lib/project/buffer";
 import { type CodeAction, lspCodeActions } from "@/lib/project/api";
 import { sessionForContext } from "@/lib/lsp/context";
-import { applyFileEdits } from "@/lib/refactor/apply";
+import { documentVersionOf } from "@/lib/lsp/documentVersions";
+import { applyFileEdits, refusalNotice } from "@/lib/refactor/apply";
 import { cacheKey } from "./parts";
 
 /** How long a line above the list stays: long enough to read, short enough not to stick. */
@@ -136,8 +137,14 @@ export function useProblemActions({
 			}
 			closeMenu();
 			try {
-				await applyFileEdits(action.edits, buffers, setBuffers);
-				showApplied(action.title);
+				const result = await applyFileEdits(
+					action.edits,
+					buffers,
+					setBuffers,
+					documentVersionOf,
+				);
+				for (const refused of result.refused) showError(refusalNotice(refused));
+				if (result.files > 0) showApplied(action.title);
 			} catch (error) {
 				showError(error instanceof Error ? error.message : String(error));
 			}

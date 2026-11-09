@@ -6,9 +6,10 @@
  */
 
 import type { Dispatch, SetStateAction } from "react";
+import { documentVersionOf } from "@/lib/lsp/documentVersions";
 import type { FileEdit } from "@/lib/project/api";
 import type { FileBuffer } from "@/lib/project/buffer";
-import { applyFileEdits } from "@/lib/refactor/apply";
+import { applyFileEdits, refusalNotice } from "@/lib/refactor/apply";
 
 export async function applyEditsWithNotice(
 	edits: FileEdit[],
@@ -16,8 +17,11 @@ export async function applyEditsWithNotice(
 	setBuffers: Dispatch<SetStateAction<FileBuffer[]>>,
 	onNotice: (message: string) => void,
 ): Promise<void> {
-	const result = await applyFileEdits(edits, buffers, setBuffers);
+	const result = await applyFileEdits(edits, buffers, setBuffers, documentVersionOf);
 	if (result.files > 0) onNotice(`Renamed ${result.files} files`);
 	for (const failed of result.failed) onNotice(`Failed: ${failed}`);
-	if (result.files === 0 && result.failed.length === 0) onNotice("Rename unavailable here");
+	for (const refused of result.refused) onNotice(refusalNotice(refused));
+	if (result.files === 0 && result.failed.length === 0 && result.refused.length === 0) {
+		onNotice("Rename unavailable here");
+	}
 }

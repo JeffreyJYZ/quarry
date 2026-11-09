@@ -99,6 +99,32 @@ pub mod rename_extra_tests {
     }
 
     #[test]
+    fn document_changes_carry_version() {
+        let v = json!({
+            "documentChanges": [
+                { "textDocument": { "uri": path_to_uri("/p/src/other.rs"), "version": 7 }, "edits": [
+                    { "range": { "start": {"line":0,"character":0}, "end": {"line":0,"character":1} }, "newText": "y" }
+                ] }
+            ]
+        });
+        let out = parse_workspace_edit(&v);
+        assert_eq!(out[0].version, Some(7));
+    }
+
+    #[test]
+    fn changes_shape_has_no_version() {
+        let v = json!({
+            "changes": {
+                path_to_uri("/p/src/main.rs"): [
+                    { "range": { "start": {"line":0,"character":0}, "end": {"line":0,"character":1} }, "newText": "x" }
+                ]
+            }
+        });
+        let out = parse_workspace_edit(&v);
+        assert_eq!(out[0].version, None);
+    }
+
+    #[test]
     fn code_action_keeps_edit_and_command() {
         let v = json!([
             { "title": "fix", "kind": "quickfix", "edit": { "changes": {} } },

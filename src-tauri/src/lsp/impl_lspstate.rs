@@ -52,7 +52,7 @@ pub async fn lsp_open_document(
     root: String,
     path: String,
     text: String,
-) -> Result<(), String> {
+) -> Result<u32, String> {
     let session = session_for(&state, &root)?;
     let mut session = lock(&session);
 
@@ -89,7 +89,7 @@ pub async fn lsp_open_document(
         object.remove("id");
     }
     let _ = send(&mut session, "workspace/executeCommand", &check);
-    Ok(())
+    Ok(version)
 }
 
 #[tauri::command]
@@ -98,7 +98,7 @@ pub async fn lsp_change_document(
     root: String,
     path: String,
     text: String,
-) -> Result<(), String> {
+) -> Result<u32, String> {
     let session = session_for(&state, &root)?;
     let mut session = lock(&session);
 
@@ -111,7 +111,7 @@ pub async fn lsp_change_document(
         // identical: no send
         let v = session.documents.get(&path).copied().unwrap_or(0);
         session.documents.insert(path.clone(), v);
-        return Ok(());
+        return Ok(v);
     }
 
     let version = session.documents.get(&path).copied().unwrap_or(0) + 1;
@@ -146,7 +146,8 @@ pub async fn lsp_change_document(
             }),
         )
     };
-    send(&mut session, "textDocument/didChange", &message)
+    send(&mut session, "textDocument/didChange", &message)?;
+    Ok(version)
 }
 
 #[tauri::command]

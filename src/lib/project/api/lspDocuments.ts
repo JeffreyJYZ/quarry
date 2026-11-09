@@ -18,12 +18,14 @@ export function stopLsp(root: string): Promise<void> {
 	return invoke<void>("stop_lsp", { root });
 }
 
-export function lspOpenDocument(root: string, path: string, text: string): Promise<void> {
-	return invoke<void>("lsp_open_document", { root, path, text });
+/** Opens a document and answers the version the server assigned it. */
+export function lspOpenDocument(root: string, path: string, text: string): Promise<number> {
+	return invoke<number>("lsp_open_document", { root, path, text });
 }
 
-export function lspChangeDocument(root: string, path: string, text: string): Promise<void> {
-	return invoke<void>("lsp_change_document", { root, path, text });
+/** Sends new text and answers the version the server assigned it; unchanged text keeps the old one. */
+export function lspChangeDocument(root: string, path: string, text: string): Promise<number> {
+	return invoke<number>("lsp_change_document", { root, path, text });
 }
 
 export function lspCloseDocument(root: string, path: string): Promise<void> {
