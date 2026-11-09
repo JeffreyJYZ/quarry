@@ -79,8 +79,13 @@ published. A successful build's `artifact` overrides the resolved program, so Ru
 cargo just wrote. Which file that is, is one decision (`choose_artifact` in
 `src-tauri/src/build_task/choose_artifact.rs`): a target the build system reported wins outright,
 otherwise the newest file the build wrote at or after its own start time wins, and equal times resolve
-by path. A successful build that reports no executable is reported in the Run dock — the resolved
-path is not launched in its place, because that binary belongs to an earlier build.
+by path. Cargo reports its executable as JSON; CMake names a target only as text, so `Built target
+<name>` lines are read and each name is resolved to a program under the build tree
+(`reported_targets` and `resolve_target` in `src-tauri/src/build_task/cmake_artifact.rs`) before the
+choice is made. A name that resolves to no file, or only to a library, falls back to the newest-file
+rule rather than inventing a path. A successful build that reports no executable is reported in the
+Run dock — the resolved path is not launched in its place, because that binary belongs to an earlier
+build.
 
 ### What stays
 

@@ -37,7 +37,7 @@ pub mod tests_group_5 {
         write_executable(&root.join("demo"));
 
         assert_eq!(
-            newest_executable(root, since).as_deref(),
+            cmake_artifact("", root, since).as_deref(),
             Some(root.join("demo").to_string_lossy().as_ref())
         );
     }
@@ -50,7 +50,7 @@ pub mod tests_group_5 {
 
         // Everything on disk predates this build, so the build produced nothing to launch.
         let since = SystemTime::now() + Duration::from_secs(5);
-        assert_eq!(newest_executable(root, since), None);
+        assert_eq!(cmake_artifact("", root, since), None);
     }
 
     #[test]
@@ -63,11 +63,11 @@ pub mod tests_group_5 {
         write_executable(&root.join("libdemo.dylib"));
         write_plain(&root.join("notes.txt"));
 
-        assert_eq!(newest_executable(root, since), None);
+        assert_eq!(cmake_artifact("", root, since), None);
 
         write_executable(&root.join("demo"));
         assert_eq!(
-            newest_executable(root, since).as_deref(),
+            cmake_artifact("", root, since).as_deref(),
             Some(root.join("demo").to_string_lossy().as_ref())
         );
     }
@@ -84,17 +84,12 @@ pub mod tests_group_5 {
 
         // The old answer: the newest file the build wrote, here the test binary.
         assert_eq!(
-            newest_executable(root, since).as_deref(),
+            cmake_artifact("", root, since).as_deref(),
             Some(root.join("demo_test").to_string_lossy().as_ref())
         );
         // The answer Run launches: what the build reported, even though it is the older file.
         assert_eq!(
-            choose_artifact(
-                &executable_candidates(root),
-                since,
-                Some(&root.join("demo").to_string_lossy())
-            )
-            .as_deref(),
+            cmake_artifact("Built target demo\n", root, since).as_deref(),
             Some(root.join("demo").to_string_lossy().as_ref())
         );
     }
@@ -103,6 +98,6 @@ pub mod tests_group_5 {
     pub fn a_missing_directory_reports_nothing_instead_of_failing() {
         let directory = TempDir::new("newest-missing");
         let missing = directory.path().join("never-built");
-        assert_eq!(newest_executable(&missing, SystemTime::UNIX_EPOCH), None);
+        assert_eq!(cmake_artifact("", &missing, SystemTime::UNIX_EPOCH), None);
     }
 }

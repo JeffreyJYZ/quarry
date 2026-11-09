@@ -23,18 +23,6 @@ pub const SKIPPED: [&str; 6] = [
 /// Suffixes that are never the program a user runs.
 pub const NOT_PROGRAMS: [&str; 5] = [".dylib", ".so", ".a", ".o", ".d"];
 
-/// The executable a build just wrote, newest first.
-///
-/// This is the filesystem half of the choice and knows only about files: which of them was written
-/// by *this* build is [`choose_artifact`]'s decision, and it is the one Run and Debug act on.
-///
-/// A CMake project does not name its output in a way we can predict: the binary is the project's
-/// `add_executable` name, not the directory name, and it can land in a subdirectory. Since CMake's
-/// build output reports no target either, the files this build touched are the only honest answer.
-pub fn newest_executable(root: &Path, since: SystemTime) -> Option<String> {
-    choose_artifact(&executable_candidates(root), since, None)
-}
-
 /// Every file under `root` that could be the program, with the time the build wrote it.
 ///
 /// Nothing is filtered by time here: a build start means something only next to a build, so the
@@ -79,7 +67,7 @@ fn walk(root: &Path, depth: usize, candidates: &mut Vec<Candidate>) {
 ///
 /// The name checks matter as much as the mode bits: a `.o` file is not executable and a build
 /// script is, and either one winning would hand Run the wrong file.
-fn is_candidate(path: &Path) -> bool {
+pub fn is_candidate(path: &Path) -> bool {
     let name = path
         .file_name()
         .map(|name| name.to_string_lossy())
@@ -91,7 +79,7 @@ fn is_candidate(path: &Path) -> bool {
 }
 
 #[cfg(unix)]
-fn is_executable(path: &Path) -> bool {
+pub fn is_executable(path: &Path) -> bool {
     use std::os::unix::fs::PermissionsExt;
 
     fs::metadata(path)
@@ -100,7 +88,7 @@ fn is_executable(path: &Path) -> bool {
 }
 
 #[cfg(not(unix))]
-fn is_executable(path: &Path) -> bool {
+pub fn is_executable(path: &Path) -> bool {
     fs::metadata(path)
         .map(|meta| meta.is_file())
         .unwrap_or(false)

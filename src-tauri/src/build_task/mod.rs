@@ -42,6 +42,9 @@ pub use choose_artifact::*;
 mod newest_executable;
 pub use newest_executable::*;
 
+mod cmake_artifact;
+pub use cmake_artifact::*;
+
 mod tests_1;
 pub use tests_1::*;
 
@@ -62,3 +65,6 @@ pub use tests_choice::*;
 
 mod tests_plain_clang_sources;
 pub use tests_plain_clang_sources::*;
+
+mod tests_cmake_artifact;
+pub use tests_cmake_artifact::*;
