@@ -37,7 +37,9 @@ export default function ReleaseNotes({
 
 	const body =
 		notes === null ? (
-			<p className="notes-empty">{failed ? "No notes for this version" : "Loading notes…"}</p>
+			<p className="notes-empty">
+				{failed ? "No release notes published for this version" : "Loading notes…"}
+			</p>
 		) : (
 			<>
 				{lead === null ? null : <p className="notes-lead">{lead}</p>}

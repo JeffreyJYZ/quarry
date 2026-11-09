@@ -115,7 +115,14 @@ export default function StatusBar({
 					onRun={onRun}
 					onStop={onStop}
 				/>
-				<span className="status-left" title={project?.root}>
+				<span
+					className="status-left"
+					title={
+						project === null
+							? "Open a folder to start a language server."
+							: project.root
+					}
+				>
 					{project === null
 						? "no project"
 						: `${project.name} · ${kindLabel(project.kind)}`}

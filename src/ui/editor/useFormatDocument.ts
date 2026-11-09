@@ -39,7 +39,9 @@ export function useFormatDocument(options: {
 			return null;
 		}
 		if (formatter === "") {
-			notify?.(`no formatter for .${ext}`);
+			notify?.(
+				`No formatter for .${ext}: install taplo-cli (TOML) or configure one in Settings.`,
+			);
 			return null;
 		}
 		try {

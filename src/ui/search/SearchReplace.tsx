@@ -64,7 +64,9 @@ export function SearchReplace({
 						<p className="search-state">preview truncated (cap {PREVIEW_LIMIT})</p>
 					) : null}
 					{isPreviewStale(preview, trimmed, replacement) ? (
-						<p className="search-state error">preview is stale</p>
+						<p className="search-state error">
+							Preview is stale: run Preview again before Replace.
+						</p>
 					) : null}
 				</div>
 			) : null}

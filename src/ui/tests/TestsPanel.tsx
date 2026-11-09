@@ -1,5 +1,5 @@
 import type { TestItem, TestReport } from "@/lib/project/api";
-import { type ResultFilter, resultLabel } from "@/lib/tests/filterTests";
+import { emptyTestsMessage, type ResultFilter } from "@/lib/tests/filterTests";
 import { groupByBinary } from "./parts";
 import { TestGroups } from "./TestGroups";
 
@@ -44,7 +44,7 @@ export default function TestsPanel({
 		return report !== undefined && !report.passed;
 	}).length;
 	const notRunCount = items.filter((item) => results.get(item.name) === undefined).length;
-	const emptyMessage = `No tests match "${textFilter}" · "${binaryFilter ?? "All binaries"}" · "${resultLabel(resultFilter)}"`;
+	const emptyMessage = emptyTestsMessage(items.length, textFilter, binaryFilter, resultFilter);
 
 	return (
 		<div className="tests">

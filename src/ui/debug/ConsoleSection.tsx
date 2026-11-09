@@ -25,7 +25,9 @@ export default function ConsoleSection({ session }: { session: string | null }) 
 	return (
 		<div className="dock-console">
 			<div className="dock-console-bar">
-				<span className="dock-debug-label">{session === null ? "no session" : "live"}</span>
+				<span className="dock-debug-label">
+					{session === null ? "No debug session" : "Live"}
+				</span>
 				<button
 					type="button"
 					className="dock-action"

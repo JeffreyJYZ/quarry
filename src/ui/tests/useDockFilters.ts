@@ -162,7 +162,11 @@ export function useDockFilters({
 			setCopyStatus("Copied");
 			window.setTimeout(() => setCopyStatus(null), TOAST_MS);
 		} catch (error) {
-			setCopyStatus(error instanceof Error ? error.message : "copy failed");
+			setCopyStatus(
+				error instanceof Error
+					? error.message
+					: "Copy failed: could not copy to clipboard.",
+			);
 			window.setTimeout(() => setCopyStatus(null), TOAST_MS);
 		}
 	};

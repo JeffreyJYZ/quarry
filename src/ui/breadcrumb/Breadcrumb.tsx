@@ -38,7 +38,9 @@ export default function Breadcrumb({ root, activePath, cursor, onNavigate }: Bre
 			await navigator.clipboard.writeText(text);
 			setCopyError(null);
 		} catch (err) {
-			setCopyError(err instanceof Error ? err.message : "copy failed");
+			setCopyError(
+				err instanceof Error ? err.message : "Copy failed: could not copy to clipboard.",
+			);
 		}
 	};
 
