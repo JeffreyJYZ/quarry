@@ -73,6 +73,33 @@ pub mod tests_group_5 {
     }
 
     #[test]
+    pub fn a_newer_artifact_does_not_take_the_launch_from_the_reported_target() {
+        let directory = TempDir::new("newest-helper");
+        let root = directory.path();
+        let since = SystemTime::now() - Duration::from_secs(60);
+
+        write_executable(&root.join("demo"));
+        std::thread::sleep(Duration::from_millis(20));
+        write_executable(&root.join("demo_test"));
+
+        // The old answer: the newest file the build wrote, here the test binary.
+        assert_eq!(
+            newest_executable(root, since).as_deref(),
+            Some(root.join("demo_test").to_string_lossy().as_ref())
+        );
+        // The answer Run launches: what the build reported, even though it is the older file.
+        assert_eq!(
+            choose_artifact(
+                &executable_candidates(root),
+                since,
+                Some(&root.join("demo").to_string_lossy())
+            )
+            .as_deref(),
+            Some(root.join("demo").to_string_lossy().as_ref())
+        );
+    }
+
+    #[test]
     pub fn a_missing_directory_reports_nothing_instead_of_failing() {
         let directory = TempDir::new("newest-missing");
         let missing = directory.path().join("never-built");

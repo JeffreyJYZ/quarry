@@ -6,7 +6,7 @@ pub use serde_json::Value;
 pub use std::collections::HashSet;
 pub use std::path::Path;
 pub use std::process::Command;
-pub use std::time::Instant;
+pub use std::time::{Instant, SystemTime};
 
 use super::*;
 
@@ -109,6 +109,9 @@ pub fn no_build_system() -> String {
 /// Runs the build and reports. Called on a blocking thread so the async runtime stays free.
 pub fn run_build(build_root: &str, release: bool) -> Result<BuildReport, String> {
     let started = Instant::now();
+    // The moment the build begins: the boundary between a file this run wrote and one an earlier
+    // run left behind. Read before the spawn so nothing the build writes can predate it.
+    let started_at = SystemTime::now();
     let program = cargo_program();
 
     let mut command = crate::resolve::command(&program)?;
@@ -134,6 +137,9 @@ pub fn run_build(build_root: &str, release: bool) -> Result<BuildReport, String>
         diagnostics: parsed.diagnostics,
         duration_ms,
         summary: summarize(&stderr, &parsed.unlocated),
-        artifact: parsed.artifact,
+        // Cargo names the executable of the unit it built, so there is nothing to guess and no
+        // filesystem walk: a `target/` sweep would find build scripts and dependency binaries,
+        // and launching one of those is worse than reporting that the build produced no program.
+        artifact: choose_artifact(&[], started_at, parsed.artifact.as_deref()),
     })
 }

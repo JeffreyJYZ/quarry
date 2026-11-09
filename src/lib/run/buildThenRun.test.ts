@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { LaunchConfig } from "@/lib/project/api";
-import { buildThenResolve } from "@/lib/run/buildThenRun";
+import { buildThenResolve, NO_EXECUTABLE } from "@/lib/run/buildThenRun";
 
 const resolved: LaunchConfig = {
 	program: "/work/demo/target/debug/demo",
@@ -33,20 +33,30 @@ describe("buildThenResolve", () => {
 		});
 	});
 
-	test("a debug build with no artifact keeps the resolved program", async () => {
+	test("a build that reports no executable is reported instead of launching a stale binary", async () => {
+		let resolvedCalls = 0;
 		const result = await buildThenResolve({
 			root: "/work/demo",
 			targetId: "cargo:demo:demo",
 			profile: "debug",
 			stopOnEntry: true,
 			build: async () => ({ success: true, summary: "build ok", artifact: null }),
-			resolve: async () => resolved,
+			resolve: async () => {
+				resolvedCalls += 1;
+				return resolved;
+			},
 		});
 
-		expect(result).toEqual({ ok: true, config: resolved });
+		expect(result).toEqual({
+			ok: false,
+			stage: "build",
+			message: NO_EXECUTABLE,
+			diagnostics: [],
+		});
+		expect(resolvedCalls).toBe(0);
 	});
 
-	test("a blank artifact is no artifact", async () => {
+	test("a blank artifact is no executable either", async () => {
 		const result = await buildThenResolve({
 			root: "/work/demo",
 			targetId: "cargo:demo:demo",
@@ -56,7 +66,12 @@ describe("buildThenResolve", () => {
 			resolve: async () => resolved,
 		});
 
-		expect(result).toEqual({ ok: true, config: resolved });
+		expect(result).toEqual({
+			ok: false,
+			stage: "build",
+			message: NO_EXECUTABLE,
+			diagnostics: [],
+		});
 	});
 
 	test("a failed build reports its summary and never resolves", async () => {
@@ -140,7 +155,11 @@ describe("buildThenResolve", () => {
 			targetId: "cargo:demo:demo",
 			profile: "debug",
 			stopOnEntry: false,
-			build: async () => ({ success: true, summary: "build ok" }),
+			build: async () => ({
+				success: true,
+				summary: "build ok",
+				artifact: "/work/demo/target/debug/demo",
+			}),
 			resolve: async () => {
 				throw "unknown run target: cargo:demo:demo";
 			},

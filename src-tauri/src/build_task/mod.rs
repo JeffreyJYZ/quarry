@@ -36,6 +36,9 @@ pub use collect_plain_clang_sources::*;
 mod split_severity;
 pub use split_severity::*;
 
+mod choose_artifact;
+pub use choose_artifact::*;
+
 mod newest_executable;
 pub use newest_executable::*;
 
@@ -53,6 +56,9 @@ pub use tests_4::*;
 
 mod tests_5;
 pub use tests_5::*;
+
+mod tests_choice;
+pub use tests_choice::*;
 
 mod tests_plain_clang_sources;
 pub use tests_plain_clang_sources::*;

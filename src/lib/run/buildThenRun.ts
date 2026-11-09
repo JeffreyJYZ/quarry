@@ -10,6 +10,15 @@ type BuildOutcome = {
 	diagnostics?: Diagnostic[];
 };
 
+/**
+ * Shown when a build succeeds without naming an executable.
+ *
+ * It is a result of the build, not a failure to launch, so it is reported in the same place a
+ * compiler error goes instead of resolving a path the build never wrote.
+ */
+export const NO_EXECUTABLE =
+	"the build succeeded but produced no executable to run: set the program in the run form";
+
 export type BuildThenResolveResult =
 	{ ok: true; config: LaunchConfig } | ({ ok: false } & LaunchFailure);
 
@@ -24,9 +33,10 @@ export type BuildThenResolveResult =
  * exact message — file, position, the compiler's own words — is only in the diagnostics; dropping
  * them is why a run used to fail with a bare "Build failed" and nothing to read.
  *
- * A successful build's `artifact` replaces the resolved `program`, because the binary cargo just
- * wrote is the one to launch; a build that reports none (a library, a text-only build) leaves the
- * resolved path alone.
+ * A successful build's `artifact` replaces the resolved `program`, because the binary the build just
+ * wrote is the one to launch. A build that reports none produced nothing to run, and that is
+ * reported here: falling back to the resolved path launches whatever an earlier build left there,
+ * which is why Run used to start a stale binary after a build that wrote nothing.
  */
 export async function buildThenResolve(options: {
 	root: string;
@@ -58,15 +68,15 @@ export async function buildThenResolve(options: {
 			diagnostics: report.diagnostics ?? [],
 		};
 	}
+	const artifact = report.artifact?.trim() ?? "";
+	if (artifact === "") {
+		return { ok: false, stage: "build", message: NO_EXECUTABLE, diagnostics: [] };
+	}
 	let config: LaunchConfig;
 	try {
 		config = await options.resolve(options.root, options.targetId, options.stopOnEntry);
 	} catch (error) {
 		return { ok: false, stage: "resolve", message: describeError(error), diagnostics: [] };
-	}
-	const artifact = report.artifact?.trim() ?? "";
-	if (artifact === "") {
-		return { ok: true, config };
 	}
 	return { ok: true, config: { ...config, program: artifact } };
 }
