@@ -56,25 +56,7 @@ pub async fn lsp_open_document(
     let session = session_for(&state, &root)?;
     let mut session = lock(&session);
 
-    let version = 1;
-    session.documents.insert(path.clone(), version);
-    session
-        .document_ends
-        .insert(path.clone(), document_end(&text));
-    session.document_texts.insert(path.clone(), text.clone());
-
-    let message = notification(
-        "textDocument/didOpen",
-        json!({
-            "textDocument": {
-                "uri": path_to_uri(&path),
-                "languageId": language_id(&path),
-                "version": version,
-                "text": text,
-            }
-        }),
-    );
-    send(&mut session, "textDocument/didOpen", &message)?;
+    open_document(&mut session, &path, text)?;
 
     // Opening a file should check it, the way CLion analyses on open: rust-analyzer's type findings
     // come from `cargo check`, so ask for one run now instead of waiting for a save.
@@ -102,52 +84,7 @@ pub async fn lsp_change_document(
     let session = session_for(&state, &root)?;
     let mut session = lock(&session);
 
-    let old_text = session
-        .document_texts
-        .get(&path)
-        .cloned()
-        .unwrap_or_default();
-    if old_text == text {
-        // identical: no send
-        let v = session.documents.get(&path).copied().unwrap_or(0);
-        session.documents.insert(path.clone(), v);
-        return Ok(v);
-    }
-
-    let version = session.documents.get(&path).copied().unwrap_or(0) + 1;
-    session.documents.insert(path.clone(), version);
-    session
-        .document_ends
-        .insert(path.clone(), document_end(&text));
-    session.document_texts.insert(path.clone(), text.clone());
-
-    let message = if let Some(range) = incremental_range(&old_text, &text) {
-        // replacement text is the tail of `new` from the first differing utf-16 position
-        let old_u: Vec<u16> = old_text.encode_utf16().collect();
-        let new_u: Vec<u16> = text.encode_utf16().collect();
-        let mut p = 0usize;
-        while p < old_u.len() && p < new_u.len() && old_u[p] == new_u[p] {
-            p += 1;
-        }
-        let new_text = String::from_utf16_lossy(&new_u[p..]);
-        notification(
-            "textDocument/didChange",
-            json!({
-                "textDocument": { "uri": path_to_uri(&path), "version": version },
-                "contentChanges": [{ "range": range, "text": new_text }],
-            }),
-        )
-    } else {
-        notification(
-            "textDocument/didChange",
-            json!({
-                "textDocument": { "uri": path_to_uri(&path), "version": version },
-                "contentChanges": [{ "text": text }],
-            }),
-        )
-    };
-    send(&mut session, "textDocument/didChange", &message)?;
-    Ok(version)
+    change_document(&mut session, &path, text)
 }
 
 #[tauri::command]

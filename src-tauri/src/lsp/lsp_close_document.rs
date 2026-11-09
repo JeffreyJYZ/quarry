@@ -51,15 +51,7 @@ pub async fn lsp_close_document(
     let session = session_for(&state, &root)?;
     let mut session = lock(&session);
 
-    session.documents.remove(&path);
-    session.document_ends.remove(&path);
-    session.document_texts.remove(&path);
-
-    let message = notification(
-        "textDocument/didClose",
-        json!({ "textDocument": { "uri": path_to_uri(&path) } }),
-    );
-    send(&mut session, "textDocument/didClose", &message)
+    drop_document(&mut session, &path)
 }
 
 /// Emit helper the unit must keep so the payload shape stays in one place.

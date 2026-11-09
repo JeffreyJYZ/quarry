@@ -48,6 +48,12 @@ pub use impl_lspstate::*;
 mod incremental_sync;
 pub use incremental_sync::*;
 
+mod document_sync;
+pub use document_sync::*;
+
+mod document_sync_tests;
+pub use document_sync_tests::*;
+
 mod lsp_watched_files;
 pub use lsp_watched_files::*;
 
