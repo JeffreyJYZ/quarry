@@ -7,11 +7,20 @@ import "@/ui/app/crash.css";
  * the only way out is to know that the app has to be relaunched. The panel says what happened, names
  * the component React blamed, and offers the one action that helps.
  */
-export default function CrashPanel({ message, stack }: { message: string; stack?: string }) {
+export default function CrashPanel({
+	message,
+	stack,
+	region,
+}: {
+	message: string;
+	stack?: string;
+	/** The part that failed, so a nested boundary does not claim the whole window died. */
+	region?: string;
+}) {
 	return (
 		<div className="crash">
 			<div className="crash-panel">
-				<h1 className="crash-title">quarry stopped drawing this window</h1>
+				<h1 className="crash-title">quarry stopped drawing {region ?? "this window"}</h1>
 				<p className="crash-message">{message}</p>
 				<pre className="crash-stack">{stack ?? "No stack was reported."}</pre>
 				<div className="crash-actions">

@@ -1,5 +1,6 @@
 import AppBody from "@/ui/app/AppBody";
 import AppTopBar from "@/ui/app/AppTopBar";
+import AppErrorBoundary from "@/ui/app/AppErrorBoundary";
 import OverlaysMount from "@/ui/app/OverlaysMount";
 import RunDebugWidget from "@/ui/app/RunDebugWidget";
 import UpdateSlot from "@/ui/updates/UpdateSlot";
@@ -41,8 +42,13 @@ export default function AppView({ model }: { model: ShellModel }) {
 					</button>
 				</div>
 			)}
-			<AppBody model={model} />
-			<OverlaysMount model={model} />
+			{/* One region per boundary: a throw in the workspace must not take the panels with it. */}
+			<AppErrorBoundary region="the workspace">
+				<AppBody model={model} />
+			</AppErrorBoundary>
+			<AppErrorBoundary region="a panel">
+				<OverlaysMount model={model} />
+			</AppErrorBoundary>
 		</div>
 	);
 }
