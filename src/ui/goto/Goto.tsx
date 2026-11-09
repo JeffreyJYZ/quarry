@@ -1,9 +1,10 @@
+import { GOTO_RESULT_LIMIT } from "@/lib/consts/goto";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { lspSymbols, lspWorkspaceSymbols, type WorkspaceSymbol } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
 import { isInsideRoot } from "@/lib/lsp/paths";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
-import type { ServerKind } from "@/lib/lsp/served";
+import { ALL_SERVER_KINDS, RUST_ANALYZER } from "@/lib/consts/lsp";
 import { useDialogFocus } from "@/ui/app/useDialogFocus";
 import "@/ui/goto/goto.css";
 import GotoInput from "@/ui/goto/GotoInput";
@@ -61,7 +62,7 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose, onNoti
 				if (mode === "symbol") {
 					let symbols: Awaited<ReturnType<typeof lspSymbols>> = [];
 					if (path !== null && isInsideRoot(root, path)) {
-						const running = new Set<ServerKind>(["rust-analyzer", "clangd"]);
+						const running = new Set(ALL_SERVER_KINDS);
 						const kind = servedByRunningServer(path, running);
 						if (kind !== null) {
 							symbols = await lspSymbols(sessionId(kind, root), path).catch((err) => {
@@ -82,12 +83,8 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose, onNoti
 						})),
 					);
 				} else {
-					const running = new Set<ServerKind>(["rust-analyzer", "clangd"]);
-					const kind = running.has("rust-analyzer")
-						? "rust-analyzer"
-						: running.has("clangd")
-							? "clangd"
-							: null;
+					// Workspace symbols come from the Rust server; the set above is "every server".
+					const kind = RUST_ANALYZER;
 					const symbols: WorkspaceSymbol[] =
 						kind === null
 							? []
@@ -119,7 +116,10 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose, onNoti
 		};
 		// The class mode is the only one that re-queries as the query changes.
 	}, [mode, path, recent, root, query, onNotice]);
-	const visible = useMemo(() => filterRows(rows, query).slice(0, 200), [query, rows]);
+	const visible = useMemo(
+		() => filterRows(rows, query).slice(0, GOTO_RESULT_LIMIT),
+		[query, rows],
+	);
 	useEffect(() => {
 		const item = listRef.current?.children[active] as HTMLElement | undefined;
 		item?.scrollIntoView({ block: "nearest" });

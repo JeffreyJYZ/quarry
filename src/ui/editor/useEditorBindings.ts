@@ -1,3 +1,4 @@
+import { ALL_SERVER_KINDS } from "@/lib/consts/lsp";
 import type { CodeAction } from "@/lib/project/api";
 import type { BehaviourDeps } from "@/ui/editor/extensionsBehaviour";
 import type { KeymapDeps } from "@/ui/editor/keymapDeps";
@@ -53,7 +54,7 @@ export function useEditorBindings(options: {
 } {
 	const { refs, search, actions } = options;
 	const runningRef = options.runningRef ?? {
-		current: new Set<import("@/lib/lsp/served").ServerKind>(["rust-analyzer", "clangd"]),
+		current: new Set(ALL_SERVER_KINDS),
 	};
 	const counters = { completionSeq: 0, hoverSeq: 0 };
 

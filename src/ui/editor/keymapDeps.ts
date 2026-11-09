@@ -1,7 +1,8 @@
+import type { ServerKind } from "@/lib/lsp/served";
 import type { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import type { CodeAction, Location } from "@/lib/project/api";
-import type { ServerKind } from "@/lib/lsp/served";
+
 import type { InlayHint } from "@/lib/project/api";
 
 /** What the surface's key bindings reach: refs for live values, setters for the panels they open. */

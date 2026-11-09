@@ -1,3 +1,4 @@
+import { HIERARCHY_BASE_INDENT, HIERARCHY_INDENT_STEP } from "@/lib/consts/lsp";
 import type { ReactElement } from "react";
 import { TITLES, EMPTY_NOTES } from "@/ui/lsp/parts";
 import {
@@ -31,7 +32,7 @@ export default function HierarchyNode({
 	const key = hierarchyKey(node);
 	const busy = loadingKey === `${direction}:${key}`;
 	const level = hierarchy.levels.get(key);
-	const pad = { paddingLeft: `${6 + depth * 14}px` };
+	const pad = { paddingLeft: `${HIERARCHY_BASE_INDENT + depth * HIERARCHY_INDENT_STEP}px` };
 	const name = (
 		<>
 			<span className="type-hierarchy-label">{node.name}</span>
@@ -77,7 +78,9 @@ export default function HierarchyNode({
 			{busy ? (
 				<p
 					className="type-hierarchy-loading"
-					style={{ paddingLeft: `${6 + (depth + 1) * 14}px` }}
+					style={{
+						paddingLeft: `${HIERARCHY_BASE_INDENT + (depth + 1) * HIERARCHY_INDENT_STEP}px`,
+					}}
 				>
 					Loading {TITLES[direction].toLowerCase()}…
 				</p>
@@ -85,7 +88,9 @@ export default function HierarchyNode({
 			{expanded && level !== undefined && level.length === 0 ? (
 				<p
 					className="type-hierarchy-empty"
-					style={{ paddingLeft: `${6 + (depth + 1) * 14}px` }}
+					style={{
+						paddingLeft: `${HIERARCHY_BASE_INDENT + (depth + 1) * HIERARCHY_INDENT_STEP}px`,
+					}}
 				>
 					{EMPTY_NOTES[direction]}
 				</p>

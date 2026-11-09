@@ -1,3 +1,4 @@
+import type { ServerKind } from "@/lib/lsp/served";
 import { useCallback, useRef, useState } from "react";
 import { useDebugSession } from "@/lib/debug/session";
 import { lspOverridesFrom } from "@/ui/app/lspOverrides";
@@ -5,7 +6,6 @@ import type { DiagnosticsLifecycleEvent } from "@/lib/lsp/lifecycle";
 import { RESTART_NOTICE } from "@/lib/lsp/restart";
 import { useLspRestart } from "@/ui/app/useLspRestart";
 import { useShellDiagnostics } from "@/ui/app/useShellDiagnostics";
-import type { ServerKind } from "@/lib/lsp/served";
 import type { RunConfiguration } from "@/lib/project/api";
 import { useTests } from "@/lib/tests/useTests";
 import { useBuild } from "@/ui/app/useBuild";

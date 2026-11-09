@@ -1,8 +1,10 @@
+import type { ServerKind } from "@/lib/lsp/served";
 import { useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
 import { type InlayHint, lspInlayHints } from "@/lib/project/api";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
-import type { ServerKind } from "@/lib/lsp/served";
+import { ALL_SERVER_KINDS } from "@/lib/consts/lsp";
+
 import { setInlayHints } from "@/lib/editor/inlayHints";
 
 /** Inlay hints: fetched after a short pause and discarded if the document moved on. */
@@ -14,7 +16,7 @@ export function useInlayHints(options: {
 }) {
 	const { viewRef, rootRef, pathRef } = options;
 	const runningRef = options.runningRef ?? {
-		current: new Set<ServerKind>(["rust-analyzer", "clangd"]),
+		current: new Set(ALL_SERVER_KINDS),
 	};
 	const [hintsVisible, setHintsVisible] = useState(true);
 	const hintsVisibleRef = useRef(hintsVisible);

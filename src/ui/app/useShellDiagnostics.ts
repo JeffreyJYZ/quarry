@@ -1,5 +1,6 @@
-import type { MutableRefObject } from "react";
 import type { ServerKind } from "@/lib/lsp/served";
+import type { MutableRefObject } from "react";
+
 import type { LspStatusMap } from "@/lib/lsp/session";
 import { useDiagnosticsState } from "@/ui/app/useDiagnosticsState";
 import { useLspWiring } from "@/ui/app/useLspWiring";

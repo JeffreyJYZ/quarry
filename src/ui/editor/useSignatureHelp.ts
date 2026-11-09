@@ -1,10 +1,11 @@
+import type { ServerKind } from "@/lib/lsp/served";
 import { useCallback, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
 import { toLspPosition } from "@/lib/editor/positions";
 import type { SignatureHelp } from "@/lib/project/api";
 import { lspSignatureHelp } from "@/lib/project/api";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
-import type { ServerKind } from "@/lib/lsp/served";
+import { ALL_SERVER_KINDS } from "@/lib/consts/lsp";
 
 export type SignatureHelpArgs = {
 	viewRef: { current: EditorView | null };
@@ -14,7 +15,7 @@ export type SignatureHelpArgs = {
 };
 
 export function useSignatureHelp({ viewRef, rootRef, pathRef, runningRef }: SignatureHelpArgs) {
-	const running = runningRef ?? { current: new Set<ServerKind>(["rust-analyzer", "clangd"]) };
+	const running = runningRef ?? { current: new Set(ALL_SERVER_KINDS) };
 	const [sigHelp, setSigHelp] = useState<SignatureHelp | null>(null);
 	const [sigCoords, setSigCoords] = useState<{
 		left: number;

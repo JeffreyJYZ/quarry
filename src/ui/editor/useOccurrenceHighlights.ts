@@ -1,8 +1,10 @@
+import type { ServerKind } from "@/lib/lsp/served";
 import { useRef } from "react";
 import type { EditorView } from "@codemirror/view";
 import { lspDocumentHighlights } from "@/lib/project/api";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
-import type { ServerKind } from "@/lib/lsp/served";
+import { ALL_SERVER_KINDS } from "@/lib/consts/lsp";
+
 import { toLspPosition } from "@/lib/editor/positions";
 import { setOccurrences } from "@/lib/editor/occurrences";
 
@@ -15,7 +17,7 @@ export function useOccurrenceHighlights(options: {
 }) {
 	const { viewRef, rootRef, pathRef } = options;
 	const runningRef = options.runningRef ?? {
-		current: new Set<ServerKind>(["rust-analyzer", "clangd"]),
+		current: new Set(ALL_SERVER_KINDS),
 	};
 	const occSeqRef = useRef(0);
 	const occTimerRef = useRef<number | null>(null);

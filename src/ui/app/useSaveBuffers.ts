@@ -1,9 +1,10 @@
+import type { ServerKind } from "@/lib/lsp/served";
 import { useCallback, useEffect, useRef } from "react";
 import { isDirty, settleSave, type FileBuffer } from "@/lib/project/buffer";
 import { type SaveOutcome, saveBuffer, saveErrorMessage, saveMessage } from "@/lib/project/save";
 import { formatterFor, lspDidSave } from "@/lib/project/api";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
-import type { ServerKind } from "@/lib/lsp/served";
+
 import type { EditorHandle } from "@/ui/editor/Editor";
 import type { StatusText } from "@/ui/app/status";
 

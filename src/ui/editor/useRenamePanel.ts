@@ -1,8 +1,10 @@
+import type { ServerKind } from "@/lib/lsp/served";
 import { useState } from "react";
 import type { EditorView } from "@codemirror/view";
 import { type FileEdit, lspRename } from "@/lib/project/api";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
-import type { ServerKind } from "@/lib/lsp/served";
+import { ALL_SERVER_KINDS } from "@/lib/consts/lsp";
+
 import { toLspPosition } from "@/lib/editor/positions";
 
 /** The inline rename: F2 opens it with the identifier under the caret, Enter sends the request. */
@@ -16,7 +18,7 @@ export function useRenamePanel(options: {
 }) {
 	const { viewRef, rootRef, pathRef, onNotice, onApplyEdits } = options;
 	const runningRef = options.runningRef ?? {
-		current: new Set<ServerKind>(["rust-analyzer", "clangd"]),
+		current: new Set(ALL_SERVER_KINDS),
 	};
 	const [renameOpen, setRenameOpen] = useState(false);
 	const [renameValue, setRenameValue] = useState("");

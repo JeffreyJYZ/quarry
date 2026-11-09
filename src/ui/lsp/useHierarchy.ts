@@ -1,3 +1,4 @@
+import type { ServerKind } from "@/lib/lsp/served";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	createHierarchy,
@@ -18,7 +19,7 @@ import {
 } from "@/lib/lsp/typeHierarchy";
 import { describeError } from "@/lib/project/errors";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
-import type { ServerKind } from "@/lib/lsp/served";
+import { ALL_SERVER_KINDS } from "@/lib/consts/lsp";
 
 type Hierarchies = Record<TypeHierarchyDirection, TypeHierarchy>;
 
@@ -42,7 +43,7 @@ export function useHierarchy({
 	onClose: () => void;
 	running?: ReadonlySet<ServerKind>;
 }) {
-	const runningSet = running ?? new Set<ServerKind>(["rust-analyzer", "clangd"]);
+	const runningSet = running ?? new Set(ALL_SERVER_KINDS);
 	const [direction, setDirection] = useState<TypeHierarchyDirection>("supertypes");
 	const [hierarchies, setHierarchies] = useState<Hierarchies>(freshHierarchies);
 	const [prepared, setPrepared] = useState<TypeHierarchyNode[] | null>(null);
