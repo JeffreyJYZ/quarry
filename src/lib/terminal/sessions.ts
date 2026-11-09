@@ -66,8 +66,12 @@ export function tabLabel(session: Session): string {
 	return session.title ?? shortCwd(session.cwd);
 }
 
-/** The PTY's grid size for a host element, with the minimums a shell needs. */
-export function ptySize(element: HTMLElement | null): { rows: number; cols: number } {
+/** A raw PTY chunk, for a renderer that needs bytes rather than the parsed line model. */
+export type RawOutputHandler = (ptyId: string, data: string) => void;
+
+/** The PTY's grid size for a host element, with the minimums a shell needs. */ export function ptySize(
+	element: HTMLElement | null,
+): { rows: number; cols: number } {
 	const width = element ? element.clientWidth : 800;
 	const height = element ? element.clientHeight : 200;
 	return {

@@ -1,10 +1,12 @@
 import { useEffect } from "react";
+import { inTerminal } from "@/ui/app/focusGuard";
 
 /**
  * Cmd+W closes the active tab, Ctrl+Tab and Ctrl+Shift+Tab walk the strip.
  *
  * Cmd+W is swallowed even when the editor has focus: in a webview it otherwise reaches the window
- * and closes it, which loses every unsaved buffer at once.
+ * and closes it, which loses every unsaved buffer at once. A terminal is the exception: every key
+ * typed into it belongs to the shell, so none of these chords may touch the editor's tabs.
  */
 export function useTabKeybindings({
 	closeActiveTab,
@@ -17,6 +19,7 @@ export function useTabKeybindings({
 }) {
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
+			if (inTerminal()) return;
 			if (event.metaKey && !event.ctrlKey && !event.altKey && event.shiftKey) {
 				if (event.key.toLowerCase() !== "t") return;
 				event.preventDefault();

@@ -1,26 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ptyClose, ptyOpen, ptyWrite } from "@/lib/project/api";
+import { applyChunks, PtyBuffer } from "@/lib/terminal/ptyBuffer";
 import {
-	onPtyExited,
-	onPtyOutput,
-	type PtyExitedEvent,
-	type PtyOutputEvent,
-	ptyClose,
-	ptyOpen,
-	ptyWrite,
-} from "@/lib/project/api";
-import { applyChunks, PtyBuffer, withChunk } from "@/lib/terminal/ptyBuffer";
-import { appendData, describe, emptySession, ptySize, type Session } from "@/lib/terminal/sessions";
+	describe,
+	emptySession,
+	ptySize,
+	type RawOutputHandler,
+	type Session,
+} from "@/lib/terminal/sessions";
 import { parentDir } from "@/lib/project/paths";
-/** A raw PTY chunk, for a renderer that needs bytes rather than the parsed line model. */
-export type RawOutputHandler = (ptyId: string, data: string) => void;
-/** A promise that settles once the PTY listeners are attached, whichever way that went. */
-function gate(): { promise: Promise<void>; open: () => void } {
-	let open: () => void = () => undefined;
-	const promise = new Promise<void>((done) => {
-		open = done;
-	});
-	return { promise, open: () => open() };
-}
+import { ptyGate, usePtyEvents } from "@/ui/terminal/usePtyEvents";
 /** The terminal's sessions: one PTY each, plus the global event wiring. It owns nothing visual. */
 export function useTerminalSessions(options: {
 	root: string;
@@ -36,9 +25,13 @@ export function useTerminalSessions(options: {
 	const nextId = useRef(1);
 	const sessionsRef = useRef<Session[]>([]);
 	const activeIdRef = useRef<number | null>(null);
+	/** The root this session set belongs to, so a project switch is told apart from a re-render. */
+	const rootRef = useRef(root);
+	/** The newest `openSession`, so the root effect opens a tab without taking it as a dependency. */
+	const openSessionRef = useRef<() => Promise<void>>(async () => undefined);
 	/** Output that beats its session's `ptyId` assignment; replayed below, never dropped. */
 	const [buffer] = useState(() => new PtyBuffer());
-	const listeners = useMemo(gate, []);
+	const listeners = useMemo(ptyGate, []);
 	const rawHandlers = useRef<Set<RawOutputHandler>>(new Set());
 	const subscribeRaw = useCallback((handler: RawOutputHandler) => {
 		rawHandlers.current.add(handler);
@@ -58,7 +51,12 @@ export function useTerminalSessions(options: {
 			activePath !== null && activePath !== undefined
 				? (parentDir(activePath) ?? root)
 				: root;
-		setSessions((current) => [...current, emptySession(id, cwd, defaultFontSize)]);
+		setSessions((current) => {
+			// The ref the open guard reads must already hold the row, before React renders it.
+			const next = [...current, emptySession(id, cwd, defaultFontSize)];
+			sessionsRef.current = next;
+			return next;
+		});
 		setActiveId(id);
 		// The prompt lands milliseconds after `pty_open`, so its listeners must exist first. The gate
 		// settles on a failed subscription too.
@@ -85,6 +83,10 @@ export function useTerminalSessions(options: {
 			}));
 		}
 	}, [root, activePath, updateSession, defaultFontSize, containerRef, buffer, listeners]);
+	// The root effect reads this, so a project switch opens a tab through the newest closure.
+	useEffect(() => {
+		openSessionRef.current = openSession;
+	}, [openSession]);
 	const closeSession = useCallback(
 		(id: number) => {
 			const session = sessionsRef.current.find((s) => s.id === id);
@@ -104,47 +106,9 @@ export function useTerminalSessions(options: {
 		},
 		[buffer],
 	);
-	// One listener pair for every session; the PTY id is the key.
-	useEffect(() => {
-		let unOutput: (() => void) | undefined;
-		let unExited: (() => void) | undefined;
-		let cancelled = false;
-		void (async () => {
-			try {
-				unOutput = await onPtyOutput((event: PtyOutputEvent) => {
-					for (const handler of rawHandlers.current) handler(event.id, event.data);
-					if (!sessionsRef.current.some((s) => s.ptyId === event.id)) {
-						buffer.push(event.id, event.data);
-						return;
-					}
-					setSessions((current) =>
-						current.map((s) => (s.ptyId !== event.id ? s : withChunk(s, event.data))),
-					);
-				});
-				unExited = await onPtyExited((event: PtyExitedEvent) => {
-					setSessions((current) =>
-						current.map((s) => {
-							if (s.ptyId !== event.id) return s;
-							const next = appendData(s, `\nexited with code ${event.code ?? 0}`);
-							return { ...next, exited: event.code };
-						}),
-					);
-				});
-			} catch {
-				/* the panel already reports a failed open */
-			}
-			if (cancelled) {
-				unOutput?.();
-				unExited?.();
-			}
-			listeners.open();
-		})();
-		return () => {
-			cancelled = true;
-			unOutput?.();
-			unExited?.();
-		};
-	}, [buffer, listeners]);
+	// One listener pair for every session, wired outside this file so the session bookkeeping stays
+	// readable.
+	usePtyEvents({ buffer, sessionsRef, rawHandlers, setSessions, listeners });
 	// A claimed PTY owns the handshake output; the replay restarts this effect for a late chunk.
 	useEffect(() => {
 		for (const session of sessions) {
@@ -156,8 +120,16 @@ export function useTerminalSessions(options: {
 				for (const data of pending) handler(ptyId, data);
 		}
 	}, [sessions, buffer, updateSession]);
-	// Closing the panel must not leave shells running in the background.
+	// Shells belong to the project they were opened in: a root change tears the old ones down and
+	// opens a tab in the new root, and unmounting closes them too rather than leaving them running.
 	useEffect(() => {
+		if (rootRef.current !== root) {
+			rootRef.current = root;
+			sessionsRef.current = [];
+			setSessions([]);
+			setActiveId(null);
+			void openSessionRef.current();
+		}
 		return () => {
 			for (const s of sessionsRef.current) {
 				if (s.ptyId !== null) {
@@ -165,7 +137,7 @@ export function useTerminalSessions(options: {
 				}
 			}
 		};
-	}, []);
+	}, [root]);
 	const send = useCallback(
 		(data: string) => {
 			const session = sessionsRef.current.find((s) => s.id === activeIdRef.current);

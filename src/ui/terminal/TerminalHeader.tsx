@@ -1,14 +1,13 @@
-import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { decreaseFontSize, increaseFontSize, scrollbackText } from "@/lib/terminal/fontSize";
-import { describe, type Session, shortCwd, tabLabel } from "@/lib/terminal/sessions";
-import TabRename from "@/ui/terminal/TabRename";
+import { describe, type Session, shortCwd } from "@/lib/terminal/sessions";
+import TerminalTabs from "@/ui/terminal/TerminalTabs";
 import {
 	CopyIcon,
 	FontDownIcon,
 	FontUpIcon,
 	PlusIcon,
 	RestartIcon,
-	TerminalIcon,
 	TrashIcon,
 } from "@/ui/terminal/TerminalIcons";
 type HeaderProps = {
@@ -51,84 +50,15 @@ export default function TerminalHeader({
 	onRestart,
 	updateSession,
 }: HeaderProps) {
-	const [editingId, setEditingId] = useState<number | null>(null);
-	const closedAt = useRef(0);
 	return (
 		<div className="terminal-chrome">
-			<div
-				className="terminal-tabs"
-				role="tablist"
-				aria-label="Terminal sessions"
-				onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
-					const index = sessions.findIndex((s) => s.id === activeId);
-					if (index < 0) return;
-					let next = index;
-					if (event.key === "ArrowRight" || event.key === "ArrowDown")
-						next = (index + 1) % sessions.length;
-					else if (event.key === "ArrowLeft" || event.key === "ArrowUp")
-						next = (index - 1 + sessions.length) % sessions.length;
-					else if (event.key === "Enter" || event.key === " ") {
-						event.preventDefault();
-						return;
-					} else return;
-					if (next === index) return;
-					event.preventDefault();
-					onSelect(sessions[next].id);
-				}}
-			>
-				{sessions.map((s) => {
-					const label = tabLabel(s);
-					const editing = editingId === s.id;
-					return (
-						<div
-							key={s.id}
-							className={`terminal-tab${s.id === activeId ? " active" : ""}${s.exited !== null ? " exited" : ""}`}
-							role="tab"
-							aria-selected={s.id === activeId}
-							tabIndex={s.id === activeId ? 0 : -1}
-							title={`${s.cwd} · pid ${s.pid ?? "—"}`}
-						>
-							<span className="terminal-tab-glyph">
-								<TerminalIcon />
-							</span>
-							{editing ? (
-								<TabRename
-									value={label}
-									session={s}
-									updateSession={updateSession}
-									onDone={() => {
-										closedAt.current = Date.now();
-										setEditingId(null);
-									}}
-								/>
-							) : (
-								<button
-									type="button"
-									className="terminal-tab-label"
-									onClick={() => onSelect(s.id)}
-									onDoubleClick={() => {
-										if (
-											editingId === null &&
-											Date.now() - closedAt.current >= 300
-										)
-											setEditingId(s.id);
-									}}
-								>
-									{label}
-								</button>
-							)}
-							<button
-								type="button"
-								className="terminal-tab-close"
-								aria-label={`Close ${label}`}
-								onClick={() => onClose(s.id)}
-							>
-								×
-							</button>
-						</div>
-					);
-				})}
-			</div>
+			<TerminalTabs
+				sessions={sessions}
+				activeId={activeId}
+				onSelect={onSelect}
+				onClose={onClose}
+				updateSession={updateSession}
+			/>
 			<div className="terminal-actions" role="toolbar" aria-label="Terminal actions">
 				<IconButton label="New terminal" title="New terminal (⌘T)" onClick={onOpen}>
 					<PlusIcon />
