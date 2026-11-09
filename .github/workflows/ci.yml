@@ -28,6 +28,11 @@ jobs:
               with:
                   workspaces: src-tauri
 
+            - name: Install cargo-nextest
+              uses: taiki-e/install-action@v2
+              with:
+                  tool: nextest
+
             - name: Install dependencies
               run: bun install --frozen-lockfile
 
