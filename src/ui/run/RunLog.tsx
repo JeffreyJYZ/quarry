@@ -1,26 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { exitStatusText } from "@/lib/run/exitStatus";
 import { TOAST_MS } from "@/lib/consts/tests";
+import type { RunExit, RunLine } from "@/lib/run/runOutput";
+import { copyText, lineClass, stopLabel } from "@/ui/run/view";
 
-/** One console line; the id makes a repeated line a distinct row. */
-export type RunLine = { id: number; stream: "stdout" | "stderr"; line: string };
+export type { RunLine } from "@/lib/run/runOutput";
 
 export type RunLogProps = {
 	lines: RunLine[];
-	exited: { code: number | null; killed?: boolean } | null;
+	exited: RunExit | null;
 	onClear: () => void;
 	argv: string;
 	cwd?: string;
 	running: boolean;
+	/** Stop was sent and the process has not reported its exit yet. */
+	stopping: boolean;
+	onStop: () => void;
 	onRerun: () => void;
 };
-
-// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape sequences
-const ANSI_RE = /\x1b\[[0-9;]*[A-Za-z]/g;
-
-function stripAnsi(text: string): string {
-	return text.replace(ANSI_RE, "");
-}
 
 export default function RunLog({
 	lines,
@@ -29,6 +26,8 @@ export default function RunLog({
 	argv,
 	cwd,
 	running,
+	stopping,
+	onStop,
 	onRerun,
 }: RunLogProps) {
 	const ref = useRef<HTMLDivElement | null>(null);
@@ -36,7 +35,9 @@ export default function RunLog({
 	const [copyStatus, setCopyStatus] = useState<string | null>(null);
 	const statusTimer = useRef<number | null>(null);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: scroll trigger depends on line count and exit state
+	// Follow the newest line: `lines` is a new array on every append, so the cap on its length can
+	// never stop the scroll from sticking to the bottom.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: scroll trigger depends on the line array and the exit state
 	useEffect(() => {
 		const el = ref.current;
 		if (el === null) {
@@ -45,7 +46,7 @@ export default function RunLog({
 		if (stickRef.current) {
 			el.scrollTop = el.scrollHeight;
 		}
-	}, [lines.length, exited]);
+	}, [lines, exited]);
 
 	const onScroll = () => {
 		const el = ref.current;
@@ -68,7 +69,7 @@ export default function RunLog({
 	};
 
 	const copyOutput = async () => {
-		const text = lines.map((entry) => stripAnsi(entry.line)).join("\n");
+		const text = copyText(lines);
 		try {
 			if (navigator.clipboard === undefined) {
 				throw new Error("clipboard unavailable");
@@ -123,6 +124,14 @@ export default function RunLog({
 				)}
 				{copyStatus === null ? null : <span className="run-copy-status">{copyStatus}</span>}
 				<div className="run-log-actions">
+					<button
+						type="button"
+						className="dock-action"
+						onClick={onStop}
+						disabled={!running || stopping}
+					>
+						{stopLabel(stopping)}
+					</button>
 					<button type="button" className="dock-action" onClick={() => void copyOutput()}>
 						Copy output
 					</button>
@@ -144,10 +153,7 @@ export default function RunLog({
 			</div>
 			<div ref={ref} className="run-log-body" onScroll={onScroll}>
 				{lines.map((entry) => (
-					<div
-						key={entry.id}
-						className={entry.stream === "stderr" ? "run-line stderr" : "run-line"}
-					>
+					<div key={entry.seq} className={lineClass(entry.stream)}>
 						{entry.line}
 					</div>
 				))}

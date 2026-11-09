@@ -33,7 +33,7 @@ export function useRunControls(options: {
 	const [consoleOpen, setConsoleOpen] = useState(false);
 
 	const proc = useRunProcess(onNotice);
-	const { running, lines, exited } = proc;
+	const { running, stopping, lines, exited } = proc;
 
 	const { select, save, update, remove } = useRunConfigurations({
 		configurations,
@@ -118,6 +118,7 @@ export function useRunControls(options: {
 		closePanel: () => setPanelOpen(false),
 		consoleOpen,
 		running,
+		stopping,
 		lines,
 		exited,
 		program,

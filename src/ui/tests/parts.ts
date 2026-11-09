@@ -1,4 +1,5 @@
 import type { TestItem, TestReport } from "@/lib/project/api";
+import { signalName } from "@/lib/run/exitStatus";
 
 export type DockTab = "problems" | "tests" | "run" | "debugger" | "console" | "memory";
 
@@ -12,7 +13,7 @@ export function isDockTab(value: unknown): value is DockTab {
 /** What the run tab's suffix says: live while a process is up, then how it ended, then nothing. */
 export function runTabStatus(input: {
 	running: boolean;
-	exited: { code: number | null; killed?: boolean } | null;
+	exited: { code: number | null; signal?: number | null; killed?: boolean } | null;
 }): string | null {
 	if (input.running) {
 		return "running";
@@ -20,8 +21,14 @@ export function runTabStatus(input: {
 	if (input.exited === null) {
 		return null;
 	}
-	if (input.exited.killed === true || input.exited.code === null) {
-		return "killed";
+	if (input.exited.killed === true) {
+		return "stopped";
+	}
+	if (input.exited.signal !== undefined && input.exited.signal !== null) {
+		return signalName(input.exited.signal);
+	}
+	if (input.exited.code === null) {
+		return "terminated";
 	}
 	return `exit ${input.exited.code}`;
 }

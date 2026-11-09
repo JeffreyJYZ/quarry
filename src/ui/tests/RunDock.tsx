@@ -61,6 +61,8 @@ export default function RunDock({ runs }: { runs: RunControls }) {
 					argv={runs.argv}
 					cwd={runs.cwd}
 					running={running}
+					stopping={runs.stopping}
+					onStop={() => void runs.stop()}
 					onRerun={() => void runs.run()}
 					onClear={runs.clearLog}
 				/>
