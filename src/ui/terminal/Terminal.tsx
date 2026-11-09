@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { DEFAULT_FONT_SIZE } from "@/lib/terminal/fontSize";
+import type { TerminalAppearance } from "@/ui/terminal/appearance";
 import "@/ui/terminal/terminal.css";
 import "@/ui/terminal/xterm.css";
 import { shouldFocusTerminal } from "@/ui/terminal/focusTarget";
@@ -19,6 +20,8 @@ export type TerminalProps = {
 	placement?: "bottom" | "right";
 	/** Terminal font family; empty keeps the built-in monospace stack. */
 	fontFamily?: string;
+	/** Line height, letter spacing, cursor and scrollback; absent means the emulator defaults. */
+	appearance?: TerminalAppearance;
 };
 
 /**
@@ -33,6 +36,7 @@ export default function Terminal({
 	defaultFontSize,
 	placement = "bottom",
 	fontFamily = "",
+	appearance,
 }: TerminalProps) {
 	const containerRef = useRef<HTMLDivElement | null>(null);
 	const {
@@ -56,6 +60,7 @@ export default function Terminal({
 		ptyId: active?.ptyId ?? null,
 		fontSize: active?.fontSize ?? DEFAULT_FONT_SIZE,
 		fontFamily,
+		...(appearance ?? {}),
 		onData: send,
 	});
 

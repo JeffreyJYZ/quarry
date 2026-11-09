@@ -1,4 +1,5 @@
 import { Suspense, lazy } from "react";
+import { terminalAppearance } from "@/ui/terminal/appearance";
 import CallsPanel from "@/ui/calls/CallsPanel";
 import TypeHierarchyPanel from "@/ui/lsp/TypeHierarchyPanel";
 import BottomDock from "@/ui/app/BottomDock";
@@ -38,6 +39,7 @@ export default function CanvasPanels({ model }: { model: ShellModel }) {
 						activePath={model.activePath}
 						defaultFontSize={settings.effective.terminalFontSize}
 						fontFamily={settings.effective.terminalFontFamily}
+						appearance={terminalAppearance(settings.effective)}
 					/>
 				</Suspense>
 			</>
