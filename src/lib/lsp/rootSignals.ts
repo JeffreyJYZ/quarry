@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { isCppPath } from "@/lib/consts/extensions";
+import type { RootSignals } from "@/lib/lsp/served";
 import { listDir } from "@/lib/project/api";
 import { fileName } from "@/lib/project/paths";
-import type { RootSignals } from "@/lib/lsp/served";
 
 const SKIP_DIRS = new Set(["target", "node_modules", ".git", "build", "out"]);
 const MAX_DEPTH = 4;
@@ -142,6 +142,9 @@ export function useRootSignals(root: string | null): RootSignals | null {
 		};
 	}, [root]);
 	useEffect(() => {
+		// `revision` is a re-probe trigger, never a value the probe reads: referencing it keeps the
+		// dependency honest and reruns the probe after the cache was invalidated.
+		void revision;
 		if (root === null) {
 			setSignals(null);
 			return;
