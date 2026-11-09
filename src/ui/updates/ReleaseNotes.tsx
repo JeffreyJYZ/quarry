@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useDialogFocus } from "@/ui/app/useDialogFocus";
 import { useReleaseNotes } from "@/ui/updates/useReleaseNotes";
 import "@/ui/updates/updates.css";
 
@@ -18,6 +19,7 @@ export default function ReleaseNotes({
 	variant?: "panel" | "inline";
 }) {
 	const { notes, failed } = useReleaseNotes(version);
+	const { panelRef, onKeyDown } = useDialogFocus(variant !== "inline");
 
 	useEffect(() => {
 		if (variant !== "panel" || onClose === undefined) return;
@@ -64,6 +66,9 @@ export default function ReleaseNotes({
 					className="notes-panel"
 					role="dialog"
 					aria-label={`Release notes for ${version}`}
+					tabIndex={-1}
+					ref={panelRef}
+					onKeyDown={onKeyDown}
 				>
 					<header className="notes-head">
 						<span className="notes-title">What's new in {version}</span>

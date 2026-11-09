@@ -1,4 +1,5 @@
-import { type JSX, useEffect, useRef, useState } from "react";
+import { type JSX, useEffect, useState } from "react";
+import { useDialogFocus } from "@/ui/app/useDialogFocus";
 import {
 	effectivePreferences,
 	normalizePreferences,
@@ -49,21 +50,14 @@ export default function SettingsPage({
 }: SettingsPageProps): JSX.Element | null {
 	const [tab, setTab] = useState<Tab>(initialTab);
 	// updates/version now live in UpdatesSection
-	const panelRef = useRef<HTMLDivElement>(null);
-	const openerRef = useRef<HTMLElement | null>(null);
+	const { panelRef, onKeyDown } = useDialogFocus(open);
 	const { query, setQuery, bodyRef, matches } = useSettingsSearch(open, tab);
 	const effective = effectivePreferences(user, project);
 	const projectEmpty = project === null || projectSettingsAreEmpty(project);
 
 	useEffect(() => {
 		if (!open) return;
-		openerRef.current =
-			document.activeElement instanceof HTMLElement ? document.activeElement : null;
 		setTab(initialTab);
-		panelRef.current?.focus();
-		return () => {
-			openerRef.current?.focus();
-		};
 	}, [initialTab, open]);
 
 	if (!open) return null;
@@ -91,29 +85,10 @@ export default function SettingsPage({
 				tabIndex={-1}
 				ref={panelRef}
 				onKeyDown={(event) => {
+					onKeyDown(event);
 					if (event.key === "Escape") {
 						event.preventDefault();
 						onClose();
-						return;
-					}
-					if (event.key !== "Tab") return;
-					const panel = panelRef.current;
-					if (panel === null) return;
-					const focusable = panel.querySelectorAll<HTMLElement>(
-						'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])',
-					);
-					if (focusable.length === 0) {
-						event.preventDefault();
-						return;
-					}
-					const first = focusable[0];
-					const last = focusable[focusable.length - 1];
-					if (event.shiftKey && document.activeElement === first) {
-						event.preventDefault();
-						last.focus();
-					} else if (!event.shiftKey && document.activeElement === last) {
-						event.preventDefault();
-						first.focus();
 					}
 				}}
 			>

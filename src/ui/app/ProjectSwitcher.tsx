@@ -1,4 +1,5 @@
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDialogFocus } from "@/ui/app/useDialogFocus";
 import { splitPath } from "@/ui/projects/recentPaths";
 
 export type ProjectSwitcherProps = {
@@ -24,6 +25,7 @@ export default function ProjectSwitcher(props: ProjectSwitcherProps) {
 	const triggerRef = useRef<HTMLButtonElement | null>(null);
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const rowRefs = useRef<Array<HTMLButtonElement | null>>([]);
+	const { panelRef, onKeyDown } = useDialogFocus(open);
 
 	const filtered = useMemo(() => {
 		const needle = query.trim().toLowerCase();
@@ -111,7 +113,12 @@ export default function ProjectSwitcher(props: ProjectSwitcherProps) {
 					className="project-popover"
 					role="dialog"
 					aria-label="Projects"
-					onKeyDown={handleKey}
+					tabIndex={-1}
+					ref={panelRef}
+					onKeyDown={(event) => {
+						onKeyDown(event);
+						handleKey(event);
+					}}
 				>
 					<input
 						ref={inputRef}
