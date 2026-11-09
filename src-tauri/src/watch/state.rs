@@ -35,7 +35,7 @@ impl WatchState {
         }
     }
 
-    /// App quit: nothing is left watching a tree that is going away.
+    /// The last window going away, or the app quitting: nothing is left watching a gone tree.
     pub fn shutdown_all(&self) {
         self.stop();
     }

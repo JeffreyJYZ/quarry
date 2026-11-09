@@ -26,7 +26,8 @@ use super::*;
 ///
 /// `configurationDone` is deliberately not sent here: the caller sets breakpoints first.
 impl DapState {
-    /// Ends every debug session; used on exit so no adapter outlives the window.
+    /// Ends every debug session; used when the window goes away and on exit, so no adapter
+    /// outlives it.
     pub fn shutdown_all(&self) {
         let sessions: Vec<_> = lock(&self.sessions)
             .drain()

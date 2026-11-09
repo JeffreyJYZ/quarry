@@ -23,7 +23,8 @@ pub use tokio::sync::oneshot;
 use super::*;
 
 impl LspState {
-    /// Stops every language server; used on exit so no child outlives the window.
+    /// Stops every language server; used when the window goes away and on exit, so none outlives
+    /// it.
     pub fn shutdown_all(&self) {
         let sessions: Vec<_> = lock(&self.sessions)
             .drain()

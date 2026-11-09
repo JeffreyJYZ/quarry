@@ -122,7 +122,7 @@ pub async fn run_program(
     Ok(run_id)
 }
 
-/// Kill every live run; used on exit so no program outlives the window.
+/// Kill every live run; used when the window goes away and on exit, so no program outlives it.
 impl RunState {
     pub fn shutdown_all(&self) {
         let runs: Vec<_> = lock(&self.runs).drain().map(|(_, entry)| entry).collect();
