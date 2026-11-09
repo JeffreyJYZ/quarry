@@ -52,7 +52,8 @@ export function useSessionPersistence(options: {
 		let cancelled = false;
 		void (async () => {
 			try {
-				const settings = await readSettings();
+				// A repaired file reports through the one notice channel; the snapshot stays a Settings.
+				const settings = await readSettings((message) => setters.onNotice(message));
 				if (cancelled) return;
 				preserved.current = settings;
 				setters.onPreferences(normalizePreferences(settings.preferences));

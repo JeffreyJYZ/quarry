@@ -19,8 +19,26 @@ export type Settings = {
 	preferences?: Preferences;
 };
 
-export function readSettings(): Promise<Settings> {
-	return invoke<Settings>("read_settings");
+export type SettingsRead = {
+	settings: Settings;
+	/**
+	 * Set when the file had to be repaired: a value was skipped, or the whole file was unusable and
+	 * was kept as a `.bad` sibling. The read rejects in the second case.
+	 */
+	warning: string | null;
+};
+
+/**
+ * The settings file, as the shell reads it: a plain snapshot, never the repair wrapper.
+ *
+ * The command answers the settings plus a warning. The warning goes to `onWarning`, which the shell
+ * wires to its one notice channel, so the snapshot a caller works with keeps the shape every other
+ * part of the shell already expects — including the restore that reopens each stored tab.
+ */
+export async function readSettings(onWarning?: (message: string) => void): Promise<Settings> {
+	const read = await invoke<SettingsRead>("read_settings");
+	if (read.warning !== null) onWarning?.(read.warning);
+	return read.settings;
 }
 
 export function writeSettings(settings: Settings): Promise<void> {

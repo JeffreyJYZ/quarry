@@ -70,6 +70,7 @@ pub mod tests_group_3 {
             editor_tab_size: Some(2),
             format_on_save: Some(true),
             build_profile: Some("release".to_string()),
+            ..Default::default()
         };
         super::write_project_settings(root.clone(), settings.clone()).expect("writes");
 

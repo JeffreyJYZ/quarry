@@ -27,7 +27,11 @@ pub fn remember_root_value(settings: &mut Settings, root: String) -> Result<Vec<
 
 #[tauri::command]
 pub fn remember_root(app: AppHandle, root: String) -> Result<Vec<String>, String> {
-    let mut settings = read_settings(app.clone());
+    // A file that failed to read is already kept as `.bad`, so this build starts from defaults
+    // rather than refusing to remember the root the user just picked.
+    let mut settings = read_settings(app.clone())
+        .map(|read| read.settings)
+        .unwrap_or_default();
     let list = remember_root_value(&mut settings, root)?;
     write_settings(app, settings)?;
     Ok(list)
