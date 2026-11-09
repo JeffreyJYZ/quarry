@@ -117,9 +117,12 @@ export async function checkForUpdates(): Promise<void> {
 			progress: progressPercent(downloaded, total),
 		});
 	} catch (error) {
+		// The download failed, so the handle it was reading from owns nothing now: close it and keep
+		// the offer, so the panel still names the version and the user can retry the check.
+		await closeHandle();
 		setState({
 			phase: "failed",
-			offer: null,
+			offer,
 			message: error instanceof Error ? error.message : String(error),
 			progress: null,
 		});
@@ -127,10 +130,18 @@ export async function checkForUpdates(): Promise<void> {
 	void version;
 }
 
+/** True while an install runs; a second restart click must neither queue nor retry. */
+let installing = false;
+
 export async function restartWithUpdate(): Promise<void> {
+	if (installing) return;
 	const state = getState();
 	const offer = state.offer;
-	if (offer !== null && offer.kind === "updater") {
+	if (state.phase !== "ready" || offer === null || offer.kind !== "updater") {
+		return;
+	}
+	installing = true;
+	try {
 		const update = offer.update as { install?: (options?: unknown) => Promise<void> };
 		if (typeof update.install === "function") {
 			try {
@@ -145,8 +156,10 @@ export async function restartWithUpdate(): Promise<void> {
 				return;
 			}
 		}
+		await getDeps().relaunch();
+	} finally {
+		installing = false;
 	}
-	await getDeps().relaunch();
 }
 
 /** @deprecated use restartWithUpdate */
