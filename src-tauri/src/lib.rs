@@ -22,6 +22,7 @@ pub mod test_support;
 mod test_task;
 mod toolchain;
 mod types;
+mod watch;
 mod workspace;
 
 #[tauri::command]
@@ -40,6 +41,7 @@ pub fn run() {
         .manage(dap::DapState::default())
         .manage(run_task::RunState::default())
         .manage(pty::PtyState::default())
+        .manage(watch::WatchState::default())
         .invoke_handler(tauri::generate_handler![
             version,
             toolchain::toolchains,
@@ -130,6 +132,8 @@ pub fn run() {
             git::git_stage_hunk,
             git::git_unstage_hunk,
             files::list_files,
+            watch::watch_start,
+            watch::watch_stop,
             files::create_file,
             files::create_dir,
             files::rename_path,
@@ -161,6 +165,7 @@ pub fn run() {
                     handle.state::<dap::DapState>().shutdown_all();
                     handle.state::<pty::PtyState>().shutdown_all();
                     handle.state::<run_task::RunState>().shutdown_all();
+                    handle.state::<watch::WatchState>().shutdown_all();
                 }
                 _ => {}
             }

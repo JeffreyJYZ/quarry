@@ -50,10 +50,7 @@ impl PtyState {
     pub fn shutdown_all(&self) {
         let sessions = lock(&self.sessions);
         for session in sessions.values() {
-            if let Some(mut child) = lock(&session.child).take() {
-                let _ = child.kill();
-                let _ = child.wait();
-            }
+            kill_spawned(&session.child);
         }
     }
 }
@@ -62,10 +59,7 @@ impl Drop for PtyState {
     fn drop(&mut self) {
         let sessions = lock(&self.sessions);
         for session in sessions.values() {
-            if let Some(mut child) = lock(&session.child).take() {
-                let _ = child.kill();
-                let _ = child.wait();
-            }
+            kill_spawned(&session.child);
         }
     }
 }
@@ -92,7 +86,7 @@ pub async fn pty_open(
     cols: u16,
 ) -> Result<PtyOpenResult, String> {
     let cwd_path = validate_cwd(&cwd)?;
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let shell = shell_program();
     let pty_system = native_pty_system();
     let pair = pty_system
         .openpty(PtySize {
@@ -111,14 +105,14 @@ pub async fn pty_open(
         .map_err(|e| format!("cannot spawn shell in {cwd}: {e}"))?;
     let pid = child.process_id();
     let child = Arc::new(Mutex::new(Some(child)));
-    let writer = pair
-        .master
-        .take_writer()
-        .map_err(|e| format!("cannot take writer: {e}"))?;
-    let reader = pair
-        .master
-        .try_clone_reader()
-        .map_err(|e| format!("cannot clone reader: {e}"))?;
+    let writer = pair.master.take_writer().map_err(|e| {
+        kill_spawned(&child);
+        format!("cannot take writer: {e}")
+    })?;
+    let reader = pair.master.try_clone_reader().map_err(|e| {
+        kill_spawned(&child);
+        format!("cannot clone reader: {e}")
+    })?;
 
     let id = next_id(&state.counter);
 
@@ -137,10 +131,7 @@ pub async fn pty_open(
         .name(format!("{id}-reader"))
         .spawn(move || pump(reader, &app2, &id2, child2))
         .map_err(|e| {
-            if let Some(mut c) = lock(&child).take() {
-                let _ = c.kill();
-                let _ = c.wait();
-            }
+            kill_spawned(&child);
             lock(&state.sessions).remove(&id);
             format!("cannot start reader: {e}")
         })?;

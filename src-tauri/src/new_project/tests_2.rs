@@ -69,4 +69,19 @@ pub mod tests_group_2 {
         assert!(error.contains("not available"), "{error}");
         assert!(error.contains("11, 17, 23"), "{error}");
     }
+
+    /// The starter a new C++ project gets: the standard library with `using namespace std;`, so a
+    /// first program reads like the code the course uses rather than a qualified `std::`.
+    #[test]
+    pub fn the_cpp_starter_uses_the_namespace() {
+        let parent = scratch("cpp-starter");
+        let project = create_with(&parent, "demo", "cpp-cmake", "").expect("creates c++");
+        let main =
+            fs::read_to_string(Path::new(&project.root).join("src/main.cpp")).expect("reads");
+        assert_eq!(
+            main,
+            "#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << \"Hello from demo\" << endl;\n    return 0;\n}\n"
+        );
+        let _ = fs::remove_dir_all(&parent);
+    }
 }

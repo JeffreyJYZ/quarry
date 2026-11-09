@@ -9,6 +9,9 @@ pub(crate) use crate::types::ProjectInfo;
 pub use std::fs;
 pub use std::path::{Path, PathBuf};
 
+mod templates;
+pub use templates::*;
+
 mod create_project;
 pub use create_project::*;
 

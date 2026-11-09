@@ -74,12 +74,8 @@ pub fn create_project(
             )?;
             fs::create_dir_all(target.join("src"))
                 .map_err(|e| format!("cannot create src: {e}"))?;
-            write_file(
-                &target,
-                "src/main.rs",
-                &format!("fn main() {{\n    println!(\"Hello from {trimmed_name}\");\n}}\n"),
-            )?;
-            write_file(&target, ".gitignore", "/target\n")?;
+            write_file(&target, "src/main.rs", &with_name(RUST_MAIN, &trimmed_name))?;
+            write_file(&target, ".gitignore", GITIGNORE_TARGET)?;
         }
         "rust-lib" => {
             write_file(
@@ -89,12 +85,8 @@ pub fn create_project(
             )?;
             fs::create_dir_all(target.join("src"))
                 .map_err(|e| format!("cannot create src: {e}"))?;
-            write_file(
-                &target,
-                "src/lib.rs",
-                "pub fn add(a: usize, b: usize) -> usize {\n    a + b\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n\n    #[test]\n    fn it_works() {\n        assert_eq!(add(2, 2), 4);\n    }\n}\n",
-            )?;
-            write_file(&target, ".gitignore", "/target\n")?;
+            write_file(&target, "src/lib.rs", RUST_LIB)?;
+            write_file(&target, ".gitignore", GITIGNORE_TARGET)?;
         }
         "c-cmake" => {
             write_file(
@@ -104,14 +96,8 @@ pub fn create_project(
             )?;
             fs::create_dir_all(target.join("src"))
                 .map_err(|e| format!("cannot create src: {e}"))?;
-            write_file(
-                &target,
-                "src/main.c",
-                &format!(
-                    "#include <stdio.h>\n\nint main(void) {{\n    printf(\"Hello from {trimmed_name}\\n\");\n    return 0;\n}}\n"
-                ),
-            )?;
-            write_file(&target, ".gitignore", "/build\n")?;
+            write_file(&target, "src/main.c", &with_name(C_MAIN, &trimmed_name))?;
+            write_file(&target, ".gitignore", GITIGNORE_BUILD)?;
         }
         "cpp-cmake" => {
             write_file(
@@ -121,14 +107,8 @@ pub fn create_project(
             )?;
             fs::create_dir_all(target.join("src"))
                 .map_err(|e| format!("cannot create src: {e}"))?;
-            write_file(
-                &target,
-                "src/main.cpp",
-                &format!(
-                    "#include <iostream>\n\nint main() {{\n    std::cout << \"Hello from {trimmed_name}\" << std::endl;\n    return 0;\n}}\n"
-                ),
-            )?;
-            write_file(&target, ".gitignore", "/build\n")?;
+            write_file(&target, "src/main.cpp", &with_name(CPP_MAIN, &trimmed_name))?;
+            write_file(&target, ".gitignore", GITIGNORE_BUILD)?;
         }
         _ => unreachable!(),
     }
