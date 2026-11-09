@@ -76,14 +76,20 @@ pub async fn run_program(
     for var in &env_vars {
         command.env(&var.name, &var.value);
     }
+    // Its own group, so a stop reaches what the program started: `rustc` under `cargo build` is a
+    // grandchild, and a signal to the direct child alone leaves it building.
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
 
     let mut child = command
         .spawn()
         .map_err(|error| format!("cannot run {program_text} in {cwd_text}: {error}"))?;
 
     let (Some(stdout), Some(stderr)) = (child.stdout.take(), child.stderr.take()) else {
-        let _ = child.kill();
-        let _ = child.wait();
+        let _ = stop_tree(child);
         return Err(format!(
             "cannot capture the output of {program_text}: its pipes were not created"
         ));
@@ -115,42 +121,42 @@ pub async fn run_program(
     Ok(run_id)
 }
 
-/// Kill a running child and reap it; an unknown id is already stopped, which is not an error.
+/// Kill every live run; used on exit so no program outlives the window.
 impl RunState {
-    /// Kills every live run; used on exit so no program outlives the window.
     pub fn shutdown_all(&self) {
         let runs: Vec<_> = lock(&self.runs).drain().map(|(_, entry)| entry).collect();
         for entry in runs {
-            if let Some(mut child) = lock(&entry).take() {
-                let _ = child.kill();
-                let _ = child.wait();
+            if let Some(child) = lock(&entry).take() {
+                let _ = stop_tree(child);
             }
         }
     }
 }
 
+/// Stop one run's whole process group; an unknown or already-finished run is not an error.
 #[tauri::command]
-pub async fn stop_program(state: State<'_, RunState>, run_id: String) -> Result<(), String> {
-    let entry = lock(&state.runs).get(&run_id).cloned();
-    let Some(entry) = entry else {
-        return Ok(());
+pub async fn stop_program(state: State<'_, RunState>, run_id: String) -> Result<Stop, String> {
+    let Some(entry) = lock(&state.runs).get(&run_id).cloned() else {
+        return Ok(Stop::quiet());
     };
 
-    let Some(mut child) = lock(&entry).take() else {
+    let Some(child) = lock(&entry).take() else {
         // The waiter already reaped it and is about to report the exit.
-        return Ok(());
+        return Ok(Stop::quiet());
     };
 
-    if let Err(error) = child.kill()
-        && !matches!(error.kind(), ErrorKind::InvalidInput | ErrorKind::NotFound)
-    {
-        // Hand the child back so the waiter keeps watching it instead of leaking a zombie.
-        lock(&entry).replace(child);
-        return Err(format!("cannot stop {run_id}: {error}"));
-    }
+    // No state lock is held from here on: the group is signalled and reaped on a blocking thread,
+    // so a program that ignores the polite signal cannot pin an async worker.
+    let terminated = tauri::async_runtime::spawn_blocking(move || stop_tree(child))
+        .await
+        .map_err(|error| format!("cannot stop {run_id}: {error}"))?;
 
-    child
-        .wait()
-        .map(|_status| ())
-        .map_err(|error| format!("cannot reap {run_id}: {error}"))
+    match terminated {
+        Terminated::Stopped(stop) => Ok(stop),
+        Terminated::Failed { child, error } => {
+            // Hand the child back so the waiter keeps watching it instead of leaking a zombie.
+            lock(&entry).replace(child);
+            Err(format!("cannot stop {run_id}: {error}"))
+        }
+    }
 }

@@ -18,11 +18,9 @@ impl Drop for RunState {
     /// Last resort at app shutdown: no child outlives the window.
     fn drop(&mut self) {
         for entry in lock(&self.runs).values() {
-            let Some(mut child) = lock(entry).take() else {
-                continue;
-            };
-            let _ = child.kill();
-            let _ = child.wait();
+            if let Some(child) = lock(entry).take() {
+                let _ = stop_tree(child);
+            }
         }
     }
 }

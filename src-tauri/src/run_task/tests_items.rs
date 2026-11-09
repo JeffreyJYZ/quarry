@@ -62,6 +62,16 @@ pub mod tests {
         assert_eq!(exited["signal"], Value::Null);
     }
 
+    /// The stop result is the shape the frontend reads, so the field name is part of the contract.
+    #[test]
+    fn a_stop_says_whether_it_escalated() {
+        assert_eq!(
+            json!(Stop { escalated: true }),
+            json!({ "escalated": true })
+        );
+        assert!(!Stop::quiet().escalated);
+    }
+
     #[cfg(unix)]
     #[test]
     fn a_killed_child_reports_its_signal_at_the_kernel_level() {
