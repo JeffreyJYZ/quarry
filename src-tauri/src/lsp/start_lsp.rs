@@ -72,14 +72,21 @@ pub async fn start_lsp_session(
     // second server (which would leak the first child/pipe).
     loop {
         {
-            let sessions = lock(&state.sessions);
+            let mut sessions = lock(&state.sessions);
             if let Some(existing) = sessions.get(&root).cloned() {
-                let server = lock(&existing).server.clone();
-                return Ok(LspStatus {
-                    root,
-                    server,
-                    version: None,
-                });
+                // A session whose server has exited is useless: drop it so the fresh-spawn
+                // path below runs instead of handing back a dead handle forever.
+                if !session_is_reusable(&lock(&existing)) {
+                    sessions.remove(&root);
+                    // Fall through to the in_flight reserve + spawn below.
+                } else {
+                    let server = lock(&existing).server.clone();
+                    return Ok(LspStatus {
+                        root,
+                        server,
+                        version: None,
+                    });
+                }
             }
         }
         {
@@ -166,4 +173,11 @@ pub async fn start_lsp_session(
         server: server.to_string(),
         version: None,
     })
+}
+
+/// Whether a session found in `state.sessions` can still be handed back to a caller.
+/// A server that has exited is marked `dead` by the pump thread, so such a session
+/// must be discarded and respawned instead of returned as "ok".
+pub(crate) fn session_is_reusable(session: &Session) -> bool {
+    !session.dead
 }

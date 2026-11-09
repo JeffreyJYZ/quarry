@@ -69,6 +69,16 @@ pub mod tests_group_6 {
         ));
     }
 
+    #[test]
+    pub fn dead_session_is_not_reusable_so_a_fresh_one_is_spawned() {
+        let session = session_on_cat();
+        assert!(session_is_reusable(&lock(&session)));
+
+        server_gone(&session);
+
+        assert!(!session_is_reusable(&lock(&session)));
+    }
+
     /// A session over a real `cat`, which owns a pipe without being a language server.
     fn session_on_cat() -> Arc<Mutex<Session>> {
         let mut command = Command::new("cat");
