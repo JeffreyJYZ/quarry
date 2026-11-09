@@ -26,7 +26,7 @@ export const ayuDark: Theme = {
 		keyword: "#ff8f40",
 		type: "#59c2ff",
 		string: "#aad94c",
-		comment: "#6c7680",
+		comment: "#727f89",
 		number: "#d2a6ff",
 		function: "#ffb454",
 		macro: "#ff8f40",

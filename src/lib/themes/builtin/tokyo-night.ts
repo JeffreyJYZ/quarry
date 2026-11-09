@@ -26,7 +26,7 @@ export const tokyoNight: Theme = {
 		keyword: "#bb9af7",
 		type: "#2ac3de",
 		string: "#9ece6a",
-		comment: "#67709c",
+		comment: "#7982a8",
 		number: "#ff9e64",
 		function: "#7aa2f7",
 		macro: "#bb9af7",

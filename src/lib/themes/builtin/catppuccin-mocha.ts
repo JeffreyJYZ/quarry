@@ -27,7 +27,7 @@ export const catppuccinMocha: Theme = {
 		keyword: "#cba6f7",
 		type: "#f9e2af",
 		string: "#a6e3a1",
-		comment: "#7f849c",
+		comment: "#82879e",
 		number: "#fab387",
 		function: "#89b4fa",
 		macro: "#f5c2e7",

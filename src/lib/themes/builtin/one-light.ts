@@ -26,7 +26,7 @@ export const oneLight: Theme = {
 		keyword: "#a626a4",
 		type: "#7a5200",
 		string: "#3d7b2f",
-		comment: "#7d838c",
+		comment: "#6f737c",
 		number: "#986801",
 		function: "#2f62c4",
 		macro: "#a626a4",
