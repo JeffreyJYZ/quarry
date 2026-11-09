@@ -24,7 +24,7 @@ pub mod tests_group_3 {
     #[test]
     pub fn unusable_preferences_are_clamped_on_read() {
         let parsed: Settings = serde_json::from_str(
-            r#"{"preferences":{"editorFontSize":400,"editorTabSize":3,"terminalFontSize":1,"buildProfile":"fast","panelSizes":{"railWidth":10,"debugWidth":9999,"dockHeight":0,"terminalHeight":42}}}"#,
+            r#"{"preferences":{"editorFontSize":400,"editorTabSize":3,"terminalFontSize":1,"buildProfile":"fast","panelSizes":{"railWidth":10,"disasmWidth":9999,"dockHeight":0,"terminalHeight":42}}}"#,
         )
         .expect("parses");
 
@@ -34,15 +34,20 @@ pub mod tests_group_3 {
         assert_eq!(preferences.terminal_font_size, 9.0);
         assert_eq!(preferences.build_profile, "debug");
         assert_eq!(preferences.panel_sizes.rail_width, 160.0);
-        assert_eq!(preferences.panel_sizes.debug_width, 640.0);
+        assert_eq!(preferences.panel_sizes.disasm_width, 1200.0);
         assert_eq!(preferences.panel_sizes.dock_height, 120.0);
         assert_eq!(preferences.panel_sizes.terminal_height, 100.0);
+
+        let narrow: Settings =
+            serde_json::from_str(r#"{"preferences":{"panelSizes":{"disasmWidth":10}}}"#)
+                .expect("parses");
+        assert_eq!(narrow.preferences.panel_sizes.disasm_width, 240.0);
     }
 
     #[test]
     pub fn a_valid_preferences_block_survives_a_round_trip() {
         let parsed: Settings = serde_json::from_str(
-            r#"{"preferences":{"editorFontSize":15,"editorTabSize":2,"terminalFontSize":16,"formatOnSave":true,"buildProfile":"release","panelSizes":{"railWidth":300,"debugWidth":420,"dockHeight":340,"terminalHeight":220}}}"#,
+            r#"{"preferences":{"editorFontSize":15,"editorTabSize":2,"terminalFontSize":16,"formatOnSave":true,"buildProfile":"release","panelSizes":{"railWidth":300,"disasmWidth":420,"dockHeight":340,"terminalHeight":220}}}"#,
         )
         .expect("parses");
         let text = serde_json::to_string_pretty(&parsed).expect("serializes");
@@ -54,6 +59,7 @@ pub mod tests_group_3 {
         assert!(back.preferences.format_on_save);
         assert_eq!(back.preferences.build_profile, "release");
         assert_eq!(back.preferences.panel_sizes.rail_width, 300.0);
+        assert_eq!(back.preferences.panel_sizes.disasm_width, 420.0);
         assert_eq!(back.preferences.panel_sizes.terminal_height, 220.0);
     }
 

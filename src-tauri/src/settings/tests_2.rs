@@ -137,8 +137,32 @@ pub mod tests_group_2 {
         assert!(!parsed.preferences.format_on_save);
         assert_eq!(parsed.preferences.build_profile, "debug");
         assert_eq!(parsed.preferences.panel_sizes.rail_width, 240.0);
-        assert_eq!(parsed.preferences.panel_sizes.debug_width, 320.0);
+        assert_eq!(parsed.preferences.panel_sizes.disasm_width, 520.0);
         assert_eq!(parsed.preferences.panel_sizes.dock_height, 260.0);
         assert_eq!(parsed.preferences.panel_sizes.terminal_height, 180.0);
+    }
+
+    #[test]
+    pub fn the_disasm_width_survives_a_round_trip() {
+        // The bug this pins: the TS PanelSizes sends `disasmWidth` while this struct read
+        // `debugWidth`, so the dragged width never came back after a relaunch.
+        let json = r#"{"preferences":{"panelSizes":{"disasmWidth":700}}}"#;
+        let parsed: Settings = serde_json::from_str(json).expect("parses");
+        assert_eq!(parsed.preferences.panel_sizes.disasm_width, 700.0);
+
+        let text = serde_json::to_string_pretty(&parsed).expect("serializes");
+        let back: Settings = serde_json::from_str(&text).expect("parses");
+        assert_eq!(back.preferences.panel_sizes.disasm_width, 700.0);
+        assert!(
+            text.contains("\"disasmWidth\""),
+            "the wire name is disasmWidth: {text}"
+        );
+    }
+
+    #[test]
+    pub fn a_stale_debug_width_key_no_longer_sets_the_width() {
+        let json = r#"{"preferences":{"panelSizes":{"debugWidth":900}}}"#;
+        let parsed: Settings = serde_json::from_str(json).expect("parses");
+        assert_eq!(parsed.preferences.panel_sizes.disasm_width, 520.0);
     }
 }
