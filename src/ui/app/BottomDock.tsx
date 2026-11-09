@@ -86,7 +86,7 @@ export type PaletteProps = {
 	commands: import("@/ui/palette/CommandPalette").Command[];
 	recentCommands: string[];
 	onRecentCommands: (next: string[]) => void;
-	onOpenMatch: (path: string) => void;
+	onOpenMatch: (path: string, line: number, column: number) => void;
 	onOpenQuick: (path: string) => void;
 	onCloseSearch: () => void;
 	onCloseQuick: () => void;

@@ -3,6 +3,7 @@ import {
 	applyReplacement,
 	buildPreview,
 	isPreviewStale,
+	revealTarget,
 	searchFlags,
 	transformQuery,
 } from "@/lib/search/model";
@@ -91,5 +92,21 @@ describe("isPreviewStale", () => {
 	});
 	test("stale when no snapshot", () => {
 		expect(isPreviewStale(null, "a", "b")).toBe(true);
+	});
+});
+
+describe("revealTarget", () => {
+	// The bug this pins: a click on a search hit opened the file at the top, because the position was
+	// dropped on the way to the editor. The match is 1-based, the reveal target is 0-based.
+	test("the first line and column of a file stay at zero", () => {
+		expect(revealTarget(1, 1)).toEqual({ line: 0, character: 0 });
+	});
+
+	test("a match on line 12, column 5 reveals line 11, character 4", () => {
+		expect(revealTarget(12, 5)).toEqual({ line: 11, character: 4 });
+	});
+
+	test("a column past the first character is not clamped to the line start", () => {
+		expect(revealTarget(3, 40).character).toBe(39);
 	});
 });

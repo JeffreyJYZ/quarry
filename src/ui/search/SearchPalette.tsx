@@ -10,7 +10,7 @@ import { useSearchToggles } from "./useSearchToggles";
 export type SearchPaletteProps = {
 	root: string;
 	/** Opens one absolute path through the app's existing open-by-path flow. */
-	onOpen: (path: string) => void;
+	onOpen: (path: string, line: number, column: number) => void;
 	onClose: () => void;
 	/** Prefill the input on mount (used by Cmd+Shift+F). */
 	initialQuery?: string;
