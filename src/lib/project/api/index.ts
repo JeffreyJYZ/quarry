@@ -15,3 +15,4 @@ export * from "./run-configuration";
 export * from "./search";
 export * from "./settings";
 export * from "./terminal";
+export * from "./watch";

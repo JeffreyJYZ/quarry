@@ -1,8 +1,10 @@
 import { useCallback } from "react";
 import { useRestart } from "./useRestart";
+import { dropTemporary } from "./breakpointTypes";
 import { dapContinueOn, dapStepOn } from "@/lib/debug/dap";
 import { dapStop } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
+import type { TransportGate } from "@/lib/debug/transportGate";
 import type { BreakpointEntry, StopView, StepKind, WatchRow } from "./sessionTypes";
 
 type Setter<T> = (updater: T | ((current: T) => T)) => void;
@@ -13,6 +15,8 @@ export type TransportDeps = {
 	watchRef: { current: WatchRow[] };
 	breakpointMapRef: { current: Map<string, Map<number, BreakpointEntry>> };
 	generationRef: { current: number };
+	gate: TransportGate;
+	commitMap: (next: Map<string, Map<number, BreakpointEntry>>) => void;
 	restarting: boolean;
 	loadExceptionFilters: (session: string, preserveChecked: boolean) => Promise<void>;
 	setError: (message: string | null) => void;
@@ -40,6 +44,8 @@ export function useTransport(deps: TransportDeps) {
 		watchRef,
 		breakpointMapRef,
 		generationRef,
+		gate,
+		commitMap,
 		restarting,
 		loadExceptionFilters,
 		setError,
@@ -59,31 +65,43 @@ export function useTransport(deps: TransportDeps) {
 		setExceptionChecked,
 	} = deps;
 
+	/** Nothing in the tree describes the old stop any more. */
+	const clearStopRows = useCallback(() => {
+		setStopView(null);
+		setChildren(new Map());
+		setExpanded(new Set());
+		setSelectedVariable(null);
+	}, [setChildren, setExpanded, setSelectedVariable, setStopView]);
+
 	const continueRun = useCallback(async () => {
 		const session = sessionRef.current;
 		if (session === null) return;
-		try {
-			await dapContinueOn(session, stopRef.current?.threadId ?? undefined);
-			setStopView(null);
-			setError(null);
-		} catch (reason) {
-			setError(`Continue: ${describeError(reason)}`);
-		}
-	}, [sessionRef, stopRef, setError, setStopView]);
+		await gate.run(async () => {
+			try {
+				await dapContinueOn(session, stopRef.current?.threadId ?? undefined);
+				clearStopRows();
+				setError(null);
+			} catch (reason) {
+				setError(`Continue: ${describeError(reason)}`);
+			}
+		});
+	}, [clearStopRows, gate, sessionRef, stopRef, setError]);
 
 	const step = useCallback(
 		async (kind: StepKind) => {
 			const session = sessionRef.current;
 			if (session === null) return;
-			try {
-				await dapStepOn(session, kind, stopRef.current?.threadId ?? undefined);
-				setStopView(null);
-				setError(null);
-			} catch (reason) {
-				setError(`Step: ${describeError(reason)}`);
-			}
+			await gate.run(async () => {
+				try {
+					await dapStepOn(session, kind, stopRef.current?.threadId ?? undefined);
+					clearStopRows();
+					setError(null);
+				} catch (reason) {
+					setError(`Step: ${describeError(reason)}`);
+				}
+			});
 		},
-		[sessionRef, stopRef, setError, setStopView],
+		[clearStopRows, gate, sessionRef, stopRef, setError],
 	);
 
 	const stop = useCallback(async () => {
@@ -95,6 +113,9 @@ export function useTransport(deps: TransportDeps) {
 		} catch (reason) {
 			setError(`Stop: ${describeError(reason)}`);
 		}
+		/* A manual stop emits no stopped event, so its run-to-cursor breakpoints die here. */
+		const dropped = dropTemporary(breakpointMapRef.current);
+		if (dropped.paths.length > 0) commitMap(dropped.next);
 		generationRef.current += 1;
 		sessionRef.current = null;
 		setSessionId(null);
@@ -112,6 +133,8 @@ export function useTransport(deps: TransportDeps) {
 		setExceptionFilters([]);
 		setExceptionChecked(new Set());
 	}, [
+		breakpointMapRef,
+		commitMap,
 		sessionRef,
 		watchRef,
 		generationRef,

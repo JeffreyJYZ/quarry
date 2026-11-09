@@ -6,6 +6,7 @@ import SideRail from "@/ui/app/SideRail";
 import IconRail from "@/ui/app/IconRail";
 import EditorColumn from "@/ui/app/EditorColumn";
 import Splitter from "@/ui/layout/Splitter";
+import { useFileWatch } from "@/ui/app/useFileWatch";
 import type { ShellModel } from "@/ui/app/useShell";
 
 const Terminal = lazy(() => import("@/ui/terminal/Terminal"));
@@ -15,6 +16,11 @@ export default function AppBody({ model }: { model: ShellModel }) {
 	const { workspace, overlays, panels, settings, git } = model;
 	const { railWidth, terminalWidth } = settings.panels;
 	const project = workspace.project;
+	const watch = useFileWatch({
+		root: project?.root ?? null,
+		onPaths: (paths) => void workspace.applyExternalChanges(paths),
+		onError: model.setNotice,
+	});
 
 	return (
 		<div
@@ -41,6 +47,7 @@ export default function AppBody({ model }: { model: ShellModel }) {
 				gitRefresh={git.refreshToken}
 				blameSaveToken={git.blameSaveToken}
 				revealToken={panels.fileRevealToken}
+				watch={watch}
 				changes={Object.fromEntries(
 					(git.status?.entries ?? []).map((entry) => [entry.path, entry.status]),
 				)}

@@ -6,6 +6,7 @@
  */
 
 import { isCppPath, isRustPath } from "@/lib/consts/extensions";
+import { CPP_MAIN_SNIPPET } from "@/lib/consts/generate";
 
 export type GenerateItem = {
 	id: string;
@@ -148,7 +149,7 @@ function cppMain(text: string): GenerateItem | null {
 		id: "main",
 		label: "main function",
 		insert: "end",
-		text: "\nint main() {\n\treturn 0;\n}\n",
+		text: CPP_MAIN_SNIPPET,
 	};
 }
 

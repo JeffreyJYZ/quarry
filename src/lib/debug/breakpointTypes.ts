@@ -29,6 +29,33 @@ export function breakpointKey(path: string, line: number): string {
 	return `${path}:${line}`;
 }
 
+/**
+ * The map without its temporary run-to-cursor entries, plus every path that lost one so the caller
+ * can re-send it. The input map is untouched.
+ */
+export function dropTemporary(map: Map<string, Map<number, BreakpointEntry>>): {
+	next: Map<string, Map<number, BreakpointEntry>>;
+	paths: string[];
+} {
+	const next = new Map(map);
+	const paths: string[] = [];
+	for (const [path, lines] of map) {
+		const kept = new Map(lines);
+		let changed = false;
+		for (const [line, entry] of kept) {
+			if (entry.temporary) {
+				kept.delete(line);
+				changed = true;
+			}
+		}
+		if (!changed) continue;
+		paths.push(path);
+		if (kept.size === 0) next.delete(path);
+		else next.set(path, kept);
+	}
+	return { next, paths };
+}
+
 /** Rows stay sorted by path then line, so the panel and the gutter agree on order. */
 export function sortBreakpoints(rows: readonly BreakpointRow[]): BreakpointRow[] {
 	return [...rows].sort((left, right) => {

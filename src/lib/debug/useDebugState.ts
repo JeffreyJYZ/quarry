@@ -8,6 +8,7 @@ import type {
 	ProjectKind,
 } from "@/lib/project/api";
 import type { BuildProfile } from "@/lib/debug/profile";
+import { createTransportGate } from "@/lib/debug/transportGate";
 import type { BreakpointEntry, StopView, VariableRow, WatchRow } from "./sessionTypes";
 
 /**
@@ -59,6 +60,8 @@ export function useDebugState(root: string | null) {
 	const exceptionCheckedRef = useRef<Set<string>>(exceptionChecked);
 	const expandedRef = useRef<Set<string>>(expanded);
 	const generationRef = useRef(0);
+	/* One resume/step at a time, shared by the transport and run-to-cursor. */
+	const [gate] = useState(createTransportGate);
 
 	rootRef.current = root;
 	presetRef.current = preset;
@@ -70,7 +73,7 @@ export function useDebugState(root: string | null) {
 	expandedRef.current = expanded;
 	exceptionCheckedRef.current = exceptionChecked;
 
-	const refs = { sessionRef, breakpointMapRef, generationRef };
+	const refs = { sessionRef, breakpointMapRef, generationRef, gate };
 	const ui = {
 		setError,
 		setLaunching,

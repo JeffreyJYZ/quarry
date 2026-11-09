@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { inEditableTarget, inTerminal } from "@/ui/app/focusGuard";
+import { resolveDebugKey } from "@/ui/editor/keymapDebug";
 
 export type ClionKeymapContext = {
 	root: string | null;
@@ -82,24 +83,20 @@ export function useClionKeymap(context: ClionKeymapContext): void {
 				})();
 				return;
 			}
-			if (live && event.key === "F7") {
+			const debugKey = resolveDebugKey(event, live);
+			if (debugKey !== null) {
 				event.preventDefault();
-				debug.step("stepIn");
-				return;
-			}
-			if (live && event.key === "F8") {
-				event.preventDefault();
-				debug.step(event.shiftKey ? "stepOut" : "next");
-				return;
-			}
-			if (live && event.key === "F9") {
-				event.preventDefault();
-				debug.continueRun();
-				return;
-			}
-			if (mod && !event.altKey && key === "f8" && activePath !== null && cursor !== null) {
-				event.preventDefault();
-				toggleBreakpoint(activePath, cursor.line + 1);
+				if (debugKey === "toggleBreakpoint") {
+					if (activePath !== null && cursor !== null) {
+						toggleBreakpoint(activePath, cursor.line + 1);
+					}
+					return;
+				}
+				if (debugKey === "continue") {
+					debug.continueRun();
+					return;
+				}
+				debug.step(debugKey);
 				return;
 			}
 			if (mod && !event.shiftKey && !event.altKey && key === "o") {
