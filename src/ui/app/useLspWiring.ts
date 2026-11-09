@@ -22,8 +22,14 @@ export type LspWiringOptions = {
 /**
  * The language-server side of the shell: which servers a root needs, their sessions, the document
  * sync, and the running set the editor guards consult.
+ *
+ * `running` is returned rather than only parked in a ref: diagnostics are published per server, so
+ * the shell needs the same set to drop the findings of a server that has just stopped.
  */
-export function useLspWiring(options: LspWiringOptions): LspStatusMap {
+export function useLspWiring(options: LspWiringOptions): {
+	statuses: LspStatusMap;
+	running: ReadonlySet<ServerKind>;
+} {
 	const signals = useRootSignals(options.root);
 	const statuses = useLspServers(
 		options.root,
@@ -70,5 +76,5 @@ export function useLspWiring(options: LspWiringOptions): LspStatusMap {
 		statuses,
 	});
 
-	return statuses;
+	return { statuses, running };
 }

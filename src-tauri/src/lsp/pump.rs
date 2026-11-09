@@ -6,7 +6,7 @@ pub(crate) use crate::resolve;
 pub(crate) use crate::types::{
     CallHierarchyNode, CodeAction, CompletionItem, CompletionList, Diagnostic, DiagnosticsEvent,
     FileEdit, HoverInfo, InlayHint, Location, LspStatus, Position, ProjectKind, Range,
-    SignatureHelp, SignatureInformation, Symbol, TextEdit, WorkspaceSymbol,
+    SessionEndedEvent, SignatureHelp, SignatureInformation, Symbol, TextEdit, WorkspaceSymbol,
 };
 pub use serde::Serialize;
 pub use serde_json::{Value, json};
@@ -149,6 +149,9 @@ pub fn pump(
     }
 
     server_gone(&session);
+    // A server that exited can never publish again, so nothing it already published is still true.
+    let server = lock(&session).server.clone();
+    emit_session_ended(&app, SessionEndedEvent { root, server });
 }
 
 /// The reader is finished: the frame channel closed because the server exited, or a write to it

@@ -1,14 +1,14 @@
 import { useCallback, useRef, useState } from "react";
 import { useDebugSession } from "@/lib/debug/session";
 import { lspOverridesFrom } from "@/ui/app/lspOverrides";
+import type { DiagnosticsLifecycleEvent } from "@/lib/lsp/lifecycle";
 import { RESTART_NOTICE } from "@/lib/lsp/restart";
 import { useLspRestart } from "@/ui/app/useLspRestart";
-import { useLspWiring } from "@/ui/app/useLspWiring";
+import { useShellDiagnostics } from "@/ui/app/useShellDiagnostics";
 import type { ServerKind } from "@/lib/lsp/served";
 import type { RunConfiguration } from "@/lib/project/api";
 import { useTests } from "@/lib/tests/useTests";
 import { useBuild } from "@/ui/app/useBuild";
-import { useDiagnosticsState } from "@/ui/app/useDiagnosticsState";
 import type { EditorHandle } from "@/ui/editor/Editor";
 import { useEditorActions } from "@/ui/app/useEditorActions";
 import { useGitState } from "@/ui/app/useGitState";
@@ -24,10 +24,7 @@ import { useShellGlue } from "@/ui/app/useShellGlue";
 import { useWorkspace } from "@/ui/app/useWorkspace";
 export type ShellModel = ReturnType<typeof useShell>;
 /**
- * The whole shell, composed.
- *
- * Each hook owns one slice of state; this function only decides the order they depend on each other
- * and derives the handful of values several of them share. The view tree receives this as one prop.
+ * The whole shell, composed: each hook owns one slice of state, and the view gets it as one prop.
  */
 export function useShell() {
 	const overlays = useOverlays();
@@ -38,10 +35,13 @@ export function useShell() {
 	const editorRef = useRef<EditorHandle | null>(null);
 	const runConfigurationsRef = useRef<RunConfiguration[]>([]);
 	const lspRunningRef = useRef<ReadonlySet<ServerKind>>(new Set());
+	// The workspace is built first, so the store it must reach with a close travels through a ref.
+	const diagnosticsEventRef = useRef<(event: DiagnosticsLifecycleEvent) => void>(() => {});
 	const workspace = useWorkspace({
 		onNotice: setNotice,
 		onProjectOpened: () => projectOpenedRef.current(),
 		savePaths: (paths) => savePathsRef.current(paths),
+		onDiagnosticsEvent: (event) => diagnosticsEventRef.current(event),
 		setRevealTarget: overlays.setRevealTarget,
 		setRevealToken: overlays.setRevealToken,
 		setReferences: overlays.setReferences,
@@ -92,7 +92,7 @@ export function useShell() {
 	const active = workspace.buffers.find((buffer) => buffer.path === activePath) ?? null;
 	const lspOverrides = lspOverridesFrom(effective);
 	const lspRestart = useLspRestart(reportNotice);
-	const lspStatuses = useLspWiring({
+	const { lspStatuses, diagnostics } = useShellDiagnostics({
 		root,
 		activePath: active?.path ?? null,
 		activeText: active?.text ?? "",
@@ -101,9 +101,10 @@ export function useShell() {
 		onRestarted: () => setNotice((current) => (current === RESTART_NOTICE ? null : current)),
 		runningRef: lspRunningRef,
 		restartToken: lspRestart.token,
+		onError: reportNotice,
 	});
+	diagnosticsEventRef.current = diagnostics.applyEvent;
 	const debug = useDebugSession(root, settings.buildProfile);
-	const diagnostics = useDiagnosticsState({ root, onError: reportNotice });
 	const build = useBuild({
 		root,
 		profile: settings.buildProfile,

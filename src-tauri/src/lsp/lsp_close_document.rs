@@ -6,7 +6,7 @@ pub(crate) use crate::resolve;
 pub(crate) use crate::types::{
     CallHierarchyNode, CodeAction, CompletionItem, CompletionList, Diagnostic, DiagnosticsEvent,
     FileEdit, HoverInfo, InlayHint, Location, LspStatus, Position, ProjectKind, Range,
-    SignatureHelp, SignatureInformation, Symbol, TextEdit, WorkspaceSymbol,
+    SessionEndedEvent, SignatureHelp, SignatureInformation, Symbol, TextEdit, WorkspaceSymbol,
 };
 pub use serde::Serialize;
 pub use serde_json::{Value, json};
@@ -66,6 +66,16 @@ pub async fn lsp_close_document(
 pub fn emit_diagnostics(app: &AppHandle, payload: DiagnosticsEvent) {
     use tauri::Emitter;
     let _ = app.emit("lsp://diagnostics", payload);
+}
+
+/// Tell the window that one server's reader thread finished.
+///
+/// Without this the frontend keeps the last set it was sent: the pump only forwards what the
+/// server publishes, and a server that exited publishes nothing more, so its findings stayed in the
+/// badge and the problems panel until the project was reopened.
+pub fn emit_session_ended(app: &AppHandle, payload: SessionEndedEvent) {
+    use tauri::Emitter;
+    let _ = app.emit("lsp://session-ended", payload);
 }
 
 /// The only writer of a session mutex that is allowed to fail on a poisoned lock: a panicking

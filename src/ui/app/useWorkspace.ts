@@ -4,6 +4,7 @@ import type { FileBuffer } from "@/lib/project/buffer";
 import { describeError } from "@/lib/project/errors";
 import { applyEditsWithNotice } from "@/ui/app/applyEdits";
 import { externalChangeHandler } from "@/ui/app/externalChanges";
+import type { DiagnosticsLifecycleEvent } from "@/lib/lsp/lifecycle";
 import { useTabClose } from "@/ui/app/useTabClose";
 import { followExternalChanges } from "@/ui/app/recentsFollow";
 import { useFileOpening } from "@/ui/app/useFileOpening";
@@ -13,6 +14,8 @@ export type WorkspaceOptions = {
 	onNotice: (message: string | null) => void;
 	onProjectOpened: () => void;
 	savePaths: (paths: string[]) => Promise<boolean>;
+	/** A tab closed or a file moved on disk, so anything keyed by that path has to follow. */
+	onDiagnosticsEvent?: (event: DiagnosticsLifecycleEvent) => void;
 	setRevealTarget: (target: Reveal | null) => void;
 	setRevealToken: (updater: (current: number) => number) => void;
 	setReferences: (paths: import("@/lib/project/api").Location[]) => void;
@@ -113,16 +116,26 @@ export function useWorkspace(options: WorkspaceOptions) {
 	// The watcher reports paths; this turns them into buffer text, never touching a dirty one. A
 	// close or a move also leaves the recents list and the active tab pointing somewhere real.
 	const bufferRefs = { buffers: buffersRef, mounted: mountedRef };
+	const follow = followExternalChanges({
+		activePath: () => activePathRef.current,
+		setActivePath,
+		setRecentFiles,
+	});
 	const applyExternalChanges = externalChangeHandler(
 		bufferRefs,
 		setBuffers,
 		options.onNotice,
 		undefined,
-		followExternalChanges({
-			activePath: () => activePathRef.current,
-			setActivePath,
-			setRecentFiles,
-		}),
+		{
+			onClosed: (path) => {
+				follow.onClosed(path);
+				options.onDiagnosticsEvent?.({ type: "close", path });
+			},
+			onMoved: (from, to) => {
+				follow.onMoved(from, to);
+				options.onDiagnosticsEvent?.({ type: "rename", from, to });
+			},
+		},
 	);
 
 	const tabs = useTabClose({
@@ -133,6 +146,7 @@ export function useWorkspace(options: WorkspaceOptions) {
 		savePaths: options.savePaths,
 		setConfirmClose,
 		clearReveal: () => options.setRevealTarget(null),
+		onClosed: (path) => options.onDiagnosticsEvent?.({ type: "close", path }),
 	});
 
 	return {
