@@ -12,8 +12,6 @@ pub use tauri::{AppHandle, Emitter, State};
 
 use super::*;
 
-// We need mutable access to writer; restructure.
-
 pub fn validate_cwd(cwd: &str) -> Result<PathBuf, String> {
     let path = Path::new(cwd);
     if !path.is_absolute() {
@@ -45,31 +43,12 @@ pub async fn pty_resize(
     rows: u16,
     cols: u16,
 ) -> Result<(), String> {
-    let sessions = lock(&state.sessions);
-    let session = sessions
-        .get(&id)
-        .ok_or_else(|| format!("unknown pty session: {id}"))?;
-    session
-        .master
-        .resize(PtySize {
-            rows,
-            cols,
-            pixel_width: 0,
-            pixel_height: 0,
-        })
-        .map_err(|e| format!("cannot resize {id}: {e}"))
+    state.resize(&id, rows, cols)
 }
 
 #[tauri::command]
 pub async fn pty_close(state: State<'_, PtyState>, id: String) -> Result<(), String> {
-    let session = lock(&state.sessions).remove(&id);
-    if let Some(session) = session {
-        kill_spawned(&session.child);
-        // Drop the master and writer so their descriptors do not leak per closed tab.
-        drop(session.writer);
-        drop(session.master);
-    }
-    Ok(())
+    state.close(&id)
 }
 
 pub fn pty_id(n: u64) -> String {

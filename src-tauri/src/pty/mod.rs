@@ -13,6 +13,12 @@ pub use tauri::{AppHandle, Emitter, State};
 
 mod output_event;
 
+mod impl_ptystate;
+pub use impl_ptystate::*;
+
+mod impl_session;
+pub use impl_session::*;
+
 mod shell_program;
 pub use shell_program::*;
 
@@ -27,3 +33,6 @@ pub use validate_cwd::*;
 
 mod tests_items;
 pub use tests_items::*;
+
+mod tests_locks;
+pub use tests_locks::*;

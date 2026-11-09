@@ -25,7 +25,7 @@ pub struct PtyOpenResult {
 }
 
 pub struct PtyState {
-    pub(crate) sessions: Mutex<HashMap<String, Session>>,
+    pub(crate) sessions: Mutex<HashMap<String, Arc<Session>>>,
     pub(crate) counter: AtomicU64,
 }
 
@@ -38,29 +38,17 @@ impl Default for PtyState {
     }
 }
 
+/// A terminal handle behind its own locks, so the map can hand out a clone and let the caller do the
+/// blocking syscall outside the map guard. `master` and `writer` each get a mutex of their own.
 pub struct Session {
-    pub(crate) master: Box<dyn portable_pty::MasterPty + Send>,
-    pub(crate) writer: Box<dyn Write + Send>,
+    pub(crate) master: Mutex<Box<dyn portable_pty::MasterPty + Send>>,
+    pub(crate) writer: Mutex<Box<dyn Write + Send>>,
     pub(crate) child: Arc<Mutex<Option<Box<dyn portable_pty::Child + Send + Sync>>>>,
-}
-
-impl PtyState {
-    /// Kills every shell. Called when the app exits: a live PTY keeps the process group alive, and
-    /// macOS then shows the app as still running in the background after its window is gone.
-    pub fn shutdown_all(&self) {
-        let sessions = lock(&self.sessions);
-        for session in sessions.values() {
-            kill_spawned(&session.child);
-        }
-    }
 }
 
 impl Drop for PtyState {
     fn drop(&mut self) {
-        let sessions = lock(&self.sessions);
-        for session in sessions.values() {
-            kill_spawned(&session.child);
-        }
+        self.shutdown_all();
     }
 }
 
@@ -116,12 +104,12 @@ pub async fn pty_open(
 
     let id = next_id(&state.counter);
 
-    let session = Session {
-        master: pair.master,
-        writer,
+    let session = Arc::new(Session {
+        master: Mutex::new(pair.master),
+        writer: Mutex::new(writer),
         child: Arc::clone(&child),
-    };
-    lock(&state.sessions).insert(id.clone(), session);
+    });
+    state.insert_session(id.clone(), session);
 
     // reader thread
     let app2 = app.clone();
@@ -132,7 +120,7 @@ pub async fn pty_open(
         .spawn(move || pump(reader, &app2, &id2, child2))
         .map_err(|e| {
             kill_spawned(&child);
-            lock(&state.sessions).remove(&id);
+            let _ = state.take_session(&id);
             format!("cannot start reader: {e}")
         })?;
 
@@ -141,19 +129,7 @@ pub async fn pty_open(
 
 #[tauri::command]
 pub async fn pty_write(state: State<'_, PtyState>, id: String, data: String) -> Result<(), String> {
-    let mut sessions = lock(&state.sessions);
-    let session = sessions
-        .get_mut(&id)
-        .ok_or_else(|| format!("unknown pty session: {id}"))?;
-    session
-        .writer
-        .write_all(data.as_bytes())
-        .map_err(|e| format!("cannot write to {id}: {e}"))?;
-    session
-        .writer
-        .flush()
-        .map_err(|e| format!("cannot flush {id}: {e}"))?;
-    Ok(())
+    state.write(&id, data.as_bytes())
 }
 
 #[cfg(test)]
