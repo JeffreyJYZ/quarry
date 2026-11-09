@@ -2,8 +2,9 @@ import { generateItems } from "@/lib/generate/model";
 import { serverKindForPath } from "@/lib/lsp/served";
 import { DEFAULT_PROJECT_SETTINGS } from "@/lib/settings/model";
 import { languageLabel } from "@/lib/editor/languageLabel";
+import { Suspense, lazy } from "react";
 import AppOverlays from "@/ui/app/AppOverlays";
-import ReleaseNotes from "@/ui/updates/ReleaseNotes";
+const ReleaseNotes = lazy(() => import("@/ui/updates/ReleaseNotes"));
 import { useCurrentVersion } from "@/ui/updates/useCurrentVersion";
 import type { ShellModel } from "@/ui/app/useShell";
 
@@ -17,7 +18,9 @@ export default function OverlaysMount({ model }: { model: ShellModel }) {
 	return (
 		<>
 			{overlays.notesOpen && version !== null ? (
-				<ReleaseNotes version={version} onClose={() => overlays.setNotesOpen(false)} />
+				<Suspense fallback={null}>
+					<ReleaseNotes version={version} onClose={() => overlays.setNotesOpen(false)} />
+				</Suspense>
 			) : null}
 			<AppOverlays
 				root={model.root}

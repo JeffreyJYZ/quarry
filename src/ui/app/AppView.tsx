@@ -3,7 +3,8 @@ import AppTopBar from "@/ui/app/AppTopBar";
 import AppErrorBoundary from "@/ui/app/AppErrorBoundary";
 import OverlaysMount from "@/ui/app/OverlaysMount";
 import RunDebugWidget from "@/ui/app/RunDebugWidget";
-import UpdateSlot from "@/ui/updates/UpdateSlot";
+import { Suspense, lazy } from "react";
+const UpdateSlot = lazy(() => import("@/ui/updates/UpdateSlot"));
 import { useWhatsNew } from "@/ui/updates/useWhatsNew";
 import type { ShellModel } from "@/ui/app/useShell";
 
@@ -24,7 +25,9 @@ export default function AppView({ model }: { model: ShellModel }) {
 								model.panels.showRun();
 							}}
 						/>
-						<UpdateSlot />
+						<Suspense fallback={null}>
+							<UpdateSlot />
+						</Suspense>
 					</>
 				}
 			/>

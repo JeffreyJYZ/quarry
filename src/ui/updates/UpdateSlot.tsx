@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useUpdates } from "@/lib/updates/state";
 import { restartWithUpdate } from "@/lib/updates/store";
-import ReleaseNotes from "@/ui/updates/ReleaseNotes";
+import { Suspense, lazy } from "react";
+const ReleaseNotes = lazy(() => import("@/ui/updates/ReleaseNotes"));
 import "@/ui/updates/updates.css";
 
 /**
@@ -36,7 +37,11 @@ export default function UpdateSlot() {
 			>
 				What's new
 			</button>
-			{notesOpen ? <ReleaseNotes version={version} variant="inline" /> : null}
+			{notesOpen ? (
+				<Suspense fallback={null}>
+					<ReleaseNotes version={version} variant="inline" />
+				</Suspense>
+			) : null}
 		</div>
 	);
 }
