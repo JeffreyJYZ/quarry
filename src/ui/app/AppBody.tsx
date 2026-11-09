@@ -18,7 +18,12 @@ export default function AppBody({ model }: { model: ShellModel }) {
 	const project = workspace.project;
 	const watch = useFileWatch({
 		root: project?.root ?? null,
-		onPaths: (paths) => void workspace.applyExternalChanges(paths),
+		onPaths: (paths) =>
+			void workspace.applyExternalChanges(paths, () => {
+				// One refresh per batch: the focus handler bumps the same token, so the burst of a
+				// rename never asks the source-control view to read git once per path.
+				if (panels.gitOpen) git.setRefreshToken((current) => current + 1);
+			}),
 		onError: model.setNotice,
 	});
 
