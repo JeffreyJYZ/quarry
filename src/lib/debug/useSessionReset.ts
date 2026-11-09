@@ -4,7 +4,7 @@ import { describeError } from "@/lib/project/errors";
 import type { DapVariable, ExceptionFilter, LaunchPreset, ProjectKind } from "@/lib/project/api";
 import type { Pin, PinResult } from "@/lib/debug/watch";
 import type { BreakpointEntry, StopView, VariableRow, WatchRow } from "./sessionTypes";
-
+import type { BuildProfile } from "@/lib/debug/profile";
 type Setter<T> = (updater: T | ((current: T) => T)) => void;
 
 export type ResetDeps = {
@@ -31,7 +31,7 @@ export type ResetDeps = {
 	setKind: Setter<ProjectKind | null>;
 	setResolved: Setter<import("@/lib/project/api").LaunchConfig | null>;
 	setSessionKind: Setter<string | null>;
-	setSessionBuildProfile: Setter<"debug" | "release" | null>;
+	setSessionBuildProfile: Setter<BuildProfile | null>;
 	setAttachPid: Setter<number | null>;
 	setPidInput: Setter<string>;
 	setBuildNeeded: Setter<string | null>;

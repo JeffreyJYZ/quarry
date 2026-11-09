@@ -116,14 +116,19 @@ export function combineDiagnostics(server: DiagnosticMap, build: DiagnosticMap):
 	return next;
 }
 
+/** LSP `DiagnosticSeverity.Error`. */
+export const DIAGNOSTIC_SEVERITY_ERROR = 1;
+/** LSP `DiagnosticSeverity.Warning`. */
+export const DIAGNOSTIC_SEVERITY_WARNING = 2;
+
 export function countSeverities(map: DiagnosticMap): SeverityCounts {
 	let errors = 0;
 	let warnings = 0;
 	for (const list of map.values()) {
 		for (const diagnostic of list) {
-			if (diagnostic.severity === 1) {
+			if (diagnostic.severity === DIAGNOSTIC_SEVERITY_ERROR) {
 				errors += 1;
-			} else if (diagnostic.severity === 2) {
+			} else if (diagnostic.severity === DIAGNOSTIC_SEVERITY_WARNING) {
 				warnings += 1;
 			}
 		}

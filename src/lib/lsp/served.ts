@@ -1,7 +1,7 @@
 /** Which language server a project runs, and which files that server actually serves. */
 
 import { CPP_EXTENSIONS, RUST_EXTENSIONS, dotted, extensionOf } from "@/lib/consts/extensions";
-
+import { ALL_SERVER_KINDS, SESSION_SEPARATOR } from "@/lib/consts/lsp";
 export type ServerKind = "rust-analyzer" | "clangd";
 
 const EXTENSIONS: Record<ServerKind, readonly string[]> = {
@@ -31,19 +31,19 @@ export function servedExtensions(kind: ServerKind): readonly string[] {
 
 /** Whether a server name that arrived over the wire is one this build knows. */
 export function isServerKind(value: string): value is ServerKind {
-	return value === "rust-analyzer" || value === "clangd";
+	return (ALL_SERVER_KINDS as readonly string[]).includes(value);
 }
 
 /** Compose the session id a server is keyed by. Single source of truth. */
 export function sessionId(kind: ServerKind, root: string): string {
-	return `${kind}::${root}`;
+	return `${kind}${SESSION_SEPARATOR}${root}`;
 }
 
 /** Whether a string is a composed session id (`{kind}::{root}`), not a bare path. */
 export function isSessionId(value: string): boolean {
-	const separator = value.indexOf("::");
+	const separator = value.indexOf(SESSION_SEPARATOR);
 	if (separator <= 0) return false;
-	return value.slice(separator + 2).length > 0;
+	return value.slice(separator + SESSION_SEPARATOR.length).length > 0;
 }
 
 /** Which servers should run for a root, from what is actually there. */
