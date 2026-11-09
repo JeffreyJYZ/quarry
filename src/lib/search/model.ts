@@ -2,6 +2,8 @@ import { directoryOf, fileName } from "@/lib/project/paths";
 import type { SearchMatch, SearchReport } from "@/lib/project/api";
 
 import { SEARCH_RENDER_LIMIT } from "@/lib/consts/search";
+import { applyReplacement } from "@/lib/search/replace";
+import type { SearchOptions } from "@/lib/search/replace";
 
 /** Rows the palette renders no matter how many matches the backend returned. */
 export { SEARCH_RENDER_LIMIT } from "@/lib/consts/search";
@@ -9,21 +11,34 @@ export { SEARCH_RENDER_LIMIT } from "@/lib/consts/search";
 /** How much of one matched line a row keeps; CSS clamps it to the real palette width. */
 const LINE_CLIP = 240;
 
-export type SearchOptions = {
-	caseSensitive: boolean;
-	regex: boolean;
-	wholeWord: boolean;
-};
+export type { SearchOptions } from "@/lib/search/replace";
+
+export { applyReplacement } from "@/lib/search/replace";
+
+const encoder = new TextEncoder();
 
 /**
  * The editor's reveal target for a search match.
  *
  * A match is reported with a 1-based line and a 1-based byte column, because that is what ripgrep
- * prints; the reveal target counts from 0. Converting in one place keeps a click from landing on the
- * line above the hit or one character to its left.
+ * prints and what its own matcher counts; the reveal target counts from 0 in characters. The byte
+ * column is walked over `text` instead of being decremented, so a hit after a multi-byte character
+ * does not land several columns to its right.
  */
-export function revealTarget(line: number, column: number): { line: number; character: number } {
-	return { line: line - 1, character: column - 1 };
+export function revealTarget(
+	line: number,
+	column: number,
+	text: string,
+): { line: number; character: number } {
+	const limit = column - 1;
+	let bytes = 0;
+	let character = 0;
+	for (const symbol of text) {
+		if (bytes >= limit) break;
+		bytes += encoder.encode(symbol).length;
+		character += symbol.length;
+	}
+	return { line: line - 1, character };
 }
 
 export { isStaleSearch } from "@/lib/search/stale";
@@ -131,35 +146,6 @@ export type PreviewSnapshot = {
  * Apply one replacement to a single line. Regex mode honours `$1`/`${name}` capture references;
  * literal mode inserts the replacement verbatim. Toggles come through options.
  */
-export function applyReplacement(
-	line: string,
-	query: string,
-	replacement: string,
-	options: SearchOptions,
-): string {
-	if (options.regex) {
-		const flags = options.caseSensitive ? "g" : "gi";
-		// whole word handled by transformQuery already; here query is already transformed? We pass raw query.
-		let re: RegExp;
-		try {
-			const source = options.wholeWord ? `\\b(?:${query})\\b` : query;
-			re = new RegExp(source, flags);
-		} catch {
-			return line;
-		}
-		const repl = replacement.replace(/\$\{(\w+)\}/g, "$<$1>");
-		return line.replace(re, repl);
-	}
-	// literal
-	if (query === "") {
-		return line;
-	}
-	const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	const source = options.wholeWord ? `\\b(?:${escaped})\\b` : escaped;
-	const re = new RegExp(source, options.caseSensitive ? "g" : "gi");
-	return line.replace(re, () => replacement);
-}
-
 export function buildPreview(
 	matches: { path: string; line: number; text: string }[],
 	query: string,

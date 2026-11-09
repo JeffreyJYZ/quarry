@@ -1,7 +1,9 @@
 import { useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { SearchReport } from "@/lib/project/api";
+import type { FileBuffer } from "@/lib/project/buffer";
 import { describeError } from "@/lib/project/errors";
+import { dirtyReplaceMessage, dirtyReplaceTargets } from "@/lib/search/dirty";
 import {
 	buildPreview,
 	isPreviewStale,
@@ -28,6 +30,7 @@ export function useReplace({
 	trimmed,
 	report,
 	options,
+	buffers,
 	setBusy,
 	setError,
 }: {
@@ -35,6 +38,7 @@ export function useReplace({
 	trimmed: string;
 	report: SearchReport | null;
 	options: SearchOptions;
+	buffers: readonly FileBuffer[];
 	setBusy: Dispatch<SetStateAction<boolean>>;
 	setError: Dispatch<SetStateAction<string | null>>;
 }): SearchReplace {
@@ -60,6 +64,16 @@ export function useReplace({
 	const doReplaceAll = async () => {
 		if (isPreviewStale(preview, trimmed, replacement)) {
 			setError("preview is stale: run preview again before replacing");
+			return;
+		}
+		// The backend rewrites files straight from disk, so a dirty tab would be clobbered before
+		// its text ever reached the disk. Refuse the whole replace and name every file at risk.
+		const blocked = dirtyReplaceTargets(
+			buffers,
+			(report?.matches ?? []).map((match) => match.path),
+		);
+		if (blocked.length > 0) {
+			setError(dirtyReplaceMessage(blocked));
 			return;
 		}
 		const flags = searchFlags(options);

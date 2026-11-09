@@ -1,4 +1,5 @@
 import { resultSummary, searchFlags } from "@/lib/search/model";
+import type { FileBuffer } from "@/lib/project/buffer";
 import { useDialogFocus } from "@/ui/app/useDialogFocus";
 import "@/ui/search/search.css";
 import { SearchHead } from "./SearchHead";
@@ -11,13 +12,21 @@ import { useSearchToggles } from "./useSearchToggles";
 export type SearchPaletteProps = {
 	root: string;
 	/** Opens one absolute path through the app's existing open-by-path flow. */
-	onOpen: (path: string, line: number, column: number) => void;
+	onOpen: (path: string, line: number, column: number, text: string) => void;
 	onClose: () => void;
 	/** Prefill the input on mount (used by Cmd+Shift+F). */
 	initialQuery?: string;
+	/** Open buffers, so a replace never overwrites a dirty tab. */
+	buffers?: readonly FileBuffer[];
 };
 
-export default function SearchPalette({ root, onOpen, onClose, initialQuery }: SearchPaletteProps) {
+export default function SearchPalette({
+	root,
+	onOpen,
+	onClose,
+	initialQuery,
+	buffers = [],
+}: SearchPaletteProps) {
 	const toggles = useSearchToggles();
 	const search = useSearchQuery({
 		root,
@@ -31,6 +40,7 @@ export default function SearchPalette({ root, onOpen, onClose, initialQuery }: S
 		trimmed: search.trimmed,
 		report: search.report,
 		options: toggles.options,
+		buffers,
 		setBusy: search.setBusy,
 		setError: search.setError,
 	});

@@ -84,6 +84,7 @@ export default function EditorColumn({ model }: { model: ShellModel }) {
 				shortcutsOpen={overlays.shortcutsOpen}
 				commandOpen={overlays.commandPaletteOpen}
 				openPaths={new Set(workspace.buffers.map((buffer) => buffer.path))}
+				buffers={workspace.buffers}
 				commands={model.commands}
 				recentCommands={overlays.recentCommands}
 				onRecentCommands={overlays.setRecentCommands}
