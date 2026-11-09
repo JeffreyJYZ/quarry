@@ -7,3 +7,6 @@ export const TITLES: Record<GotoMode, string> = {
 	symbol: "Go to symbol in file",
 	recent: "Recent files",
 };
+
+/** Rows the goto dialog filters and shows; beyond this nobody scrolls. */
+export const GOTO_RESULT_LIMIT = 200;

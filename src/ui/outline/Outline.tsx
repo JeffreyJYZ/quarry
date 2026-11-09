@@ -3,7 +3,8 @@ import { type DocumentSymbol as LspSymbol, lspSymbols } from "@/lib/project/api"
 import { describeError } from "@/lib/project/errors";
 import { isInsideRoot, lspErrorMessage } from "@/lib/lsp/paths";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
-import type { ServerKind } from "@/lib/lsp/served";
+import { ALL_SERVER_KINDS } from "@/lib/consts/lsp";
+
 import { caretSymbolIndex, filterSymbolIndices } from "@/lib/outline/model";
 import { kindLabel } from "./outlineKinds";
 import "./outline.css";
@@ -43,7 +44,7 @@ export default function Outline({ root, activePath, onNavigate, cursor }: Outlin
 		const seq = ++seqRef.current;
 		setLoading(true);
 		setError(null);
-		const running = new Set<ServerKind>(["rust-analyzer", "clangd"]);
+		const running = new Set(ALL_SERVER_KINDS);
 		const kind = servedByRunningServer(activePath, running);
 		if (kind === null) {
 			setSymbols([]);

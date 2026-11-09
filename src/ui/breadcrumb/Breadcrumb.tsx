@@ -1,7 +1,9 @@
+import { BREADCRUMB_TAIL, BREADCRUMB_VISIBLE } from "@/lib/consts/breadcrumb";
 import { useEffect, useRef, useState } from "react";
 import { type DocumentSymbol as LspSymbol, lspSymbols } from "@/lib/project/api";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
-import type { ServerKind } from "@/lib/lsp/served";
+import { ALL_SERVER_KINDS } from "@/lib/consts/lsp";
+
 import { qualifiedName } from "@/lib/breadcrumb/model";
 import { relativeTo, segments } from "@/lib/project/paths";
 
@@ -51,7 +53,7 @@ export default function Breadcrumb({ root, activePath, cursor, onNavigate }: Bre
 			return;
 		}
 		const seq = ++seqRef.current;
-		const running = new Set<ServerKind>(["rust-analyzer", "clangd"]);
+		const running = new Set(ALL_SERVER_KINDS);
 		const kind = servedByRunningServer(activePath, running);
 		if (kind === null) {
 			setSymbols([]);
@@ -79,8 +81,8 @@ export default function Breadcrumb({ root, activePath, cursor, onNavigate }: Bre
 	const pathSegments = segments(relative);
 
 	let displaySegments = pathSegments;
-	if (pathSegments.length > 4) {
-		displaySegments = ["…", ...pathSegments.slice(pathSegments.length - 3)];
+	if (pathSegments.length > BREADCRUMB_VISIBLE) {
+		displaySegments = ["…", ...pathSegments.slice(pathSegments.length - BREADCRUMB_TAIL)];
 	}
 
 	const chain: LspSymbol[] = [];

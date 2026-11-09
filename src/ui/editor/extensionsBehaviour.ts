@@ -1,3 +1,4 @@
+import type { ServerKind } from "@/lib/lsp/served";
 import { autocompletion } from "@codemirror/autocomplete";
 import { EditorView, hoverTooltip, tooltips } from "@codemirror/view";
 import { kindToType } from "@/lib/editor/completion";
@@ -6,7 +7,7 @@ import { renderMarkdown } from "@/lib/editor/markdown";
 import { tooltipSpace } from "@/lib/editor/tooltipSpace";
 import { type Location, lspCompletion, lspDefinition, lspHover } from "@/lib/project/api";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
-import type { ServerKind } from "@/lib/lsp/served";
+
 import type { KeymapDeps } from "@/ui/editor/keymapDeps";
 
 export type BehaviourDeps = KeymapDeps & {

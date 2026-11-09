@@ -5,7 +5,7 @@ import {
 	lspCallHierarchyPrepare,
 } from "@/lib/project/api";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
-import type { ServerKind } from "@/lib/lsp/served";
+import { ALL_SERVER_KINDS } from "@/lib/consts/lsp";
 import { fileName } from "@/lib/project/paths";
 export type CallsPanelProps = {
 	root: string;
@@ -36,7 +36,7 @@ export default function CallsPanel({ root, path, cursor, onNavigate, onClose }: 
 		setChildren(new Map());
 		setExpanded(new Set());
 		setLoadingNodes(new Set());
-		const running = new Set<ServerKind>(["rust-analyzer", "clangd"]);
+		const running = new Set(ALL_SERVER_KINDS);
 		const kind = servedByRunningServer(path, running);
 		if (kind === null) {
 			setPrepared([]);
@@ -71,7 +71,7 @@ export default function CallsPanel({ root, path, cursor, onNavigate, onClose }: 
 				});
 				return;
 			}
-			const running = new Set<ServerKind>(["rust-analyzer", "clangd"]);
+			const running = new Set(ALL_SERVER_KINDS);
 			const kind = servedByRunningServer(path, running);
 			if (kind === null) return;
 			const sid = sessionId(kind, root);

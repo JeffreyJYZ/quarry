@@ -1,9 +1,9 @@
+import type { ServerKind } from "@/lib/lsp/served";
 import { useEffect, useMemo, useRef, type MutableRefObject } from "react";
 import { useRootSignals } from "@/lib/lsp/rootSignals";
 import { useDocumentSync, useLspServers, type LspStatusMap } from "@/lib/lsp/session";
 import { setLspContext } from "@/lib/lsp/context";
 import { NO_RESTART_IN_FLIGHT, restartSettled } from "@/lib/lsp/restart";
-import type { ServerKind } from "@/lib/lsp/served";
 
 export type LspWiringOptions = {
 	root: string | null;
