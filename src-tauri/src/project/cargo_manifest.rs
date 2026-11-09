@@ -25,6 +25,7 @@ pub fn inspect(root: &str) -> Result<ProjectInfo, String> {
     if !canonical.is_dir() {
         return Err(format!("not a directory: {root}"));
     }
+    crate::workspace::register_opened_root(&canonical);
 
     let (kind, build_root, cargo_manifest) = match detect(&canonical) {
         Some(detected) => (detected.kind, detected.build_root, detected.cargo_manifest),
