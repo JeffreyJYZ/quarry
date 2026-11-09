@@ -134,7 +134,8 @@ export function useShell() {
 	const saveError = panels.saveStatus?.failed === true ? panels.saveStatus.text : null;
 
 	// Everything that belonged to the previous project, cleared when a new one opens.
-	projectOpenedRef.current = () => resetProjectState({ git, panels, overlays, diagnostics });
+	projectOpenedRef.current = () =>
+		resetProjectState({ git, panels, overlays, diagnostics, runs });
 
 	const snapshotRef = useShellSnapshot({
 		workspace,

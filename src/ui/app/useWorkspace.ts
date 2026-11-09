@@ -57,6 +57,9 @@ export function useWorkspace(options: WorkspaceOptions) {
 				setBuffers([]);
 				setActivePath(null);
 				setConfirmClose(null);
+				// Recents are file paths in the project that was open; keeping them lists another
+				// tree's files under this one and stamps them into this project's settings.
+				setRecentFiles([]);
 				options.onProjectOpened();
 				try {
 					setRecentRoots(await rememberRoot(nextRoot));
