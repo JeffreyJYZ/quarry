@@ -11,13 +11,21 @@ use super::*;
 pub const MAX_DEPTH: usize = 4;
 
 /// Directories a build writes that never hold the program itself.
-pub const SKIPPED: [&str; 6] = [
+///
+/// The cargo four matter most: `target/debug/deps` holds every unit cargo links — test binaries and
+/// examples, none of them carrying an extension — so walking it lets a test binary be launched as
+/// the app. `build` and `incremental` hold build scripts and compiler state beside it.
+pub const SKIPPED: [&str; 10] = [
     "CMakeFiles",
     "CMakeScripts",
     ".git",
     "node_modules",
     ".cmake",
     "CMakeTmp",
+    "deps",
+    "examples",
+    "build",
+    "incremental",
 ];
 
 /// Suffixes that are never the program a user runs.

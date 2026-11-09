@@ -60,6 +60,13 @@ pub fn resolve_target(build_root: &Path, name: &str, written_since: SystemTime) 
     for path in layout_paths(build_root, name) {
         collect_program(&path, &mut found);
     }
+    // `OUTPUT_NAME` and `RUNTIME_OUTPUT_DIRECTORY` rename or move the file, so the layouts above
+    // name nothing that exists; the generated build tree records where the link step wrote it.
+    if found.is_empty() {
+        for path in target_output(build_root, name) {
+            collect_program(&path, &mut found);
+        }
+    }
     // `add_subdirectory` keeps the source tree's shape, so the executable can sit anywhere below
     // the build root; the explicit layouts above cover the common cases without a walk.
     if found.is_empty() {
@@ -78,6 +85,8 @@ pub fn resolve_target(build_root: &Path, name: &str, written_since: SystemTime) 
 /// - `<build>/<Config>/<name>` and `.exe` — Xcode, Visual Studio, Ninja Multi-Config.
 /// - `<build>/<subdir>/<name>` and `<build>/<subdir>/<Config>/<name>` — `add_subdirectory`, which
 ///   finds the file by its exact name and ignores every other file.
+/// - A name no layout matches: the path the target's own link command records, which is the only
+///   place `OUTPUT_NAME` and `RUNTIME_OUTPUT_DIRECTORY` are written down.
 ///
 /// A name that resolves feeds `choose_artifact` as the reported target, so a newer helper binary
 /// written by the same build cannot take the launch. Nothing resolving is not a failure: the
