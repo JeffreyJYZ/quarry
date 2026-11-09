@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { filterProblemFiles, flatProblems, type ProblemFile } from "@/lib/problems/model";
+import {
+	countProblems,
+	filterProblemFiles,
+	flatProblems,
+	type ProblemFile,
+} from "@/lib/problems/model";
 import { FlatProblems } from "./FlatProblems";
 import { ProblemsHead } from "./ProblemsHead";
 import { ProblemsList } from "./ProblemsList";
@@ -16,8 +21,6 @@ import "./problems.css";
 
 export type ProblemsPanelProps = {
 	files: ProblemFile[];
-	errors: number;
-	warnings: number;
 	open: boolean;
 	onToggle: () => void;
 	onSelect: (path: string, line?: number, character?: number) => void;
@@ -33,8 +36,6 @@ export type ProblemsPanelProps = {
 
 export default function ProblemsPanel({
 	files,
-	errors,
-	warnings,
 	open,
 	onToggle,
 	onSelect,
@@ -43,9 +44,6 @@ export default function ProblemsPanel({
 	buffers,
 	setBuffers,
 }: ProblemsPanelProps) {
-	const total = files.reduce((sum, file) => sum + file.diagnostics.length, 0);
-	const other = total - errors - warnings;
-
 	const [allowed, setAllowed] = useState<Set<number>>(() => storedAllowed());
 	const [groupByFile, setGroupByFile] = useState(storedGrouping);
 	const [textFilter, setTextFilter] = useState(storedTextFilter);
@@ -76,6 +74,9 @@ export default function ProblemsPanel({
 
 	const filteredFiles = filterProblemFiles(files, allowed, textFilter);
 	const flat = flatProblems(files, allowed, textFilter);
+	// The counts follow the list: a filtered panel that still claims the unfiltered total is lying
+	// about what is on screen.
+	const { errors, warnings, other } = countProblems(flat);
 	const actions = useProblemActions({ root, buffers, setBuffers });
 
 	if (!open) {

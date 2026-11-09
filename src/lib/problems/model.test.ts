@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import type { Diagnostic } from "@/lib/project/api";
 import type { ProblemFile } from "@/lib/problems/model";
-import { copyLine, filterProblemFiles, flatProblems } from "@/lib/problems/model";
+import {
+	copyLine,
+	countProblems,
+	type FlatProblem,
+	filterProblemFiles,
+	flatProblems,
+} from "@/lib/problems/model";
 
 const diag = (
 	severity: Diagnostic["severity"],
@@ -43,5 +49,44 @@ describe("copyLine", () => {
 	test("composes path:line:col severity: message", () => {
 		const d = diag(1, 27, 6, "boom");
 		expect(copyLine("src/App.tsx", d)).toBe("src/App.tsx:28:7 error: boom");
+	});
+});
+
+describe("countProblems", () => {
+	// The regression: the panel's header showed the project-wide totals while the list under it was
+	// filtered, so a search for one word still claimed "12 errors" above two rows.
+	function row(severity: number): FlatProblem {
+		return {
+			path: "/p/a.cpp",
+			name: "a.cpp",
+			diagnostic: { severity, message: "m", range: { start: { line: 0, character: 0 } } },
+		} as FlatProblem;
+	}
+
+	test("counts only the rows it is given", () => {
+		expect(countProblems([row(1), row(2), row(3)])).toEqual({
+			errors: 1,
+			warnings: 1,
+			other: 1,
+		});
+	});
+
+	test("an empty list counts nothing", () => {
+		expect(countProblems([])).toEqual({ errors: 0, warnings: 0, other: 0 });
+	});
+
+	test("the list the panel filters is the list it counts", () => {
+		const files: ProblemFile[] = [
+			{
+				path: "/p/a.cpp",
+				name: "a.cpp",
+				diagnostics: [
+					{ severity: 1, message: "needle", range: { start: { line: 0, character: 0 } } },
+					{ severity: 2, message: "hay", range: { start: { line: 1, character: 0 } } },
+				],
+			},
+		] as ProblemFile[];
+		const filtered = flatProblems(files, new Set([1, 2, 3, 4]), "needle");
+		expect(countProblems(filtered)).toEqual({ errors: 1, warnings: 0, other: 0 });
 	});
 });
