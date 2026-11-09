@@ -10,8 +10,14 @@ type State = { failure: Failure | null };
  * React unmounts the whole tree when a component throws without a boundary, so one bad value in a
  * panel left an empty frame with no chrome — the failure looked like the app refusing to start. The
  * boundary renders `CrashPanel` in its place, which names the error and can reload.
+ *
+ * Nest one around a region (the workspace, the overlays) and a throw there costs that region only;
+ * the root boundary in `main.tsx` stays as the last resort.
  */
-export default class AppErrorBoundary extends Component<{ children: ReactNode }, State> {
+export default class AppErrorBoundary extends Component<
+	{ children: ReactNode; region?: string },
+	State
+> {
 	state: State = { failure: null };
 
 	static getDerivedStateFromError(error: unknown): State {
@@ -27,7 +33,13 @@ export default class AppErrorBoundary extends Component<{ children: ReactNode },
 	render() {
 		const failure = this.state.failure;
 		if (failure !== null) {
-			return <CrashPanel message={failure.message} stack={failure.stack} />;
+			return (
+				<CrashPanel
+					message={failure.message}
+					stack={failure.stack}
+					region={this.props.region}
+				/>
+			);
 		}
 		return this.props.children;
 	}
