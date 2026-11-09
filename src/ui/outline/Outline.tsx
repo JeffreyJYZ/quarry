@@ -5,7 +5,8 @@ import { isInsideRoot, lspErrorMessage } from "@/lib/lsp/paths";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
 import { ALL_SERVER_KINDS } from "@/lib/consts/lsp";
 
-import { caretSymbolIndex, filterSymbolIndices } from "@/lib/outline/model";
+import { caretSymbolIndex } from "@/lib/outline/model";
+import { useOutlineRows } from "@/lib/outline/useOutlineRows";
 import { kindLabel } from "./outlineKinds";
 import "./outline.css";
 
@@ -77,13 +78,9 @@ export default function Outline({ root, activePath, onNavigate, cursor }: Outlin
 		};
 	}, [root, activePath]);
 
-	const visibleIndices = filterSymbolIndices(symbols, filter);
-
 	// The cap is on what is drawn, not only on what the "+N more" line counts: a C file with a few
 	// hundred symbols would otherwise render every row and shout about a limit it never applied.
-	const cappedIndices = filter.trim() === "" ? visibleIndices.slice(0, CAP) : visibleIndices;
-
-	const shownSymbols = cappedIndices.map((i) => symbols[i]);
+	const { visibleIndices, cappedIndices, shownSymbols } = useOutlineRows(symbols, filter, CAP);
 
 	useEffect(() => {
 		setKbIndex((current) =>

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { diagnosticKey } from "@/lib/lsp/diagnostics";
-import { copyLine, type FlatProblem } from "@/lib/problems/model";
+import { copyLine, type FlatProblem, flatProblemKey } from "@/lib/problems/model";
 import { rowKeyNav } from "./rowKeyNav";
 import { SEVERITY_CLASS } from "./parts";
 
@@ -35,7 +34,7 @@ export function FlatProblems({
 				{rows.map((row, index) => {
 					const { line, character } = row.diagnostic.range.start;
 					return (
-						<li key={diagnosticKey(row.diagnostic)} className="problems-item">
+						<li key={flatProblemKey(row)} className="problems-item">
 							<button
 								type="button"
 								ref={(element) => {

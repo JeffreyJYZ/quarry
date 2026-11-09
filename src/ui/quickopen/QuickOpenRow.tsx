@@ -1,9 +1,9 @@
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import { matchPositions } from "@/lib/quickopen/rank";
 import { highlight } from "./Highlight";
 import { fileParts } from "./parts";
 
-export function QuickOpenRow({
+export const QuickOpenRow = memo(function QuickOpenRow({
 	path,
 	root,
 	index,
@@ -19,8 +19,10 @@ export function QuickOpenRow({
 	active: boolean;
 	isOpen: boolean;
 	query?: string;
-	onSelect: () => void;
-	onHover: () => void;
+	/** The row passes its own path, so one handler serves every row. */
+	onSelect: (path: string) => void;
+	/** The row passes its own index, so one handler serves every row. */
+	onHover: (index: number) => void;
 }) {
 	const { name, relDir } = fileParts(path, root);
 	let nameNode: ReactNode = name;
@@ -35,12 +37,12 @@ export function QuickOpenRow({
 			className={active ? "quick-open-row active" : "quick-open-row"}
 			data-index={index}
 			title={path}
-			onClick={onSelect}
-			onMouseEnter={onHover}
+			onClick={() => onSelect(path)}
+			onMouseEnter={() => onHover(index)}
 		>
 			{isOpen ? <span className="quick-open-dot">•</span> : null}
 			<span className="search-file-name">{nameNode}</span>
 			<span className="search-file-dir">{dirNode}</span>
 		</button>
 	);
-}
+});

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { diagnosticKey } from "@/lib/lsp/diagnostics";
 import { directoryOf } from "@/lib/project/paths";
 import type { ProblemFile } from "@/lib/problems/model";
+import { useProblemItems } from "@/lib/problems/useProblemItems";
 import { ProblemRow } from "./ProblemRow";
 import { rowKeyNav } from "./rowKeyNav";
 import type { ProblemActions } from "./useProblemActions";
@@ -17,9 +18,7 @@ export function ProblemsList({
 	onSelect: (path: string, line?: number, character?: number) => void;
 	actions: ProblemActions;
 }) {
-	const items = files.flatMap((file) =>
-		file.diagnostics.map((diagnostic) => ({ path: file.path, diagnostic })),
-	);
+	const items = useProblemItems(files);
 	const [selected, setSelected] = useState(0);
 	const rowRefs = useRef<(HTMLButtonElement | null)[]>([]);
 

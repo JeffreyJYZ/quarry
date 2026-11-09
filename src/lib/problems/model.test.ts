@@ -6,6 +6,7 @@ import {
 	countProblems,
 	type FlatProblem,
 	filterProblemFiles,
+	flatProblemKey,
 	flatProblems,
 } from "@/lib/problems/model";
 
@@ -88,5 +89,26 @@ describe("countProblems", () => {
 		] as ProblemFile[];
 		const filtered = flatProblems(files, new Set([1, 2, 3, 4]), "needle");
 		expect(countProblems(filtered)).toEqual({ errors: 1, warnings: 0, other: 0 });
+	});
+});
+
+describe("flatProblemKey", () => {
+	// The regression: the flat panel keyed rows on the diagnostic alone, so two files reporting the
+	// same span in the same words collided and React reused one row for both.
+	test("two files reporting the same span and text get distinct row keys", () => {
+		const shared = diag(1, 4, 2, "boom");
+		const left: FlatProblem = { path: "/p/a.cpp", name: "a.cpp", diagnostic: shared };
+		const right: FlatProblem = { path: "/p/b.cpp", name: "b.cpp", diagnostic: shared };
+
+		expect(flatProblemKey(left)).not.toBe(flatProblemKey(right));
+	});
+
+	test("the same file and problem keep one key", () => {
+		const row: FlatProblem = {
+			path: "/p/a.cpp",
+			name: "a.cpp",
+			diagnostic: diag(1, 4, 2, "boom"),
+		};
+		expect(flatProblemKey({ ...row })).toBe(flatProblemKey(row));
 	});
 });

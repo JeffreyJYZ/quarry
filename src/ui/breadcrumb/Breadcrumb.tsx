@@ -5,6 +5,7 @@ import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
 import { ALL_SERVER_KINDS } from "@/lib/consts/lsp";
 
 import { qualifiedName } from "@/lib/breadcrumb/model";
+import { useBreadcrumbChain } from "@/lib/breadcrumb/useBreadcrumbChain";
 import { relativeTo, segments } from "@/lib/project/paths";
 
 export type BreadcrumbProps = {
@@ -13,19 +14,6 @@ export type BreadcrumbProps = {
 	cursor: { line: number; character: number } | null;
 	onNavigate: (path: string, line: number, character: number) => void;
 };
-
-function containsRange(symbol: LspSymbol, cursor: { line: number; character: number }): boolean {
-	const r = symbol.range;
-	if (cursor.line < r.start.line || cursor.line > r.end.line) return false;
-	if (cursor.line === r.start.line && cursor.character < r.start.character) return false;
-	if (cursor.line === r.end.line && cursor.character > r.end.character) return false;
-	return true;
-}
-
-function rangeSize(symbol: LspSymbol): number {
-	const r = symbol.range;
-	return (r.end.line - r.start.line) * 1000000 + (r.end.character - r.start.character);
-}
 
 export default function Breadcrumb({ root, activePath, cursor, onNavigate }: BreadcrumbProps) {
 	const [symbols, setSymbols] = useState<LspSymbol[]>([]);
@@ -75,6 +63,8 @@ export default function Breadcrumb({ root, activePath, cursor, onNavigate }: Bre
 		})();
 	}, [root, activePath]);
 
+	const { chain } = useBreadcrumbChain(symbols, cursor);
+
 	if (activePath === null) {
 		return null;
 	}
@@ -85,13 +75,6 @@ export default function Breadcrumb({ root, activePath, cursor, onNavigate }: Bre
 	let displaySegments = pathSegments;
 	if (pathSegments.length > BREADCRUMB_VISIBLE) {
 		displaySegments = ["…", ...pathSegments.slice(pathSegments.length - BREADCRUMB_TAIL)];
-	}
-
-	const chain: LspSymbol[] = [];
-	if (cursor !== null) {
-		const containing = symbols.filter((s) => containsRange(s, cursor));
-		containing.sort((a, b) => rangeSize(b) - rangeSize(a));
-		chain.push(...containing);
 	}
 
 	const chainNames = chain.map((s) => s.name);

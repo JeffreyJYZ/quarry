@@ -1,4 +1,4 @@
-import type { DiagnosticMap } from "@/lib/lsp/diagnostics";
+import { type DiagnosticMap, diagnosticKey } from "@/lib/lsp/diagnostics";
 import type { Diagnostic } from "@/lib/project/api";
 import { fileName } from "@/lib/project/paths";
 
@@ -64,6 +64,16 @@ export function filterProblemFiles(
 }
 
 export type FlatProblem = { path: string; name: string; diagnostic: Diagnostic };
+
+/**
+ * The key of one flat row: the file is part of it.
+ *
+ * `diagnosticKey` names a problem within one file, so two files reporting the same span in the same
+ * words produce the same string and React would reuse one row for both.
+ */
+export function flatProblemKey(row: FlatProblem): string {
+	return `${row.path}\u0000${diagnosticKey(row.diagnostic)}`;
+}
 
 export function flatProblems(
 	files: ProblemFile[],
