@@ -1,5 +1,7 @@
 import { useEffect } from "react";
-import { inTerminal } from "@/ui/app/focusGuard";
+import type { FocusKind } from "@/lib/layout/toggles";
+import { resolveLayoutToggle } from "@/lib/layout/toggles";
+import { inEditableTarget, inTerminal } from "@/ui/app/focusGuard";
 import { useMetaShortcuts } from "@/ui/app/useMetaShortcuts";
 import { useTabKeybindings } from "@/ui/app/useTabKeybindings";
 
@@ -54,6 +56,14 @@ function inInput(): boolean {
 	);
 }
 
+/** Classify the focused element once, so the editor is not mistaken for a plain text field. */
+function focusKind(): FocusKind {
+	if (inTerminal()) return "terminal";
+	if (inEditor()) return "editor";
+	if (inEditableTarget()) return "input";
+	return "other";
+}
+
 /**
  * Every window-level accelerator the shell owns.
  *
@@ -94,7 +104,11 @@ export function useKeybindings(context: KeybindingContext): void {
 		return () => window.removeEventListener("keydown", handleKeyDown, true);
 	}, [root, saveActive, saveAll, formatActive, activePath, context.setSearchOpen]);
 
-	/** Cmd+K toggles the shortcut sheet; `?` opens it outside the editor and any input. */
+	/**
+	 * Cmd+K toggles the shortcut sheet; `?` opens it outside the editor and any input. `?` is
+	 * Shift+`/` on every layout, so the shifted modifier is expected and only the other three are
+	 * refused.
+	 */
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) {
@@ -104,13 +118,7 @@ export function useKeybindings(context: KeybindingContext): void {
 					return;
 				}
 			}
-			if (
-				event.key === "?" &&
-				!event.metaKey &&
-				!event.ctrlKey &&
-				!event.altKey &&
-				!event.shiftKey
-			) {
+			if (event.key === "?" && !event.metaKey && !event.ctrlKey && !event.altKey) {
 				if (inEditor() || inInput()) return;
 				event.preventDefault();
 				context.setShortcutsOpen(() => true);
@@ -123,32 +131,24 @@ export function useKeybindings(context: KeybindingContext): void {
 	/** Layout toggles: Cmd+B rail, Cmd+J dock, Cmd+Shift+D debugger tab, Cmd+Shift+G git. */
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
-			if (!event.metaKey || event.ctrlKey || event.altKey) return;
-			if (inEditor() || inInput() || inTerminal()) return;
-			const key = event.key.toLowerCase();
-			if (!event.shiftKey) {
-				if (key === "b") {
-					event.preventDefault();
-					context.setRailCollapsed((current) => !current);
-					return;
-				}
-				if (key === "j") {
-					event.preventDefault();
-					context.setPanelOpen(!panelExpanded);
-				}
+			const toggle = resolveLayoutToggle(event, focusKind());
+			if (toggle === null) return;
+			event.preventDefault();
+			if (toggle === "rail") {
+				context.setRailCollapsed((current) => !current);
 				return;
 			}
-			if (key === "d") {
-				event.preventDefault();
+			if (toggle === "dock") {
+				context.setPanelOpen(!panelExpanded);
+				return;
+			}
+			if (toggle === "debugger") {
 				context.showDebugger();
 				return;
 			}
-			if (key === "g") {
-				event.preventDefault();
-				const showing = !context.railCollapsed && context.gitOpen;
-				context.setRailCollapsed(() => showing);
-				context.setGitOpen(() => !showing);
-			}
+			const showing = !context.railCollapsed && context.gitOpen;
+			context.setRailCollapsed(() => showing);
+			context.setGitOpen(() => !showing);
 		};
 		window.addEventListener("keydown", handleKeyDown, true);
 		return () => window.removeEventListener("keydown", handleKeyDown, true);
