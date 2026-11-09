@@ -116,12 +116,10 @@ pub fn stage_hunk(root: &str, path: &str, id: &str, reverse: bool) -> Result<(),
         args.push("-R".to_string());
     }
     args.push(tmp.to_string_lossy().into_owned());
-    let output = Command::new(&program)
-        .args(&args)
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("cannot run git: {e}"))?;
+    let borrowed: Vec<&str> = args.iter().map(String::as_str).collect();
+    let result = run(&program, root, &borrowed);
     let _ = std::fs::remove_file(&tmp);
+    let output = result?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(operation_error("git apply", &stderr));

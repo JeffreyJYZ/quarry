@@ -43,9 +43,7 @@ pub fn run_mutation(
     let program = git_program()?;
     let mut command = Command::new(&program);
     command.args(head).args(paths).current_dir(root);
-    let output = command
-        .output()
-        .map_err(|error| format!("cannot run {program} in {root}: {error}"))?;
+    let output = output_within(&mut command, GIT_TIMEOUT)?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

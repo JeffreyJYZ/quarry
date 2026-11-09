@@ -87,6 +87,9 @@ pub use dap_restart::*;
 mod impl_pump_1;
 pub use impl_pump_1::*;
 
+mod frame_wait;
+pub use frame_wait::*;
+
 mod pump_events;
 pub use pump_events::*;
 
@@ -116,6 +119,9 @@ pub use tests_3::*;
 
 mod tests_4;
 pub use tests_4::*;
+
+mod tests_5;
+pub use tests_5::*;
 
 mod dap_write_memory;
 pub use dap_write_memory::*;

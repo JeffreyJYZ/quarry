@@ -17,6 +17,9 @@ pub use std::process::Command;
 mod git_program;
 pub use git_program::*;
 
+mod bounded_run;
+pub use bounded_run::*;
+
 mod file_diff;
 pub use file_diff::*;
 
@@ -37,6 +40,9 @@ pub use tests_2::*;
 
 mod tests_3;
 pub use tests_3::*;
+
+mod tests_4;
+pub use tests_4::*;
 
 mod git_stage;
 pub use git_stage::*;

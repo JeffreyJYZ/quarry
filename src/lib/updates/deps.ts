@@ -1,9 +1,20 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check as checkUpdater, type Update } from "@tauri-apps/plugin-updater";
+import { withTimeout } from "@/lib/updates/notes";
+
+/** Where the release list lives; the only network call the fallback check makes. */
+const RELEASE_URL = "https://api.github.com/repos/JeffreyJYZ/quarry/releases/latest";
 
 /**
- * The outside world the updater touches, behind one object so tests can replace it.
+ * How long the GitHub lookup may take before it is abandoned.
+ *
+ * The check runs while the panel says "checking", so a request that never settles leaves the panel
+ * there for the session. Eight seconds matches the release-notes lookup.
+ */
+export const UPDATE_FETCH_TIMEOUT_MS = 8000;
+
+/** The outside world the updater touches, behind one object so tests can replace it.
  *
  * `setUpdateDeps` is used by the update tests and by the store's own reset; production never calls
  * it, so the real implementations below are the ones that ship.
@@ -15,14 +26,33 @@ export type Deps = {
 	relaunch: () => Promise<void>;
 };
 
-const defaultDeps: Deps = {
-	checkUpdater: () => checkUpdater(),
-	fetchGithub: async () => {
-		const response = await fetch(
-			"https://api.github.com/repos/JeffreyJYZ/quarry/releases/latest",
-		);
+export type GithubFetch = (
+	url: string,
+	signal: AbortSignal,
+) => Promise<{ ok: boolean; json: () => Promise<unknown> }>;
+
+/**
+ * The latest release's version, or `null` when it cannot be read in time.
+ *
+ * The abort signal cancels the request itself, and the per-call timeout also bounds the body read,
+ * so a stub or a platform that ignores the signal cannot hold the panel.
+ */
+export async function fetchLatestRelease(
+	fetchImpl: GithubFetch = fetch as unknown as GithubFetch,
+	timeoutMs: number = UPDATE_FETCH_TIMEOUT_MS,
+): Promise<{ version: string } | null> {
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(), timeoutMs);
+	const deadline = Date.now() + timeoutMs;
+	const remaining = () => Math.max(1, deadline - Date.now());
+
+	try {
+		const response = await withTimeout(fetchImpl(RELEASE_URL, controller.signal), remaining());
 		if (!response.ok) return null;
-		const body = (await response.json()) as { tag_name?: unknown; name?: unknown };
+		const body = (await withTimeout(response.json(), remaining())) as {
+			tag_name?: unknown;
+			name?: unknown;
+		};
 		const raw =
 			typeof body.tag_name === "string"
 				? body.tag_name
@@ -30,9 +60,17 @@ const defaultDeps: Deps = {
 					? body.name
 					: null;
 		if (raw === null) return null;
-		const version = raw.replace(/^v/, "");
-		return { version };
-	},
+		return { version: raw.replace(/^v/, "") };
+	} catch {
+		return null;
+	} finally {
+		clearTimeout(timer);
+	}
+}
+
+const defaultDeps: Deps = {
+	checkUpdater: () => checkUpdater(),
+	fetchGithub: () => fetchLatestRelease(),
 	currentVersion: () => getVersion(),
 	relaunch: () => relaunch(),
 };

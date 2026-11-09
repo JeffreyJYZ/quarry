@@ -28,6 +28,13 @@ pub const ADAPTER: &str = "lldb-dap";
 /// Every request is bounded: a hung adapter fails the command instead of freezing the UI.
 pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 
+/// How often the pump looks at the adapter while no frame is arriving.
+///
+/// The pump must not give up on silence: a paused debuggee produces no frames for as long as the
+/// user inspects it. It only gives up when the process is gone, and this is how long that takes to
+/// notice when a grandchild keeps the stream open.
+pub const PUMP_POLL_INTERVAL: Duration = Duration::from_millis(250);
+
 /// Fixed ids for the two handshake requests; anything a session sends starts above them.
 pub const INITIALIZE_SEQ: i64 = 1;
 

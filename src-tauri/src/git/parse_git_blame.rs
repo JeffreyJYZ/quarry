@@ -113,11 +113,7 @@ pub fn discard(root: &str, paths: &[String]) -> Result<(), String> {
     if !tracked.is_empty() {
         let argv = discard_restore_argv(&tracked);
         let args: Vec<&str> = argv.iter().map(String::as_str).collect();
-        let output = Command::new(&program)
-            .args(&args)
-            .current_dir(root)
-            .output()
-            .map_err(|error| format!("cannot run {program} in {root}: {error}"))?;
+        let output = run(&program, root, &args)?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             if is_not_a_repository(&stderr) {
@@ -130,11 +126,7 @@ pub fn discard(root: &str, paths: &[String]) -> Result<(), String> {
     if !untracked.is_empty() {
         let argv = discard_clean_argv(&untracked);
         let args: Vec<&str> = argv.iter().map(String::as_str).collect();
-        let output = Command::new(&program)
-            .args(&args)
-            .current_dir(root)
-            .output()
-            .map_err(|error| format!("cannot run {program} in {root}: {error}"))?;
+        let output = run(&program, root, &args)?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             if is_not_a_repository(&stderr) {

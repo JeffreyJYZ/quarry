@@ -125,6 +125,28 @@ impl ProcessPipe {
         std::mem::replace(&mut self.frames, replacement)
     }
 
+    /// True once the child has exited, whether or not its stream was closed.
+    ///
+    /// `wait` blocks until the child is reaped, which is the wrong tool here: an adapter that died
+    /// while a debuggee it spawned kept the pipe open would hang the caller. This only reaps and
+    /// reports, so `Drop` has nothing left to signal.
+    pub fn exited(&mut self) -> bool {
+        if self.finished {
+            return true;
+        }
+        match self.child.try_wait() {
+            Ok(Some(_)) => {
+                self.finished = true;
+                true
+            }
+            Ok(None) => false,
+            Err(_) => {
+                self.finished = true;
+                true
+            }
+        }
+    }
+
     /// Terminate the child and reap it so no zombie is left behind.
     pub fn kill(&mut self) -> io::Result<()> {
         if self.finished {
