@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { editingBindings } from "@/ui/editor/keymapEditing";
 import type { KeymapDeps } from "@/ui/editor/keymapDeps";
 
-const escape = (deps: KeymapDeps) =>
+const escapeBinding = (deps: KeymapDeps) =>
 	editingBindings(deps).find((binding) => binding.key === "Escape");
 
 describe("Escape in the editor", () => {
@@ -15,7 +15,7 @@ describe("Escape in the editor", () => {
 			setRenameOpen: () => {},
 			setCodeMenuOpen: (open: boolean) => closed.push(open),
 		} as unknown as KeymapDeps;
-		const binding = escape(deps);
+		const binding = escapeBinding(deps);
 		expect(binding).toBeDefined();
 
 		deps.codeMenuOpenRef.current = true;
@@ -35,6 +35,6 @@ describe("Escape in the editor", () => {
 			searchOpenRef: { current: false },
 		} as unknown as KeymapDeps;
 
-		expect(escape(deps)?.run?.({} as never)).toBe(false);
+		expect(escapeBinding(deps)?.run?.({} as never)).toBe(false);
 	});
 });
