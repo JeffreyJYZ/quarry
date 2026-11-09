@@ -1,4 +1,5 @@
 import type { EditorSearch } from "@/ui/editor/useEditorSearch";
+import "./searchBar.css";
 
 /** The in-file find and replace bar, floated over the surface. */
 export default function SearchBar({ search }: { search: EditorSearch }) {
@@ -35,7 +36,7 @@ export default function SearchBar({ search }: { search: EditorSearch }) {
 			</button>
 			<button
 				type="button"
-				className={search.caseSensitive ? "active" : ""}
+				className={search.caseSensitive ? "search-bar-toggle active" : "search-bar-toggle"}
 				onClick={search.toggleCase}
 				aria-label="case sensitive"
 			>
@@ -43,7 +44,7 @@ export default function SearchBar({ search }: { search: EditorSearch }) {
 			</button>
 			<button
 				type="button"
-				className={search.useRegex ? "active" : ""}
+				className={search.useRegex ? "search-bar-toggle active" : "search-bar-toggle"}
 				onClick={search.toggleRegex}
 				aria-label="regex"
 			>

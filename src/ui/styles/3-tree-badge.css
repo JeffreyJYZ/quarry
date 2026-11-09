@@ -64,8 +64,12 @@ button.tree-note {
 	display: flex;
 	flex-direction: column;
 	/* The shell body is a flex row now, so the canvas has to claim the leftover width itself. */
-	flex: 1 1 auto;
-	min-width: 0;
+	/*
+	 * Its basis is its own floor, so the row sees the editor's real demand: the side panels take
+	 * the shrink (the terminal first, then the rail) and the canvas only grows past the basis.
+	 */
+	flex: 1 1 var(--editor-min-width, 360px);
+	min-width: var(--editor-min-width, 360px);
 	min-height: 0;
 	overflow: hidden;
 	background: var(--bg);

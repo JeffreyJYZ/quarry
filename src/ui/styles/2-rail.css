@@ -1,9 +1,10 @@
 .rail {
-	flex: 0 0 var(--rail-width, 240px);
+	/* Shrinks after the terminal does; the floor is the same minimum the splitter enforces. */
+	flex: 0 1 var(--rail-width, 240px);
 	width: var(--rail-width, 240px);
 	display: flex;
 	flex-direction: column;
-	min-width: 0;
+	min-width: var(--rail-min-width, 160px);
 	min-height: 0;
 	/* The panel never paints outside its own column: the outline under the tree is sized in pixels,
 	   and on a short window that height plus the header is more than the column can hold. */
@@ -15,6 +16,8 @@
 .body.rail-collapsed .rail {
 	flex-basis: 0;
 	width: 0;
+	/* The collapsing column drops the floor too, or the rail would stay wide. */
+	min-width: 0;
 	border-right: 0;
 	overflow: hidden;
 }
