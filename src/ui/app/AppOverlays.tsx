@@ -2,16 +2,9 @@ import type { GenerateItem } from "@/lib/generate/model";
 import type { GitStatus, Location, ProjectInfo } from "@/lib/project/api";
 import type { Preferences, ProjectSettings } from "@/lib/settings/model";
 import type { GotoMode } from "@/ui/goto/gotoModel";
-import { Suspense, lazy } from "react";
+import { Suspense } from "react";
 import StatusBar from "@/ui/components/StatusBar";
-
-const DiffView = lazy(() => import("@/ui/git/DiffView"));
-const Goto = lazy(() => import("@/ui/goto/Goto"));
-const LinePrompt = lazy(() => import("@/ui/goto/LinePrompt"));
-const Generate = lazy(() => import("@/ui/generate/Generate"));
-const NewProject = lazy(() => import("@/ui/projects/NewProject"));
-const RefsPanel = lazy(() => import("@/ui/components/RefsPanel"));
-const SettingsPage = lazy(() => import("@/ui/settings/SettingsPage"));
+import * as Lazy from "@/ui/app/lazyOverlays";
 
 export type OverlaysProps = {
 	root: string | null;
@@ -92,7 +85,7 @@ export default function AppOverlays(props: OverlaysProps) {
 		<>
 			{props.refsOpen ? (
 				<Suspense fallback={null}>
-					<RefsPanel
+					<Lazy.RefsPanel
 						locations={props.references}
 						onNavigate={props.onNavigate}
 						onClose={props.onCloseRefs}
@@ -101,7 +94,7 @@ export default function AppOverlays(props: OverlaysProps) {
 			) : null}
 			{props.gitDiffPath !== null && props.root !== null ? (
 				<Suspense fallback={null}>
-					<DiffView
+					<Lazy.DiffView
 						root={props.root}
 						path={props.gitDiffPath}
 						onClose={props.onCloseGitDiff}
@@ -109,7 +102,7 @@ export default function AppOverlays(props: OverlaysProps) {
 				</Suspense>
 			) : props.gitCommitDiffHash !== null && props.root !== null ? (
 				<Suspense fallback={null}>
-					<DiffView
+					<Lazy.DiffView
 						root={props.root}
 						commit={props.gitCommitDiffHash}
 						onClose={props.onCloseCommitDiff}
@@ -146,7 +139,7 @@ export default function AppOverlays(props: OverlaysProps) {
 			/>
 			{props.settingsOpen ? (
 				<Suspense fallback={null}>
-					<SettingsPage
+					<Lazy.SettingsPage
 						open
 						user={props.preferences}
 						project={props.projectSettings}
@@ -161,7 +154,7 @@ export default function AppOverlays(props: OverlaysProps) {
 			) : null}
 			{props.gotoMode !== null && props.root !== null ? (
 				<Suspense fallback={null}>
-					<Goto
+					<Lazy.Goto
 						mode={props.gotoMode}
 						root={props.root}
 						path={props.activePath}
@@ -173,7 +166,7 @@ export default function AppOverlays(props: OverlaysProps) {
 			) : null}
 			{props.lineOpen ? (
 				<Suspense fallback={null}>
-					<LinePrompt
+					<Lazy.LinePrompt
 						total={props.lineTotal}
 						onGo={props.onGoLine}
 						onClose={props.onCloseLine}
@@ -182,7 +175,7 @@ export default function AppOverlays(props: OverlaysProps) {
 			) : null}
 			{props.generateOpen ? (
 				<Suspense fallback={null}>
-					<Generate
+					<Lazy.Generate
 						items={props.generateItems}
 						onPick={props.onPickGenerate}
 						onClose={props.onCloseGenerate}
@@ -190,7 +183,7 @@ export default function AppOverlays(props: OverlaysProps) {
 				</Suspense>
 			) : null}
 			<Suspense fallback={null}>
-				<NewProject
+				<Lazy.NewProject
 					open={props.newProjectOpen}
 					initialParent={props.newProjectParent}
 					onParentChange={props.onNewProjectParentChange}

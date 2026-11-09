@@ -26,10 +26,7 @@ export function revealTarget(line: number, column: number): { line: number; char
 	return { line: line - 1, character: column - 1 };
 }
 
-/** A run whose ticket no longer matches the current sequence was superseded/cancelled: it must not overwrite a newer result. */
-export function isStaleSearch(ticket: number, current: number): boolean {
-	return ticket !== current;
-}
+export { isStaleSearch } from "@/lib/search/stale";
 
 export type SearchRow = {
 	match: SearchMatch;
