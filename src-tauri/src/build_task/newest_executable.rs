@@ -29,7 +29,9 @@ pub const SKIPPED: [&str; 10] = [
 ];
 
 /// Suffixes that are never the program a user runs.
-pub const NOT_PROGRAMS: [&str; 5] = [".dylib", ".so", ".a", ".o", ".d"];
+pub const NOT_PROGRAMS: [&str; 11] = [
+    ".dylib", ".so", ".a", ".o", ".d", ".pdb", ".dll", ".lib", ".exp", ".ilk", ".obj",
+];
 
 /// Every file under `root` that could be the program, with the time the build wrote it.
 ///
@@ -97,7 +99,16 @@ pub fn is_executable(path: &Path) -> bool {
 
 #[cfg(not(unix))]
 pub fn is_executable(path: &Path) -> bool {
+    /// The suffixes Windows launches itself.
+    const LAUNCHABLE: [&str; 4] = [".exe", ".com", ".bat", ".cmd"];
+
+    // Windows has no mode bits, so the name is the only signal: a `.pdb`, an extensionless cargo
+    // test binary or a shared library is a regular file too, and `is_file` alone let Run start one.
+    let Some(extension) = path.extension().and_then(|value| value.to_str()) else {
+        return false;
+    };
+    let extension = format!(".{}", extension.to_ascii_lowercase());
     fs::metadata(path)
-        .map(|meta| meta.is_file())
+        .map(|meta| meta.is_file() && LAUNCHABLE.contains(&extension.as_str()))
         .unwrap_or(false)
 }

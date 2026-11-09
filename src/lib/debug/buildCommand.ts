@@ -6,6 +6,7 @@ import {
 	runProgram,
 } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
+import { buildShell, buildShellArgs, shellPlatform } from "@/lib/debug/buildShell";
 import { CARGO_DEFAULT } from "@/lib/debug/sessionTypes";
 
 /** Output arrives before the run id is known, so it waits here until it is. */
@@ -22,12 +23,12 @@ export type BuildOutcome = { ok: boolean; code: number | null; lines: string[] }
  * A preset's `build` field is a shell line — `cargo build`, `cmake --build build`, `make -j8 && cp …` —
  * and isn't a program plus arguments. It goes through the user's login shell so their PATH is the one
  * a terminal has: a Dock-launched app otherwise sees `/usr/bin:/bin:/usr/sbin:/sbin` and reports
- * `cargo: not found`.
+ * `cargo: not found`. It is per platform, because `/bin/zsh` is not on every Linux install.
  */
 export async function runBuildCommand(root: string, command: string): Promise<BuildOutcome> {
-	const windows = navigator.userAgent.includes("Windows");
-	const shell = windows ? "C:\\Windows\\System32\\cmd.exe" : "/bin/zsh";
-	const args = windows ? ["/C", command] : ["-lc", command];
+	const platform = shellPlatform(navigator.userAgent);
+	const shell = buildShell(platform);
+	const args = buildShellArgs(platform, command);
 
 	const lines: string[] = [];
 	const pending = new Map<string, string[]>();
