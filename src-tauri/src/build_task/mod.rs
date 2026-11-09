@@ -53,3 +53,6 @@ pub use tests_4::*;
 
 mod tests_5;
 pub use tests_5::*;
+
+mod tests_plain_clang_sources;
+pub use tests_plain_clang_sources::*;

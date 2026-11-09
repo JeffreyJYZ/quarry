@@ -64,35 +64,7 @@ pub fn run_plain_clang_build(root: &str, name: &str) -> Result<BuildReport, Stri
 }
 pub fn collect_plain_clang_sources(root: &Path) -> Result<Vec<std::path::PathBuf>, String> {
     let mut sources: Vec<std::path::PathBuf> = Vec::new();
-    let entries = std::fs::read_dir(root)
-        .map_err(|error| format!("cannot read {}: {error}", root.display()))?;
-
-    for entry in entries {
-        let entry = entry.map_err(|error| format!("cannot read entry: {error}"))?;
-        let path = entry.path();
-        let name = entry.file_name();
-        let name_str = name.to_string_lossy();
-
-        if path.is_dir() {
-            if PLAIN_CLANG_IGNORED_DIRS.contains(&name_str.as_ref()) {
-                continue;
-            }
-            if let Ok(child_entries) = std::fs::read_dir(&path) {
-                for child in child_entries {
-                    let child = child.map_err(|error| format!("cannot read entry: {error}"))?;
-                    let child_path = child.path();
-                    if child_path.is_file() && is_plain_clang_source(&child_path) {
-                        sources.push(
-                            std::path::PathBuf::from(name_str.as_ref()).join(child.file_name()),
-                        );
-                    }
-                }
-            }
-        } else if path.is_file() && is_plain_clang_source(&path) {
-            sources.push(std::path::PathBuf::from(name_str.as_ref()));
-        }
-    }
-
+    collect_into(root, Path::new(""), 0, &mut sources)?;
     sources.sort();
     if sources.len() > PLAIN_CLANG_SOURCE_CAP {
         return Err(format!(
@@ -102,6 +74,42 @@ pub fn collect_plain_clang_sources(root: &Path) -> Result<Vec<std::path::PathBuf
         ));
     }
     Ok(sources)
+}
+
+/// Walks `dir` to a bounded depth, collecting sources as paths relative to the project root.
+///
+/// One level was not enough: a project that keeps its code in `src/impl/` or `sources/app/` collected
+/// nothing and was told "no build system", with the files sitting right there. The depth limit and the
+/// ignored directory list keep a deep tree from turning into an accidental whole-disk build.
+fn collect_into(
+    dir: &Path,
+    relative: &Path,
+    depth: usize,
+    sources: &mut Vec<std::path::PathBuf>,
+) -> Result<(), String> {
+    let entries = std::fs::read_dir(dir)
+        .map_err(|error| format!("cannot read {}: {error}", dir.display()))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|error| format!("cannot read entry: {error}"))?;
+        let name = entry.file_name();
+        let path = entry.path();
+        let child = relative.join(&name);
+
+        if path.is_dir() {
+            if depth >= PLAIN_CLANG_MAX_DEPTH {
+                continue;
+            }
+            let name_str = name.to_string_lossy();
+            if PLAIN_CLANG_IGNORED_DIRS.contains(&name_str.as_ref()) {
+                continue;
+            }
+            collect_into(&path, &child, depth + 1, sources)?;
+        } else if path.is_file() && is_plain_clang_source(&path) {
+            sources.push(child);
+        }
+    }
+    Ok(())
 }
 
 pub fn is_plain_clang_source(path: &Path) -> bool {
