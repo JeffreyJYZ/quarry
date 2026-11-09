@@ -14,7 +14,17 @@ import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { ciVerdict } from "./ci-status";
-import { isStableTag, manifestPlatforms, selectDmg, versionDrift } from "./release-manifest";
+import {
+	isStableTag,
+	lockVersion,
+	manifestPlatforms,
+	manifestProblem,
+	manifestUrl,
+	type PublishedManifest,
+	selectDmg,
+	versionDrift,
+} from "./release-manifest";
+import { uploadAssets } from "./release-publish";
 
 const ROOT = join(import.meta.dir, "..");
 const REPO = "JeffreyJYZ/quarry";
@@ -27,15 +37,19 @@ const DMG_DIR = join(ROOT, "src-tauri", "target", BUILD_TARGET, "release", "bund
 const RELEASE_DIR = join(ROOT, "dist-release");
 const LATEST = join(RELEASE_DIR, "latest.json");
 
-function readVersions(): { package: string; tauri: string; cargo: string } {
+/** Every file `bump-version.ts` writes, so a half-bumped tree is refused before a build. */
+function readVersions() {
 	const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { version: string };
 	const tauri = JSON.parse(readFileSync(join(ROOT, "src-tauri", "tauri.conf.json"), "utf8")) as {
 		version: string;
 	};
+	const site = JSON.parse(readFileSync(join(ROOT, "website", "package.json"), "utf8")) as {
+		version: string;
+	};
 	const cargoRaw = readFileSync(join(ROOT, "src-tauri", "Cargo.toml"), "utf8");
-	const cargoMatch = /^version\s*=\s*"([^"]+)"/m.exec(cargoRaw);
-	const cargo = cargoMatch?.[1] ?? "";
-	return { package: pkg.version, tauri: tauri.version, cargo };
+	const cargo = /^version\s*=\s*"([^"]+)"/m.exec(cargoRaw)?.[1] ?? "";
+	const lock = lockVersion(readFileSync(join(ROOT, "src-tauri", "Cargo.lock"), "utf8"));
+	return { package: pkg.version, tauri: tauri.version, cargo, site: site.version, lock };
 }
 
 function readVersion(): string {
@@ -323,11 +337,11 @@ async function main(): Promise<number> {
 
 	const dmgPathValue = dmg as string;
 	const assets = [
-		[archive, "quarry.app.tar.gz"],
-		[signatureFile, "quarry.app.tar.gz.sig"],
-		[dmgPathValue, dmgPathValue.slice(dmgPathValue.lastIndexOf("/") + 1)],
-		[LATEST, "latest.json"],
-	] as const;
+		{ path: archive, name: "quarry.app.tar.gz" },
+		{ path: signatureFile, name: "quarry.app.tar.gz.sig" },
+		{ path: dmgPathValue, name: dmgPathValue.slice(dmgPathValue.lastIndexOf("/") + 1) },
+		{ path: LATEST, name: "latest.json" },
+	];
 
 	const exists = (() => {
 		try {
@@ -340,19 +354,15 @@ async function main(): Promise<number> {
 
 	if (exists) {
 		log(`release ${tag} exists, replacing assets`);
-		const upload = assets.flatMap(([path, name]) => [`${path}#${name}`]);
-		run("gh", ["release", "upload", tag, ...upload, "--clobber"]);
 		run("gh", ["release", "edit", tag, "--notes", latest.notes]);
 	} else {
 		log(`creating release ${tag}`);
 		const notesFile = join(latestDir, "notes.md");
 		writeFileSync(notesFile, latest.notes);
-		const upload = assets.flatMap(([path, name]) => [`${path}#${name}`]);
 		const createArgs = [
 			"release",
 			"create",
 			tag,
-			...upload,
 			"--title",
 			`quarry ${version}`,
 			"--notes-file",
@@ -362,20 +372,19 @@ async function main(): Promise<number> {
 		run("gh", createArgs);
 	}
 
-	log("verifying the published manifest");
-	let published: {
-		version?: string;
-		platforms?: Record<string, { signature?: string; url?: string }>;
-	} = {};
+	// One asset per call, retried, so a failure names the tag and the file instead of leaving a
+	// release whose assets are only partly there.
+	uploadAssets(run, tag, assets);
+
+	const url = manifestUrl(REPO, tag);
+	log(`verifying the published manifest at ${url}`);
+	let published: PublishedManifest = {};
 	let lastError = "";
 	for (let attempt = 0; attempt < 10; attempt += 1) {
 		try {
-			const response = await fetch(
-				`https://github.com/${REPO}/releases/latest/download/latest.json`,
-				{ redirect: "follow" },
-			);
+			const response = await fetch(url, { redirect: "follow" });
 			if (response.ok) {
-				published = (await response.json()) as typeof published;
+				published = (await response.json()) as PublishedManifest;
 				break;
 			}
 			lastError = `HTTP ${response.status}`;
@@ -385,16 +394,9 @@ async function main(): Promise<number> {
 		await new Promise((resolve) => setTimeout(resolve, 5000));
 	}
 
-	if (published.version !== version) {
-		fail(
-			`latest.json reports ${published.version ?? "nothing"} (${lastError}), expected ${version}`,
-		);
-	}
-	for (const platform of manifestPlatforms().filter((key) => !key.endsWith("-app"))) {
-		const row = published.platforms?.[platform];
-		if (row === undefined || row.signature === undefined || row.url === undefined) {
-			fail(`latest.json has no usable ${platform} entry`);
-		}
+	const problem = manifestProblem(published, version, manifestPlatforms());
+	if (problem !== null) {
+		fail(`${problem} at ${url}${lastError === "" ? "" : ` (${lastError})`}`);
 	}
 
 	detachVolumes();
@@ -402,7 +404,7 @@ async function main(): Promise<number> {
 	log(`  version    ${version}`);
 	log(`  update     ${assetUrl(tag, "quarry.app.tar.gz")}`);
 	log(`  dmg        ${assetUrl(tag, dmgPathValue.slice(dmgPathValue.lastIndexOf("/") + 1))}`);
-	log(`  manifest   https://github.com/${REPO}/releases/latest/download/latest.json`);
+	log(`  manifest   ${url}`);
 	return 0;
 }
 

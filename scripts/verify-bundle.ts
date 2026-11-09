@@ -2,23 +2,38 @@
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { bundleDir, DEFAULT_TARGET, lipoProblem, releaseDir } from "./bundle-info";
 
 const ROOT = join(import.meta.dir, "..");
-const APP_PATH = join(ROOT, "src-tauri", "target", "release", "bundle", "macos", "quarry.app");
+
+function arg(name: string): string | null {
+	const index = process.argv.indexOf(name);
+	return index === -1 ? null : (process.argv[index + 1] ?? null);
+}
+
+if (process.argv.includes("--help") || process.argv.includes("-h")) {
+	console.log(
+		[
+			"verify-bundle [--target <triple>]",
+			"",
+			"Checks the built .app, its universal architectures, signature, launch, freshness and",
+			"updater artefacts. A release is universal, so that is the default target.",
+			"",
+			`  --target   bundle target directory (default: ${DEFAULT_TARGET})`,
+		].join("\n"),
+	);
+	process.exit(0);
+}
+
+const TARGET = arg("--target") ?? DEFAULT_TARGET;
+const BUNDLE_DIR = bundleDir(ROOT, TARGET);
+const APP_PATH = join(BUNDLE_DIR, "quarry.app");
 const APP_BINARY = join(APP_PATH, "Contents", "MacOS", "quarry");
-const PLAIN_BINARY = join(ROOT, "src-tauri", "target", "release", "quarry");
-const UPDATER_TAR = join(
-	ROOT,
-	"src-tauri",
-	"target",
-	"release",
-	"bundle",
-	"macos",
-	"quarry.app.tar.gz",
-);
+const PLAIN_BINARY = join(releaseDir(ROOT, TARGET), "quarry");
+const UPDATER_TAR = join(BUNDLE_DIR, "quarry.app.tar.gz");
 const UPDATER_SIG = `${UPDATER_TAR}.sig`;
 const DIST_DIR = join(ROOT, "dist");
-const REBUILD_HINT = "run: bun run tauri build --bundles app";
+const REBUILD_HINT = `run: bun run tauri build --bundles app --target ${TARGET}`;
 
 function readPackageVersion(): string {
 	const raw = readFileSync(join(ROOT, "package.json"), "utf8");
@@ -103,6 +118,21 @@ async function main(): Promise<number> {
 	if (existsSync(APP_PATH)) {
 		artefactOk = true;
 		sizeMiB = dirSizeMiB(APP_PATH);
+	}
+
+	// A release is universal: a thin arch-only bundle would install on one half of the Macs and
+	// would also mean this check is reading a leftover build rather than the one being shipped.
+	let universal = "not checked";
+	let universalOk = false;
+	if (artefactOk) {
+		try {
+			const info = execFileSync("lipo", ["-info", APP_BINARY], { encoding: "utf8" });
+			const problem = lipoProblem(info);
+			universal = problem ?? "arm64 + x86_64";
+			universalOk = problem === null;
+		} catch {
+			universal = lipoProblem(null) ?? "lipo failed";
+		}
 	}
 
 	let binaryExec = false;
@@ -261,6 +291,7 @@ async function main(): Promise<number> {
 	);
 	if (artefactOk) lines.push(`  artefact  ${APP_PATH} (${sizeMiB.toFixed(2)} MiB)`);
 	else lines.push(`  artefact  MISSING: ${APP_PATH} — build with: bun run tauri build`);
+	if (artefactOk) lines.push(`  universal ${universal}`);
 	lines.push(
 		`  freshness dist=${iso(distMtime)} bundle=${iso(appBinaryMtime)} binary=${iso(plainBinaryMtime)}`,
 	);
@@ -272,6 +303,7 @@ async function main(): Promise<number> {
 	const failed =
 		!versionMatch ||
 		!artefactOk ||
+		!universalOk ||
 		!binaryExec ||
 		sigStatus.startsWith("FAILED") ||
 		!launchOk ||
