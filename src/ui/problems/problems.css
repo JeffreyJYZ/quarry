@@ -52,3 +52,45 @@
 .problems-list-root {
 	outline: none;
 }
+
+.problem-fix {
+	padding: 2px 6px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: transparent;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10px;
+	cursor: pointer;
+}
+
+.problem-menu {
+	position: absolute;
+	z-index: 50;
+	min-width: 160px;
+	border: 1px solid var(--line);
+	background: var(--panel);
+	padding: 4px 0;
+}
+
+.problem-menu-item {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 8px;
+	font-family: var(--mono);
+	font-size: 11px;
+	color: var(--text);
+	cursor: pointer;
+}
+
+.problem-menu-item:hover {
+	background: var(--hover);
+}
+
+.problem-menu-loading {
+	padding: 4px 8px;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 11px;
+}

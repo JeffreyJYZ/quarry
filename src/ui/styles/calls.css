@@ -1,0 +1,97 @@
+.calls-panel {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.calls-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--line);
+}
+
+.calls-title {
+	font-family: var(--mono);
+	font-size: 11px;
+	color: var(--text);
+}
+
+.calls-tabs {
+	display: inline-flex;
+	gap: 2px;
+}
+
+.calls-tab {
+	padding: 3px 6px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: transparent;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10px;
+	cursor: pointer;
+}
+
+.calls-tab.active {
+	color: var(--text);
+	background: var(--hover);
+}
+
+.calls-close {
+	padding: 2px 6px;
+	border: 0;
+	background: none;
+	color: var(--muted);
+	cursor: pointer;
+}
+
+.calls-body {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: auto;
+	padding: 6px 8px;
+	font-family: var(--mono);
+	font-size: 11px;
+}
+
+.calls-loading,
+.calls-empty,
+.calls-error {
+	padding: 8px;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 11px;
+}
+
+.calls-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 0;
+}
+
+.calls-expand {
+	width: 12px;
+	color: var(--muted);
+	cursor: pointer;
+}
+
+.calls-file {
+	color: var(--text);
+}
+
+.calls-node {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.calls-children {
+	padding-left: 14px;
+}
+
+.calls-name {
+	color: var(--text);
+}

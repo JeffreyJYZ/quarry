@@ -114,3 +114,8 @@
 	font-size: 12px;
 	color: var(--muted);
 }
+
+.goto {
+	display: flex;
+	flex-direction: column;
+}

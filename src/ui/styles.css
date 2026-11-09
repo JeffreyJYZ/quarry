@@ -49,3 +49,6 @@
 @import "./styles/editor-split.css";
 
 @import "./styles/welcome.css";
+
+@import "./styles/breadcrumb.css";
+@import "./styles/calls.css";
