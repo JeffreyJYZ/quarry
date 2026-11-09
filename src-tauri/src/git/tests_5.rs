@@ -129,6 +129,8 @@ pub mod tests_group_5 {
     }
 }
 
+#[cfg(test)]
+#[allow(dead_code)]
 pub mod tests_hunk_patch {
     use super::*;
 
@@ -153,7 +155,10 @@ pub mod tests_hunk_patch {
 
         let written = write_hunk_patch(PATCH).expect("write patch");
 
-        assert_eq!(fs::read_to_string(written.path()).expect("read patch"), PATCH);
+        assert_eq!(
+            fs::read_to_string(written.path()).expect("read patch"),
+            PATCH
+        );
         assert_eq!(
             fs::read_to_string(&victim).expect("read victim"),
             "victim bytes",
