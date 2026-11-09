@@ -94,6 +94,11 @@ export function stopProgram(runId: string): Promise<StopReport> {
 	return invoke<StopReport>("stop_program", { runId });
 }
 
+/** One line into a run's stdin; the backend refuses it once the program is gone. */
+export function sendRunStdin(runId: string, text: string): Promise<void> {
+	return invoke<void>("run_stdin", { runId, text });
+}
+
 export function onRunOutput(handler: (event: RunOutputEvent) => void): Promise<() => void> {
 	return listen<RunOutputEvent>("run://output", (event) => handler(event.payload));
 }

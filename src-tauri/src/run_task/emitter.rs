@@ -94,6 +94,7 @@ pub fn spawn_waiter(
     run_id: &str,
     entry: Arc<Mutex<Option<Child>>>,
     runs: Arc<Mutex<Runs>>,
+    stdin: Arc<Mutex<StdinHandles>>,
     events: Sender<RunEvent>,
 ) -> io::Result<()> {
     let id = run_id.to_string();
@@ -102,6 +103,7 @@ pub fn spawn_waiter(
         .spawn(move || {
             let status = wait_for_exit(&entry);
             let _ = events.send(RunEvent::Exit(status));
+            lock(&stdin).remove(&id);
             lock(&runs).remove(&id);
         })
         .map(drop)

@@ -117,6 +117,7 @@ pub fn run() {
             run_config::write_launch_config,
             run_config::resolve_launch_config,
             run_task::run_program,
+            run_task::run_stdin,
             run_task::stop_program,
             launch::default_launch_config,
             launch::list_run_targets,

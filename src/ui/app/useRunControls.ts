@@ -140,6 +140,7 @@ export function useRunControls(options: {
 		runConfig,
 		stop: proc.stop,
 		clearLog: proc.clear,
+		sendStdin: proc.sendStdin,
 		/** Write into the console and bring it up: a failed build never started a process. */
 		appendLog: (lines: string[]) => {
 			setConsoleOpen(true);

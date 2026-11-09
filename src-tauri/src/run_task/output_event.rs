@@ -3,9 +3,9 @@
 pub use serde::{Deserialize, Serialize};
 pub use serde_json::{Value, json};
 pub use std::collections::HashMap;
-pub use std::io::{self, BufRead, BufReader, ErrorKind, Read};
+pub use std::io::{self, BufRead, BufReader, ErrorKind, Read, Write};
 pub use std::path::{Path, PathBuf};
-pub use std::process::{Child, Command, ExitStatus, Stdio};
+pub use std::process::{Child, ChildStdin, Command, ExitStatus, Stdio};
 pub use std::sync::atomic::{AtomicU64, Ordering};
 pub use std::sync::mpsc::{self, Receiver, Sender};
 pub use std::sync::{Arc, Mutex, MutexGuard};
@@ -34,10 +34,15 @@ pub const WAIT_INTERVAL: Duration = Duration::from_millis(20);
 /// Live children by run id. The map is shared with the waiter threads, which drop their own entry.
 pub type Runs = HashMap<String, Arc<Mutex<Option<Child>>>>;
 
+/// Live stdin pipes by run id; a run's handle is gone once its waiter reports the exit.
+pub type StdinHandles = HashMap<String, ChildStdin>;
+
 /// Managed state: one live child per run id, and the counter that names the next run.
 #[derive(Default)]
 pub struct RunState {
     pub(crate) runs: Arc<Mutex<Runs>>,
+    /// Kept apart from the child so a blocked write never holds the lock a stop needs.
+    pub(crate) stdin: Arc<Mutex<StdinHandles>>,
     /// Only ever incremented, so an id is never reused while a stale thread is still draining.
     pub(crate) counter: AtomicU64,
 }
@@ -70,7 +75,7 @@ pub async fn run_program(
     command
         .args(&args)
         .current_dir(&cwd)
-        .stdin(Stdio::null())
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     for var in &env_vars {
@@ -88,16 +93,19 @@ pub async fn run_program(
         .spawn()
         .map_err(|error| format!("cannot run {program_text} in {cwd_text}: {error}"))?;
 
-    let (Some(stdout), Some(stderr)) = (child.stdout.take(), child.stderr.take()) else {
+    let (Some(stdin), Some(stdout), Some(stderr)) =
+        (child.stdin.take(), child.stdout.take(), child.stderr.take())
+    else {
         let _ = stop_tree(child);
         return Err(format!(
-            "cannot capture the output of {program_text}: its pipes were not created"
+            "cannot capture the input and output of {program_text}: its pipes were not created"
         ));
     };
 
     let run_id = next_id(&state.counter);
     let entry: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(Some(child)));
     lock(&state.runs).insert(run_id.clone(), Arc::clone(&entry));
+    lock(&state.stdin).insert(run_id.clone(), stdin);
 
     // One channel per run: both readers write into it, the emitter drains it in order.
     let (events, receiver) = mpsc::channel::<RunEvent>();
@@ -107,12 +115,21 @@ pub async fn run_program(
     ]
     .into_iter()
     .find_map(Result::err)
-    .or_else(|| spawn_waiter(&run_id, entry, Arc::clone(&state.runs), events.clone()).err())
+    .or_else(|| {
+        spawn_waiter(
+            &run_id,
+            entry,
+            Arc::clone(&state.runs),
+            Arc::clone(&state.stdin),
+            events.clone(),
+        )
+        .err()
+    })
     .or_else(|| spawn_emitter(&app, &run_id, receiver).err());
     drop(events);
 
     if let Some(error) = failure {
-        discard(&state.runs, &run_id);
+        discard(&state.runs, &state.stdin, &run_id);
         return Err(format!(
             "cannot stream the output of {program_text}: {error}"
         ));
@@ -125,6 +142,7 @@ pub async fn run_program(
 impl RunState {
     pub fn shutdown_all(&self) {
         let runs: Vec<_> = lock(&self.runs).drain().map(|(_, entry)| entry).collect();
+        lock(&self.stdin).clear();
         for entry in runs {
             if let Some(child) = lock(&entry).take() {
                 let _ = stop_tree(child);
