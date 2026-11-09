@@ -92,6 +92,32 @@ pub fn read_settings(app: AppHandle) -> Settings {
         .unwrap_or_default()
 }
 
+/// Write through a sibling temp file and rename it into place.
+///
+/// `fs::write` truncates first, so a crash, a full disk or a killed process between the truncate and
+/// the last byte leaves an empty or half-written file — and the next launch reads defaults, silently.
+/// A rename is atomic inside one directory, so the file is either the previous one or the new one.
+pub(crate) fn write_atomic(path: &std::path::Path, text: &str) -> Result<(), String> {
+    let temp = path.with_file_name(format!(
+        "{}.tmp",
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("settings.json")
+    ));
+    {
+        let mut file = fs::File::create(&temp)
+            .map_err(|error| format!("cannot create {}: {error}", temp.display()))?;
+        std::io::Write::write_all(&mut file, text.as_bytes())
+            .map_err(|error| format!("cannot write {}: {error}", temp.display()))?;
+        file.sync_all()
+            .map_err(|error| format!("cannot flush {}: {error}", temp.display()))?;
+    }
+    fs::rename(&temp, path).map_err(|error| {
+        let _ = fs::remove_file(&temp);
+        format!("cannot replace {}: {error}", path.display())
+    })
+}
+
 #[tauri::command]
 pub fn write_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
     let path = settings_path(&app)?;
@@ -101,8 +127,7 @@ pub fn write_settings(app: AppHandle, settings: Settings) -> Result<(), String> 
     }
     let text = serde_json::to_string_pretty(&settings)
         .map_err(|error| format!("cannot serialize settings: {error}"))?;
-    fs::write(&path, format!("{text}\n"))
-        .map_err(|error| format!("cannot write {}: {error}", path.display()))
+    write_atomic(&path, &format!("{text}\n"))
 }
 
 #[tauri::command]
@@ -137,6 +162,5 @@ pub fn write_project_settings(root: String, settings: ProjectSettings) -> Result
     let file = dir.join("settings.json");
     let text = serde_json::to_string_pretty(&settings)
         .map_err(|error| format!("cannot serialize project settings: {error}"))?;
-    fs::write(&file, format!("{text}\n"))
-        .map_err(|error| format!("cannot write {}: {error}", file.display()))
+    write_atomic(&file, &format!("{text}\n"))
 }
