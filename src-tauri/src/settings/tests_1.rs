@@ -43,6 +43,17 @@ pub mod tests_group_1 {
     }
 
     #[test]
+    pub fn every_dock_tab_the_ui_has_survives_a_read() {
+        // Mirrors DockTab in src/ui/tests/parts.ts: a tab missing from the Rust allowlist is reset to
+        // "problems" on every relaunch, so the user's dock forgets which panel they were using.
+        for tab in ["problems", "tests", "run", "debugger", "console", "memory"] {
+            let parsed: Settings =
+                serde_json::from_str(&format!(r#"{{"dockTab":"{tab}"}}"#)).expect("parses");
+            assert_eq!(parsed.dock_tab, tab, "{tab} was reset on read");
+        }
+    }
+
+    #[test]
     pub fn roundtrip_keeps_every_field() {
         let settings = Settings {
             last_root: Some("/tmp/project".to_string()),
