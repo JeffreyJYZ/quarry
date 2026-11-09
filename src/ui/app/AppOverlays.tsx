@@ -4,7 +4,7 @@ import type { Preferences, ProjectSettings } from "@/lib/settings/model";
 import type { StatusChip } from "@/lib/status/model";
 import type { GotoMode } from "@/ui/goto/gotoModel";
 import { Suspense } from "react";
-import StatusBar from "@/ui/components/StatusBar";
+import AppStatusBar from "@/ui/app/AppStatusBar";
 import * as Lazy from "@/ui/app/lazyOverlays";
 
 export type OverlaysProps = {
@@ -28,6 +28,8 @@ export type OverlaysProps = {
 	gitOpen: boolean;
 	debuggerActive: boolean;
 	building: boolean;
+	/** Stop was sent for the build in flight and the backend has not reported it finished yet. */
+	stopping: boolean;
 	running: boolean;
 	onToggleRail: () => void;
 	onToggleTerminal: () => void;
@@ -35,6 +37,7 @@ export type OverlaysProps = {
 	onToggleGit: () => void;
 	onShowDebugger: () => void;
 	onBuild: () => void;
+	onStopBuild: () => void;
 	onRun: () => void;
 	onStop: () => void;
 
@@ -111,34 +114,7 @@ export default function AppOverlays(props: OverlaysProps) {
 					/>
 				</Suspense>
 			) : null}
-			<StatusBar
-				project={props.project}
-				git={props.gitStatus}
-				missingTools={props.missingTools}
-				saveError={props.saveError}
-				caret={props.caret}
-				errors={props.counts.errors}
-				warnings={props.counts.warnings}
-				language={props.language}
-				tabSize={props.tabSize}
-				status={props.status}
-				onOpenSettings={props.onOpenSettings}
-				railCollapsed={props.railCollapsed}
-				terminalOpen={props.terminalOpen}
-				panelExpanded={props.panelExpanded}
-				gitOpen={props.gitOpen}
-				debuggerActive={props.debuggerActive}
-				building={props.building}
-				running={props.running}
-				onToggleRail={props.onToggleRail}
-				onToggleTerminal={props.onToggleTerminal}
-				onTogglePanel={props.onTogglePanel}
-				onToggleGit={props.onToggleGit}
-				onShowDebugger={props.onShowDebugger}
-				onBuild={props.onBuild}
-				onRun={props.onRun}
-				onStop={props.onStop}
-			/>
+			<AppStatusBar {...props} />
 			{props.settingsOpen ? (
 				<Suspense fallback={null}>
 					<Lazy.SettingsPage

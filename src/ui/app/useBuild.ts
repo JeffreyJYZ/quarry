@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Diagnostic } from "@/lib/project/api";
+import { stopBuild } from "@/lib/project/api";
 import { buildOnce } from "@/lib/project/buildOnce";
 import { describeError } from "@/lib/project/errors";
 
@@ -21,6 +22,8 @@ export function useBuild(options: {
 }) {
 	const { root, profile, onDiagnostics, onNotice } = options;
 	const [building, setBuilding] = useState(false);
+	/** Stop was sent and the backend has not reported the build finished yet. */
+	const [stopping, setStopping] = useState(false);
 	const [menuOpen, setMenuOpen] = useState(false);
 	const splitRef = useRef<HTMLDivElement | null>(null);
 	const chevronRef = useRef<HTMLButtonElement | null>(null);
@@ -34,6 +37,7 @@ export function useBuild(options: {
 		generation.current += 1;
 		buildingRef.current = false;
 		setBuilding(false);
+		setStopping(false);
 	}, [root]);
 
 	// The profile menu closes on a click outside it and on Escape, like the recents menu.
@@ -77,7 +81,25 @@ export function useBuild(options: {
 		}
 	}, [root, profile, onDiagnostics, onNotice]);
 
-	return { building, build, menuOpen, setMenuOpen, splitRef, chevronRef };
+	/**
+	 * Stop the build in flight.
+	 *
+	 * The backend signals the build's whole process group, so the compiler it started dies with it;
+	 * the build's own promise still resolves, and that is what clears `building`.
+	 */
+	const stop = useCallback(async () => {
+		if (!buildingRef.current) return;
+		setStopping(true);
+		try {
+			await stopBuild();
+		} catch (error) {
+			onNotice(`Stop failed: ${describeError(error)}`);
+		} finally {
+			setStopping(false);
+		}
+	}, [onNotice]);
+
+	return { building, stopping, build, stop, menuOpen, setMenuOpen, splitRef, chevronRef };
 }
 
 export type BuildModel = ReturnType<typeof useBuild>;

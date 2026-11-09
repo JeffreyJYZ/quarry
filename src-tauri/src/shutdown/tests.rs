@@ -13,6 +13,7 @@ struct States {
     pty: PtyState,
     run: RunState,
     watch: WatchState,
+    build: BuildState,
 }
 
 impl States {
@@ -23,6 +24,7 @@ impl States {
             pty: &self.pty,
             run: &self.run,
             watch: &self.watch,
+            build: &self.build,
         }
     }
 }

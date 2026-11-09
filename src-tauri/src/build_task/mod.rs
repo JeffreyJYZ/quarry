@@ -18,6 +18,12 @@ pub use std::path::Path;
 pub use std::process::Command;
 pub use std::time::Instant;
 
+mod build_state;
+pub use build_state::*;
+
+mod run_child;
+pub use run_child::*;
+
 mod default_cargo;
 pub use default_cargo::*;
 
@@ -32,6 +38,9 @@ pub use cmakeoutcome::*;
 
 mod collect_plain_clang_sources;
 pub use collect_plain_clang_sources::*;
+
+mod run_plain_clang;
+pub use run_plain_clang::*;
 
 mod split_severity;
 pub use split_severity::*;
@@ -71,3 +80,6 @@ pub use tests_plain_clang_sources::*;
 
 mod tests_cmake_artifact;
 pub use tests_cmake_artifact::*;
+
+mod tests_build;
+pub use tests_build::*;

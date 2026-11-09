@@ -51,6 +51,7 @@ pub fn run() {
         .manage(lsp::LspState::default())
         .manage(dap::DapState::default())
         .manage(run_task::RunState::default())
+        .manage(build_task::BuildState::default())
         .manage(pty::PtyState::default())
         .manage(watch::WatchState::default())
         .invoke_handler(tauri::generate_handler![
@@ -88,6 +89,7 @@ pub fn run() {
             lsp::lsp_prepare_type_hierarchy,
             lsp::lsp_type_hierarchy,
             build_task::build_project,
+            build_task::stop_build,
             format::format_document,
             format::formatter_for,
             search::search_project,
