@@ -102,7 +102,8 @@ pub fn replace(
                     continue;
                 }
                 let new_text = re.replace_all(&text, replacement).to_string();
-                match fs::write(&path, &new_text) {
+                // A sibling temp and a rename keep the source file whole when a write fails.
+                match crate::atomic_write::replace(&path, new_text.as_bytes()) {
                     Ok(()) => {
                         files_changed += 1;
                         replacements += count;

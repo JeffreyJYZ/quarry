@@ -44,6 +44,9 @@ pub use tests_3::*;
 mod tests_4;
 pub use tests_4::*;
 
+mod tests_5;
+pub use tests_5::*;
+
 mod git_stage;
 pub use git_stage::*;
 

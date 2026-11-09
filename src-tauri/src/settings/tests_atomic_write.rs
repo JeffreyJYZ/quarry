@@ -30,6 +30,16 @@ mod tests_write_atomic {
         dir
     }
 
+    /// Every `.tmp` sibling a write may have created, whatever unique suffix it carries.
+    fn temporary_files(dir: &std::path::Path) -> Vec<String> {
+        fs::read_dir(dir)
+            .expect("list")
+            .filter_map(|entry| entry.ok())
+            .map(|entry| entry.file_name().to_string_lossy().to_string())
+            .filter(|name| name.ends_with(".tmp"))
+            .collect()
+    }
+
     #[test]
     fn a_written_file_reads_back_byte_for_byte() {
         let dir = fixture("roundtrip");
@@ -67,7 +77,30 @@ mod tests_write_atomic {
             error.contains("cannot replace"),
             "unexpected error: {error}"
         );
-        assert!(!dir.join("settings.json.tmp").exists());
+        let left = temporary_files(&dir);
+        assert!(
+            left.is_empty(),
+            "a temp file survived the failure: {left:?}"
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// The guard owns every failure branch: a create, write or flush that fails drops it without a
+    /// rename, and the drop removes the temp file.
+    #[test]
+    fn an_abandoned_temporary_file_is_removed_by_its_guard() {
+        use crate::atomic_write::TempFile;
+
+        let dir = fixture("abandoned");
+        let path = dir.join("settings.json");
+        {
+            let temp = TempFile::sibling(&path);
+            fs::write(temp.path(), b"partial").expect("write temp");
+            // Dropped without a rename, exactly like a failed write_all or sync_all.
+        }
+        let left = temporary_files(&dir);
+        assert!(left.is_empty(), "a temp file survived the drop: {left:?}");
+        assert!(!path.exists(), "the target was never created");
         let _ = fs::remove_dir_all(&dir);
     }
 

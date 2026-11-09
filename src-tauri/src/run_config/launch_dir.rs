@@ -49,7 +49,8 @@ pub fn write(root: &str, file: &LaunchFile) -> Result<String, String> {
     })?;
     json.push('\n');
 
-    fs::write(&path, json).map_err(|error| format!("cannot write {}: {error}", display(&path)))?;
+    crate::atomic_write::replace(&path, json.as_bytes())
+        .map_err(|error| format!("cannot write {}: {error}", display(&path)))?;
     Ok(display(&path))
 }
 

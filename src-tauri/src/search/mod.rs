@@ -32,3 +32,6 @@ pub use tests_1::*;
 
 mod tests_2;
 pub use tests_2::*;
+
+mod tests_3;
+pub use tests_3::*;
