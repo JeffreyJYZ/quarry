@@ -67,7 +67,9 @@ pub async fn lsp_code_actions(
 /// Supports both `changes: { uri: TextEdit[] }` and
 /// `documentChanges: [{ textDocument: { uri }, edits }]`. `create`/`rename`/`delete`
 /// file operations are ignored; URIs that are not file URIs are skipped. A null
-/// result reads as an empty vector.
+/// result reads as an empty vector. A `documentChanges` entry also carries the
+/// `textDocument.version` the server computed against, which `changes` has no way
+/// to express.
 pub fn parse_workspace_edit(result: &Value) -> Vec<FileEdit> {
     let mut out = Vec::new();
     if result.is_null() {
@@ -91,6 +93,7 @@ pub fn parse_workspace_edit(result: &Value) -> Vec<FileEdit> {
                 out.push(FileEdit {
                     path,
                     edits: file_edits,
+                    version: None,
                 });
             }
         }
@@ -115,6 +118,12 @@ pub fn parse_workspace_edit(result: &Value) -> Vec<FileEdit> {
             let Some(edits) = entry.get("edits").and_then(Value::as_array) else {
                 continue;
             };
+            // The version the server computed against, so a rename that raced a `didChange` can be
+            // refused instead of merged into text it never saw. `changes` has no such field.
+            let version = entry
+                .get("textDocument")
+                .and_then(|td| td.get("version"))
+                .and_then(Value::as_i64);
             let mut file_edits = Vec::new();
             for edit_entry in edits {
                 let candidate = edit_entry.get("textEdit").unwrap_or(edit_entry);
@@ -126,6 +135,7 @@ pub fn parse_workspace_edit(result: &Value) -> Vec<FileEdit> {
                 out.push(FileEdit {
                     path,
                     edits: file_edits,
+                    version,
                 });
             }
         }

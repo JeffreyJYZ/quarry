@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { forgetDocumentVersion, setDocumentVersion } from "@/lib/lsp/documentVersions";
 import { isMissingSessionError } from "@/lib/lsp/errors";
 import { serverKindForPath, sessionId as makeSessionId } from "@/lib/lsp/served";
 import type { LspStatusMap } from "@/lib/lsp/session";
@@ -48,14 +49,20 @@ export function useDocumentSync({
 		const initial = latest.current.text;
 		let live = true;
 		lspOpenDocument(sessionId, path, initial).then(
-			() => {
+			(version) => {
 				if (!live) return;
+				setDocumentVersion(path, version);
 				opened.current = { root, path, text: initial };
 				const current = latest.current.text;
 				if (current !== initial) {
-					lspChangeDocument(sessionId, path, current).catch((error) => {
-						latest.current.report(`Sync document: ${describeError(error)}`);
-					});
+					lspChangeDocument(sessionId, path, current).then(
+						(next) => {
+							if (live) setDocumentVersion(path, next);
+						},
+						(error) => {
+							latest.current.report(`Sync document: ${describeError(error)}`);
+						},
+					);
 				}
 			},
 			(error) => {
@@ -67,6 +74,7 @@ export function useDocumentSync({
 			const open = opened.current;
 			if (open !== null && open.root === root && open.path === path) {
 				opened.current = null;
+				forgetDocumentVersion(path);
 				lspCloseDocument(sessionId, path).catch((error) => {
 					if (isMissingSessionError(error)) return;
 					latest.current.report(`Close document: ${describeError(error)}`);
@@ -80,6 +88,7 @@ export function useDocumentSync({
 			return;
 		}
 		const sessionId = makeSessionId(kind, root);
+		let live = true;
 		const open = opened.current;
 		if (open !== null && open.root === root && open.path === path && open.text === text) {
 			return;
@@ -90,7 +99,9 @@ export function useDocumentSync({
 				return;
 			}
 			lspChangeDocument(sessionId, path, text).then(
-				() => {
+				(version) => {
+					if (!live) return;
+					setDocumentVersion(path, version);
 					const current = opened.current;
 					if (current !== null && current.root === root && current.path === path) {
 						current.text = text;
@@ -101,6 +112,9 @@ export function useDocumentSync({
 				},
 			);
 		}, CHANGE_DEBOUNCE_MS);
-		return () => clearTimeout(timer);
+		return () => {
+			live = false;
+			clearTimeout(timer);
+		};
 	}, [root, path, text, kind, serverReady]);
 }
