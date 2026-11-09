@@ -24,6 +24,8 @@ export type KeymapDeps = {
 	openSearchRef: { current: (replace: boolean) => void };
 	closeSearchRef: { current: () => void };
 	stepRef: { current: (delta: number) => void };
+	/** Toggles a breakpoint on a 1-based line; null until the shell has a file to act on. */
+	toggleBreakpointRef: { current: ((line: number) => void) | null };
 	applyInlay: (hints: InlayHint[] | null) => void;
 	hideSig: () => void;
 	runSig: () => Promise<void>;

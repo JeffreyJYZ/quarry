@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { type DapStoppedEvent, dapStackTrace, dapThreads } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
 import type { BreakpointEntry, StopView } from "./sessionTypes";
+import { dropTemporary } from "./breakpointTypes";
 
 type Setter<T> = (updater: T | ((current: T) => T)) => void;
 
@@ -51,26 +52,10 @@ export function useStopSnapshot(deps: StopDeps) {
 			if (sessionRef.current === null || event.session !== sessionRef.current) return;
 			const session = event.session;
 			/* Remove any temporary (run-to-cursor) breakpoints on the first stop. */
-			const tempPaths = new Set<string>();
-			const nextMap = new Map(breakpointMapRef.current);
-			for (const [path, lines] of nextMap) {
-				const nextLines = new Map(lines);
-				let changed = false;
-				for (const [line, entry] of nextLines) {
-					if (entry.temporary) {
-						nextLines.delete(line);
-						changed = true;
-					}
-				}
-				if (changed) {
-					if (nextLines.size === 0) nextMap.delete(path);
-					else nextMap.set(path, nextLines);
-					tempPaths.add(path);
-				}
-			}
-			if (tempPaths.size > 0) {
-				commitMap(nextMap);
-				for (const path of tempPaths) void syncFile(path);
+			const dropped = dropTemporary(breakpointMapRef.current);
+			if (dropped.paths.length > 0) {
+				commitMap(dropped.next);
+				for (const path of dropped.paths) void syncFile(path);
 			}
 			setLaunching(false);
 			setRestarting(false);

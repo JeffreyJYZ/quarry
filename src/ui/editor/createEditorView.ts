@@ -30,6 +30,7 @@ import { quarryHighlightStyle } from "@/lib/editor/themeSyntax";
 import { semanticTokens } from "@/lib/editor/semanticTokens";
 import { type BehaviourDeps, behaviourExtensions } from "@/ui/editor/extensionsBehaviour";
 import { completionBindings } from "@/ui/editor/keymapCompletion";
+import { debugBindings } from "@/ui/editor/keymapDebug";
 import { editingBindings } from "@/ui/editor/keymapEditing";
 import { lspBindings } from "@/ui/editor/keymapLsp";
 import type { KeymapDeps } from "@/ui/editor/keymapDeps";
@@ -82,6 +83,7 @@ export function createEditorView(options: {
 					...completionBindings(options.deps),
 					...lspBindings(options.deps),
 					...editingBindings(options.deps),
+					...debugBindings(options.deps),
 				]),
 				language.of(languageForPath(initialPath)),
 				quarryTheme,

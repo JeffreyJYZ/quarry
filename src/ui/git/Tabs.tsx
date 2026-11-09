@@ -11,9 +11,11 @@ type TabsProps = {
 /** The Changes / History / Blame strip; Blame only appears with a file open. */
 export default function Tabs({ tab, activePath, onChanges, onHistory, onBlame }: TabsProps) {
 	return (
-		<div className="git-tabs">
+		<div className="git-tabs" role="tablist" aria-label="Source control">
 			<button
 				type="button"
+				role="tab"
+				aria-selected={tab === "changes"}
 				className={`git-tab${tab === "changes" ? " git-tab-active" : ""}`}
 				onClick={onChanges}
 			>
@@ -21,6 +23,8 @@ export default function Tabs({ tab, activePath, onChanges, onHistory, onBlame }:
 			</button>
 			<button
 				type="button"
+				role="tab"
+				aria-selected={tab === "history"}
 				className={`git-tab${tab === "history" ? " git-tab-active" : ""}`}
 				onClick={onHistory}
 			>
@@ -29,6 +33,8 @@ export default function Tabs({ tab, activePath, onChanges, onHistory, onBlame }:
 			{activePath !== null ? (
 				<button
 					type="button"
+					role="tab"
+					aria-selected={tab === "blame"}
 					className={`git-tab${tab === "blame" ? " git-tab-active" : ""}`}
 					onClick={onBlame}
 				>

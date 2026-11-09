@@ -10,7 +10,8 @@ import {
 } from "@/lib/project/api";
 import type { FileBuffer } from "@/lib/project/buffer";
 import { describeError } from "@/lib/project/errors";
-import { applyFileEdits } from "@/lib/refactor/apply";
+import { applyEditsWithNotice } from "@/ui/app/applyEdits";
+import { externalChangeHandler } from "@/ui/app/externalChanges";
 import { useTabClose } from "@/ui/app/useTabClose";
 import { useFileNavigation } from "@/ui/app/useFileNavigation";
 export type Reveal = { line: number; character: number };
@@ -142,16 +143,14 @@ export function useWorkspace(options: WorkspaceOptions) {
 	}, []);
 
 	const handleApplyEdits = useCallback(
-		async (edits: FileEdit[]) => {
-			const result = await applyFileEdits(edits, buffersRef.current, setBuffers);
-			if (result.files > 0) options.onNotice(`Renamed ${result.files} files`);
-			for (const failed of result.failed) options.onNotice(`Failed: ${failed}`);
-			if (result.files === 0 && result.failed.length === 0) {
-				options.onNotice("Rename unavailable here");
-			}
-		},
+		async (edits: FileEdit[]) =>
+			applyEditsWithNotice(edits, buffersRef.current, setBuffers, options.onNotice),
 		[options],
 	);
+
+	// The watcher reports paths; this turns them into buffer text, never touching a dirty one.
+	const bufferRefs = { buffers: buffersRef, mounted: mountedRef };
+	const applyExternalChanges = externalChangeHandler(bufferRefs, setBuffers, options.onNotice);
 
 	const tabs = useTabClose({
 		buffersRef,
@@ -191,6 +190,7 @@ export function useWorkspace(options: WorkspaceOptions) {
 		handleNavigate: navigation.navigate,
 		handleChange,
 		handleApplyEdits,
+		applyExternalChanges,
 		handleClose: tabs.close,
 		handleSaveClose: tabs.saveClose,
 		handleDiscardClose: tabs.discardClose,

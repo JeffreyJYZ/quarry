@@ -2,9 +2,10 @@ import { useState } from "react";
 import type { FileEntry } from "@/lib/project/api";
 import { TreeLevel } from "./TreeLevel";
 import TreeContextMenu from "./TreeContextMenu";
-import { useFileTree, type FileTreeProps } from "./useFileTree";
+import { useFileTree } from "./useFileTree";
+import type { FileTreeProps } from "./FileTreeTypes";
 
-export type { FileTreeProps } from "./useFileTree";
+export type { FileTreeProps } from "./FileTreeTypes";
 export type { DirState, EditState } from "./FileTreeTypes";
 
 type OpenMenu = { entry: FileEntry; x: number; y: number } | null;

@@ -4,6 +4,7 @@ import { onDapStopped, onDapTerminated } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
 import type { Pin, PinResult } from "@/lib/debug/watch";
 import type { BreakpointEntry, StopView, VariableRow, WatchRow } from "./sessionTypes";
+import { dropTemporary } from "./breakpointTypes";
 
 type Setter<T> = (updater: T | ((current: T) => T)) => void;
 
@@ -64,22 +65,8 @@ export function useDebugEvents(deps: EventDeps) {
 	const handleTerminated = useCallback(
 		(session: string) => {
 			if (sessionRef.current !== null && session !== sessionRef.current) return;
-			const nextMap = new Map(breakpointMapRef.current);
-			for (const [path, lines] of nextMap) {
-				const nextLines = new Map(lines);
-				let changed = false;
-				for (const [line, entry] of nextLines) {
-					if (entry.temporary) {
-						nextLines.delete(line);
-						changed = true;
-					}
-				}
-				if (changed) {
-					if (nextLines.size === 0) nextMap.delete(path);
-					else nextMap.set(path, nextLines);
-				}
-			}
-			commitMap(nextMap);
+			const dropped = dropTemporary(breakpointMapRef.current);
+			if (dropped.paths.length > 0) commitMap(dropped.next);
 			generationRef.current += 1;
 			sessionRef.current = null;
 			setSessionId(null);

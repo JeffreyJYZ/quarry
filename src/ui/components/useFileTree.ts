@@ -3,20 +3,8 @@ import { useReveal } from "./useReveal";
 import { type FileEntry, listDir } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
 import { createDir, createFile, deletePath, renamePath } from "@/lib/project/fileOps";
-import type { DirState, EditState } from "./FileTreeTypes";
-
-export type FileTreeProps = {
-	root: string;
-	activePath: string | null;
-	onOpenFile: (entry: FileEntry) => void;
-	onFileRenamed?: (oldPath: string, newPath: string) => void;
-	onFileDeleted?: (path: string) => void;
-	onNotice?: (message: string) => void;
-	/** Right-click action: stop and start the language server for the open project. */
-	onRestartLsp?: () => void;
-	changes?: Record<string, import("@/lib/project/api").GitStatusEntry["status"]>;
-	revealToken?: number;
-};
+import { useWatchRefresh } from "./useWatchRefresh";
+import type { DirState, EditState, FileTreeProps } from "./FileTreeTypes";
 
 export function useFileTree({
 	root,
@@ -27,6 +15,7 @@ export function useFileTree({
 	onNotice,
 	changes,
 	revealToken,
+	watch,
 }: FileTreeProps) {
 	const changeMap = changes ?? {};
 	const [dirs, setDirs] = useState<Record<string, DirState>>({});
@@ -79,6 +68,10 @@ export function useFileTree({
 			/* root load failure surfaces through the tree */
 		});
 	}, [load, root]);
+
+	// An external change re-lists only the directories already on screen, so the expansion the user
+	// set up survives the refresh.
+	useWatchRefresh(watch, settled, refreshDir);
 
 	const toggle = useCallback(
 		(path: string) => {

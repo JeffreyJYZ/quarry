@@ -1,5 +1,6 @@
 import type { GitStatus, ProjectInfo } from "@/lib/project/api";
 import type { FileEntry } from "@/lib/project/api";
+import type { WatchBatch } from "@/lib/project/watch";
 import FileTree from "@/ui/components/FileTree";
 import Outline from "@/ui/outline/Outline";
 import SourceControl from "@/ui/git/SourceControl";
@@ -22,6 +23,8 @@ export type SideRailProps = {
 	gitRefresh: number;
 	blameSaveToken: number;
 	revealToken: number;
+	/** Latest external-change batch, forwarded to the explorer. */
+	watch: WatchBatch | null;
 	changes: Record<
 		string,
 		"modified" | "added" | "deleted" | "renamed" | "untracked" | "conflicted"
@@ -87,6 +90,7 @@ export default function SideRail(props: SideRailProps) {
 						onFileDeleted={props.onFileDeleted}
 						onNotice={props.onNotice}
 						revealToken={props.revealToken}
+						watch={props.watch}
 						changes={props.changes}
 						onRestartLsp={props.onRestartLsp}
 					/>

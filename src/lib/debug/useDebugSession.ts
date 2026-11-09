@@ -150,6 +150,7 @@ export function useDebugSession(
 		...ui,
 		stopRef: s.stopRef,
 		watchRef: s.watchRef,
+		commitMap,
 		restarting: s.restarting,
 		loadExceptionFilters: exceptions.loadExceptionFilters,
 		setSessionId: s.setSessionId,

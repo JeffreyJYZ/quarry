@@ -42,7 +42,7 @@ export default function TabStrip({
 	}, [confirmClose, onCancelClose]);
 
 	return (
-		<div className="tabstrip">
+		<div className="tabstrip" role="tablist" aria-label="Open files">
 			{buffers.map((buffer) => {
 				const active = buffer.path === activePath;
 				const confirming = buffer.path === confirmClose;
@@ -52,7 +52,7 @@ export default function TabStrip({
 					.join(" ");
 
 				return (
-					<div key={buffer.path} className={rowClass}>
+					<div key={buffer.path} className={rowClass} role="presentation">
 						{confirming ? (
 							<>
 								<span className="tab-name tab-confirm-name" title={buffer.path}>
@@ -81,6 +81,8 @@ export default function TabStrip({
 									type="button"
 									className="tab-name"
 									title={buffer.path}
+									role="tab"
+									aria-selected={active}
 									onClick={() => onActivate(buffer.path)}
 								>
 									{isDirty(buffer) ? (

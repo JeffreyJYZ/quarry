@@ -1,12 +1,14 @@
 import { useCallback } from "react";
 import { dapContinueOn } from "@/lib/debug/dap";
 import { describeError } from "@/lib/project/errors";
+import type { TransportGate } from "@/lib/debug/transportGate";
 import type { BreakpointEntry, BreakpointField, StopView } from "./sessionTypes";
 
 export type BreakpointActionsDeps = {
 	sessionRef: { current: string | null };
 	stopRef: { current: StopView | null };
 	breakpointMapRef: { current: Map<string, Map<number, BreakpointEntry>> };
+	gate: TransportGate;
 	commitMap: (next: Map<string, Map<number, BreakpointEntry>>) => void;
 	syncFile: (path: string) => Promise<void>;
 	setStopView: (next: StopView | null) => void;
@@ -33,8 +35,16 @@ export function blankBreakpoint(temporary = false): BreakpointEntry {
  * update: a condition change is a new set for the whole path.
  */
 export function useBreakpointActions(deps: BreakpointActionsDeps) {
-	const { sessionRef, stopRef, breakpointMapRef, commitMap, syncFile, setStopView, setError } =
-		deps;
+	const {
+		sessionRef,
+		stopRef,
+		breakpointMapRef,
+		gate,
+		commitMap,
+		syncFile,
+		setStopView,
+		setError,
+	} = deps;
 
 	/** The gutter path: one line of one absolute file, added or removed. */
 	const toggleBreakpoint = useCallback(
@@ -100,36 +110,38 @@ export function useBreakpointActions(deps: BreakpointActionsDeps) {
 		async (path: string, line: number) => {
 			const session = sessionRef.current;
 			if (session === null || path === "" || !Number.isInteger(line) || line < 1) return;
-			const lines = breakpointMapRef.current.get(path);
-			if (lines?.has(line)) {
-				const live = sessionRef.current;
-				if (live !== null) {
-					try {
-						await dapContinueOn(live, stopRef.current?.threadId ?? undefined);
-						setStopView(null);
-						setError(null);
-					} catch (reason) {
-						setError(`Continue: ${describeError(reason)}`);
+			await gate.run(async () => {
+				const lines = breakpointMapRef.current.get(path);
+				if (lines?.has(line)) {
+					const live = sessionRef.current;
+					if (live !== null) {
+						try {
+							await dapContinueOn(live, stopRef.current?.threadId ?? undefined);
+							setStopView(null);
+							setError(null);
+						} catch (reason) {
+							setError(`Continue: ${describeError(reason)}`);
+						}
 					}
+					return;
 				}
-				return;
-			}
-			setError(null);
-			const next = new Map(breakpointMapRef.current);
-			const nextLines = new Map(lines ?? []);
-			nextLines.set(line, blankBreakpoint(true));
-			next.set(path, nextLines);
-			commitMap(next);
-			await syncFile(path);
-			try {
-				await dapContinueOn(session, stopRef.current?.threadId ?? undefined);
-				setStopView(null);
 				setError(null);
-			} catch (reason) {
-				setError(`Continue: ${describeError(reason)}`);
-			}
+				const next = new Map(breakpointMapRef.current);
+				const nextLines = new Map(lines ?? []);
+				nextLines.set(line, blankBreakpoint(true));
+				next.set(path, nextLines);
+				commitMap(next);
+				await syncFile(path);
+				try {
+					await dapContinueOn(session, stopRef.current?.threadId ?? undefined);
+					setStopView(null);
+					setError(null);
+				} catch (reason) {
+					setError(`Continue: ${describeError(reason)}`);
+				}
+			});
 		},
-		[breakpointMapRef, commitMap, syncFile, sessionRef, stopRef, setStopView, setError],
+		[breakpointMapRef, commitMap, gate, syncFile, sessionRef, stopRef, setStopView, setError],
 	);
 
 	const setBreakpointField = useCallback(
