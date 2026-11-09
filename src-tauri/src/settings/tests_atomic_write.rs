@@ -44,7 +44,7 @@ mod tests_write_atomic {
     fn a_written_file_reads_back_byte_for_byte() {
         let dir = fixture("roundtrip");
         let path = dir.join("settings.json");
-        write_atomic(&path, "{\n  \"a\": 1\n}\n").expect("write");
+        write_atomic(&path, b"{\n  \"a\": 1\n}\n").expect("write");
         assert_eq!(
             fs::read_to_string(&path).expect("read"),
             "{\n  \"a\": 1\n}\n"
@@ -56,7 +56,7 @@ mod tests_write_atomic {
     fn no_temporary_file_is_left_behind() {
         let dir = fixture("cleanup");
         let path = dir.join("settings.json");
-        write_atomic(&path, "{}").expect("write");
+        write_atomic(&path, b"{}").expect("write");
         let left: Vec<String> = fs::read_dir(&dir)
             .expect("list")
             .filter_map(|entry| entry.ok())
@@ -72,7 +72,7 @@ mod tests_write_atomic {
         // A directory cannot be replaced by a rename, so the write fails after the temp file exists.
         let path = dir.join("settings.json");
         fs::create_dir_all(&path).expect("dir in the way");
-        let error = write_atomic(&path, "{}").expect_err("a directory cannot be replaced");
+        let error = write_atomic(&path, b"{}").expect_err("a directory cannot be replaced");
         assert!(
             error.contains("cannot replace"),
             "unexpected error: {error}"
@@ -113,9 +113,9 @@ mod tests_write_atomic {
 
         let dir = fixture("inode");
         let path = dir.join("settings.json");
-        write_atomic(&path, "{\"a\":1}").expect("first write");
+        write_atomic(&path, b"{\"a\":1}").expect("first write");
         let before = fs::metadata(&path).expect("metadata").ino();
-        write_atomic(&path, "{\"a\":2}").expect("second write");
+        write_atomic(&path, b"{\"a\":2}").expect("second write");
         let after = fs::metadata(&path).expect("metadata").ino();
         assert_ne!(
             before, after,

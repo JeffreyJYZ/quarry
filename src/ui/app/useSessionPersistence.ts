@@ -52,8 +52,11 @@ export function useSessionPersistence(options: {
 		let cancelled = false;
 		void (async () => {
 			try {
-				const settings = await readSettings();
+				const read = await readSettings();
 				if (cancelled) return;
+				// The file kept a setting it could not parse; say so rather than forgetting it.
+				if (read.warning !== null) setters.onNotice(read.warning);
+				const settings = read.settings;
 				preserved.current = settings;
 				setters.onPreferences(normalizePreferences(settings.preferences));
 				setters.onRailCollapsed(settings.railCollapsed ?? false);

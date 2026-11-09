@@ -83,6 +83,9 @@ pub struct Preferences {
     pub custom_themes: Vec<serde_json::Value>,
     #[serde(default, deserialize_with = "deserialize_panel_sizes")]
     pub panel_sizes: PanelSizes,
+    /// Fields written by another build, kept verbatim so a save from this build never drops them.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 pub fn default_editor_font_size() -> f64 {
@@ -160,6 +163,7 @@ impl Default for Preferences {
             theme: String::new(),
             custom_themes: Vec::new(),
             panel_sizes: PanelSizes::default(),
+            extra: serde_json::Map::new(),
         }
     }
 }
@@ -186,15 +190,4 @@ impl Preferences {
         }
         self.panel_sizes.normalize();
     }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
-#[serde(rename_all = "camelCase", default)]
-pub struct ProjectSettings {
-    #[serde(default, deserialize_with = "deserialize_project_editor_tab_size")]
-    pub editor_tab_size: Option<u32>,
-    #[serde(default, deserialize_with = "deserialize_project_format_on_save")]
-    pub format_on_save: Option<bool>,
-    #[serde(default, deserialize_with = "deserialize_project_build_profile")]
-    pub build_profile: Option<String>,
 }

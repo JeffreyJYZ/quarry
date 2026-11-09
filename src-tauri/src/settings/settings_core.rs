@@ -84,12 +84,9 @@ pub fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 #[tauri::command]
-pub fn read_settings(app: AppHandle) -> Settings {
-    settings_path(&app)
-        .ok()
-        .and_then(|path| fs::read_to_string(path).ok())
-        .and_then(|text| serde_json::from_str(&text).ok())
-        .unwrap_or_default()
+pub fn read_settings(app: AppHandle) -> Result<SettingsRead, String> {
+    let path = settings_path(&app)?;
+    read_settings_at(&path)
 }
 
 /// Write through a sibling temp file and rename it into place.
@@ -97,7 +94,7 @@ pub fn read_settings(app: AppHandle) -> Settings {
 /// `fs::write` truncates first, so a crash, a full disk or a killed process between the truncate and
 /// the last byte leaves an empty or half-written file — and the next launch reads defaults, silently.
 /// A rename is atomic inside one directory, so the file is either the previous one or the new one.
-pub(crate) fn write_atomic(path: &std::path::Path, text: &str) -> Result<(), String> {
+pub(crate) fn write_atomic(path: &std::path::Path, bytes: &[u8]) -> Result<(), String> {
     use crate::atomic_write::TempFile;
 
     // The guard removes the temp on drop, so a failed create, write or flush cannot leave a stray
@@ -107,7 +104,7 @@ pub(crate) fn write_atomic(path: &std::path::Path, text: &str) -> Result<(), Str
         let mut file = temp
             .create()
             .map_err(|error| format!("cannot create {}: {error}", temp.path().display()))?;
-        std::io::Write::write_all(&mut file, text.as_bytes())
+        std::io::Write::write_all(&mut file, bytes)
             .map_err(|error| format!("cannot write {}: {error}", temp.path().display()))?;
         file.sync_all()
             .map_err(|error| format!("cannot flush {}: {error}", temp.path().display()))?;
@@ -127,7 +124,7 @@ pub fn write_settings(app: AppHandle, settings: Settings) -> Result<(), String> 
     }
     let text = serde_json::to_string_pretty(&settings)
         .map_err(|error| format!("cannot serialize settings: {error}"))?;
-    write_atomic(&path, &format!("{text}\n"))
+    write_atomic(&path, format!("{text}\n").as_bytes())
 }
 
 #[tauri::command]
@@ -137,9 +134,16 @@ pub fn read_project_settings(root: String) -> ProjectSettings {
         return ProjectSettings::default();
     }
     let file = path.join(".quarry").join("settings.json");
-    match fs::read_to_string(&file) {
-        Ok(text) => serde_json::from_str(&text).unwrap_or_default(),
-        Err(_) => ProjectSettings::default(),
+    let Ok(text) = fs::read_to_string(&file) else {
+        return ProjectSettings::default();
+    };
+    match project_settings_from_text(&text) {
+        Some((settings, _)) => settings,
+        None => {
+            // Keep what the file held, so the next save cannot silently replace the only copy.
+            let _ = keep_bad(&file, text.as_bytes());
+            ProjectSettings::default()
+        }
     }
 }
 
@@ -162,5 +166,5 @@ pub fn write_project_settings(root: String, settings: ProjectSettings) -> Result
     let file = dir.join("settings.json");
     let text = serde_json::to_string_pretty(&settings)
         .map_err(|error| format!("cannot serialize project settings: {error}"))?;
-    write_atomic(&file, &format!("{text}\n"))
+    write_atomic(&file, format!("{text}\n").as_bytes())
 }

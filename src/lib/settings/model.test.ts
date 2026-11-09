@@ -23,6 +23,18 @@ describe("normalizePreferences", () => {
 		expect(preferences.customThemes).toEqual([]);
 	});
 
+	test("keeps a preference key this build does not know", () => {
+		const preferences = normalizePreferences({ editorFontSize: 15, futureKnob: 7 });
+		expect(preferences.editorFontSize).toBe(15);
+		expect((preferences as Record<string, unknown>).futureKnob).toBe(7);
+	});
+
+	test("a known key wins over the preserved copy of itself", () => {
+		const preferences = normalizePreferences({ editorFontSize: 400, futureKnob: 7 });
+		expect(preferences.editorFontSize).toBe(24);
+		expect((preferences as Record<string, unknown>).futureKnob).toBe(7);
+	});
+
 	test("clamps font sizes and keeps a usable tab size and profile", () => {
 		const preferences = normalizePreferences({
 			editorFontSize: 400,
@@ -86,6 +98,12 @@ describe("normalizeProjectSettings", () => {
 		expect(settings.editorTabSize).toBe(8);
 		expect(settings.formatOnSave).toBe(false);
 		expect(settings.buildProfile).toBeNull();
+	});
+
+	test("keeps an override key this build does not know", () => {
+		const settings = normalizeProjectSettings({ formatOnSave: true, futureOverride: "keep" });
+		expect(settings.formatOnSave).toBe(true);
+		expect((settings as Record<string, unknown>).futureOverride).toBe("keep");
 	});
 });
 

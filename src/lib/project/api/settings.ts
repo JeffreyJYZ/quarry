@@ -19,8 +19,17 @@ export type Settings = {
 	preferences?: Preferences;
 };
 
-export function readSettings(): Promise<Settings> {
-	return invoke<Settings>("read_settings");
+export type SettingsRead = {
+	settings: Settings;
+	/**
+	 * Set when the file had to be repaired: a value was skipped, or the whole file was unusable and
+	 * was kept as a `.bad` sibling. `readSettings` rejects in the second case.
+	 */
+	warning: string | null;
+};
+
+export function readSettings(): Promise<SettingsRead> {
+	return invoke<SettingsRead>("read_settings");
 }
 
 export function writeSettings(settings: Settings): Promise<void> {

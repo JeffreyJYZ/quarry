@@ -2,8 +2,9 @@
 //!
 //! The only durable piece in P0 is the last opened project, so a relaunch lands where the user left off.
 //! The file lives under the platform config directory (`app.path().app_config_dir()`), never inside a
-//! project. Malformed settings are treated as empty rather than as an error: a corrupt preference must
-//! never block startup.
+//! project. A corrupt value must never block startup, and it must never take the rest of the file with
+//! it either: a file that cannot be parsed is kept as a `.bad` sibling and the read says so, while a
+//! single bad field costs only that field.
 
 #![allow(dead_code)]
 #![allow(unused_imports)]
@@ -24,6 +25,12 @@ pub use deserialize_terminal_prefs::*;
 mod preferences;
 pub use preferences::*;
 
+mod project_settings;
+pub use project_settings::*;
+
+mod settings_read;
+pub use settings_read::*;
+
 mod settings_core;
 pub use settings_core::*;
 
@@ -41,3 +48,9 @@ pub use tests_3::*;
 
 mod tests_atomic_write;
 pub use tests_atomic_write::*;
+
+mod tests_read_repair;
+pub use tests_read_repair::*;
+
+mod tests_extra;
+pub use tests_extra::*;

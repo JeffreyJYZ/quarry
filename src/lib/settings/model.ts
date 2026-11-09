@@ -112,12 +112,27 @@ function readText(value: unknown): string {
 	return typeof value === "string" ? value.trim() : "";
 }
 
+/**
+ * A normalised value, plus every key the input carried that this build does not know.
+ *
+ * The Rust side keeps those in its `extra` map so another build's preference is not deleted on the
+ * next save; the same has to hold here, because the shell writes back the object it normalised and
+ * a key dropped now never reaches the file again.
+ */
+function withUnknownKeys<T extends object>(known: T, source: Record<string, unknown>): T {
+	const extras: Record<string, unknown> = {};
+	for (const key of Object.keys(source)) {
+		if (!(key in known)) extras[key] = source[key];
+	}
+	return { ...extras, ...known } as T;
+}
+
 export function normalizePreferences(input: unknown): Preferences {
 	const source = (typeof input === "object" && input !== null ? input : {}) as Record<
 		string,
 		unknown
 	>;
-	return {
+	const known: Preferences = {
 		...normalizeThemePreferences(source),
 		editorFontSize: clampFontSize(source.editorFontSize, DEFAULT_PREFERENCES.editorFontSize),
 		editorTabSize: readTabSize(source.editorTabSize) ?? DEFAULT_PREFERENCES.editorTabSize,
@@ -140,6 +155,7 @@ export function normalizePreferences(input: unknown): Preferences {
 		clangdArgs: readText(source.clangdArgs),
 		panelSizes: clampPanelSizes(source.panelSizes),
 	};
+	return withUnknownKeys(known, source);
 }
 
 export function normalizeProjectSettings(input: unknown): ProjectSettings {
@@ -147,11 +163,12 @@ export function normalizeProjectSettings(input: unknown): ProjectSettings {
 		string,
 		unknown
 	>;
-	return {
+	const known: ProjectSettings = {
 		editorTabSize: readTabSize(source.editorTabSize),
 		formatOnSave: typeof source.formatOnSave === "boolean" ? source.formatOnSave : null,
 		buildProfile: readBuildProfile(source.buildProfile),
 	};
+	return withUnknownKeys(known, source);
 }
 
 /** What the editor and the shell should use right now: the project's overrides, else the user's. */
