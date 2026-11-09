@@ -1,14 +1,7 @@
+import type { ShortcutGroup } from "@/lib/consts/app";
 import { useDialogFocus } from "@/ui/app/useDialogFocus";
 
-export type ShortcutEntry = {
-	keys: string[];
-	action: string;
-};
-
-export type ShortcutGroup = {
-	title: string;
-	entries: ShortcutEntry[];
-};
+export type { ShortcutEntry, ShortcutGroup } from "@/lib/consts/app";
 
 export type ShortcutSheetProps = {
 	groups: ShortcutGroup[];
@@ -69,6 +62,11 @@ export default function ShortcutSheet({ groups, onClose }: ShortcutSheetProps) {
 					<span className="label">shortcuts</span>
 				</div>
 				<div className="shortcut-body">
+					<p className="shortcut-copy">
+						A native menu accelerator wins over an in-app binding with the same chord: a
+						row marked menu opens the menu action, and a note names any in-app command
+						that lost its chord.
+					</p>
 					{mergedGroups.map((group) => (
 						<section className="shortcut-group" key={group.title}>
 							<h2 className="shortcut-group-title">{group.title}</h2>
@@ -89,7 +87,15 @@ export default function ShortcutSheet({ groups, onClose }: ShortcutSheetProps) {
 												</kbd>
 											))}
 										</span>
-										<span className="shortcut-action">{entry.action}</span>
+										<span className="shortcut-action">
+											{entry.action}
+											{entry.menu === true ? (
+												<span className="shortcut-menu">menu</span>
+											) : null}
+										</span>
+										{entry.note === undefined ? null : (
+											<span className="shortcut-note">{entry.note}</span>
+										)}
 									</li>
 								))}
 							</ul>

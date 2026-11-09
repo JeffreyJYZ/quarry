@@ -1,24 +1,60 @@
 /** Every accelerator the app answers to, grouped the way the sheet displays them. */
 
+export type ShortcutEntry = {
+	keys: string[];
+	action: string;
+	/** A native menu accelerator owns this chord, so the menu receives it before the window does. */
+	menu?: boolean;
+	/** The in-app command a menu accelerator shadows, and where else that command can be reached. */
+	note?: string;
+};
+
+export type ShortcutGroup = {
+	title: string;
+	entries: ShortcutEntry[];
+};
+
 /** The shortcut sheet's groups, in display order. */
-export const SHORTCUT_GROUPS = [
+export const SHORTCUT_GROUPS: ShortcutGroup[] = [
 	{
 		title: "Project",
 		entries: [
-			{ keys: ["Cmd", "K"], action: "Toggle shortcut sheet" },
+			{
+				keys: ["Cmd", "K"],
+				action: "Toggle shortcut sheet",
+				menu: true,
+				note: "The menu opens the sheet, so this chord no longer closes it.",
+			},
 			{ keys: ["Cmd", "Shift", "P"], action: "Open command palette" },
-			{ keys: ["Cmd", ","], action: "Open settings" },
+			{ keys: ["Cmd", ","], action: "Open settings", menu: true },
 			{ keys: ["Cmd", ";"], action: "Open settings (same page)" },
 			{ keys: ["?"], action: "Open shortcut sheet (outside editor)" },
+			{
+				keys: ["Cmd", "N"],
+				action: "New project",
+				menu: true,
+				note: "The in-app generate binding on this chord never runs and has no other route.",
+			},
+			{
+				keys: ["Cmd", "O"],
+				action: "Open project",
+				menu: true,
+				note: 'The in-app go to class binding on this chord never runs; the palette row "Go to symbol in workspace…" opens that list.',
+			},
 		],
 	},
 	{
 		title: "Editing",
 		entries: [
-			{ keys: ["Cmd", "S"], action: "Save active file" },
-			{ keys: ["Cmd", "Alt", "S"], action: "Save all dirty files" },
+			{ keys: ["Cmd", "S"], action: "Save active file", menu: true },
+			{ keys: ["Cmd", "Alt", "S"], action: "Save all dirty files", menu: true },
 			{ keys: ["Cmd", "F"], action: "Find in file" },
-			{ keys: ["Cmd", "Alt", "F"], action: "Find in project" },
+			{
+				keys: ["Cmd", "Alt", "F"],
+				action: "Find in project",
+				menu: true,
+				note: "The in-app in-file replace binding on this chord never runs and has no other route.",
+			},
 			{ keys: ["Cmd", "G"], action: "Next match" },
 			{ keys: ["Cmd", "L"], action: "Go to line" },
 			{ keys: ["Cmd", "Alt", "L"], action: "Format active file" },
@@ -50,8 +86,12 @@ export const SHORTCUT_GROUPS = [
 	{
 		title: "Navigation",
 		entries: [
-			{ keys: ["Cmd", "P"], action: "Quick open by file name" },
-			{ keys: ["Cmd", "Shift", "E"], action: "Reveal active file in explorer" },
+			{ keys: ["Cmd", "P"], action: "Quick open by file name", menu: true },
+			{
+				keys: ["Cmd", "Shift", "E"],
+				action: "Reveal active file in explorer",
+				menu: true,
+			},
 			{ keys: ["F12"], action: "Go to definition" },
 			{ keys: ["Shift", "F12"], action: "Find references" },
 			{ keys: ["Cmd", "Click"], action: "Go to definition" },
@@ -71,7 +111,7 @@ export const SHORTCUT_GROUPS = [
 	{
 		title: "Debug",
 		entries: [
-			{ keys: ["Cmd", "F10"], action: "Run to cursor" },
+			{ keys: ["Cmd", "F10"], action: "Run to cursor", menu: true },
 			{ keys: ["Cmd", "F8"], action: "Toggle breakpoint on the caret line" },
 			{ keys: ["F7"], action: "Step into" },
 			{ keys: ["F8"], action: "Step over" },
@@ -89,12 +129,17 @@ export const SHORTCUT_GROUPS = [
 	{
 		title: "View",
 		entries: [
-			{ keys: ["Cmd", "B"], action: "Toggle left rail" },
-			{ keys: ["Cmd", "W"], action: "Close the active tab" },
+			{ keys: ["Cmd", "B"], action: "Toggle left rail", menu: true },
+			{
+				keys: ["Cmd", "W"],
+				action: "Close the active tab",
+				menu: true,
+				note: "File ▸ Close Window is a predefined macOS menu item whose chord is Cmd+W, so the in-app close-tab binding never runs.",
+			},
 			{ keys: ["Cmd", "Shift", "T"], action: "Reopen the last closed tab" },
 			{ keys: ["Ctrl", "Tab"], action: "Next tab" },
 			{ keys: ["Ctrl", "Shift", "Tab"], action: "Previous tab" },
-			{ keys: ["Cmd", "J"], action: "Toggle bottom dock" },
+			{ keys: ["Cmd", "J"], action: "Toggle bottom dock", menu: true },
 			{ keys: ["Cmd", "Shift", "D"], action: "Show debugger" },
 			{ keys: ["Cmd", "Shift", "G"], action: "Toggle source control" },
 		],
