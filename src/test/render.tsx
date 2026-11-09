@@ -11,15 +11,7 @@ import { Window } from "happy-dom";
 import { type ReactElement, act } from "react";
 import { createRoot } from "react-dom/client";
 
-export {
-	act,
-	cleanup,
-	fireEvent,
-	render,
-	screen,
-	waitFor,
-	within,
-} from "@testing-library/react";
+export { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 export type { RenderResult } from "@testing-library/react";
 
 /** A window of its own, so a re-render test never borrows a neighbour's DOM. */
