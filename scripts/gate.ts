@@ -38,7 +38,16 @@ const FRONTEND: Step[] = [
 
 const RUST: Step[] = [
 	{ name: "cargo fmt --check", command: "cargo", args: ["fmt", "--check"], cwd: TAURI },
-	{ name: "cargo test", command: "cargo", args: ["test"], cwd: TAURI },
+	/**
+	 * `cargo nextest` when it is installed, plain `cargo test` otherwise.
+	 *
+	 * nextest runs the same tests with its own parallel runner and skips the doc-test compile this
+	 * crate does not use: measured with one crate rebuild, 6.99s against 4.95s. The fallback keeps a
+	 * fresh checkout and CI working without an extra install, and the step name says which ran.
+	 */
+	Bun.which("cargo-nextest") === null
+		? { name: "cargo test", command: "cargo", args: ["test"], cwd: TAURI }
+		: { name: "cargo nextest", command: "cargo", args: ["nextest", "run"], cwd: TAURI },
 	{
 		name: "cargo clippy",
 		command: "cargo",
