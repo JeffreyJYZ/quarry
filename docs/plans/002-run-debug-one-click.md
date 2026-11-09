@@ -76,7 +76,11 @@ Run and Debug both build first with the current profile, then resolve, then star
 
 A failed build stops there and reports in the Run dock, keeping the diagnostics the build just
 published. A successful build's `artifact` overrides the resolved program, so Rust picks the binary
-cargo just wrote.
+cargo just wrote. Which file that is, is one decision (`choose_artifact` in
+`src-tauri/src/build_task/choose_artifact.rs`): a target the build system reported wins outright,
+otherwise the newest file the build wrote at or after its own start time wins, and equal times resolve
+by path. A successful build that reports no executable is reported in the Run dock — the resolved
+path is not launched in its place, because that binary belongs to an earlier build.
 
 ### What stays
 
