@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { useDialogFocus } from "@/ui/app/useDialogFocus";
 import "@/ui/projects/newProject.css";
 import { KindPicker } from "./KindPicker";
 import { StandardPicker } from "./StandardPicker";
@@ -28,6 +29,7 @@ export default function NewProject({
 	onCreated,
 }: NewProjectProps): JSX.Element | null {
 	const scaffold = useScaffold({ open: isOpen, initialParent, onParentChange, onCreated });
+	const { panelRef, onKeyDown } = useDialogFocus(isOpen);
 	const { parent, name, kind, standard, creating, error, target, canCreate } = scaffold;
 
 	if (!isOpen) return null;
@@ -45,7 +47,10 @@ export default function NewProject({
 				role="dialog"
 				aria-modal="true"
 				aria-labelledby="newproject-title"
+				tabIndex={-1}
+				ref={panelRef}
 				onKeyDown={(event) => {
+					onKeyDown(event);
 					if (event.key === "Escape") {
 						event.preventDefault();
 						onClose();

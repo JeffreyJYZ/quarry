@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { parseLine } from "@/lib/editor/linePrompt";
+import { useDialogFocus } from "@/ui/app/useDialogFocus";
 
 /**
  * Jump to a line number in the active file.
@@ -20,6 +21,7 @@ export default function LinePrompt({
 }) {
 	const [value, setValue] = useState("");
 	const inputRef = useRef<HTMLInputElement | null>(null);
+	const { panelRef, onKeyDown } = useDialogFocus(true);
 
 	useEffect(() => {
 		inputRef.current?.focus();
@@ -32,7 +34,14 @@ export default function LinePrompt({
 	};
 
 	return (
-		<div className="goto" role="dialog" aria-label="Go to line">
+		<div
+			className="goto"
+			role="dialog"
+			aria-label="Go to line"
+			tabIndex={-1}
+			ref={panelRef}
+			onKeyDown={onKeyDown}
+		>
 			<div className="goto-head">
 				<span className="label">go to line</span>
 				<input

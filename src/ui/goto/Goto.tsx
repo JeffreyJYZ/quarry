@@ -4,7 +4,9 @@ import { describeError } from "@/lib/project/errors";
 import { isInsideRoot } from "@/lib/lsp/paths";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
 import type { ServerKind } from "@/lib/lsp/served";
+import { useDialogFocus } from "@/ui/app/useDialogFocus";
 import "@/ui/goto/goto.css";
+import GotoInput from "@/ui/goto/GotoInput";
 import GotoList from "@/ui/goto/GotoList";
 import { type GotoMode, type Row, TITLES, fileNameOf, filterRows } from "./gotoModel";
 export type { GotoMode } from "./gotoModel";
@@ -33,6 +35,7 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose, onNoti
 	const [loading, setLoading] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const listRef = useRef<HTMLUListElement>(null);
+	const { panelRef, onKeyDown } = useDialogFocus(true);
 	useEffect(() => {
 		inputRef.current?.focus();
 	}, []);
@@ -128,7 +131,15 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose, onNoti
 				if (event.target === event.currentTarget) onClose();
 			}}
 		>
-			<div className="goto-panel" role="dialog" aria-modal="true" aria-label={TITLES[mode]}>
+			<div
+				className="goto-panel"
+				role="dialog"
+				aria-modal="true"
+				aria-label={TITLES[mode]}
+				tabIndex={-1}
+				ref={panelRef}
+				onKeyDown={onKeyDown}
+			>
 				<header className="goto-head">
 					<span className="label">{TITLES[mode]}</span>
 					{loading ? <span className="goto-loading">searching…</span> : null}
@@ -136,50 +147,21 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose, onNoti
 						esc
 					</button>
 				</header>
-				<input
-					ref={inputRef}
-					className="goto-input"
-					type="text"
-					value={query}
+				<GotoInput
+					query={query}
 					placeholder={mode === "recent" ? "Filter recent files" : "Name"}
-					spellCheck={false}
-					onChange={(event) => {
-						setQuery(event.target.value);
+					inputRef={inputRef}
+					rows={visible}
+					active={active}
+					onQuery={(next) => {
+						setQuery(next);
 						setActive(0);
 					}}
-					onKeyDown={(event) => {
-						if (event.key === "Escape") {
-							event.preventDefault();
-							onClose();
-							return;
-						}
-						if (event.key === "ArrowDown") {
-							event.preventDefault();
-							setActive((current) => Math.min(current + 1, visible.length - 1));
-							return;
-						}
-						if (event.key === "ArrowUp") {
-							event.preventDefault();
-							setActive((current) => Math.max(current - 1, 0));
-							return;
-						}
-						if (event.key === "Tab") {
-							event.preventDefault();
-							if (event.shiftKey) {
-								setActive((current) => Math.max(current - 1, 0));
-							} else {
-								setActive((current) => Math.min(current + 1, visible.length - 1));
-							}
-							return;
-						}
-						if (event.key === "Enter") {
-							event.preventDefault();
-							const row = visible[active];
-							if (row !== undefined) {
-								onOpen(row.path, row.line, row.character);
-								onClose();
-							}
-						}
+					onActive={setActive}
+					onClose={onClose}
+					onOpen={(row) => {
+						onOpen(row.path, row.line, row.character);
+						onClose();
 					}}
 				/>
 				<GotoList

@@ -1,3 +1,4 @@
+import { useDialogFocus } from "@/ui/app/useDialogFocus";
 import "@/ui/quickopen/quickopen.css";
 import { QuickOpenResults } from "./QuickOpenResults";
 import { useQuickOpen } from "./useQuickOpen";
@@ -12,9 +13,17 @@ export type Props = {
 
 export default function QuickOpen({ root, openPaths, onOpen, onClose }: Props) {
 	const quick = useQuickOpen({ root, openPaths, onOpen, onClose });
+	const { panelRef, onKeyDown } = useDialogFocus(true);
 
 	return (
-		<div className="search-palette" role="dialog" aria-label="Quick open">
+		<div
+			className="search-palette"
+			role="dialog"
+			aria-label="Quick open"
+			tabIndex={-1}
+			ref={panelRef}
+			onKeyDown={onKeyDown}
+		>
 			<div className="search-head">
 				<span className="label">open</span>
 				<input

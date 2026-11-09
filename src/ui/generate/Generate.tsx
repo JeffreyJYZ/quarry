@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GenerateItem } from "@/lib/generate/model";
+import { useDialogFocus } from "@/ui/app/useDialogFocus";
 import "@/ui/goto/goto.css";
 
 export type GenerateProps = {
@@ -12,11 +13,7 @@ export type GenerateProps = {
 export default function Generate({ items, onPick, onClose }: GenerateProps) {
 	const [active, setActive] = useState(0);
 	const listRef = useRef<HTMLUListElement>(null);
-	const panelRef = useRef<HTMLDivElement>(null);
-
-	useEffect(() => {
-		panelRef.current?.focus();
-	}, []);
+	const { panelRef, onKeyDown } = useDialogFocus(true);
 
 	useEffect(() => {
 		const item = listRef.current?.children[active] as HTMLElement | undefined;
@@ -41,6 +38,7 @@ export default function Generate({ items, onPick, onClose }: GenerateProps) {
 				tabIndex={-1}
 				ref={panelRef}
 				onKeyDown={(event) => {
+					onKeyDown(event);
 					if (event.key === "Escape") {
 						event.preventDefault();
 						onClose();

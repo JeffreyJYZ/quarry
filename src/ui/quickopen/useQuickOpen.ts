@@ -80,14 +80,8 @@ export function useQuickOpen({
 		void fetchFiles(stale);
 	}, [root, fetchFiles]);
 
-	const openerRef = useRef<HTMLElement | null>(null);
 	useEffect(() => {
-		openerRef.current =
-			document.activeElement instanceof HTMLElement ? document.activeElement : null;
 		inputRef.current?.focus();
-		return () => {
-			openerRef.current?.focus();
-		};
 	}, []);
 
 	useEffect(() => {

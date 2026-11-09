@@ -1,5 +1,6 @@
 import CommandRow from "@/ui/palette/CommandRow";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDialogFocus } from "@/ui/app/useDialogFocus";
 
 export type Command = {
 	id: string;
@@ -29,18 +30,14 @@ export default function CommandPalette({
 	const [active, setActive] = useState(0);
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const listRef = useRef<HTMLDivElement | null>(null);
-	const openerRef = useRef<HTMLElement | null>(null);
+	const { panelRef, onKeyDown } = useDialogFocus(open);
 
 	useEffect(() => {
 		if (!open) {
 			setQuery("");
 			setActive(0);
-			openerRef.current?.focus();
-			openerRef.current = null;
 			return;
 		}
-		openerRef.current =
-			document.activeElement instanceof HTMLElement ? document.activeElement : null;
 		inputRef.current?.focus();
 	}, [open]);
 
@@ -127,7 +124,14 @@ export default function CommandPalette({
 	}
 
 	return (
-		<div className="command-palette" role="dialog" aria-label="Command palette">
+		<div
+			className="command-palette"
+			role="dialog"
+			aria-label="Command palette"
+			tabIndex={-1}
+			ref={panelRef}
+			onKeyDown={onKeyDown}
+		>
 			<div className="command-head">
 				<span className="label">commands</span>
 				<input
