@@ -24,7 +24,7 @@ export function editingBindings(deps: KeymapDeps): KeyBinding[] {
 					deps.setRenameOpen(false);
 					return true;
 				}
-				if (deps.codeMenuOpen) {
+				if (deps.codeMenuOpenRef.current) {
 					deps.setCodeMenuOpen(false);
 					return true;
 				}

@@ -34,7 +34,8 @@ export type KeymapDeps = {
 	runSig: () => Promise<void>;
 	clearOccurrences: () => void;
 	renameOpen: boolean;
-	codeMenuOpen: boolean;
+	/** Read live: the keymap is built once per mount, so a plain boolean is the state it had then. */
+	codeMenuOpenRef: { current: boolean };
 	setRenameValue: (value: string) => void;
 	setRenameOpen: (value: boolean) => void;
 	setCodeActions: (actions: CodeAction[]) => void;

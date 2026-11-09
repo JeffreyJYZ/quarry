@@ -9,6 +9,9 @@ import { useRunFormMemory } from "@/ui/app/useRunFormMemory";
 import type { RunControls } from "@/ui/app/runControlsTypes";
 export type { RunControls, RunExit } from "@/ui/app/runControlsTypes";
 
+/** A resolved `LaunchConfig` carries no environment rows, so a target run passes none. */
+const NO_ENV: EnvVar[] = [];
+
 /**
  * The run tool window: the form's fields, its saved configurations, and the child process.
  *
@@ -93,7 +96,9 @@ export function useRunControls(options: {
 	 * Run one resolved configuration: the detected target's binary, or a preset's.
 	 *
 	 * The form fields take the configuration's values so the log's command line matches what ran;
-	 * the form is the only place a run's argv is displayed.
+	 * the form is the only place a run's argv is displayed. The environment rows are the form's own,
+	 * so they stay out of this path: a target's configuration has none, and rows left in the form by
+	 * a saved configuration would otherwise be inherited by a target that never asked for them.
 	 */
 	const runConfig = useCallback(
 		async (config: LaunchConfig) => {
@@ -105,11 +110,11 @@ export function useRunControls(options: {
 				config.program,
 				config.args,
 				runCwd(config.cwd, root),
-				env,
+				NO_ENV,
 			);
 			if (!started) setPanelOpen(true);
 		},
-		[root, running, env, proc],
+		[root, running, proc],
 	);
 
 	return {
