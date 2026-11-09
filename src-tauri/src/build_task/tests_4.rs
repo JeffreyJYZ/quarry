@@ -118,6 +118,22 @@ pub mod tests_group_4 {
     }
 
     #[test]
+    pub fn a_relative_cmake_diagnostic_resolves_to_the_source_tree() {
+        // CMake runs the compiler in the build directory but prints paths against the source tree
+        // it was configured from, so joining them to the build root put every click in a file that
+        // does not exist there.
+        let diagnostics =
+            cmake_diagnostics("src/main.cpp:4:2: error: expected ';'", "/projects/demo");
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].path, "/projects/demo/src/main.cpp");
+        assert_eq!(diagnostics[0].source.as_deref(), Some(CMAKE_SOURCE));
+
+        let absolute = cmake_diagnostics("/elsewhere/main.cpp:1:1: error: boom", "/projects/demo");
+        assert_eq!(absolute[0].path, "/elsewhere/main.cpp");
+    }
+
+    #[test]
     pub fn text_summary_is_the_last_non_empty_line_truncated() {
         assert_eq!(
             summarize_text("compiling\n[100%] built target demo\n\n"),

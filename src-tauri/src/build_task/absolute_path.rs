@@ -59,16 +59,26 @@ pub fn severity(level: &str) -> u8 {
 /// Last non-empty stderr line, truncated for the status bar.
 ///
 /// A message with no span never reaches stderr in some cargo versions, so its text is the fallback.
-pub fn summarize(stderr: &str, unlocated: &[String]) -> String {
+/// When neither says anything, the exit status decides: reporting "succeeded" for a build that
+/// failed is the one summary the user cannot check against the panel, which is empty too.
+pub fn summarize(stderr: &str, unlocated: &[String], success: bool) -> String {
     let last_stderr = stderr.lines().rev().find(|line| !line.trim().is_empty());
     let text = match last_stderr {
         Some(line) => line.trim(),
-        None => unlocated
-            .last()
-            .map(String::as_str)
-            .unwrap_or(DEFAULT_SUMMARY),
+        None => unlocated.last().map(String::as_str).unwrap_or(if success {
+            DEFAULT_SUMMARY
+        } else {
+            FAILED_SUMMARY
+        }),
     };
     truncate(text, SUMMARY_LIMIT)
+}
+
+/// CMake's compiler output names files relative to the source tree it was configured from, while
+/// the build itself runs in the build directory. Resolving against the build root pointed every
+/// relative diagnostic at a file that does not exist there; absolute paths are already the answer.
+pub fn cmake_diagnostics(text: &str, source_root: &str) -> Vec<Diagnostic> {
+    parse_text_diagnostics(text, Path::new(source_root))
 }
 
 pub fn truncate(text: &str, limit: usize) -> String {
@@ -107,7 +117,7 @@ pub fn run_cmake_build(
     let duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
     Ok(BuildReport {
         success,
-        diagnostics: parse_text_diagnostics(&text, Path::new(build_root)),
+        diagnostics: cmake_diagnostics(&text, source_root),
         duration_ms,
         summary: summarize_text(&text),
         // The program the build just wrote. CMake names its targets as text (`Built target …`),

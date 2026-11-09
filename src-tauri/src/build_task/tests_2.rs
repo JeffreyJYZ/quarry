@@ -63,26 +63,28 @@ pub mod tests_group_2 {
     }
 
     #[test]
-    pub fn error_and_warning_children_become_extra_diagnostics_at_the_primary_span() {
-        let line = r#"{"reason":"compiler-message","message":{"level":"error","message":"mismatched types","spans":[{"file_name":"src/main.rs","line_start":5,"line_end":5,"column_start":2,"column_end":4,"is_primary":true}],"children":[{"level":"error","message":"expected `u32`, found `&str`","spans":[]},{"level":"warning","message":"consider borrowing","spans":[]},{"level":"note","message":"ignored note","spans":[]}]}}"#;
+    pub fn a_child_keeps_its_own_span_and_a_note_is_kept() {
+        let line = r#"{"reason":"compiler-message","message":{"level":"error","message":"mismatched types","spans":[{"file_name":"src/main.rs","line_start":5,"line_end":5,"column_start":2,"column_end":4,"is_primary":true}],"children":[{"level":"note","message":"expected `u32`, found `&str`","spans":[{"file_name":"src/lib.rs","line_start":9,"line_end":9,"column_start":3,"column_end":8,"is_primary":false}]},{"level":"help","message":"consider borrowing","spans":[]},{"level":"warning","message":"unused import","spans":[{"file_name":"src/lib.rs","line_start":2,"line_end":2,"column_start":1,"column_end":4,"is_primary":true}]}]}}"#;
 
         let ParsedLine::Diagnostics(diagnostics) = parse_message_line(line, build_root()) else {
             panic!("expected diagnostics");
         };
 
-        assert_eq!(diagnostics.len(), 3);
-        assert_eq!(diagnostics[0].severity, 1);
-        assert_eq!(
-            diagnostics[1].message,
-            "error: expected `u32`, found `&str`"
-        );
-        assert_eq!(diagnostics[1].severity, 1);
-        assert_eq!(diagnostics[2].message, "warning: consider borrowing");
-        assert_eq!(diagnostics[2].severity, 2);
-        for diagnostic in &diagnostics {
-            assert_eq!(diagnostic.range, diagnostics[0].range);
-            assert_eq!(diagnostic.path, diagnostics[0].path);
-        }
+        assert_eq!(diagnostics.len(), 4);
+        assert_eq!(diagnostics[0].message, "mismatched types");
+        // The note points at another file and line, and it is no longer discarded for its level.
+        assert_eq!(diagnostics[1].path, format!("{BUILD_ROOT}/src/lib.rs"));
+        assert_eq!(diagnostics[1].range.start.line, 8);
+        assert_eq!(diagnostics[1].severity, 3);
+        assert_eq!(diagnostics[1].message, "note: expected `u32`, found `&str`");
+        // A child without a span of its own falls back to the parent's site, not to nothing.
+        assert_eq!(diagnostics[2].path, diagnostics[0].path);
+        assert_eq!(diagnostics[2].range, diagnostics[0].range);
+        assert_eq!(diagnostics[2].severity, 4);
+        // A warning that points elsewhere keeps that site too.
+        assert_eq!(diagnostics[3].path, format!("{BUILD_ROOT}/src/lib.rs"));
+        assert_eq!(diagnostics[3].range.start.line, 1);
+        assert_eq!(diagnostics[3].severity, 2);
     }
 
     #[test]
@@ -99,18 +101,30 @@ pub mod tests_group_2 {
     pub fn summary_is_the_last_non_empty_stderr_line_truncated() {
         let stderr = "warning: unused\n\n    Finished `dev` profile [unoptimized]\n\n";
         assert_eq!(
-            summarize(stderr, &[]),
+            summarize(stderr, &[], true),
             "Finished `dev` profile [unoptimized]"
         );
 
-        assert_eq!(summarize("  \n\n", &[]), DEFAULT_SUMMARY);
+        assert_eq!(summarize("  \n\n", &[], true), DEFAULT_SUMMARY);
         assert_eq!(
-            summarize("", &["could not compile `demo`".to_string()]),
+            summarize("", &["could not compile `demo`".to_string()], false),
             "could not compile `demo`"
         );
 
         let long = "e".repeat(SUMMARY_LIMIT + 50);
-        assert_eq!(summarize(&long, &[]).chars().count(), SUMMARY_LIMIT);
+        assert_eq!(summarize(&long, &[], true).chars().count(), SUMMARY_LIMIT);
+    }
+
+    #[test]
+    pub fn a_failed_build_with_empty_output_never_reports_success() {
+        let summary = summarize("  \n\n", &[], false);
+
+        assert_eq!(summary, FAILED_SUMMARY);
+        assert!(
+            !summary.contains("succeeded"),
+            "a failed build reported success: {summary}"
+        );
+        assert_eq!(summarize("", &[], true), DEFAULT_SUMMARY);
     }
 
     #[test]
@@ -128,10 +142,16 @@ pub mod tests_group_2 {
         assert!(require_cargo(ProjectKind::Cargo).is_ok());
 
         for kind in [ProjectKind::Cmake, ProjectKind::CompileCommands] {
-            let error = require_cargo(kind).expect_err("C/C++ is not wired");
+            let error = require_cargo(kind).expect_err("cargo does not build C/C++ projects");
+            assert!(error.contains("C/C++ project"), "unexpected error: {error}");
             assert!(
-                error.contains("C/C++ builds are not wired yet"),
+                error.contains("Cargo projects only"),
                 "unexpected error: {error}"
+            );
+            // The C/C++ branches are shipped, so the gate must not claim the feature is missing.
+            assert!(
+                !error.contains("not wired"),
+                "the mis-dispatch message claims a shipped feature is missing: {error}"
             );
         }
         assert!(require_cargo(ProjectKind::Unknown).is_err());

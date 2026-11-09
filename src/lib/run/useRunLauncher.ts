@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { buildProject, type LaunchConfig, resolveRunTarget } from "@/lib/project/api";
+import { type LaunchConfig, resolveRunTarget } from "@/lib/project/api";
+import { buildOnce } from "@/lib/project/buildOnce";
 import { buildThenResolve } from "@/lib/run/buildThenRun";
 import type { LaunchFailure } from "@/lib/run/failureLines";
 
@@ -58,7 +59,7 @@ export function useRunLauncher(options: {
 					targetId,
 					profile,
 					stopOnEntry: false,
-					build: buildProject,
+					build: buildOnce,
 					resolve: resolveRunTarget,
 				});
 				if (generation.current !== mine) return;
