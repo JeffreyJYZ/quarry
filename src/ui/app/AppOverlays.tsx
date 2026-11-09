@@ -2,14 +2,16 @@ import type { GenerateItem } from "@/lib/generate/model";
 import type { GitStatus, Location, ProjectInfo } from "@/lib/project/api";
 import type { Preferences, ProjectSettings } from "@/lib/settings/model";
 import type { GotoMode } from "@/ui/goto/gotoModel";
-import DiffView from "@/ui/git/DiffView";
-import Goto from "@/ui/goto/Goto";
-import LinePrompt from "@/ui/goto/LinePrompt";
-import Generate from "@/ui/generate/Generate";
-import NewProject from "@/ui/projects/NewProject";
-import RefsPanel from "@/ui/components/RefsPanel";
-import SettingsPage from "@/ui/settings/SettingsPage";
+import { Suspense, lazy } from "react";
 import StatusBar from "@/ui/components/StatusBar";
+
+const DiffView = lazy(() => import("@/ui/git/DiffView"));
+const Goto = lazy(() => import("@/ui/goto/Goto"));
+const LinePrompt = lazy(() => import("@/ui/goto/LinePrompt"));
+const Generate = lazy(() => import("@/ui/generate/Generate"));
+const NewProject = lazy(() => import("@/ui/projects/NewProject"));
+const RefsPanel = lazy(() => import("@/ui/components/RefsPanel"));
+const SettingsPage = lazy(() => import("@/ui/settings/SettingsPage"));
 
 export type OverlaysProps = {
 	root: string | null;
@@ -89,24 +91,30 @@ export default function AppOverlays(props: OverlaysProps) {
 	return (
 		<>
 			{props.refsOpen ? (
-				<RefsPanel
-					locations={props.references}
-					onNavigate={props.onNavigate}
-					onClose={props.onCloseRefs}
-				/>
+				<Suspense fallback={null}>
+					<RefsPanel
+						locations={props.references}
+						onNavigate={props.onNavigate}
+						onClose={props.onCloseRefs}
+					/>
+				</Suspense>
 			) : null}
 			{props.gitDiffPath !== null && props.root !== null ? (
-				<DiffView
-					root={props.root}
-					path={props.gitDiffPath}
-					onClose={props.onCloseGitDiff}
-				/>
+				<Suspense fallback={null}>
+					<DiffView
+						root={props.root}
+						path={props.gitDiffPath}
+						onClose={props.onCloseGitDiff}
+					/>
+				</Suspense>
 			) : props.gitCommitDiffHash !== null && props.root !== null ? (
-				<DiffView
-					root={props.root}
-					commit={props.gitCommitDiffHash}
-					onClose={props.onCloseCommitDiff}
-				/>
+				<Suspense fallback={null}>
+					<DiffView
+						root={props.root}
+						commit={props.gitCommitDiffHash}
+						onClose={props.onCloseCommitDiff}
+					/>
+				</Suspense>
 			) : null}
 			<StatusBar
 				project={props.project}
@@ -137,49 +145,59 @@ export default function AppOverlays(props: OverlaysProps) {
 				onStop={props.onStop}
 			/>
 			{props.settingsOpen ? (
-				<SettingsPage
-					open
-					user={props.preferences}
-					project={props.projectSettings}
-					projectRoot={props.root}
-					onClose={props.onCloseSettings}
-					onUserChange={props.onPreferencesChange}
-					onProjectChange={props.onProjectSettingsChange}
-					onResetPanels={props.onResetPanels}
-					initialTab={props.settingsTab}
-				/>
+				<Suspense fallback={null}>
+					<SettingsPage
+						open
+						user={props.preferences}
+						project={props.projectSettings}
+						projectRoot={props.root}
+						onClose={props.onCloseSettings}
+						onUserChange={props.onPreferencesChange}
+						onProjectChange={props.onProjectSettingsChange}
+						onResetPanels={props.onResetPanels}
+						initialTab={props.settingsTab}
+					/>
+				</Suspense>
 			) : null}
 			{props.gotoMode !== null && props.root !== null ? (
-				<Goto
-					mode={props.gotoMode}
-					root={props.root}
-					path={props.activePath}
-					recent={props.gotoRecent}
-					onOpen={props.onNavigate}
-					onClose={props.onCloseGoto}
-				/>
+				<Suspense fallback={null}>
+					<Goto
+						mode={props.gotoMode}
+						root={props.root}
+						path={props.activePath}
+						recent={props.gotoRecent}
+						onOpen={props.onNavigate}
+						onClose={props.onCloseGoto}
+					/>
+				</Suspense>
 			) : null}
 			{props.lineOpen ? (
-				<LinePrompt
-					total={props.lineTotal}
-					onGo={props.onGoLine}
-					onClose={props.onCloseLine}
-				/>
+				<Suspense fallback={null}>
+					<LinePrompt
+						total={props.lineTotal}
+						onGo={props.onGoLine}
+						onClose={props.onCloseLine}
+					/>
+				</Suspense>
 			) : null}
 			{props.generateOpen ? (
-				<Generate
-					items={props.generateItems}
-					onPick={props.onPickGenerate}
-					onClose={props.onCloseGenerate}
-				/>
+				<Suspense fallback={null}>
+					<Generate
+						items={props.generateItems}
+						onPick={props.onPickGenerate}
+						onClose={props.onCloseGenerate}
+					/>
+				</Suspense>
 			) : null}
-			<NewProject
-				open={props.newProjectOpen}
-				initialParent={props.newProjectParent}
-				onParentChange={props.onNewProjectParentChange}
-				onClose={props.onCloseNewProject}
-				onCreated={props.onProjectCreated}
-			/>
+			<Suspense fallback={null}>
+				<NewProject
+					open={props.newProjectOpen}
+					initialParent={props.newProjectParent}
+					onParentChange={props.onNewProjectParentChange}
+					onClose={props.onCloseNewProject}
+					onCreated={props.onProjectCreated}
+				/>
+			</Suspense>
 		</>
 	);
 }

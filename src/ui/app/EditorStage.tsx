@@ -6,7 +6,8 @@ import Breadcrumb from "@/ui/breadcrumb/Breadcrumb";
 import LazyEditor from "@/ui/editor/LazyEditor";
 import TabStrip from "@/ui/components/TabStrip";
 import Welcome from "@/ui/components/Welcome";
-import DisasmPane from "@/ui/debug/memory/DisasmPane";
+import { Suspense, lazy } from "react";
+const DisasmPane = lazy(() => import("@/ui/debug/memory/DisasmPane"));
 import Splitter from "@/ui/layout/Splitter";
 import type { Location, ProjectInfo } from "@/lib/project/api";
 import type { RefObject } from "react";
@@ -154,11 +155,13 @@ export default function EditorStage(props: EditorStageProps) {
 								</button>
 							</header>
 							<div className="editor-split-body">
-								<DisasmPane
-									session={props.disasm.session}
-									address={props.disasm.address}
-									frameId={props.disasm.frameId}
-								/>
+								<Suspense fallback={null}>
+									<DisasmPane
+										session={props.disasm.session}
+										address={props.disasm.address}
+										frameId={props.disasm.frameId}
+									/>
+								</Suspense>
 							</div>
 						</aside>
 					</>
