@@ -1,9 +1,9 @@
 import type { FileEntry, GitStatusEntry } from "@/lib/project/api";
-import { parentDir } from "@/lib/project/paths";
 import type { DirState, EditState } from "./FileTreeTypes";
 import { indent } from "./FileTreeIcons";
 import { CreateInputRow } from "./TreeCreateInput";
 import { TreeRow } from "./TreeRow";
+
 export type TreeLevelProps = {
 	path: string;
 	depth: number;
@@ -11,6 +11,10 @@ export type TreeLevelProps = {
 	expanded: Set<string>;
 	activePath: string | null;
 	highlightedPath: string | null;
+	/** The single row that owns the tab stop and `aria-selected`. */
+	selectedPath: string | null;
+	changedDirs: ReadonlySet<string>;
+	onRowFocus: (path: string) => void;
 	onToggle: (path: string) => void;
 	onRetry: (path: string) => void;
 	onOpenFile: (entry: FileEntry) => void;
@@ -23,6 +27,7 @@ export type TreeLevelProps = {
 	onCancelDelete: () => void;
 	changes: Record<string, GitStatusEntry["status"]>;
 };
+
 export function TreeLevel({
 	path,
 	depth,
@@ -30,6 +35,9 @@ export function TreeLevel({
 	expanded,
 	activePath,
 	highlightedPath,
+	selectedPath,
+	changedDirs,
+	onRowFocus,
 	onToggle,
 	onRetry,
 	onOpenFile,
@@ -74,15 +82,6 @@ export function TreeLevel({
 			</p>
 		);
 	}
-	const changedDirs = new Set<string>();
-	for (const p of Object.keys(changes)) {
-		for (let cur = p; ;) {
-			changedDirs.add(cur);
-			const up = parentDir(cur);
-			if (up === null) break;
-			cur = up;
-		}
-	}
 	const showCreateInput =
 		editing?.kind.startsWith("create") === true &&
 		editing !== null &&
@@ -90,14 +89,14 @@ export function TreeLevel({
 		editing.parent === path;
 
 	return (
-		<ul className="tree">
+		<ul className="tree" role="presentation">
 			{/* The new-file row sits at the top of the folder it is being made in, where CLion and VS
 			    Code put it; at the bottom it landed screens away from the folder that was right-clicked. */}
 			{showCreateInput &&
 			editing !== null &&
 			"parent" in editing &&
 			editing.parent === path ? (
-				<li>
+				<li role="none">
 					<CreateInputRow
 						depth={depth}
 						parent={path}
@@ -114,7 +113,7 @@ export function TreeLevel({
 					editing !== null && editing.kind === "rename" && editing.target === entry.path;
 				const isDeleting = deleteConfirm === entry.path;
 				return (
-					<li key={entry.path}>
+					<li key={entry.path} role="none">
 						{isRenaming ? (
 							<div className="tree-row edit-row" style={indent(depth)}>
 								<input
@@ -137,7 +136,11 @@ export function TreeLevel({
 						) : isDeleting ? (
 							<div className="tree-row delete-row" style={indent(depth)}>
 								<span className="tree-name">delete {entry.name}?</span>
-								<button type="button" onClick={() => onConfirmDelete(entry.path)}>
+								<button
+									type="button"
+									ref={(node) => node?.focus()}
+									onClick={() => onConfirmDelete(entry.path)}
+								>
 									delete
 								</button>
 								<button type="button" onClick={onCancelDelete}>
@@ -149,6 +152,8 @@ export function TreeLevel({
 								entry={entry}
 								depth={depth}
 								isOpen={isOpen}
+								selected={entry.path === selectedPath}
+								tabIndex={entry.path === selectedPath ? 0 : -1}
 								status={status}
 								activePath={activePath}
 								highlightedPath={highlightedPath}
@@ -156,6 +161,7 @@ export function TreeLevel({
 								onToggle={onToggle}
 								onOpenFile={onOpenFile}
 								onMenu={onMenu}
+								onFocus={() => onRowFocus(entry.path)}
 							/>
 						)}
 						{isOpen ? (
@@ -166,6 +172,9 @@ export function TreeLevel({
 								expanded={expanded}
 								activePath={activePath}
 								highlightedPath={highlightedPath}
+								selectedPath={selectedPath}
+								changedDirs={changedDirs}
+								onRowFocus={onRowFocus}
 								onToggle={onToggle}
 								onRetry={onRetry}
 								onOpenFile={onOpenFile}
