@@ -32,8 +32,9 @@ export function settleSave(live: FileBuffer, writtenFrom: string, saved: string)
 /**
  * One document, as the editor sees it: a path plus the number of times disk replaced its text.
  *
- * The surface keys its view on this, so a tab switch, a reopen and a reload each start a fresh undo
- * history instead of inheriting the last document's steps.
+ * The surface keys its view on this, so a disk reload disposes the old view instead of letting an
+ * undo walk back into text that was never on disk. A tab switch disposes the view too, and the
+ * per-document state cache is what brings its undo history, caret and scroll back.
  */
 export function documentId(buffer: Pick<FileBuffer, "path" | "loadId">): string {
 	return `${buffer.path}#${buffer.loadId ?? 0}`;
