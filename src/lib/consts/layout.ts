@@ -11,6 +11,13 @@ export const DEFAULT_PANEL_SIZES: PanelSizes = {
 	disasmWidth: 520,
 };
 
+/**
+ * The editor column's floor. The rail and the terminal give width up before the canvas does, so a
+ * narrow window narrows the side panels instead of collapsing the editor; `AppBody` publishes it
+ * as `--editor-min-width` and the stylesheet reads that, so the number lives here only.
+ */
+export const EDITOR_MIN_WIDTH = 360;
+
 export const PANEL_LIMITS: Record<PanelName, { min: number; max: number }> = {
 	railWidth: { min: 160, max: 560 },
 	dockHeight: { min: 120, max: 900 },

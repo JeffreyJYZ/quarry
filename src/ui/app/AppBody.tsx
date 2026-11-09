@@ -10,7 +10,7 @@ import SideRail from "@/ui/app/SideRail";
 import IconRail from "@/ui/app/IconRail";
 import EditorColumn from "@/ui/app/EditorColumn";
 import Splitter from "@/ui/layout/Splitter";
-import { PANEL_LIMITS } from "@/lib/consts/layout";
+import { EDITOR_MIN_WIDTH, PANEL_LIMITS } from "@/lib/consts/layout";
 import { useFileWatch } from "@/ui/app/useFileWatch";
 import type { ShellModel } from "@/ui/app/useShell";
 
@@ -52,7 +52,11 @@ export default function AppBody({ model }: { model: ShellModel }) {
 			style={
 				{
 					"--rail-width": `${railWidth}px`,
+					/* The floors come from PANEL_LIMITS, so the stylesheet never re-guesses them. */
+					"--rail-min-width": `${PANEL_LIMITS.railWidth.min}px`,
 					"--terminal-width": `${terminalWidth}px`,
+					"--terminal-min-width": `${PANEL_LIMITS.terminalWidth.min}px`,
+					"--editor-min-width": `${EDITOR_MIN_WIDTH}px`,
 				} as CSSProperties
 			}
 		>

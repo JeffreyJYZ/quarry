@@ -63,8 +63,10 @@
 
 /* Docked right: a column beside the editor, not a strip under it. */
 .terminal.terminal-side {
-	flex: 0 0 var(--terminal-width, 380px);
+	/* It yields the most width (shrink 3 to the rail's 1), down to the splitter's own minimum. */
+	flex: 0 3 var(--terminal-width, 380px);
 	width: var(--terminal-width, 380px);
+	min-width: var(--terminal-min-width, 240px);
 	height: auto;
 	border-top: 0;
 	border-left: 1px solid var(--line);

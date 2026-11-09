@@ -1,0 +1,57 @@
+/* The in-file find and replace bar that floats over the editor surface (`SearchBar.tsx`). */
+
+.editor-host .cm-search-bar {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	z-index: 10;
+	display: flex;
+	gap: 6px;
+	align-items: center;
+	padding: 6px 8px;
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	font-size: 12px;
+}
+
+.editor-host .cm-search-bar input {
+	width: 160px;
+	background: var(--bg);
+	color: var(--text);
+	border: 1px solid var(--line);
+	border-radius: 4px;
+	padding: 2px 6px;
+}
+
+.editor-host .cm-search-bar button {
+	background: transparent;
+	color: var(--text);
+	border: 1px solid var(--line);
+	border-radius: 4px;
+	padding: 2px 6px;
+	cursor: pointer;
+}
+
+/* Case, regex and the replace latch: a base class plus a modifier, never a bare `active`. */
+.editor-host .cm-search-bar .search-bar-toggle {
+	font-family: var(--mono);
+	letter-spacing: 0.02em;
+}
+
+.editor-host .cm-search-bar .search-bar-toggle.active {
+	background: var(--accent);
+	color: var(--bg);
+	border-color: var(--accent);
+}
+
+.editor-host .cm-search-bar .search-error {
+	color: var(--muted);
+	font-style: italic;
+}
+
+.editor-host .cm-search-bar .search-count {
+	color: var(--muted);
+	min-width: 60px;
+	text-align: center;
+}

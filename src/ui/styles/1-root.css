@@ -175,6 +175,11 @@ body {
 	color: var(--text);
 }
 
+/*
+ * One row: the icon rail, the explorer, the editor column, then a docked terminal. The side regions
+ * shrink first and the canvas keeps `--editor-min-width`, so a narrow window narrows the panels
+ * instead of collapsing the editor to nothing.
+ */
 .body {
 	position: relative;
 	display: flex;

@@ -105,7 +105,8 @@
 	z-index: 60;
 	display: flex;
 	flex-direction: column;
-	width: 380px;
+	/* A popover never runs past the window it opens into: it shrinks instead of holding 380px. */
+	width: min(380px, calc(100vw - 100px));
 	padding: 6px;
 	border: 1px solid var(--line);
 	border-radius: 6px;
