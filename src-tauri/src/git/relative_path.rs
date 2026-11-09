@@ -74,13 +74,70 @@ pub fn read_file(root: &str, relative: &str) -> Result<String, String> {
         .map_err(|error| format!("git diff failed: cannot read {path:?}: {error}"))
 }
 
+/// True when git's `core.quotePath` writes the path as a C-quoted string.
+fn needs_quote(path: &str) -> bool {
+    path.bytes()
+        .any(|byte| byte < 0x20 || byte == 0x7f || byte >= 0x80 || byte == b'"' || byte == b'\\')
+}
+
+/// The short escape git uses for a byte inside a quoted path, when it has one.
+fn short_escape(byte: u8) -> Option<char> {
+    match byte {
+        0x07 => Some('a'),
+        0x08 => Some('b'),
+        b'\t' => Some('t'),
+        b'\n' => Some('n'),
+        0x0b => Some('v'),
+        0x0c => Some('f'),
+        b'\r' => Some('r'),
+        b'"' => Some('"'),
+        b'\\' => Some('\\'),
+        _ => None,
+    }
+}
+
+/// One name in a diff header, C-quoted exactly as git writes it: `"a/x"` with control bytes
+/// escaped and every UTF-8 byte at or above 0x80 as a three-digit octal, which is git's default.
+pub fn quote_diff_name(name: &str) -> String {
+    let mut quoted = String::with_capacity(name.len() + 2);
+    quoted.push('"');
+    for byte in name.bytes() {
+        match short_escape(byte) {
+            Some(escape) => {
+                quoted.push('\\');
+                quoted.push(escape);
+            }
+            None if byte < 0x20 || byte == 0x7f || byte >= 0x80 => {
+                quoted.push_str(&format!("\\{byte:03o}"));
+            }
+            None => quoted.push(byte as char),
+        }
+    }
+    quoted.push('"');
+    quoted
+}
+
+/// The name a diff header carries: verbatim when git would, quoted when it would.
+fn diff_name(name: &str) -> String {
+    if needs_quote(name) {
+        quote_diff_name(name)
+    } else {
+        name.to_string()
+    }
+}
+
 /// Builds the diff of an untracked file: its whole content as one added hunk.
 pub fn untracked_diff(path: &str, content: &str) -> String {
     let mut diff = String::new();
-    diff.push_str(&format!("diff --git a/{path} b/{path}\n"));
+    let old = diff_name(&format!("a/{path}"));
+    let new = diff_name(&format!("b/{path}"));
+    diff.push_str(&format!("diff --git {old} {new}\n"));
     diff.push_str("new file mode 100644\n");
     diff.push_str("--- /dev/null\n");
-    diff.push_str(&format!("+++ b/{path}\n"));
+    // An unquoted name is terminated by a tab when it contains a space, so the header still ends
+    // where the name does; git writes the tab for a quoted name that contains one too.
+    let terminator = if new.contains([' ', '\t']) { "\t" } else { "" };
+    diff.push_str(&format!("+++ {new}{terminator}\n"));
 
     let lines: Vec<&str> = content.lines().collect();
     if lines.is_empty() {
