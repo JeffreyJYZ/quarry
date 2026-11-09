@@ -66,6 +66,25 @@ pub mod tests_group_7 {
         assert_eq!(lock(&state.sessions).len(), 1);
     }
 
+    /// A dead entry must not be handed back: the server behind it has exited, so the caller reserves
+    /// the root and spawns a fresh one.
+    #[test]
+    fn a_dead_session_is_dropped_instead_of_returned() {
+        let state = LspState::default();
+        let root = "rust-analyzer::/tmp/quarry-lsp-claim";
+        let session = session_on_cat();
+        // Exactly what the pump thread does when the server goes away.
+        server_gone(&session);
+        lock(&state.sessions).insert(root.to_string(), session);
+
+        let claimed = tauri::async_runtime::block_on(claim_start(&state, root));
+
+        assert!(claimed.is_none());
+        assert!(lock(&state.in_flight).contains(root));
+        assert!(!lock(&state.sessions).contains_key(root));
+        assert_eq!(lock(&state.sessions).len(), 0);
+    }
+
     /// A session over a real `cat`, which owns a pipe without being a language server.
     fn session_on_cat() -> Arc<Mutex<Session>> {
         let mut command = Command::new("cat");

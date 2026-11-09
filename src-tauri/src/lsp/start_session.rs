@@ -40,8 +40,21 @@ pub struct Started {
 /// one root must not pin an async worker while the first server answers `initialize`.
 pub(crate) async fn claim_start(state: &LspState, root: &str) -> Option<Arc<Mutex<Session>>> {
     loop {
-        if let Some(existing) = lock(&state.sessions).get(root).cloned() {
-            return Some(existing);
+        let found = lock(&state.sessions).get(root).cloned();
+        if let Some(existing) = found {
+            // A session whose server has exited can never answer again, so hand back only a live
+            // one; a dead entry is dropped and this call spawns a fresh server. The map lock is
+            // released before the session lock is taken, and neither is held together.
+            if !lock(&existing).dead {
+                return Some(existing);
+            }
+            let mut sessions = lock(&state.sessions);
+            if sessions
+                .get(root)
+                .is_some_and(|current| Arc::ptr_eq(current, &existing))
+            {
+                sessions.remove(root);
+            }
         }
         {
             let mut flight = lock(&state.in_flight);
