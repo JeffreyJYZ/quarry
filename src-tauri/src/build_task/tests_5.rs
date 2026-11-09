@@ -127,4 +127,59 @@ pub mod tests_group_5 {
         let missing = directory.path().join("never-built");
         assert_eq!(cmake_artifact("", &missing, SystemTime::UNIX_EPOCH), None);
     }
+
+    #[test]
+    pub fn debug_symbols_and_link_artefacts_are_never_the_program() {
+        let directory = TempDir::new("newest-artifacts");
+        let root = directory.path();
+        let since = SystemTime::now() - Duration::from_secs(60);
+
+        for name in [
+            "demo.pdb", "demo.dll", "demo.lib", "demo.exp", "demo.ilk", "demo.obj",
+        ] {
+            write_executable(&root.join(name));
+        }
+        write_executable(&root.join("demo.exe"));
+
+        assert_eq!(
+            executable_candidates(root)
+                .iter()
+                .map(|candidate| candidate
+                    .path
+                    .file_name()
+                    .expect("file name")
+                    .to_string_lossy()
+                    .into_owned())
+                .collect::<Vec<_>>(),
+            vec!["demo.exe".to_string()]
+        );
+        assert_eq!(
+            cmake_artifact("", root, since).as_deref(),
+            Some(root.join("demo.exe").to_string_lossy().as_ref())
+        );
+    }
+
+    // Windows has no mode bits, so the extension is the only thing that says a file can be launched.
+    #[cfg(not(unix))]
+    #[test]
+    pub fn windows_requires_a_launchable_extension() {
+        let directory = TempDir::new("newest-launchable");
+        let root = directory.path();
+
+        write_plain(&root.join("demo"));
+        write_plain(&root.join("demo.txt"));
+        write_plain(&root.join("run.bat"));
+        write_plain(&root.join("DEMO.EXE"));
+
+        assert!(
+            !is_executable(&root.join("demo")),
+            "extensionless cargo test binary"
+        );
+        assert!(!is_executable(&root.join("demo.txt")));
+        assert!(is_executable(&root.join("run.bat")));
+        assert!(
+            is_executable(&root.join("DEMO.EXE")),
+            "extensions are case-insensitive"
+        );
+    }
 }
