@@ -1,6 +1,7 @@
 import type { GenerateItem } from "@/lib/generate/model";
 import type { GitStatus, Location, ProjectInfo } from "@/lib/project/api";
 import type { Preferences, ProjectSettings } from "@/lib/settings/model";
+import type { StatusChip } from "@/lib/status/model";
 import type { GotoMode } from "@/ui/goto/gotoModel";
 import { Suspense } from "react";
 import StatusBar from "@/ui/components/StatusBar";
@@ -17,7 +18,8 @@ export type OverlaysProps = {
 	caret: { line: number; column: number } | null;
 	language: string | null;
 	tabSize: number;
-	server: string | null;
+	/** The one status chip decision: language server name, or the work that is in flight. */
+	status: StatusChip | null;
 	onOpenSettings: () => void;
 
 	railCollapsed: boolean;
@@ -119,7 +121,7 @@ export default function AppOverlays(props: OverlaysProps) {
 				warnings={props.counts.warnings}
 				language={props.language}
 				tabSize={props.tabSize}
-				server={props.server}
+				status={props.status}
 				onOpenSettings={props.onOpenSettings}
 				railCollapsed={props.railCollapsed}
 				terminalOpen={props.terminalOpen}
