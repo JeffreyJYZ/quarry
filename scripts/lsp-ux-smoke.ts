@@ -1,14 +1,32 @@
 #!/usr/bin/env bun
 // biome-ignore-all lint/suspicious/noExplicitAny: LSP payloads are untyped JSON
 import { type ChildProcess, spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-const SERVER_BINARY = "/opt/homebrew/opt/rustup/bin/rust-analyzer";
+/** Resolve `rust-analyzer` the way detect-tools does: PATH first, then the usual install dirs. */
+function findServerBinary(): string {
+	const dirs = [
+		...(process.env.PATH ?? "").split(":").filter(Boolean),
+		"/opt/homebrew/opt/rustup/bin",
+		"/opt/homebrew/bin",
+		"/usr/local/bin",
+		`${process.env.HOME}/.cargo/bin`,
+	];
+	for (const dir of dirs) {
+		const candidate = join(dir, "rust-analyzer");
+		if (existsSync(candidate)) return candidate;
+	}
+	return "rust-analyzer";
+}
+
+const SERVER_BINARY = findServerBinary();
 const ROOT = join(import.meta.dir, "..", "src-tauri");
 const SOURCE = join(ROOT, "src", "main.rs");
 const REQ_TIMEOUT = 20_000;
-const INDEX_TIMEOUT = 30_000;
+// Indexing `src-tauri` from scratch outruns 30s on a cold CI runner, which made this probe
+// report a null hover for a server that was merely still loading.
+const INDEX_TIMEOUT = 90_000;
 
 function serverPath(binary: string): string {
 	const dirs = [

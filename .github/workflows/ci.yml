@@ -11,7 +11,7 @@ jobs:
         runs-on: macos-latest
         steps:
             - name: Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@v7
 
             - name: Setup Bun
               uses: oven-sh/setup-bun@v2
@@ -46,3 +46,44 @@ jobs:
 
             - name: Build
               run: bun run build
+
+    # The LSP and debugger probes are a separate job: they need toolchains the gate does not, and
+    # a hung language server should not hold the gate job hostage. `bun scripts/integration.ts`
+    # exits non-zero only when a probe that ran fails; probes whose tool is missing are SKIPPED and
+    # probes marked manualOnly (they need DevToolsSecurity) are never run, so this job never asks
+    # for sudo and never enables the debugger permission.
+    integration:
+        name: integration
+        runs-on: macos-latest
+        timeout-minutes: 20
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v7
+
+            - name: Setup Bun
+              uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: "1"
+
+            # The runner image carries Xcode and Homebrew, so `clang`, `clangd`, `lldb-dap`,
+            # `cmake` and `ninja` are already present; rust-analyzer is the one tool to install.
+            - name: Setup Rust
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: rust-analyzer
+
+            - name: Cache Rust
+              uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: src-tauri
+
+            - name: Install dependencies
+              run: bun install --frozen-lockfile
+
+            # A missing toolchain should name itself here, in one line per tool, rather than
+            # surfacing later as a probe that "failed".
+            - name: Detect tools
+              run: bun scripts/detect-tools.ts
+
+            - name: Integration probes
+              run: bun scripts/integration.ts
