@@ -39,14 +39,12 @@ export function useSearchQuery({
 	root,
 	initialQuery,
 	onOpen,
-	onClose,
 	options,
 	wholeWord,
 }: {
 	root: string;
 	initialQuery?: string;
 	onOpen: (path: string, line: number, column: number) => void;
-	onClose: () => void;
 	options: SearchOptions;
 	wholeWord: boolean;
 }): SearchQuery {
@@ -124,22 +122,6 @@ export function useSearchQuery({
 		},
 		[root, options, wholeWord],
 	);
-
-	useEffect(() => {
-		inputRef.current?.focus();
-	}, []);
-
-	useEffect(() => {
-		const handleEscape = (event: KeyboardEvent) => {
-			if (event.key !== "Escape") {
-				return;
-			}
-			event.preventDefault();
-			onClose();
-		};
-		window.addEventListener("keydown", handleEscape);
-		return () => window.removeEventListener("keydown", handleEscape);
-	}, [onClose]);
 
 	useEffect(() => {
 		const host = listRef.current;

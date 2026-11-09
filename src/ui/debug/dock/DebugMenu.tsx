@@ -3,6 +3,7 @@ import ExceptionsSection from "@/ui/debug/ExceptionsSection";
 import PresetsEditor from "@/ui/debug/PresetsEditor";
 import ProcessPicker from "@/ui/debug/ProcessPicker";
 import type { DebugController } from "@/lib/debug/session";
+import { useDialogFocus } from "@/ui/app/useDialogFocus";
 import "@/ui/debug/dock/dock-debug-menu.css";
 
 /**
@@ -16,28 +17,35 @@ export default function DebugMenu({ debug }: { debug: DebugController }) {
 	const [editing, setEditing] = useState(false);
 	const [attaching, setAttaching] = useState(false);
 	const container = useRef<HTMLDivElement | null>(null);
+	const { panelRef, onKeyDown } = useDialogFocus(open, {
+		// While the editor is up it owns Escape, so the menu leaves the key to it.
+		onClose: editing
+			? undefined
+			: () => {
+					setOpen(false);
+					setAttaching(false);
+				},
+	});
+
+	useEffect(() => {
+		if (!open || !editing) return;
+		// The row that opened the editor unmounts, so the panel takes focus back and Tab keeps
+		// cycling inside the menu.
+		panelRef.current?.focus();
+	}, [open, editing, panelRef]);
 
 	useEffect(() => {
 		if (!open) return;
 		const onPointerDown = (event: MouseEvent) => {
-			// While the editor is up it owns Escape and outside clicks, so a draft is never lost.
+			// While the editor is up it owns outside clicks, so a draft is never lost.
 			if (editing) return;
 			if (container.current !== null && !container.current.contains(event.target as Node)) {
 				setOpen(false);
 				setAttaching(false);
 			}
 		};
-		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.key !== "Escape" || editing) return;
-			setOpen(false);
-			setAttaching(false);
-		};
 		document.addEventListener("mousedown", onPointerDown);
-		document.addEventListener("keydown", onKeyDown);
-		return () => {
-			document.removeEventListener("mousedown", onPointerDown);
-			document.removeEventListener("keydown", onKeyDown);
-		};
+		return () => document.removeEventListener("mousedown", onPointerDown);
 	}, [open, editing]);
 
 	const session = debug.sessionId;
@@ -60,7 +68,15 @@ export default function DebugMenu({ debug }: { debug: DebugController }) {
 				…
 			</button>
 			{open ? (
-				<div className="dock-debug-pop" role="dialog" aria-label="Debugger options">
+				<div
+					className="dock-debug-pop"
+					role="dialog"
+					aria-modal="true"
+					aria-label="Debugger options"
+					tabIndex={-1}
+					ref={panelRef}
+					onKeyDown={onKeyDown}
+				>
 					{editing ? (
 						<PresetsEditor
 							debug={debug}

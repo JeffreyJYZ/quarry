@@ -1,4 +1,5 @@
 import { resultSummary, searchFlags } from "@/lib/search/model";
+import { useDialogFocus } from "@/ui/app/useDialogFocus";
 import "@/ui/search/search.css";
 import { SearchHead } from "./SearchHead";
 import { SearchReplace } from "./SearchReplace";
@@ -22,7 +23,6 @@ export default function SearchPalette({ root, onOpen, onClose, initialQuery }: S
 		root,
 		initialQuery,
 		onOpen,
-		onClose,
 		options: toggles.options,
 		wholeWord: toggles.wholeWord,
 	});
@@ -33,6 +33,10 @@ export default function SearchPalette({ root, onOpen, onClose, initialQuery }: S
 		options: toggles.options,
 		setBusy: search.setBusy,
 		setError: search.setError,
+	});
+	const { panelRef, onKeyDown } = useDialogFocus(true, {
+		initialFocus: ".search-input",
+		onClose,
 	});
 
 	let state: string;
@@ -63,7 +67,15 @@ export default function SearchPalette({ root, onOpen, onClose, initialQuery }: S
 	}`;
 
 	return (
-		<div className="search-palette" role="dialog" aria-label="Project search">
+		<div
+			className="search-palette"
+			role="dialog"
+			aria-modal="true"
+			aria-label="Project search"
+			tabIndex={-1}
+			ref={panelRef}
+			onKeyDown={onKeyDown}
+		>
 			<SearchHead
 				query={search.query}
 				onQueryChange={search.setQuery}
