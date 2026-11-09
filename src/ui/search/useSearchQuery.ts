@@ -4,13 +4,13 @@ import { searchProject, type SearchReport } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
 import {
 	groupMatches,
-	isStaleSearch,
 	type SearchGroup,
 	type SearchOptions,
 	type SearchRow,
 	searchFlags,
 	transformQuery,
 } from "@/lib/search/model";
+import { whenCurrent } from "@/lib/search/stale";
 import { invalidQuery, searchSession } from "./parts";
 
 export type SearchQuery = {
@@ -106,24 +106,20 @@ export function useSearchQuery({
 					flags.caseSensitive,
 					flags.fixedStrings,
 				);
-				if (isStaleSearch(ticket, sequence.current)) {
-					return;
-				}
-				setReport(result);
-				setRanQuery(next);
-				setActive(0);
+				whenCurrent(ticket, sequence.current, () => {
+					setReport(result);
+					setRanQuery(next);
+					setActive(0);
+				});
 			} catch (failure) {
-				if (isStaleSearch(ticket, sequence.current)) {
-					return;
-				}
-				setReport(null);
-				setRanQuery(next);
-				setActive(0);
-				setError(describeError(failure));
+				whenCurrent(ticket, sequence.current, () => {
+					setReport(null);
+					setRanQuery(next);
+					setActive(0);
+					setError(describeError(failure));
+				});
 			} finally {
-				if (!isStaleSearch(ticket, sequence.current)) {
-					setBusy(false);
-				}
+				whenCurrent(ticket, sequence.current, () => setBusy(false));
 			}
 		},
 		[root, options, wholeWord],
