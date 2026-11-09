@@ -130,6 +130,41 @@ pub mod tests {
     }
 
     #[test]
+    fn opening_a_crate_subdirectory_reports_the_ancestor_as_root() {
+        let fixture = Fixture::new("subdir");
+        fixture.write(
+            "Cargo.toml",
+            "[package]\nname = \"crate-root\"\nversion = \"0.1.0\"\n",
+        );
+        fixture.write("src/lib.rs", "");
+        let opened = fixture.root().join("src");
+        let resolved = fixture.root();
+
+        let info = open_project(opened.to_string_lossy().into_owned()).expect("open project");
+
+        assert_eq!(info.kind, ProjectKind::Cargo);
+        assert_eq!(info.name, "crate-root");
+        assert_eq!(Path::new(&info.root), resolved);
+        assert_eq!(Path::new(&info.build_root), resolved);
+        assert_eq!(Path::new(&info.opened_root), opened.canonicalize().unwrap());
+    }
+
+    #[test]
+    fn a_build_directory_holding_both_markers_is_cmake() {
+        let fixture = Fixture::new("build-both");
+        fixture.write("CMakeLists.txt", "project(both)\n");
+        fixture.write("build/compile_commands.json", "[]\n");
+        let root = fixture.root();
+        let opened = root.join("build");
+
+        let info = open_project(opened.to_string_lossy().into_owned()).expect("open project");
+
+        assert_eq!(info.kind, ProjectKind::Cmake);
+        assert_eq!(Path::new(&info.root), root);
+        assert_eq!(Path::new(&info.build_root), root);
+    }
+
+    #[test]
     fn a_missing_root_is_an_error() {
         let fixture = Fixture::new("missing");
         let missing = fixture.path.join("does-not-exist");
