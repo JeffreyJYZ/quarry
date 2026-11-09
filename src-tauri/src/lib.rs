@@ -30,8 +30,56 @@ fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
+use std::sync::OnceLock;
+use std::time::Instant;
+
+/// Process start instant for startup instrumentation. Off by default: enable with QUARRY_STARTUP=1 (or a debug build).
+static PROCESS_START: OnceLock<Instant> = OnceLock::new();
+
+pub fn process_start() -> Instant {
+	*PROCESS_START.get_or_init(Instant::now)
+}
+
+pub fn startup_enabled() -> bool {
+	cfg!(debug_assertions) || std::env::var_os("QUARRY_STARTUP").is_some()
+}
+
+/// Format per-mark elapsed ms (since process start) into consecutive deltas. Pure, tested.
+pub fn format_startup_deltas(marks: &[(String, u128)]) -> String {
+	let mut out = String::new();
+	let mut prev: Option<u128> = None;
+	for (label, ms) in marks {
+		let delta = prev.map(|p| ms.saturating_sub(p)).unwrap_or(*ms);
+		out.push_str(&format!("{label}: +{delta}ms (t={ms}ms)\n"));
+		prev = Some(*ms);
+	}
+	out
+}
+
+#[cfg(test)]
+mod startup_marks_tests {
+	use super::format_startup_deltas;
+	#[test]
+	fn formats_deltas() {
+		let marks = vec![("process".to_string(), 0u128), ("window".to_string(), 120u128), ("paint".to_string(), 135u128)];
+		let out = format_startup_deltas(&marks);
+		assert!(out.contains("process: +0ms (t=0ms)"));
+		assert!(out.contains("window: +120ms (t=120ms)"));
+		assert!(out.contains("paint: +15ms (t=135ms)"));
+	}
+}
+
+#[tauri::command]
+fn startup_ms() -> u128 {
+	process_start().elapsed().as_millis()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+	let _start = process_start();
+	if startup_enabled() {
+		eprintln!("quarry startup: process-start (enabled by QUARRY_STARTUP/ debug build)");
+	}
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -44,6 +92,7 @@ pub fn run() {
         .manage(watch::WatchState::default())
         .invoke_handler(tauri::generate_handler![
             version,
+            startup_ms,
             toolchain::toolchains,
             project::open_project,
             workspace::list_dir,
@@ -157,6 +206,14 @@ pub fn run() {
         .expect("error while building the application")
         .run(|handle, event| {
             match event {
+                tauri::RunEvent::Ready => {
+                    if startup_enabled() {
+                        eprintln!(
+                            "quarry startup: window-ready +{}ms",
+                            process_start().elapsed().as_millis()
+                        );
+                    }
+                }
                 // A live shell, language server, adapter or program keeps the process group alive,
                 // which is what makes macOS say the app is "running in the background" after the
                 // window is gone. Take them down with the window.
