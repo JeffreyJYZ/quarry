@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { documentId, isDirty, markSaved, settleSave } from "@/lib/project/buffer";
+import { documentId, isDirty, markSaved, settleSave, withBufferText } from "@/lib/project/buffer";
 
 describe("isDirty", () => {
 	test("false when text equals loaded", () => {
@@ -61,6 +61,28 @@ describe("settleSave", () => {
 	test("keeps the reload counter, so a save is not a new document", () => {
 		const live = { path: "a", name: "a", text: "x", loaded: "x", loadId: 3 };
 		expect(settleSave(live, "x", "x").loadId).toBe(3);
+	});
+});
+
+describe("withBufferText", () => {
+	const buffers = [
+		{ path: "/p/a.rs", name: "a.rs", text: "one", loaded: "one" },
+		{ path: "/p/b.rs", name: "b.rs", text: "two", loaded: "two" },
+	];
+
+	test("replaces the one buffer the editor reported", () => {
+		const next = withBufferText(buffers, "/p/a.rs", "one two");
+		expect(next[0]?.text).toBe("one two");
+		expect(next[1]).toBe(buffers[1]);
+	});
+
+	test("the same text reported again reuses the array, so nothing downstream sees a change", () => {
+		expect(withBufferText(buffers, "/p/a.rs", "one")).toBe(buffers);
+	});
+
+	test("a path that is not open reuses the array", () => {
+		expect(withBufferText(buffers, "/p/closed.rs", "text")).toBe(buffers);
+		expect(withBufferText(buffers, null, "text")).toBe(buffers);
 	});
 });
 

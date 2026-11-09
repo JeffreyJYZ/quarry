@@ -12,6 +12,7 @@ import EditorColumn from "@/ui/app/EditorColumn";
 import Splitter from "@/ui/layout/Splitter";
 import { EDITOR_MIN_WIDTH, PANEL_LIMITS } from "@/lib/consts/layout";
 import { useFileWatch } from "@/ui/app/useFileWatch";
+import { useChanges } from "@/ui/app/useStableProps";
 import type { ShellModel } from "@/ui/app/useShell";
 
 const Terminal = lazy(() => import("@/ui/terminal/Terminal"));
@@ -21,6 +22,8 @@ export default function AppBody({ model }: { model: ShellModel }) {
 	const { workspace, overlays, panels, settings, git } = model;
 	const { railWidth, terminalWidth } = settings.panels;
 	const project = workspace.project;
+	// Rebuilt only when a status read lands, so the explorer is not handed a new map on every key.
+	const changes = useChanges(git.status);
 	const watch = useFileWatch({
 		root: project?.root ?? null,
 		onPaths: (paths) => {
@@ -74,9 +77,7 @@ export default function AppBody({ model }: { model: ShellModel }) {
 				blameSaveToken={git.blameSaveToken}
 				revealToken={panels.fileRevealToken}
 				watch={watch}
-				changes={Object.fromEntries(
-					(git.status?.entries ?? []).map((entry) => [entry.path, entry.status]),
-				)}
+				changes={changes}
 				diffPath={panels.gitDiffPath}
 				onOpenFile={workspace.handleOpenFile}
 				onRestartLsp={model.restartLsp}

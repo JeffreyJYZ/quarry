@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { startupMark } from "@/lib/startupMarks";
 import { type FileEdit, type ProjectInfo, openProject, rememberRoot } from "@/lib/project/api";
-import type { FileBuffer } from "@/lib/project/buffer";
+import { type FileBuffer, withBufferText } from "@/lib/project/buffer";
 import { describeError } from "@/lib/project/errors";
 import { applyEditsWithNotice } from "@/ui/app/applyEdits";
 import { externalChangeHandler } from "@/ui/app/externalChanges";
@@ -101,12 +101,10 @@ export function useWorkspace(options: WorkspaceOptions) {
 		setQuickOpenOpen: options.setQuickOpenOpen,
 	});
 
+	// Typing replaces the one buffer it changed. The same text reported again — an external reload
+	// echoing back through the editor — leaves the array and every buffer in it untouched.
 	const handleChange = useCallback((value: string) => {
-		setBuffers((current) =>
-			current.map((buffer) =>
-				buffer.path === activePathRef.current ? { ...buffer, text: value } : buffer,
-			),
-		);
+		setBuffers((current) => withBufferText(current, activePathRef.current, value));
 	}, []);
 
 	const handleApplyEdits = useCallback(

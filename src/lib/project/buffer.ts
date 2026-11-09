@@ -14,6 +14,27 @@ export function isDirty(buffer: FileBuffer): boolean {
 	return buffer.text !== buffer.loaded;
 }
 
+/**
+ * The buffers after the editor reported `text` for `path`.
+ *
+ * Identity is the point: the same array comes back when the path is not open or the text it already
+ * holds was reported again, which is what an external reload echoes through the editor. Only the
+ * buffer that actually changed is replaced, so every other tab keeps its identity.
+ */
+export function withBufferText(
+	buffers: FileBuffer[],
+	path: string | null,
+	text: string,
+): FileBuffer[] {
+	if (path === null) return buffers;
+	const index = buffers.findIndex((buffer) => buffer.path === path);
+	const buffer = index === -1 ? undefined : buffers[index];
+	if (buffer === undefined || buffer.text === text) return buffers;
+	const next = buffers.slice();
+	next[index] = { ...buffer, text };
+	return next;
+}
+
 /** The buffer after a successful write: in-memory text and saved text agree, so the dot clears. */
 export function markSaved(buffer: FileBuffer, text: string): FileBuffer {
 	return { ...buffer, text, loaded: text };

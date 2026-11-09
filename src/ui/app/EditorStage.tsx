@@ -12,18 +12,11 @@ import Splitter from "@/ui/layout/Splitter";
 import { PANEL_LIMITS } from "@/lib/consts/layout";
 import type { Location, ProjectInfo } from "@/lib/project/api";
 import type { RefObject } from "react";
+import { type DisasmSplit, useEditorReveal } from "@/ui/app/useStableProps";
 
 export type EditorStageProps = {
 	/** The assembly split, or null when it is closed. */
-	disasm: {
-		session: string | null;
-		address: string | null;
-		frameId: number | null;
-		/** Split width in px, owned by the shell so the handle and the pane agree. */
-		width: number;
-		onWidthChange: (next: number) => void;
-		onClose: () => void;
-	} | null;
+	disasm: DisasmSplit;
 	project: ProjectInfo | null;
 	root: string | null;
 	active: FileBuffer | null;
@@ -66,6 +59,7 @@ export type EditorStageProps = {
  * nothing is open.
  */
 export default function EditorStage(props: EditorStageProps) {
+	const reveal = useEditorReveal(props.revealTarget, props.revealToken);
 	const active = props.active;
 	if (active === null)
 		return (
@@ -121,11 +115,7 @@ export default function EditorStage(props: EditorStageProps) {
 					fontSize={props.effective.editorFontSize}
 					fontFamily={props.effective.editorFontFamily}
 					blame={props.blameOn ? (props.blameByPath.get(active.path) ?? null) : null}
-					reveal={
-						props.revealTarget === null
-							? null
-							: { ...props.revealTarget, token: props.revealToken }
-					}
+					reveal={reveal}
 				/>
 				{props.disasm === null ? null : (
 					<>

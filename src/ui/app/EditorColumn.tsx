@@ -4,8 +4,8 @@ import EditorStage from "@/ui/app/EditorStage";
 import { Palettes } from "@/ui/app/BottomDock";
 import CanvasPanels from "@/ui/app/CanvasPanels";
 import { SHORTCUT_GROUPS } from "@/ui/app/shellShortcuts";
+import { useDisasmSplit, useOpenPaths } from "@/ui/app/useStableProps";
 import type { ShellModel } from "@/ui/app/useShell";
-import { activeFrame, disasmAddressOf } from "@/ui/debug/dock/addresses";
 
 /** The editor column: the tabs and surfaces, then the bottom slot and the palettes over it. */
 export default function EditorColumn({ model }: { model: ShellModel }) {
@@ -20,6 +20,17 @@ export default function EditorColumn({ model }: { model: ShellModel }) {
 		return () => setDisassemblyOpener(null);
 	}, [openSplit]);
 
+	// Both keep their identity until the data behind them changes, so a keystroke does not hand the
+	// palettes a new path set or the split a new prop object.
+	const openPaths = useOpenPaths(workspace.buffers);
+	const disasm = useDisasmSplit({
+		open: panels.disasmOpen,
+		width: panels.disasmWidth,
+		debug: model.debug,
+		onWidthChange: panels.setDisasmWidth,
+		setOpen: panels.setDisasmOpen,
+	});
+
 	return (
 		<main
 			className="canvas"
@@ -31,18 +42,7 @@ export default function EditorColumn({ model }: { model: ShellModel }) {
 			}
 		>
 			<EditorStage
-				disasm={
-					panels.disasmOpen
-						? {
-								session: model.debug.sessionId,
-								address: disasmAddressOf(model.debug),
-								frameId: activeFrame(model.debug.stopView)?.id ?? null,
-								width: panels.disasmWidth,
-								onWidthChange: panels.setDisasmWidth,
-								onClose: () => panels.setDisasmOpen(false),
-							}
-						: null
-				}
+				disasm={disasm}
 				project={workspace.project}
 				root={model.root}
 				active={model.active}
@@ -83,7 +83,7 @@ export default function EditorColumn({ model }: { model: ShellModel }) {
 				quickOpenOpen={overlays.quickOpenOpen}
 				shortcutsOpen={overlays.shortcutsOpen}
 				commandOpen={overlays.commandPaletteOpen}
-				openPaths={new Set(workspace.buffers.map((buffer) => buffer.path))}
+				openPaths={openPaths}
 				buffers={workspace.buffers}
 				commands={model.commands}
 				recentCommands={overlays.recentCommands}
