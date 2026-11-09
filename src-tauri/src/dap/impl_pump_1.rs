@@ -47,11 +47,11 @@ impl Pump {
             return Some(self.deferred.remove(0));
         }
 
-        match self.frames.recv() {
-            Ok(Ok(value)) => Some(value),
-            // A framing error is the end of the stream, exactly like a closed channel.
-            Ok(Err(_)) | Err(_) => None,
-        }
+        wait_frame(
+            &self.frames,
+            || !self.session.adapter_exited(),
+            PUMP_POLL_INTERVAL,
+        )
     }
 
     pub fn handle(&mut self, message: Value) {

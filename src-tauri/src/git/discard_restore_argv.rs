@@ -48,11 +48,9 @@ pub async fn git_amend(root: String, message: String) -> Result<String, String> 
 
 pub fn amend(root: &str, message: &str) -> Result<String, String> {
     let program = git_program()?;
-    let output = Command::new(&program)
-        .args(amend_argv(message))
-        .current_dir(root)
-        .output()
-        .map_err(|error| format!("cannot run {program} in {root}: {error}"))?;
+    let argv = amend_argv(message);
+    let args: Vec<&str> = argv.iter().map(String::as_str).collect();
+    let output = run(&program, root, &args)?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -62,10 +60,8 @@ pub fn amend(root: &str, message: &str) -> Result<String, String> {
         return Err(operation_error("git amend", &stderr));
     }
 
-    let hash_output = Command::new(&program)
-        .args(["rev-parse", "--short", "HEAD"])
-        .current_dir(root)
-        .output();
+    // The amend already landed; a failed or stalled rev-parse must not turn success into failure.
+    let hash_output = run(&program, root, &["rev-parse", "--short", "HEAD"]);
     match hash_output {
         Ok(result) if result.status.success() => {
             Ok(String::from_utf8_lossy(&result.stdout).trim().to_string())

@@ -96,13 +96,11 @@ pub fn untracked_diff(path: &str, content: &str) -> String {
     diff
 }
 
-/// Runs git in the project root and returns its raw output.
+/// Runs git in the project root and returns its raw output, bounded by [`GIT_TIMEOUT`].
 pub fn run(program: &str, root: &str, args: &[&str]) -> Result<std::process::Output, String> {
-    Command::new(program)
-        .args(args)
-        .current_dir(root)
-        .output()
-        .map_err(|error| format!("cannot run {program} in {root}: {error}"))
+    let mut command = Command::new(program);
+    command.args(args).current_dir(root);
+    output_within(&mut command, GIT_TIMEOUT)
 }
 
 /// FNV-1a 32-bit hash, matching the frontend hunk id derivation.

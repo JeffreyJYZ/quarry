@@ -21,11 +21,11 @@ pub fn commit(root: &str, message: &str) -> Result<String, String> {
     let program = git_program()?;
 
     // Refuse an empty index before touching commit: a zero exit means "nothing staged".
-    let staged_check = Command::new(&program)
+    let mut staged = Command::new(&program);
+    staged
         .args(["diff", "--cached", "--quiet"])
-        .current_dir(root)
-        .output()
-        .map_err(|error| format!("cannot run {program} in {root}: {error}"))?;
+        .current_dir(root);
+    let staged_check = output_within(&mut staged, GIT_TIMEOUT)?;
     let stderr = String::from_utf8_lossy(&staged_check.stderr);
     if is_not_a_repository(&stderr) {
         return Err(format!("not a git repository: {root}"));
@@ -34,11 +34,9 @@ pub fn commit(root: &str, message: &str) -> Result<String, String> {
         return Err("nothing staged to commit; stage something first".to_string());
     }
 
-    let output = Command::new(&program)
-        .args(commit_argv(message))
-        .current_dir(root)
-        .output()
-        .map_err(|error| format!("cannot run {program} in {root}: {error}"))?;
+    let mut staged_commit = Command::new(&program);
+    staged_commit.args(commit_argv(message)).current_dir(root);
+    let output = output_within(&mut staged_commit, GIT_TIMEOUT)?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -48,11 +46,11 @@ pub fn commit(root: &str, message: &str) -> Result<String, String> {
         return Err(operation_error("git commit", &stderr));
     }
 
-    // The commit already landed; a failed rev-parse must not turn success into failure.
-    let hash_output = Command::new(&program)
-        .args(["rev-parse", "--short", "HEAD"])
-        .current_dir(root)
-        .output();
+    // The commit already landed; a failed or stalled rev-parse must not turn success into failure.
+    let mut hash = Command::new(&program);
+    hash.args(["rev-parse", "--short", "HEAD"])
+        .current_dir(root);
+    let hash_output = output_within(&mut hash, GIT_TIMEOUT);
     match hash_output {
         Ok(result) if result.status.success() => {
             Ok(String::from_utf8_lossy(&result.stdout).trim().to_string())
@@ -108,11 +106,9 @@ pub fn branches(root: &str) -> Result<Vec<Branch>, String> {
 
 pub fn checkout(root: &str, branch: &str) -> Result<(), String> {
     let program = git_program()?;
-    let output = Command::new(&program)
-        .args(checkout_argv(branch))
-        .current_dir(root)
-        .output()
-        .map_err(|error| format!("cannot run {program} in {root}: {error}"))?;
+    let mut command = Command::new(&program);
+    command.args(checkout_argv(branch)).current_dir(root);
+    let output = output_within(&mut command, GIT_TIMEOUT)?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

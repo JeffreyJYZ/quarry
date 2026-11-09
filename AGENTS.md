@@ -56,6 +56,8 @@ Rust and C/C++ IDE. Tauri 2 + React 19 shell; clangd, rust-analyzer and lldb-dap
 - **`evaluate` is broken for Rust** (falls back to Objective-C++, errors) — no watch-expression pane until a workaround is measured.
 - **Data breakpoint `dataId` is `<hex>/<size>` with no `0x`**, `hitBreakpointIds` is null, and the stop reports the line after the store.
 - **`realpath` the project directory before `launch`** — `/var/…` versus `/private/var/…` leaves every breakpoint unverified.
+- **Every `git` run goes through `git::output_within` with `GIT_TIMEOUT` (30s), never a bare `Command::output()`** — a held index lock or a credential prompt otherwise pins the command thread forever.
+- **The DAP pump bounds its wait by adapter liveness, not by frame silence** — a paused debuggee emits nothing for minutes, so `wait_frame` polls `PUMP_POLL_INTERVAL` and only ends when the process is gone.
 - **`cargo fmt` in `src-tauri` rewrites `lsp.rs`** — that file is not rustfmt-clean, so a crate-wide format adds an out-of-unit diff. Format the one file instead: `rustfmt --edition 2024 src/dap.rs`.
 - **A dispatched unit's report is a claim, not evidence**: check the call site exists, not just the helper — one shipped an unused `resolveDebugArtifact` and an unwired panel, another left its `lib.rs` registration out, which fails only at runtime.
 - **An empty handler is the new unwired panel** — a parity batch shipped four commands with real labels, accelerators and `run: () => {}` plus a keymap file nothing imported; audit command → handler → API → visible result, and `rg 'run: \(\) => \{\}'` in `commandList.ts` must return nothing.

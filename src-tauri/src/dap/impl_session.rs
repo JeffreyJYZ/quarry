@@ -112,6 +112,14 @@ impl Session {
         }
     }
 
+    /// True once the adapter process is gone, whether or not its stream was closed.
+    pub(crate) fn adapter_exited(&self) -> bool {
+        match lock(&self.pipe).as_mut() {
+            Some(pipe) => pipe.exited(),
+            None => true,
+        }
+    }
+
     /// Hand a response to the request that is waiting on it. `false` when nothing was waiting.
     pub(crate) fn resolve(&self, message: &Value) -> bool {
         let Some(request_seq) = message.get("request_seq").and_then(Value::as_i64) else {

@@ -104,4 +104,22 @@ pub mod tests_group_2 {
             "reader thread should end once the child is gone"
         );
     }
+
+    /// The pump's death check: a child that exited is reported without `wait` blocking on it.
+    #[test]
+    pub fn exited_reports_a_dead_child_without_waiting() {
+        let mut command = Command::new("/bin/sh");
+        command.args(["-c", "exit 0"]);
+        let mut pipe = ProcessPipe::spawn(&mut command).expect("spawn a shell that exits");
+
+        let started = std::time::Instant::now();
+        while !pipe.exited() {
+            assert!(
+                started.elapsed() < Duration::from_secs(5),
+                "the child exited but the check never saw it"
+            );
+            thread::sleep(Duration::from_millis(5));
+        }
+        assert!(pipe.exited(), "a reaped child stays exited");
+    }
 }
