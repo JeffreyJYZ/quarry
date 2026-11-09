@@ -110,10 +110,11 @@ pub fn run_cmake_build(
         diagnostics: parse_text_diagnostics(&text, Path::new(build_root)),
         duration_ms,
         summary: summarize_text(&text),
-        // The program the build just wrote: a CMake target's name is not the directory's, so
-        // guessing it is how Run and Debug ended up launching a path that does not exist.
+        // The program the build just wrote. CMake names its targets as text (`Built target …`),
+        // so those names are resolved against the build tree; when none resolves, the newest file
+        // the build touched is the answer, which is what this did before CMake's names were read.
         artifact: if success {
-            newest_executable(Path::new(build_root), started_at)
+            cmake_artifact(&text, Path::new(build_root), started_at)
         } else {
             None
         },
