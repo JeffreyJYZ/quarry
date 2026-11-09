@@ -1,5 +1,6 @@
 mod build_task;
 mod dap;
+mod extensions;
 mod files;
 mod format;
 mod git;

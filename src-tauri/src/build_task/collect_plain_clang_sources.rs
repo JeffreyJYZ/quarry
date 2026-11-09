@@ -31,7 +31,7 @@ pub fn run_plain_clang_build(root: &str, name: &str) -> Result<BuildReport, Stri
         format!("{compiler} is not on PATH: C/C++ support needs {compiler} installed")
     })?;
 
-    let build_dir = root_path.join(".quarry").join("build");
+    let build_dir = plain_clang_build_dir(root_path);
     std::fs::create_dir_all(&build_dir)
         .map_err(|error| format!("cannot create {}: {error}", build_dir.display()))?;
 
@@ -109,22 +109,26 @@ fn collect_into(
                 continue;
             }
             let name_str = name.to_string_lossy();
-            if PLAIN_CLANG_IGNORED_DIRS.contains(&name_str.as_ref()) {
+            if is_ignored_dir(&name_str) {
                 continue;
             }
             collect_into(&path, &child, depth + 1, sources)?;
-        } else if path.is_file() && is_plain_clang_source(&path) {
+        } else if path.is_file() && crate::extensions::is_cpp_source(&path) {
             sources.push(child);
         }
     }
     Ok(())
 }
 
-pub fn is_plain_clang_source(path: &Path) -> bool {
-    matches!(
-        path.extension().and_then(|ext| ext.to_str()),
-        Some("c") | Some("cc") | Some("cpp")
-    )
+/// The one directory a plain-clang build writes into, shared by the compiler invocation and the
+/// artifact the report names: two spellings let the build write a file nobody launches.
+pub fn plain_clang_build_dir(root: &Path) -> std::path::PathBuf {
+    root.join(crate::launch::QUARRY_BUILD_DIR)
+}
+
+/// Whether the walk refuses a directory: the crate-wide list, plus this build's own output.
+fn is_ignored_dir(name: &str) -> bool {
+    crate::ignore::is_dir(name) || PLAIN_CLANG_EXTRA_IGNORED_DIRS.contains(&name)
 }
 
 pub fn plain_clang_argv<P: AsRef<Path>>(root: &str, name: &str, sources: &[P]) -> Vec<String> {
@@ -137,7 +141,10 @@ pub fn plain_clang_argv<P: AsRef<Path>>(root: &str, name: &str, sources: &[P]) -
     });
     let compiler = if c_only { "clang" } else { "clang++" };
     let std_flag = if c_only { "-std=c17" } else { "-std=c++20" };
-    let output = format!("{}/.quarry/build/{}", root.trim_end_matches('/'), name);
+    let output = plain_clang_build_dir(Path::new(root))
+        .join(name)
+        .display()
+        .to_string();
 
     let mut argv = vec![
         compiler.to_string(),

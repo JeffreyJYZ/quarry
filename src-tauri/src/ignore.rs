@@ -8,10 +8,11 @@
 //! `src/main.cpp` plus forty `CMakeFiles/**/*.make` is useless.
 
 /// Directories that are never walked, listed or searched.
-pub const DIRS: [&str; 7] = [
+pub const DIRS: [&str; 8] = [
     "target",
     "node_modules",
     "dist",
+    "out",
     ".git",
     ".quarry",
     ".cache",
@@ -52,6 +53,8 @@ mod tests {
         for name in DIRS {
             assert!(is_dir(name), "{name} should be ignored");
         }
+        assert!(is_dir("dist"), "frontend output is skipped everywhere");
+        assert!(is_dir("out"), "native build output is skipped everywhere");
         assert!(!is_dir("src"));
         assert!(!is_dir("lib"));
     }
