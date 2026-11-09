@@ -100,8 +100,12 @@ mod tests {
         let root = fixture("failed");
         fs::write(root.join("main.c"), "int main(void) { this is not c }\n").expect("write source");
 
-        let report =
-            run_plain_clang_build(&root.display().to_string(), "failed-app").expect("build run");
+        let report = run_plain_clang_build(
+            &BuildState::default(),
+            &root.display().to_string(),
+            "failed-app",
+        )
+        .expect("build run");
         assert!(!report.success, "a syntax error must fail the build");
         assert_eq!(report.artifact, None, "nothing was produced to launch");
     }
@@ -129,8 +133,12 @@ mod tests {
         let root = fixture("cxx-build");
         fs::write(root.join("main.cxx"), "int main() { return 0; }\n").expect("write source");
 
-        let report =
-            run_plain_clang_build(&root.display().to_string(), "cxx-app").expect("build run");
+        let report = run_plain_clang_build(
+            &BuildState::default(),
+            &root.display().to_string(),
+            "cxx-app",
+        )
+        .expect("build run");
         assert!(report.success, "a .cxx project must build");
         let artifact = plain_clang_build_dir(&root).join("cxx-app");
         assert_eq!(report.artifact, Some(artifact.display().to_string()));
@@ -146,7 +154,8 @@ mod tests {
         fs::write(root.join("main.c"), "int main(void) { return 0; }\n").expect("write source");
 
         let report =
-            run_plain_clang_build(&root.display().to_string(), "hello").expect("build run");
+            run_plain_clang_build(&BuildState::default(), &root.display().to_string(), "hello")
+                .expect("build run");
         assert!(report.success, "a plain C project must build");
         let artifact = plain_clang_build_dir(&root).join("hello");
         assert_eq!(report.artifact, Some(artifact.display().to_string()));

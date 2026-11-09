@@ -7,6 +7,7 @@ pub use std::collections::HashSet;
 pub use std::path::Path;
 pub use std::process::Command;
 pub use std::time::{Instant, SystemTime};
+pub use tauri::State;
 
 use super::*;
 
@@ -43,24 +44,31 @@ pub const DEFAULT_CPP_SUMMARY: &str = "cmake build finished";
 
 /// `profile` is `debug` or `release`; anything else is an error naming the accepted values.
 #[tauri::command]
-pub async fn build_project(root: String, profile: String) -> Result<BuildReport, String> {
+pub async fn build_project(
+    state: State<'_, BuildState>,
+    root: String,
+    profile: String,
+) -> Result<BuildReport, String> {
     let release = release_for(&profile)?;
-    tauri::async_runtime::spawn_blocking(move || build(&root, release))
+    // The managed copy and the blocking task share one slot, so a stop and the exit path can reach
+    // the child while this call waits for the report.
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || build(&state, &root, release))
         .await
         .map_err(|error| format!("build task failed: {error}"))?
 }
 
 /// Detection and the build both touch the filesystem, so both run off the async runtime.
-pub fn build(root: &str, release: bool) -> Result<BuildReport, String> {
+pub fn build(state: &BuildState, root: &str, release: bool) -> Result<BuildReport, String> {
     let info = project::inspect(root)?;
     match info.kind {
         ProjectKind::Cargo => {
             require_cargo(info.kind)?;
-            run_build(&info.build_root, release)
+            run_build(state, &info.build_root, release)
         }
-        ProjectKind::Cmake => run_cmake_build(&info.root, &info.build_root, release),
-        ProjectKind::CompileCommands => run_plain_clang_build(&info.root, &info.name),
-        ProjectKind::Unknown => run_plain_clang_build(&info.root, &info.name),
+        ProjectKind::Cmake => run_cmake_build(state, &info.root, &info.build_root, release),
+        ProjectKind::CompileCommands => run_plain_clang_build(state, &info.root, &info.name),
+        ProjectKind::Unknown => run_plain_clang_build(state, &info.root, &info.name),
     }
 }
 
@@ -115,7 +123,11 @@ pub fn no_build_system() -> String {
 }
 
 /// Runs the build and reports. Called on a blocking thread so the async runtime stays free.
-pub fn run_build(build_root: &str, release: bool) -> Result<BuildReport, String> {
+pub fn run_build(
+    state: &BuildState,
+    build_root: &str,
+    release: bool,
+) -> Result<BuildReport, String> {
     let started = Instant::now();
     // The moment the build begins: the boundary between a file this run wrote and one an earlier
     // run left behind. Read before the spawn so nothing the build writes can predate it.
@@ -131,21 +143,25 @@ pub fn run_build(build_root: &str, release: bool) -> Result<BuildReport, String>
         command.arg("--release");
     }
 
-    let output = command
-        .output()
-        .map_err(|error| format!("cannot run {program} in {build_root}: {error}"))?;
+    // Its own process group, held in the build state: a stop signals the group and quitting kills
+    // it, where `Command::output()` left a cancelled or hung build compiling with no handle.
+    let captured = run_child(state, &mut command, &program, build_root)?;
     let duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&captured.stdout);
+    let stderr = String::from_utf8_lossy(&captured.stderr);
     let parsed = parse_cargo_json(&stdout, Path::new(build_root));
-    let success = parsed.success.unwrap_or_else(|| output.status.success());
+    let success = !captured.stopped && parsed.success.unwrap_or(captured.success);
 
     Ok(BuildReport {
         success,
         diagnostics: parsed.diagnostics,
         duration_ms,
-        summary: summarize(&stderr, &parsed.unlocated, success),
+        summary: if captured.stopped {
+            CANCELLED_SUMMARY.to_string()
+        } else {
+            summarize(&stderr, &parsed.unlocated, success)
+        },
         // Cargo names the executable of the unit it built, so there is nothing to guess and no
         // filesystem walk: a `target/` sweep would find build scripts and dependency binaries,
         // and launching one of those is worse than reporting that the build produced no program.

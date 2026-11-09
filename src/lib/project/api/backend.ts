@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { StopReport } from "@/lib/project/api/run";
 
 export type ToolSource = "path" | "xcrun" | "missing";
 
@@ -94,4 +95,9 @@ export function formatterFor(path: string): Promise<string> {
 
 export function buildProject(root: string, profile: "debug" | "release"): Promise<BuildReport> {
 	return invoke<BuildReport>("build_project", { root, profile });
+}
+
+/** Stop the build in flight, its whole process group; a build already finished is not an error. */
+export function stopBuild(): Promise<StopReport> {
+	return invoke<StopReport>("stop_build");
 }

@@ -5,6 +5,7 @@
 //! window-destroyed path and the exit path both go through [`Children::shutdown`], so the two
 //! cannot drift, and every state drains its own map, so stopping an already-stopped set is a no-op.
 
+use crate::build_task::BuildState;
 use crate::dap::DapState;
 use crate::lsp::LspState;
 use crate::pty::PtyState;
@@ -15,12 +16,13 @@ use tauri::{AppHandle, Manager, Runtime};
 #[cfg(test)]
 mod tests;
 
-/// The five managed states that own child processes.
+/// The managed states that own child processes.
 pub struct Children<'a> {
     lsp: &'a LspState,
     dap: &'a DapState,
     pty: &'a PtyState,
     run: &'a RunState,
+    build: &'a BuildState,
     watch: &'a WatchState,
 }
 
@@ -32,6 +34,7 @@ impl<'a> Children<'a> {
             dap: app.state::<DapState>().inner(),
             pty: app.state::<PtyState>().inner(),
             run: app.state::<RunState>().inner(),
+            build: app.state::<BuildState>().inner(),
             watch: app.state::<WatchState>().inner(),
         }
     }
@@ -43,6 +46,7 @@ impl<'a> Children<'a> {
         self.dap.shutdown_all();
         self.pty.shutdown_all();
         self.run.shutdown_all();
+        self.build.shutdown_all();
         self.watch.shutdown_all();
     }
 }

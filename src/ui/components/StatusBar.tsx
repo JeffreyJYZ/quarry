@@ -3,7 +3,8 @@ import { plural } from "@/lib/problems/model";
 import type { GitStatus, ProjectInfo } from "@/lib/project/api";
 import { kindLabel } from "@/lib/project/kind";
 import type { StatusChip } from "@/lib/status/model";
-import { StatusTools } from "@/ui/components/StatusBarIcons";
+import { StatusTools } from "@/ui/components/StatusTools";
+import StatusGit from "@/ui/components/StatusGit";
 
 export type StatusBarProps = {
 	project: ProjectInfo | null;
@@ -30,6 +31,8 @@ export type StatusBarProps = {
 	gitOpen: boolean;
 	debuggerActive: boolean;
 	building: boolean;
+	/** Stop was sent for the build in flight and the backend has not reported it finished yet. */
+	stopping: boolean;
 	running: boolean;
 	onToggleRail: () => void;
 	onToggleTerminal: () => void;
@@ -37,6 +40,7 @@ export type StatusBarProps = {
 	onToggleGit: () => void;
 	onShowDebugger: () => void;
 	onBuild: () => void;
+	onStopBuild: () => void;
 	onRun: () => void;
 	onStop: () => void;
 };
@@ -67,6 +71,7 @@ export default function StatusBar({
 	gitOpen,
 	debuggerActive,
 	building,
+	stopping,
 	running,
 	onToggleRail,
 	onToggleTerminal,
@@ -74,26 +79,11 @@ export default function StatusBar({
 	onToggleGit,
 	onShowDebugger,
 	onBuild,
+	onStopBuild,
 	onRun,
 	onStop,
 }: StatusBarProps) {
-	const gitSegment =
-		project !== null && git !== null && git.branch !== null ? (
-			<span
-				className="status-git"
-				title={`${git.branch} · ${git.ahead} ahead · ${git.behind} behind · ${git.entries.length} changes`}
-			>
-				<span className="status-branch">
-					<span className="branch-glyph" aria-hidden="true" />
-					<span className="branch-name">{git.branch}</span>
-				</span>
-				{git.ahead > 0 ? <span className="status-ahead">↑{git.ahead}</span> : null}
-				{git.behind > 0 ? <span className="status-behind">↓{git.behind}</span> : null}
-				{git.entries.length > 0 ? (
-					<span className="status-changes">{plural(git.entries.length, "change")}</span>
-				) : null}
-			</span>
-		) : null;
+	const gitSegment = project !== null ? <StatusGit git={git} /> : null;
 
 	return (
 		<footer className="statusbar">
@@ -105,6 +95,7 @@ export default function StatusBar({
 					gitOpen={gitOpen}
 					debuggerActive={debuggerActive}
 					building={building}
+					stopping={stopping}
 					running={running}
 					hasProject={project !== null}
 					onToggleRail={onToggleRail}
@@ -113,6 +104,7 @@ export default function StatusBar({
 					onToggleGit={onToggleGit}
 					onShowDebugger={onShowDebugger}
 					onBuild={onBuild}
+					onStopBuild={onStopBuild}
 					onRun={onRun}
 					onStop={onStop}
 				/>

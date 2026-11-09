@@ -90,6 +90,7 @@ pub fn truncate(text: &str, limit: usize) -> String {
 /// A failing configure or build is a result, not an error: only a missing `cmake` or a failed
 /// spawn is `Err`.
 pub fn run_cmake_build(
+    state: &BuildState,
     source_root: &str,
     build_root: &str,
     release: bool,
@@ -102,16 +103,19 @@ pub fn run_cmake_build(
     // place the build type is set. Skipping it for an already-configured directory left a project
     // built with no debug info forever.
     let configure = run_cmake(
+        state,
         &cmake_configure_argv(source_root, build_root, release),
         build_root,
     )?;
     text.push_str(&configure.text);
     let mut success = configure.success;
+    let mut stopped = configure.stopped;
 
-    if success {
-        let outcome = run_cmake(&cmake_build_argv(build_root, release), build_root)?;
+    if success && !stopped {
+        let outcome = run_cmake(state, &cmake_build_argv(build_root, release), build_root)?;
         text.push_str(&outcome.text);
         success = outcome.success;
+        stopped = outcome.stopped;
     }
 
     let duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
@@ -119,7 +123,11 @@ pub fn run_cmake_build(
         success,
         diagnostics: cmake_diagnostics(&text, source_root),
         duration_ms,
-        summary: summarize_text(&text),
+        summary: if stopped {
+            CANCELLED_SUMMARY.to_string()
+        } else {
+            summarize_text(&text)
+        },
         // The program the build just wrote. CMake names its targets as text (`Built target …`),
         // so those names are resolved against the build tree; when none resolves, the newest file
         // the build touched is the answer, which is what this did before CMake's names were read.

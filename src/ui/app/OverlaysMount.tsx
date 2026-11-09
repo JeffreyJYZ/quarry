@@ -53,6 +53,7 @@ export default function OverlaysMount({ model }: { model: ShellModel }) {
 				gitOpen={panels.gitOpen}
 				debuggerActive={panels.dockTab === "debugger" && model.panelExpanded}
 				building={build.building}
+				stopping={build.stopping}
 				running={runs.running !== null}
 				onToggleRail={() => panels.setRailCollapsed((collapsed) => !collapsed)}
 				onToggleTerminal={() => panels.setTerminalOpen((open) => !open)}
@@ -60,6 +61,7 @@ export default function OverlaysMount({ model }: { model: ShellModel }) {
 				onToggleGit={() => panels.setGitOpen((open) => !open)}
 				onShowDebugger={() => panels.showDebugger()}
 				onBuild={() => void build.build()}
+				onStopBuild={() => void build.stop()}
 				onRun={() => void runs.run()}
 				onStop={() => void runs.stop()}
 				references={overlays.references}

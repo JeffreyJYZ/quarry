@@ -22,32 +22,29 @@ pub fn cmake_config(release: bool) -> &'static str {
 pub struct CmakeOutcome {
     pub(crate) success: bool,
     pub(crate) text: String,
+    /// A stop took the child, so the invocation says nothing about whether the build worked.
+    pub(crate) stopped: bool,
 }
 
 /// Runs cmake with an argv whose first element is the program name.
-pub fn run_cmake(argv: &[String], build_root: &str) -> Result<CmakeOutcome, String> {
-    let mut command = crate::resolve::command(CMAKE_PROGRAM)?;
+pub fn run_cmake(
+    state: &BuildState,
+    argv: &[String],
+    build_root: &str,
+) -> Result<CmakeOutcome, String> {
+    let mut command = crate::resolve::command(CMAKE_PROGRAM).map_err(|_| missing_cmake_error())?;
     command.args(&argv[1..]).current_dir(build_root);
 
-    let output = command
-        .output()
-        .map_err(|error| cmake_spawn_error(&error))?;
-    let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
+    let captured = run_child(state, &mut command, CMAKE_PROGRAM, build_root)?;
+    let mut text = String::from_utf8_lossy(&captured.stdout).into_owned();
     text.push('\n');
-    text.push_str(&String::from_utf8_lossy(&output.stderr));
+    text.push_str(&String::from_utf8_lossy(&captured.stderr));
 
     Ok(CmakeOutcome {
-        success: output.status.success(),
+        success: captured.success,
         text,
+        stopped: captured.stopped,
     })
-}
-
-/// A missing cmake is a setup problem, so the message says what has to be installed.
-pub fn cmake_spawn_error(error: &std::io::Error) -> String {
-    if error.kind() == std::io::ErrorKind::NotFound {
-        return missing_cmake_error();
-    }
-    format!("cannot run {CMAKE_PROGRAM}: {error}")
 }
 
 /// The message for a machine without cmake installed.
