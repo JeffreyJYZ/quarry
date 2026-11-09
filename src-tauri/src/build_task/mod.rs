@@ -45,6 +45,9 @@ pub use newest_executable::*;
 mod cmake_artifact;
 pub use cmake_artifact::*;
 
+mod cmake_output;
+pub use cmake_output::*;
+
 mod tests_1;
 pub use tests_1::*;
 

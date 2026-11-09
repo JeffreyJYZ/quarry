@@ -134,6 +134,24 @@ pub mod tests_group_1 {
     }
 
     #[test]
+    pub fn a_test_binary_does_not_replace_the_app_artifact() {
+        let app = r#"{"reason":"compiler-artifact","target":{"name":"demo","kind":["bin"]},"executable":"/projects/demo/target/debug/demo"}"#;
+        // Cargo links tests and examples into `deps/`, and reports them in whatever order it built.
+        let test = r#"{"reason":"compiler-artifact","target":{"name":"demo","kind":["test"]},"executable":"/projects/demo/target/debug/deps/demo-4f9c1b2a"}"#;
+        let stream = format!(
+            "{app}\n{test}\n{}",
+            r#"{"reason":"build-finished","success":true}"#
+        );
+
+        assert_eq!(
+            parse_cargo_json(&stream, build_root()).artifact.as_deref(),
+            Some("/projects/demo/target/debug/demo")
+        );
+        // A run that only linked tests produced no program at all.
+        assert_eq!(parse_cargo_json(test, build_root()).artifact, None);
+    }
+
+    #[test]
     pub fn an_executable_artifact_is_reported() {
         let line = r#"{"reason":"compiler-artifact","target":{"name":"demo","kind":["bin"]},"executable":"/projects/demo/target/release/demo"}"#;
 

@@ -54,7 +54,11 @@ pub fn parse_cargo_json(stdout: &str, build_root: &Path) -> ParsedBuild {
             ParsedLine::Diagnostics(diagnostics) => parsed.diagnostics.extend(diagnostics),
             ParsedLine::Unlocated(text) => parsed.unlocated.push(text),
             ParsedLine::Finished(success) => parsed.success = Some(success),
-            ParsedLine::Artifact(path) => parsed.artifact = Some(path),
+            ParsedLine::Artifact(path) => {
+                if !under_deps(&path) {
+                    parsed.artifact = Some(path);
+                }
+            }
             ParsedLine::Ignored => {}
         }
     }
@@ -85,6 +89,16 @@ pub fn parse_message_line(line: &str, build_root: &Path) -> ParsedLine {
         },
         _ => ParsedLine::Ignored,
     }
+}
+
+/// Whether cargo wrote this executable under `deps/`.
+///
+/// Every unit cargo links lands there — test binaries, examples and the app's own copy — and only
+/// the app is also linked beside `deps`, which is the path its `compiler-artifact` reports. A
+/// segment is compared whole, so a directory merely named like one is not caught, and both
+/// separators are split because cargo on Windows reports backslashes.
+pub fn under_deps(path: &str) -> bool {
+    path.split(['/', '\\']).any(|segment| segment == "deps")
 }
 
 /// The diagnostic's own message, plus any error or warning child, all at the anchor span.

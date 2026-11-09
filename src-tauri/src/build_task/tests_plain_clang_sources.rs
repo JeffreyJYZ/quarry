@@ -93,6 +93,20 @@ mod tests {
     }
 
     #[test]
+    fn a_failed_build_reports_no_artifact() {
+        if crate::resolve::resolve("clang").is_none() {
+            return;
+        }
+        let root = fixture("failed");
+        fs::write(root.join("main.c"), "int main(void) { this is not c }\n").expect("write source");
+
+        let report =
+            run_plain_clang_build(&root.display().to_string(), "failed-app").expect("build run");
+        assert!(!report.success, "a syntax error must fail the build");
+        assert_eq!(report.artifact, None, "nothing was produced to launch");
+    }
+
+    #[test]
     fn headers_are_not_sources() {
         let root = fixture("headers");
         touch(&root, "src/main.cpp");

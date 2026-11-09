@@ -54,12 +54,20 @@ pub fn run_plain_clang_build(root: &str, name: &str) -> Result<BuildReport, Stri
         diagnostic.source = Some(PLAIN_CLANG_SOURCE.to_string());
     }
 
+    let success = output.status.success();
+
     Ok(BuildReport {
-        success: output.status.success(),
+        success,
         diagnostics,
         duration_ms,
         summary: summarize_text_with(&text, DEFAULT_CLANG_SUMMARY),
-        artifact: Some(build_dir.join(name).display().to_string()),
+        // A failed compile leaves whatever the previous build wrote at this path, so naming it
+        // would report a program this build never produced; `run_cmake_build` gates the same way.
+        artifact: if success {
+            Some(build_dir.join(name).display().to_string())
+        } else {
+            None
+        },
     })
 }
 pub fn collect_plain_clang_sources(root: &Path) -> Result<Vec<std::path::PathBuf>, String> {

@@ -25,6 +25,11 @@ pub mod tests_group_cmake_artifact {
         fs::set_permissions(path, fs::Permissions::from_mode(0o755)).expect("chmod");
     }
 
+    fn write_text(path: &Path, text: &str) {
+        fs::create_dir_all(path.parent().expect("parent")).expect("mkdir");
+        fs::write(path, text).expect("write");
+    }
+
     fn recent() -> SystemTime {
         SystemTime::now() - Duration::from_secs(60)
     }
@@ -125,6 +130,64 @@ pub mod tests_group_cmake_artifact {
         assert_eq!(
             resolve_target(root, "demo", recent()).as_deref(),
             Some(demo.as_path())
+        );
+    }
+
+    /// The files here are the shapes CMake 4.4 writes for an `OUTPUT_NAME` target; both were read
+    /// from a generated build tree rather than imagined.
+    #[test]
+    pub fn an_output_name_resolves_through_the_generated_link_command() {
+        let directory = TempDir::new("cmake-output-name");
+        let root = directory.path();
+        let renamed = root.join("sub/app-renamed");
+
+        write_text(
+            &root.join("CMakeFiles/TargetDirectories.txt"),
+            &format!("{}\n", root.join("sub/CMakeFiles/app.dir").display()),
+        );
+        write_text(
+            &root.join("sub/CMakeFiles/app.dir/link.txt"),
+            "/usr/bin/cc -g CMakeFiles/app.dir/main.c.o -o app-renamed\n",
+        );
+        write_executable(&renamed);
+
+        // No file is named `app`, so every name-shaped layout misses it.
+        assert_eq!(
+            resolve_target(root, "app", recent()).as_deref(),
+            Some(renamed.as_path())
+        );
+    }
+
+    /// Ninja names the output in a `phony` alias, one per configuration, so every configuration's
+    /// file is a candidate and the one this build wrote wins.
+    #[test]
+    pub fn a_ninja_alias_resolves_the_output_name_of_each_configuration() {
+        let directory = TempDir::new("cmake-output-ninja");
+        let root = directory.path();
+        let debug = root.join("Debug/renamed");
+        let release = root.join("Release/renamed");
+
+        write_text(
+            &root.join("build.ninja"),
+            "build demo: phony Debug/renamed\n",
+        );
+        write_text(
+            &root.join("build-Release.ninja"),
+            "build demo: phony Release/renamed\n",
+        );
+        // Only the release copy exists, so it is the answer while debug is absent.
+        write_executable(&release);
+        assert_eq!(
+            resolve_target(root, "demo", recent()).as_deref(),
+            Some(release.as_path())
+        );
+
+        // Once the debug copy is written by this build, it takes the launch.
+        std::thread::sleep(Duration::from_millis(20));
+        write_executable(&debug);
+        assert_eq!(
+            resolve_target(root, "demo", recent()).as_deref(),
+            Some(debug.as_path())
         );
     }
 }

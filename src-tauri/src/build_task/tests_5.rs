@@ -95,6 +95,33 @@ pub mod tests_group_5 {
     }
 
     #[test]
+    pub fn a_test_binary_under_deps_is_never_the_program() {
+        let directory = TempDir::new("newest-deps");
+        let root = directory.path();
+        let since = SystemTime::now() - Duration::from_secs(60);
+
+        let app = root.join("target/debug/demo");
+        write_executable(&app);
+        std::thread::sleep(Duration::from_millis(20));
+        // Cargo links every unit into `deps/`, so a build that also compiled tests leaves a newer
+        // extensionless binary there, and it is the app's own name that a walk would rank first.
+        let test_binary = root.join("target/debug/deps/demo-4f9c1b2a");
+        write_executable(&test_binary);
+
+        assert!(test_binary.exists(), "the walk's depth limit must reach it");
+        assert_eq!(
+            cmake_artifact("", root, since).as_deref(),
+            Some(app.to_string_lossy().as_ref())
+        );
+        assert!(
+            executable_candidates(root)
+                .iter()
+                .all(|candidate| !candidate.path.starts_with(root.join("target/debug/deps"))),
+            "a binary under deps is not a candidate at all"
+        );
+    }
+
+    #[test]
     pub fn a_missing_directory_reports_nothing_instead_of_failing() {
         let directory = TempDir::new("newest-missing");
         let missing = directory.path().join("never-built");
