@@ -4,6 +4,7 @@ import { sticksToBottom } from "@/lib/run/stick";
 import { TOAST_MS } from "@/lib/consts/tests";
 import type { RunExit, RunLine } from "@/lib/run/runOutput";
 import { copyText, lineClass, stopLabel } from "@/ui/run/view";
+import RunInputRow from "@/ui/run/RunInputRow";
 
 export type { RunLine } from "@/lib/run/runOutput";
 
@@ -37,7 +38,6 @@ export default function RunLog({
 	const ref = useRef<HTMLDivElement | null>(null);
 	const stickRef = useRef(true);
 	const [copyStatus, setCopyStatus] = useState<string | null>(null);
-	const [input, setInput] = useState("");
 	const statusTimer = useRef<number | null>(null);
 	const canSend = running && !stopping;
 
@@ -136,13 +136,6 @@ export default function RunLog({
 
 	const exitText = exited === null ? null : exitStatusText(exited);
 
-	/** Enter submits the row, which is how the browser sends a single-input form; it then clears. */
-	const send = () => {
-		if (!canSend) return;
-		onStdin(input);
-		setInput("");
-	};
-
 	return (
 		<section className="run-log" aria-label="Run output">
 			<div className="run-log-head">
@@ -189,22 +182,7 @@ export default function RunLog({
 				))}
 				{exitText === null ? null : <div className="run-exit">{exitText}</div>}
 			</div>
-			<form
-				className="run-log-input"
-				onSubmit={(event) => {
-					event.preventDefault();
-					send();
-				}}
-			>
-				<input
-					className="run-log-input-field"
-					aria-label="Program input"
-					placeholder={canSend ? "Type input, press Enter" : "No program running"}
-					value={input}
-					disabled={!canSend}
-					onChange={(event) => setInput(event.target.value)}
-				/>
-			</form>
+			<RunInputRow canSend={canSend} onSend={onStdin} />
 		</section>
 	);
 }
