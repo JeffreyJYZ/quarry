@@ -1,5 +1,5 @@
 import type { DiagnosticMap } from "@/lib/lsp/diagnostics";
-import type { FileBuffer } from "@/lib/project/buffer";
+import { type FileBuffer, documentId } from "@/lib/project/buffer";
 import type { Preferences } from "@/lib/settings/model";
 import type { EditorHandle } from "@/ui/editor/Editor";
 import Breadcrumb from "@/ui/breadcrumb/Breadcrumb";
@@ -95,7 +95,10 @@ export default function EditorStage(props: EditorStageProps) {
 				onNavigate={props.onNavigate}
 			/>
 			<div className="editor-pane">
+				{/* Keyed on the document, not the pane: a new id disposes the view, so a tab switch,
+				    a reopen and a disk reload each start a fresh undo history. */}
 				<LazyEditor
+					key={documentId(active)}
 					ref={props.editorRef}
 					path={active.path}
 					value={active.text}

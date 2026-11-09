@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import { isDirty, type FileBuffer } from "@/lib/project/buffer";
+import { isDirty, settleSave, type FileBuffer } from "@/lib/project/buffer";
 import { type SaveOutcome, saveBuffer, saveErrorMessage, saveMessage } from "@/lib/project/save";
 import { formatterFor, lspDidSave } from "@/lib/project/api";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
@@ -121,7 +121,11 @@ export function useSaveBuffers(context: SaveContext) {
 					}
 					const written = outcome.buffer;
 					setBuffers((current) =>
-						current.map((entry) => (entry.path === path ? written : entry)),
+						current.map((entry) =>
+							entry.path === path
+								? settleSave(entry, buffer.text, written.loaded)
+								: entry,
+						),
 					);
 					saved += 1;
 					context.onSaved(path);
