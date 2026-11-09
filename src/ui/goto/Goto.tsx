@@ -5,7 +5,6 @@ import { describeError } from "@/lib/project/errors";
 import { isInsideRoot } from "@/lib/lsp/paths";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
 import { ALL_SERVER_KINDS, RUST_ANALYZER } from "@/lib/consts/lsp";
-import type { ServerKind } from "@/lib/lsp/served";
 import { useDialogFocus } from "@/ui/app/useDialogFocus";
 import "@/ui/goto/goto.css";
 import GotoInput from "@/ui/goto/GotoInput";

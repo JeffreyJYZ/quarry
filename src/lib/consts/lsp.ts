@@ -2,7 +2,6 @@
 
 import type { ServerKind } from "@/lib/lsp/served";
 import type { TypeHierarchyDirection } from "@/lib/lsp/typeHierarchy";
-import type { ServerKind } from "@/lib/lsp/served";
 export const DIRECTIONS: TypeHierarchyDirection[] = ["supertypes", "subtypes"];
 
 export const TITLES: Record<TypeHierarchyDirection, string> = {
