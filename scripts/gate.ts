@@ -23,6 +23,7 @@ const STEPS: Step[] = [
 	{ name: "file size (200 lines)", command: "bun", args: ["scripts/check-file-size.ts"] },
 	{ name: "types (bun check)", command: "bun", args: ["check"] },
 	{ name: "docs dependencies", command: "bun", args: ["scripts/docs-deps.ts"] },
+	{ name: "unstyled classes", command: "bun", args: ["scripts/unstyled-classes.ts"] },
 	{ name: "format (bun fmt --check)", command: "bun", args: ["fmt", "--check"] },
 	{ name: "lint (biome)", command: "bunx", args: ["biome", "lint", "."] },
 	{ name: "frontend tests", command: "bun", args: ["test"] },

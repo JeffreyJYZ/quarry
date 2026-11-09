@@ -1,0 +1,160 @@
+.tests-summary {
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--line);
+	font-family: var(--mono);
+	font-size: 11px;
+	color: var(--muted);
+}
+
+.tests-list {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: auto;
+	padding: 4px 0;
+}
+
+.tests-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 8px;
+	font-family: var(--mono);
+	font-size: 11px;
+}
+
+.tests-group {
+	display: flex;
+	flex-direction: column;
+}
+
+.tests-group-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 8px;
+}
+
+.tests-group-count {
+	color: var(--muted);
+	font-size: 10px;
+}
+
+.tests-binary {
+	color: var(--muted);
+}
+
+.test-leaf {
+	padding-left: 14px;
+}
+
+.test-name {
+	color: var(--text);
+}
+
+.test-module {
+	color: var(--muted);
+}
+
+.test-toggle {
+	width: 12px;
+	cursor: pointer;
+	color: var(--muted);
+}
+
+.test-run {
+	padding: 2px 6px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: transparent;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10px;
+	cursor: pointer;
+}
+
+.test-duration {
+	color: var(--muted);
+	font-size: 10px;
+}
+
+.test-copy {
+	opacity: 0;
+}
+
+.test-copy-note {
+	font-size: 10px;
+	color: var(--muted);
+}
+
+.test-output-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 8px;
+	border-top: 1px solid var(--line);
+}
+
+.test-output-label {
+	font-size: 10px;
+	color: var(--muted);
+}
+
+.test-output-block {
+	padding: 4px 8px;
+	font-family: var(--mono);
+	font-size: 10px;
+	white-space: pre-wrap;
+}
+
+.test-output-more {
+	color: var(--accent);
+	font-size: 10px;
+	cursor: pointer;
+}
+
+.test-output {
+	padding: 4px 8px;
+	font-family: var(--mono);
+	font-size: 10px;
+}
+
+.delete-row,
+.edit-row {
+	padding: 2px 4px;
+	border: 0;
+	background: none;
+	color: var(--muted);
+	cursor: pointer;
+}
+
+.disabled-reason {
+	color: var(--muted);
+	font-size: 10px;
+	font-style: italic;
+}
+
+.replace-input {
+	background: var(--bg);
+	color: var(--text);
+	border: 1px solid var(--line);
+	font-family: var(--mono);
+	font-size: 11px;
+}
+
+.settings-text {
+	color: var(--text);
+	font-family: var(--mono);
+	font-size: 11px;
+}
+
+.status-settings {
+	color: var(--muted);
+	font-size: 10px;
+	cursor: pointer;
+}
+
+.tree-row-wrap {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
