@@ -41,7 +41,8 @@ impl PtyState {
         Ok(())
     }
 
-    /// Kills every shell. Called when the app exits: a live PTY keeps the process group alive, and
+    /// Kills every shell and forgets it, so the map cannot hand a dead shell back out. Called when
+    /// the window is destroyed and again on exit: a live PTY keeps the process group alive, and
     /// macOS then shows the app as still running in the background after its window is gone.
     /// The map is emptied under its guard and released before any kill, so a shell that cannot be
     /// reaped blocks at most `KILL_GRACE` and never another terminal command.

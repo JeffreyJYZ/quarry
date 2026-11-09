@@ -8,8 +8,9 @@
 //! event, so a `cargo build` or a CMake configure cannot turn into a refresh storm.
 //!
 //! Lifecycle rule: one watcher at a time. Starting a project replaces the previous one, closing or
-//! replacing the project stops it through `watch_stop`, and app quit calls `shutdown_all` beside the
-//! other managed states. Nothing here blocks the async runtime: the thread owns the notify backend
+//! replacing the project stops it through `watch_stop`, and the last window closing or the app
+//! quitting calls `shutdown_all` beside the other managed states. Nothing here blocks the async
+//! runtime: the thread owns the notify backend
 //! and exits when its stop channel closes.
 //!
 //! Frontend contract: `src/ui/app/useFileWatch.ts` subscribes, `src/lib/project/watch.ts` decides

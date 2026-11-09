@@ -19,6 +19,7 @@ mod run_config;
 mod run_task;
 mod search;
 mod settings;
+mod shutdown;
 mod teardown;
 #[cfg(test)]
 pub mod test_support;
@@ -167,28 +168,31 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while building the application")
-        .run(|handle, event| {
-            match event {
-                tauri::RunEvent::Ready => {
-                    if startup_enabled() {
-                        eprintln!(
-                            "quarry startup: window-ready +{}ms",
-                            process_start().elapsed().as_millis()
-                        );
-                    }
+        .run(|handle, event| match event {
+            tauri::RunEvent::Ready => {
+                if startup_enabled() {
+                    eprintln!(
+                        "quarry startup: window-ready +{}ms",
+                        process_start().elapsed().as_millis()
+                    );
                 }
-                // A live shell, language server, adapter or program keeps the process group alive,
-                // which is what makes macOS say the app is "running in the background" after the
-                // window is gone. Take them down with the window.
-                tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
-                    use tauri::Manager;
-                    handle.state::<lsp::LspState>().shutdown_all();
-                    handle.state::<dap::DapState>().shutdown_all();
-                    handle.state::<pty::PtyState>().shutdown_all();
-                    handle.state::<run_task::RunState>().shutdown_all();
-                    handle.state::<watch::WatchState>().shutdown_all();
-                }
-                _ => {}
             }
+            // A live shell, language server, adapter or program keeps the process group alive,
+            // which is what makes macOS say the app is "running in the background" after the
+            // window is gone. macOS does not quit on the last window close, so take them down
+            // with the window itself, not only on exit.
+            tauri::RunEvent::WindowEvent {
+                label,
+                event: tauri::WindowEvent::Destroyed,
+                ..
+            } => {
+                if shutdown::closing_last_window(handle, &label) {
+                    shutdown::Children::of(handle).shutdown();
+                }
+            }
+            tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
+                shutdown::Children::of(handle).shutdown();
+            }
+            _ => {}
         });
 }
