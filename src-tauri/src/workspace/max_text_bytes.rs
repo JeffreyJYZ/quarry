@@ -15,6 +15,13 @@ use super::*;
 /// Files above this size are not opened in the editor.
 pub const MAX_TEXT_BYTES: u64 = 2 * 1024 * 1024;
 
+/// Largest document this app sends to a language server.
+///
+/// This is the editor's load cap, not a second number: text the editor refuses to open is text
+/// nothing can synchronise, so a larger value here would only allow payloads no file could produce.
+/// A document exactly at the cap is still sent; one byte more is refused, naming both sizes.
+pub const MAX_LSP_DOCUMENT_BYTES: usize = MAX_TEXT_BYTES as usize;
+
 /// Mode of a file this module creates: owner read/write, everyone else read.
 pub const NEW_FILE_MODE: u32 = 0o644;
 
