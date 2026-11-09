@@ -18,6 +18,13 @@ pub const EXITED_EVENT: &str = "pty://exited";
 
 pub const BUF_SIZE: usize = 8192;
 
+/// The shell a session was spawned from, shared with the reader thread that reaps and kills it.
+pub type ChildHandle = Arc<Mutex<Option<Box<dyn portable_pty::Child + Send + Sync>>>>;
+
+/// The live sessions, behind its own `Arc` so a reader thread can retire its own entry after the
+/// child is reaped, instead of leaving the master and writer descriptors open until tab close.
+pub type Sessions = Arc<Mutex<HashMap<String, Arc<Session>>>>;
+
 #[derive(serde::Serialize)]
 pub struct PtyOpenResult {
     pub id: String,
@@ -25,14 +32,14 @@ pub struct PtyOpenResult {
 }
 
 pub struct PtyState {
-    pub(crate) sessions: Mutex<HashMap<String, Arc<Session>>>,
+    pub(crate) sessions: Sessions,
     pub(crate) counter: AtomicU64,
 }
 
 impl Default for PtyState {
     fn default() -> Self {
         Self {
-            sessions: Mutex::new(HashMap::new()),
+            sessions: Arc::new(Mutex::new(HashMap::new())),
             counter: AtomicU64::new(0),
         }
     }
@@ -43,7 +50,7 @@ impl Default for PtyState {
 pub struct Session {
     pub(crate) master: Mutex<Box<dyn portable_pty::MasterPty + Send>>,
     pub(crate) writer: Mutex<Box<dyn Write + Send>>,
-    pub(crate) child: Arc<Mutex<Option<Box<dyn portable_pty::Child + Send + Sync>>>>,
+    pub(crate) child: ChildHandle,
 }
 
 impl Drop for PtyState {
@@ -109,15 +116,16 @@ pub async fn pty_open(
         writer: Mutex::new(writer),
         child: Arc::clone(&child),
     });
-    state.insert_session(id.clone(), session);
+    state.insert_session(id.clone(), Arc::clone(&session));
 
     // reader thread
     let app2 = app.clone();
     let id2 = id.clone();
-    let child2 = Arc::clone(&child);
+    let session2 = Arc::clone(&session);
+    let sessions = Arc::clone(&state.sessions);
     thread::Builder::new()
         .name(format!("{id}-reader"))
-        .spawn(move || pump(reader, &app2, &id2, child2))
+        .spawn(move || pump(reader, &app2, &id2, &session2, &sessions))
         .map_err(|e| {
             kill_spawned(&child);
             let _ = state.take_session(&id);
