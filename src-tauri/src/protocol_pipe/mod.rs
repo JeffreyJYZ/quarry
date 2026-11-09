@@ -25,6 +25,9 @@ pub use impl_stderrcapture::*;
 mod impl_processpipe_1;
 pub use impl_processpipe_1::*;
 
+mod wait_exit;
+pub use wait_exit::*;
+
 mod tests_1;
 pub use tests_1::*;
 
