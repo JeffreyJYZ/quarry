@@ -1,6 +1,6 @@
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDialogFocus } from "@/ui/app/useDialogFocus";
-import { splitPath } from "@/ui/projects/recentPaths";
+import { splitPath } from "@/lib/project/paths";
 
 export type ProjectSwitcherProps = {
 	roots: string[];

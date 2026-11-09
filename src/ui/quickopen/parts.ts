@@ -16,11 +16,10 @@ export function recordRecent(path: string): void {
 	}
 }
 
-import { basename } from "@/lib/quickopen/rank";
+import { directoryOf, fileName, relativeTo } from "@/lib/project/paths";
 
 export function fileParts(path: string, root: string): { name: string; relDir: string } {
-	const name = basename(path);
-	const dir = path.startsWith(root) ? path.slice(root.length).replace(/^\/+/, "") : path;
-	const relDir = dir.slice(0, Math.max(0, dir.length - name.length)).replace(/\/+$/, "");
-	return { name, relDir };
+	const relative = relativeTo(root, path);
+	const dir = relative === null ? directoryOf(path) : directoryOf(relative);
+	return { name: fileName(path), relDir: dir };
 }

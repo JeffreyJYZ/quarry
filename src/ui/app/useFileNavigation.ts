@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { fileName } from "@/lib/problems/model";
+import { fileName } from "@/lib/project/paths";
 import { revealTarget } from "@/lib/search/model";
 
 /**

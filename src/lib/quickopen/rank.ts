@@ -4,17 +4,16 @@
 // Subsequence matching is case-insensitive by default and prefers matches at
 // word and path-segment boundaries.
 
+import { directoryOf, fileName } from "@/lib/project/paths";
+
+export { fileName as basename } from "@/lib/project/paths";
+
 export function splitQuery(query: string): { primary: string; filter: string } {
 	const spaceIndex = query.indexOf(" ");
 	if (spaceIndex === -1) {
 		return { primary: query, filter: "" };
 	}
 	return { primary: query.slice(0, spaceIndex), filter: query.slice(spaceIndex + 1) };
-}
-
-export function basename(path: string): string {
-	const slash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-	return slash === -1 ? path : path.slice(slash + 1);
 }
 
 function isBoundary(text: string, index: number): boolean {
@@ -90,16 +89,10 @@ export function rankFiles(paths: string[], query: string, context?: RankContext)
 	const currentDir =
 		context?.currentPath === null || context?.currentPath === undefined
 			? null
-			: context.currentPath.slice(
-					0,
-					Math.max(
-						context.currentPath.lastIndexOf("/"),
-						context.currentPath.lastIndexOf("\\"),
-					),
-				);
+			: directoryOf(context.currentPath);
 	const scored: Scored[] = [];
 	for (const path of paths) {
-		const base = basename(path);
+		const base = fileName(path);
 		const baseLower = base.toLowerCase();
 		const pathLower = path.toLowerCase();
 		let tier: Tier | null = null;
@@ -139,7 +132,7 @@ export function rankFiles(paths: string[], query: string, context?: RankContext)
 				sumPos = (q.length * idx + (q.length * (q.length - 1)) / 2) | 0;
 			}
 		}
-		const dir = path.slice(0, Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")));
+		const dir = directoryOf(path);
 		scored.push({
 			path,
 			tier,

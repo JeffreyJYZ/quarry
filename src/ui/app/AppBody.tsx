@@ -1,6 +1,6 @@
 import { Suspense, lazy } from "react";
 import type { CSSProperties } from "react";
-import { fileName } from "@/lib/problems/model";
+import { fileName } from "@/lib/project/paths";
 import { runningSessions } from "@/lib/lsp/context";
 import { notifyWatchedFiles } from "@/lib/lsp/watchedFiles";
 import { isDirty } from "@/lib/project/buffer";

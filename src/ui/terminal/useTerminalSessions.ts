@@ -9,14 +9,8 @@ import {
 	ptyWrite,
 } from "@/lib/project/api";
 import { applyChunks, PtyBuffer, withChunk } from "@/lib/terminal/ptyBuffer";
-import {
-	appendData,
-	describe,
-	dirOf,
-	emptySession,
-	ptySize,
-	type Session,
-} from "@/lib/terminal/sessions";
+import { appendData, describe, emptySession, ptySize, type Session } from "@/lib/terminal/sessions";
+import { parentDir } from "@/lib/project/paths";
 /** A raw PTY chunk, for a renderer that needs bytes rather than the parsed line model. */
 export type RawOutputHandler = (ptyId: string, data: string) => void;
 /** A promise that settles once the PTY listeners are attached, whichever way that went. */
@@ -60,7 +54,10 @@ export function useTerminalSessions(options: {
 	const openSession = useCallback(async () => {
 		const id = nextId.current;
 		nextId.current += 1;
-		const cwd = activePath !== null && activePath !== undefined ? dirOf(activePath) : root;
+		const cwd =
+			activePath !== null && activePath !== undefined
+				? (parentDir(activePath) ?? root)
+				: root;
 		setSessions((current) => [...current, emptySession(id, cwd, defaultFontSize)]);
 		setActiveId(id);
 		// The prompt lands milliseconds after `pty_open`, so its listeners must exist first. The gate

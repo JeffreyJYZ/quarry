@@ -12,7 +12,8 @@ import type { Dispatch, RefObject, SetStateAction } from "react";
 import { listDir, readTextFile } from "@/lib/project/api";
 import { type FileBuffer, isDirty } from "@/lib/project/buffer";
 import { describeError } from "@/lib/project/errors";
-import { baseName, planWatchBatch } from "@/lib/project/watch";
+import { fileName, parentDir } from "@/lib/project/paths";
+import { planWatchBatch } from "@/lib/project/watch";
 
 /**
  * The buffer after a disk read, or `null` when the read changes nothing it is safe to apply.
@@ -51,10 +52,10 @@ export type ExternalChangeActions = {
  * delete, which would close a tab over a file that is still there.
  */
 async function fileExists(path: string): Promise<boolean> {
-	const cut = path.lastIndexOf("/");
-	if (cut <= 0) return true;
+	const parent = parentDir(path);
+	if (parent === null) return true;
 	try {
-		const entries = await listDir(path.slice(0, cut));
+		const entries = await listDir(parent);
 		return entries.some((entry) => entry.path === path && !entry.isDir);
 	} catch {
 		return true;
@@ -90,7 +91,7 @@ export function externalChangeHandler(
 			touched.filter((buffer) => !existing.has(buffer.path)).map((buffer) => buffer.name),
 		);
 		const candidates = paths.filter(
-			(path) => !open.has(path) && vanishedNames.has(baseName(path)),
+			(path) => !open.has(path) && vanishedNames.has(fileName(path)),
 		);
 		const found = await Promise.all(
 			candidates.map(async (path) => ({ path, there: await io.exists(path) })),

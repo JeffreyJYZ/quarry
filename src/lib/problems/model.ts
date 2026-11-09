@@ -1,5 +1,6 @@
 import type { DiagnosticMap } from "@/lib/lsp/diagnostics";
 import type { Diagnostic } from "@/lib/project/api";
+import { fileName } from "@/lib/project/paths";
 
 export type ProblemFile = {
 	/** Absolute path, the key the diagnostics store uses. */
@@ -8,16 +9,6 @@ export type ProblemFile = {
 	name: string;
 	diagnostics: Diagnostic[];
 };
-
-export function fileName(path: string): string {
-	const cut = path.lastIndexOf("/");
-	return cut === -1 ? path : path.slice(cut + 1);
-}
-
-export function directoryOf(path: string): string {
-	const cut = path.lastIndexOf("/");
-	return cut === -1 ? "" : path.slice(0, cut);
-}
 
 /** `2 errors`, `1 error`; keeps every surface reading the same. */
 export function plural(count: number, noun: string): string {

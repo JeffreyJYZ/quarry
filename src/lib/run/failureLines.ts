@@ -1,4 +1,5 @@
 import type { Diagnostic } from "@/lib/project/api";
+import { relativeTo } from "@/lib/project/paths";
 
 /** Why a launch never started: the build that failed, or the target that could not be resolved. */
 export type LaunchFailure = {
@@ -17,8 +18,7 @@ const SEVERITY: Record<Diagnostic["severity"], string> = {
 /** A path as the compiler would print it: relative to the project when it is inside it. */
 function displayPath(path: string, root: string | null): string {
 	if (root === null) return path;
-	const prefix = root.endsWith("/") ? root : `${root}/`;
-	return path.startsWith(prefix) ? path.slice(prefix.length) : path;
+	return relativeTo(root, path) ?? path;
 }
 
 /**

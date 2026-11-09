@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { type DapBreakpoint, dapSetBreakpoints, dapSetBreakpointsEx } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
-import { fileName } from "@/lib/problems/model";
+import { fileName } from "@/lib/project/paths";
 import { type BreakpointEntry, breakpointKey } from "./sessionTypes";
 
 /**

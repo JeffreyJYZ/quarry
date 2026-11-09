@@ -7,6 +7,8 @@
  * checks and the tables themselves come from here.
  */
 
+import { fileName } from "@/lib/project/paths";
+
 /** C and C++ source and header extensions, without the leading dot. */
 export const CPP_EXTENSIONS = ["c", "h", "cc", "cpp", "cxx", "hh", "hpp", "hxx"] as const;
 
@@ -18,8 +20,7 @@ const RUST = new Set<string>(RUST_EXTENSIONS);
 
 /** Lowercased extension of a path without its dot, or `""` when there is none. */
 export function extensionOf(path: string): string {
-	const normalized = path.replace(/\\/g, "/");
-	const base = normalized.slice(normalized.lastIndexOf("/") + 1);
+	const base = fileName(path);
 	const dot = base.lastIndexOf(".");
 	if (dot <= 0) return "";
 	return base.slice(dot + 1).toLowerCase();

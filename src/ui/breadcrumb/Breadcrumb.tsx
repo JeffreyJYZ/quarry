@@ -3,6 +3,7 @@ import { type DocumentSymbol as LspSymbol, lspSymbols } from "@/lib/project/api"
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
 import type { ServerKind } from "@/lib/lsp/served";
 import { qualifiedName } from "@/lib/breadcrumb/model";
+import { relativeTo, segments } from "@/lib/project/paths";
 
 export type BreadcrumbProps = {
 	root: string;
@@ -74,14 +75,12 @@ export default function Breadcrumb({ root, activePath, cursor, onNavigate }: Bre
 		return null;
 	}
 
-	const relative = activePath.startsWith(`${root}/`)
-		? activePath.slice(root.length + 1)
-		: activePath;
-	const segments = relative.split("/");
+	const relative = relativeTo(root, activePath) ?? activePath;
+	const pathSegments = segments(relative);
 
-	let displaySegments = segments;
-	if (segments.length > 4) {
-		displaySegments = ["…", ...segments.slice(segments.length - 3)];
+	let displaySegments = pathSegments;
+	if (pathSegments.length > 4) {
+		displaySegments = ["…", ...pathSegments.slice(pathSegments.length - 3)];
 	}
 
 	const chain: LspSymbol[] = [];

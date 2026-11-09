@@ -1,16 +1,11 @@
 import type { Location } from "@/lib/project/api";
+import { directoryOf, fileName, separatorOf } from "@/lib/project/paths";
 
 export type RefsPanelProps = {
 	locations: Location[];
 	onNavigate: (path: string, line: number, character: number) => void;
 	onClose: () => void;
 };
-
-function splitPath(path: string): { dir: string; name: string } {
-	const last = path.lastIndexOf("/");
-	if (last === -1) return { dir: "", name: path };
-	return { dir: path.slice(0, last), name: path.slice(last + 1) };
-}
 
 export default function RefsPanel({ locations, onNavigate, onClose }: RefsPanelProps) {
 	return (
@@ -27,7 +22,8 @@ export default function RefsPanel({ locations, onNavigate, onClose }: RefsPanelP
 					<p className="refs-empty">No references</p>
 				) : (
 					locations.map((location) => {
-						const { dir, name } = splitPath(location.path);
+						const dir = directoryOf(location.path);
+						const name = fileName(location.path);
 						const line = location.range.start.line + 1;
 						const column = location.range.start.character + 1;
 						return (
@@ -44,7 +40,9 @@ export default function RefsPanel({ locations, onNavigate, onClose }: RefsPanelP
 								}
 							>
 								<span className="refs-file">{name}</span>
-								<span className="refs-dir">{dir === "" ? "" : `${dir}/`}</span>
+								<span className="refs-dir">
+									{dir === "" ? "" : `${dir}${separatorOf(dir)}`}
+								</span>
 								<span className="refs-pos">
 									{line}:{column}
 								</span>

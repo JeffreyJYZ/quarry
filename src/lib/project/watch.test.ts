@@ -1,13 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { type FileBuffer, isDirty } from "@/lib/project/buffer";
-import {
-	baseName,
-	bufferAction,
-	buffersToRefresh,
-	dirsToRefresh,
-	parentDir,
-	planWatchBatch,
-} from "@/lib/project/watch";
+import { fileName, parentDir } from "@/lib/project/paths";
+import { bufferAction, buffersToRefresh, dirsToRefresh, planWatchBatch } from "@/lib/project/watch";
 
 function buffer(path: string, text: string, loaded: string): FileBuffer {
 	return { path, name: path.split("/").pop() ?? path, text, loaded };
@@ -97,8 +91,8 @@ describe("planWatchBatch", () => {
 	});
 
 	test("a name comes off the last separator", () => {
-		expect(baseName(`${ROOT}/src/main.rs`)).toBe("main.rs");
-		expect(baseName("main.rs")).toBe("main.rs");
+		expect(fileName(`${ROOT}/src/main.rs`)).toBe("main.rs");
+		expect(fileName("main.rs")).toBe("main.rs");
 	});
 });
 

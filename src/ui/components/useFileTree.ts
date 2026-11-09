@@ -3,6 +3,7 @@ import { useReveal } from "./useReveal";
 import { type FileEntry, listDir } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
 import { createDir, createFile, deletePath, renamePath } from "@/lib/project/fileOps";
+import { parentDir } from "@/lib/project/paths";
 import { useWatchRefresh } from "./useWatchRefresh";
 import type { DirState, EditState, FileTreeProps } from "./FileTreeTypes";
 
@@ -134,8 +135,7 @@ export function useFileTree({
 					refreshDir(targetOrParent);
 				} else if (kind === "rename") {
 					const newPath = await renamePath(root, targetOrParent, name);
-					const parent = targetOrParent.split("/").slice(0, -1).join("/");
-					refreshDir(parent === "" ? root : parent);
+					refreshDir(parentDir(targetOrParent) ?? root);
 					onFileRenamed?.(targetOrParent, newPath);
 				}
 			} catch (error) {
@@ -152,8 +152,7 @@ export function useFileTree({
 			setDeleteConfirm(null);
 			try {
 				await deletePath(root, path);
-				const parent = path.split("/").slice(0, -1).join("/");
-				refreshDir(parent === "" ? root : parent);
+				refreshDir(parentDir(path) ?? root);
 				onFileDeleted?.(path);
 			} catch (error) {
 				onNotice?.(describeError(error));

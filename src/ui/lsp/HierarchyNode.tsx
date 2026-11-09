@@ -7,6 +7,7 @@ import {
 	isSelectable,
 } from "@/lib/lsp/typeHierarchy";
 import type { TypeHierarchy } from "@/lib/lsp/typeHierarchy";
+import { fileName } from "@/lib/project/paths";
 
 /** One row of the type hierarchy: expand twisty, name (selectable or not), loading/empty notes. */
 export default function HierarchyNode({
@@ -38,7 +39,7 @@ export default function HierarchyNode({
 				<span className="type-hierarchy-detail">{node.detail}</span>
 			) : null}
 			<span className="type-hierarchy-file">
-				{node.path.split("/").pop()}:{node.line + 1}
+				{fileName(node.path)}:{node.line + 1}
 			</span>
 		</>
 	);

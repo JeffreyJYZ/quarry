@@ -8,7 +8,8 @@ import { useDialogFocus } from "@/ui/app/useDialogFocus";
 import "@/ui/goto/goto.css";
 import GotoInput from "@/ui/goto/GotoInput";
 import GotoList from "@/ui/goto/GotoList";
-import { type GotoMode, type Row, TITLES, fileNameOf, filterRows } from "./gotoModel";
+import { type GotoMode, type Row, TITLES, filterRows } from "./gotoModel";
+import { fileName } from "@/lib/project/paths";
 export type { GotoMode } from "./gotoModel";
 export { filterRows } from "./gotoModel";
 export type GotoProps = {
@@ -46,7 +47,7 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose, onNoti
 				setRows(
 					recent.map((file) => ({
 						key: file,
-						label: fileNameOf(file),
+						label: fileName(file),
 						detail: file,
 						path: file,
 						line: 0,
@@ -74,7 +75,7 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose, onNoti
 						symbols.map((symbol) => ({
 							key: `${path ?? ""}:${symbol.range.start.line}:${symbol.name}`,
 							label: symbol.name,
-							detail: `${"  ".repeat(symbol.depth)}${path === null ? "" : fileNameOf(path)}:${symbol.range.start.line + 1}`,
+							detail: `${"  ".repeat(symbol.depth)}${path === null ? "" : fileName(path)}:${symbol.range.start.line + 1}`,
 							path: path ?? "",
 							line: symbol.range.start.line,
 							character: symbol.range.start.character,
@@ -101,7 +102,7 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose, onNoti
 						symbols.map((symbol) => ({
 							key: `${symbol.path}:${symbol.line}:${symbol.name}`,
 							label: symbol.name,
-							detail: `${symbol.container === "" ? "" : `${symbol.container} · `}${fileNameOf(symbol.path)}:${symbol.line + 1}`,
+							detail: `${symbol.container === "" ? "" : `${symbol.container} · `}${fileName(symbol.path)}:${symbol.line + 1}`,
 							path: symbol.path,
 							line: symbol.line,
 							character: symbol.character,

@@ -17,9 +17,15 @@ describe("isInside", () => {
 	test("trailing slash on root", () => {
 		expect(isInside("/root/", "/root/file.ts")).toBe(true);
 	});
-	test("backslashes rejected", () => {
-		expect(isInside("/root", "C:\\root\\file.ts")).toBe(false);
-		expect(isInside("/root", "/root/a\\b.ts")).toBe(false);
+	test("windows separators are a path, not a reason to bail out", () => {
+		expect(isInside("C:\\proj", "C:\\proj\\src\\main.cpp")).toBe(true);
+		expect(isInside("C:/proj", "C:/proj/src/main.cpp")).toBe(true);
+		expect(isInside("C:\\proj", "C:/proj/src/main.cpp")).toBe(true);
+		expect(isInside("C:\\proj", "C:\\proj-2\\src\\main.cpp")).toBe(false);
+	});
+	test("the root itself is not inside", () => {
+		expect(isInside("/root", "/root")).toBe(false);
+		expect(isInside("C:\\proj", "C:\\proj")).toBe(false);
 	});
 });
 
@@ -36,7 +42,13 @@ describe("ancestorDirs", () => {
 	test("trailing slash on root", () => {
 		expect(ancestorDirs("/root/", "/root/a/b.ts")).toEqual(["/root/a"]);
 	});
-	test("backslashes rejected", () => {
-		expect(ancestorDirs("/root", "/root/a\\b.ts")).toEqual([]);
+	test("windows ancestors keep the root's own separator", () => {
+		expect(ancestorDirs("C:\\proj", "C:\\proj\\a\\b\\c.ts")).toEqual([
+			"C:\\proj\\a",
+			"C:\\proj\\a\\b",
+		]);
+	});
+	test("mixed separators still name every ancestor", () => {
+		expect(ancestorDirs("C:\\proj", "C:/proj/a/b.ts")).toEqual(["C:\\proj\\a"]);
 	});
 });

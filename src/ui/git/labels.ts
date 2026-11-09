@@ -1,16 +1,5 @@
 export { STATUS_CLASS, STATUS_LETTER } from "@/lib/consts/git";
 
-export function dirOf(path: string): string {
-	const index = path.lastIndexOf("/");
-	if (index <= 0) return "";
-	return path.slice(0, index);
-}
-
-export function nameOf(path: string): string {
-	const index = path.lastIndexOf("/");
-	return index >= 0 ? path.slice(index + 1) : path;
-}
-
 export function relativeTime(iso: string): string {
 	const then = Date.parse(iso);
 	if (Number.isNaN(then)) return iso;

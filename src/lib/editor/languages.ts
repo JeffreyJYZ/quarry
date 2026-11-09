@@ -6,6 +6,7 @@ import { toml } from "@codemirror/legacy-modes/mode/toml";
 import { yaml } from "@codemirror/legacy-modes/mode/yaml";
 import type { Extension } from "@codemirror/state";
 import { isCppExtension, isRustExtension } from "@/lib/consts/extensions";
+import { fileName, normalizePath } from "@/lib/project/paths";
 
 const TOML_FILENAMES = new Set([
 	"cargo.lock",
@@ -19,10 +20,9 @@ const TOML_FILENAMES = new Set([
 
 export function languageNameForPath(path: string | null): string | null {
 	if (path === null) return null;
-	const normalized = path.replace(/\\/g, "/");
+	const normalized = normalizePath(path);
 	const lower = normalized.toLowerCase();
-	const slash = lower.lastIndexOf("/");
-	const base = slash === -1 ? lower : lower.slice(slash + 1);
+	const base = fileName(lower);
 
 	if (TOML_FILENAMES.has(base)) return "toml";
 	if (lower === ".cargo/config" || lower.endsWith("/.cargo/config")) return "toml";

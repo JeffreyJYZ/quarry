@@ -6,6 +6,7 @@ import {
 } from "@/lib/project/api";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
 import type { ServerKind } from "@/lib/lsp/served";
+import { fileName } from "@/lib/project/paths";
 export type CallsPanelProps = {
 	root: string;
 	path: string;
@@ -124,7 +125,7 @@ export default function CallsPanel({ root, path, cursor, onNavigate, onClose }: 
 				>
 					<span className="calls-name">{lastSeg}</span>
 					<span className="calls-file">
-						{node.path.split("/").pop()}:{node.line + 1}
+						{fileName(node.path)}:{node.line + 1}
 					</span>
 				</button>
 				{isLoading ? <div className="calls-loading">Loading calls…</div> : null}

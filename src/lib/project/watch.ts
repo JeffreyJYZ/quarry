@@ -7,6 +7,7 @@
  */
 
 import { type FileBuffer, isDirty } from "./buffer";
+import { fileName, parentDir } from "@/lib/project/paths";
 
 /** One debounced batch from the Rust watcher, plus a token so an effect sees each batch once. */
 export type WatchBatch = { token: number; paths: string[] };
@@ -23,12 +24,6 @@ export type BufferAction = "ignore" | "reload" | "conflict";
 export function bufferAction(buffer: FileBuffer, changed: ReadonlySet<string>): BufferAction {
 	if (!changed.has(buffer.path)) return "ignore";
 	return isDirty(buffer) ? "conflict" : "reload";
-}
-
-/** The directory above `path`, or `null` for a top-level path such as `/project`. */
-export function parentDir(path: string): string | null {
-	const cut = path.lastIndexOf("/");
-	return cut <= 0 ? null : path.slice(0, cut);
 }
 
 /**
@@ -61,12 +56,6 @@ export function buffersToRefresh(
 		else if (action === "conflict") conflicts.push(buffer);
 	}
 	return { reload, conflicts };
-}
-
-/** The last path segment, which is all a rename pair may be matched on. */
-export function baseName(path: string): string {
-	const cut = path.lastIndexOf("/");
-	return cut === -1 ? path : path.slice(cut + 1);
 }
 
 /** Everything one batch means for the open buffers, decided before anything is touched. */
@@ -133,7 +122,7 @@ export function planWatchBatch(
 
 	const created = paths.filter((path) => !open.has(path) && existing.has(path));
 	const vanishedByName = groupBy(vanished, (buffer) => buffer.name);
-	const createdByName = groupBy(created, baseName);
+	const createdByName = groupBy(created, fileName);
 	const moves = new Map<string, string>();
 	const ambiguous = new Set<string>();
 	for (const [name, olds] of vanishedByName) {
@@ -151,7 +140,7 @@ export function planWatchBatch(
 	for (const buffer of vanished) {
 		const target = moves.get(buffer.path);
 		if (target !== undefined) {
-			plan.moves.push({ buffer, to: target, name: baseName(target) });
+			plan.moves.push({ buffer, to: target, name: fileName(target) });
 			continue;
 		}
 		if (ambiguous.has(buffer.name)) {

@@ -3,6 +3,7 @@
 export type Kind = "rust-bin" | "rust-lib" | "c-cmake" | "cpp-cmake";
 
 import { STANDARDS } from "@/lib/consts/projects";
+import { joinPath as joinFsPath, trimTrailingSeparators } from "@/lib/project/paths";
 
 export { KINDS, STANDARDS } from "@/lib/consts/projects";
 
@@ -12,10 +13,9 @@ export function defaultStandard(kind: Kind): string {
 
 /** The directory a new project is created in, with a trailing separator removed. */
 export function parentOf(path: string): string {
-	return path.replace(/[\\/]+$/, "");
+	return trimTrailingSeparators(path);
 }
 
 export function joinPath(parent: string, name: string): string {
-	const separator = parent.includes("\\") && !parent.includes("/") ? "\\" : "/";
-	return `${parentOf(parent)}${separator}${name.trim()}`;
+	return joinFsPath(parent, name.trim());
 }

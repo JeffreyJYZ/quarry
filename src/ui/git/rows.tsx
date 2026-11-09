@@ -1,6 +1,7 @@
 import type { GitStatusEntry } from "@/lib/project/api";
 import { SHORT_HASH_LEN } from "@/lib/consts/git";
-import { dirOf, nameOf, STATUS_CLASS, STATUS_LETTER } from "./labels";
+import { directoryOf, fileName } from "@/lib/project/paths";
+import { STATUS_CLASS, STATUS_LETTER } from "./labels";
 
 type ChangeRowProps = {
 	entry: GitStatusEntry;
@@ -42,8 +43,8 @@ export function ChangeRow({
 				<span className={`git-status-letter ${STATUS_CLASS[entry.status]}`}>
 					{STATUS_LETTER[entry.status]}
 				</span>
-				<span className="git-row-name">{nameOf(entry.path)}</span>
-				<span className="git-row-dir">{dirOf(entry.path)}</span>
+				<span className="git-row-name">{fileName(entry.path)}</span>
+				<span className="git-row-dir">{directoryOf(entry.path)}</span>
 			</button>
 			{entry.staged ? (
 				// Staged rows offer no discard affordance: their content lives in the

@@ -11,11 +11,6 @@ export type Row = {
 
 export { TITLES } from "@/lib/consts/goto";
 
-export function fileNameOf(path: string): string {
-	const cut = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-	return cut === -1 ? path : path.slice(cut + 1);
-}
-
 /** Files whose name or directory contains every whitespace-separated term of the query. */
 export function filterRows(rows: Row[], query: string): Row[] {
 	const terms = query.toLowerCase().split(/\s+/).filter(Boolean);

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { DebugController, StopView } from "@/lib/debug/session";
 import type { DapFrame } from "@/lib/project/api/dap-types";
-import { fileName } from "@/lib/problems/model";
+import { fileName } from "@/lib/project/paths";
 import { openDisassembly } from "@/lib/debug/disasm";
 import ContextMenu from "@/ui/components/ContextMenu";
 import type { MenuItem } from "@/ui/components/ContextMenu";
