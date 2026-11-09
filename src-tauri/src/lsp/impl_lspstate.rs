@@ -56,7 +56,7 @@ pub async fn lsp_open_document(
     let session = session_for(&state, &root)?;
     let mut session = lock(&session);
 
-    open_document(&mut session, &path, text)?;
+    let version = open_document(&mut session, &path, text)?;
 
     // Opening a file should check it, the way CLion analyses on open: rust-analyzer's type findings
     // come from `cargo check`, so ask for one run now instead of waiting for a save.

@@ -22,7 +22,7 @@ fn payload_too_large(path: &str, bytes: usize) -> Option<String> {
 /// A refused document is never stored: a session entry would let a later change sync text the
 /// server was never told about. Anything already open under the same path is dropped first, so the
 /// server keeps no copy of a document this app will not sync.
-pub fn open_document(session: &mut Session, path: &str, text: String) -> Result<(), String> {
+pub fn open_document(session: &mut Session, path: &str, text: String) -> Result<u32, String> {
     if let Some(error) = payload_too_large(path, text.len()) {
         drop_document(session, path)?;
         return Err(error);
@@ -41,14 +41,15 @@ pub fn open_document(session: &mut Session, path: &str, text: String) -> Result<
             }
         }),
     );
-    send(session, "textDocument/didOpen", &message)
+    send(session, "textDocument/didOpen", &message)?;
+    Ok(version)
 }
 
 /// Sends the buffer's new text, refusing one above the payload cap.
 ///
 /// A document that grows past the cap leaves the server the way a closed one does, so it never
 /// keeps analysing text this app refuses to send again.
-pub fn change_document(session: &mut Session, path: &str, text: String) -> Result<(), String> {
+pub fn change_document(session: &mut Session, path: &str, text: String) -> Result<u32, String> {
     let old_text = session
         .document_texts
         .get(path)
@@ -58,7 +59,7 @@ pub fn change_document(session: &mut Session, path: &str, text: String) -> Resul
         // identical: no send
         let version = session.documents.get(path).copied().unwrap_or(0);
         session.documents.insert(path.to_string(), version);
-        return Ok(());
+        return Ok(version);
     }
     if let Some(error) = payload_too_large(path, text.len()) {
         drop_document(session, path)?;
@@ -68,7 +69,8 @@ pub fn change_document(session: &mut Session, path: &str, text: String) -> Resul
     let version = session.documents.get(path).copied().unwrap_or(0) + 1;
     store_document(session, path, version, &text);
     let message = change_message(path, version, &old_text, &text);
-    send(session, "textDocument/didChange", &message)
+    send(session, "textDocument/didChange", &message)?;
+    Ok(version)
 }
 
 /// Removes a document from the session and tells the server to forget it, as closing does.
