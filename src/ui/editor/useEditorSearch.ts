@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
 import { emptySearchState, setSearchMatches, type SearchMatch } from "@/lib/editor/search";
+import { replacementChanges } from "@/lib/search/replace";
 
 /** In-file search and replace: matches are pushed into the search field as a decoration set. */
 export function useEditorSearch(viewRef: { current: EditorView | null }) {
@@ -124,13 +125,14 @@ export function useEditorSearch(viewRef: { current: EditorView | null }) {
 
 	const replaceAll = () => {
 		const view = viewRef.current;
-		const current = matchesRef.current;
-		if (view === null || current.length === 0) return;
-		const changes = [...current].reverse().map((m) => ({
-			from: m.from,
-			to: m.to,
-			insert: replacementRef.current,
-		}));
+		if (view === null) return;
+		const changes = replacementChanges(
+			view.state.doc.toString(),
+			queryRef.current,
+			replacementRef.current,
+			{ caseSensitive: caseRef.current, regex: regexRef.current, wholeWord: false },
+		);
+		if (changes.length === 0) return;
 		view.dispatch({ changes });
 	};
 

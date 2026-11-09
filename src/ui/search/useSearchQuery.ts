@@ -44,7 +44,7 @@ export function useSearchQuery({
 }: {
 	root: string;
 	initialQuery?: string;
-	onOpen: (path: string, line: number, column: number) => void;
+	onOpen: (path: string, line: number, column: number, text: string) => void;
 	options: SearchOptions;
 	wholeWord: boolean;
 }): SearchQuery {
@@ -151,7 +151,7 @@ export function useSearchQuery({
 		}
 		const row = rows[active];
 		if (row !== undefined) {
-			onOpen(row.match.path, row.match.line, row.match.column);
+			onOpen(row.match.path, row.match.line, row.match.column, row.match.text);
 		}
 	};
 

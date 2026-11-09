@@ -30,10 +30,10 @@ export function useFileNavigation(options: {
 	);
 
 	const openMatch = useCallback(
-		(path: string, line: number, column: number) => {
+		(path: string, line: number, column: number, text: string) => {
 			options.setSearchOpen(false);
 			if (path !== activePathRef.current) void openPath(path, fileName(path));
-			setRevealTarget(revealTarget(line, column));
+			setRevealTarget(revealTarget(line, column, text));
 			setRevealToken((current) => current + 1);
 		},
 		[openPath, activePathRef, options, setRevealTarget, setRevealToken],

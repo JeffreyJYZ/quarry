@@ -84,10 +84,11 @@ export type PaletteProps = {
 	groups: ShortcutGroup[];
 	commandOpen: boolean;
 	openPaths: Set<string>;
+	buffers: Buffer[];
 	commands: import("@/ui/palette/CommandPalette").Command[];
 	recentCommands: string[];
 	onRecentCommands: (next: string[]) => void;
-	onOpenMatch: (path: string, line: number, column: number) => void;
+	onOpenMatch: (path: string, line: number, column: number, text: string) => void;
 	onOpenQuick: (path: string) => void;
 	onCloseSearch: () => void;
 	onCloseQuick: () => void;
@@ -105,6 +106,7 @@ export function Palettes(props: PaletteProps) {
 						root={props.root}
 						onOpen={props.onOpenMatch}
 						onClose={props.onCloseSearch}
+						buffers={props.buffers}
 					/>
 				</Suspense>
 			) : null}

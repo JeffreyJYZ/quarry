@@ -82,26 +82,41 @@ pub fn replace(
         for entry in entries.flatten() {
             let path = entry.path();
             let name = entry.file_name().to_string_lossy().to_string();
-            if path.is_dir() {
+            let Ok(file_type) = entry.file_type() else {
+                errors.push(format!("{}: cannot stat the entry", path.display()));
+                continue;
+            };
+            // ripgrep does not follow symlinks, so a replace must not either: a symlinked directory
+            // walks outside the project, and a symlinked file writes through to a target the search
+            // never listed.
+            if file_type.is_symlink() {
+                continue;
+            }
+            if file_type.is_dir() {
                 // The same list search uses: a replace that walks `.cache`, `CMakeFiles` or a
                 // `cmake-build-*` directory edits files the search it came from never showed.
                 if ignore::is_dir(&name) {
                     continue;
                 }
                 stack.push(path);
-            } else if path.is_file() {
+            } else if file_type.is_file() {
                 if ignore::is_file(&name) {
+                    continue;
+                }
+                // The same containment the workspace commands enforce: a path that resolves
+                // outside every open project is refused instead of read and rewritten.
+                if let Err(error) = crate::workspace::contained(&path) {
+                    errors.push(error);
                     continue;
                 }
                 let text = match fs::read_to_string(&path) {
                     Ok(t) => t,
                     Err(_) => continue,
                 };
-                let count = re.find_iter(&text).count() as u32;
+                let (new_text, count) = replace_text(&re, replacement, &text, fixed_strings);
                 if count == 0 {
                     continue;
                 }
-                let new_text = re.replace_all(&text, replacement).to_string();
                 // A sibling temp and a rename keep the source file whole when a write fails.
                 match crate::atomic_write::replace(&path, new_text.as_bytes()) {
                     Ok(()) => {

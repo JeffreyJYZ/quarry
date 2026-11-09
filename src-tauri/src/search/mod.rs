@@ -27,6 +27,9 @@ pub use search_core::*;
 mod parse_match_line;
 pub use parse_match_line::*;
 
+mod replace_text;
+pub(crate) use replace_text::*;
+
 mod tests_1;
 pub use tests_1::*;
 
@@ -35,3 +38,6 @@ pub use tests_2::*;
 
 mod tests_3;
 pub use tests_3::*;
+
+mod tests_4;
+pub use tests_4::*;
