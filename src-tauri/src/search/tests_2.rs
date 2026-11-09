@@ -95,4 +95,26 @@ pub mod tests_group_2 {
         assert!(args.contains(&"--fixed-strings".to_string()));
         assert!(!args.contains(&"--smart-case".to_string()));
     }
+
+    #[test]
+    pub fn cancelled_search_stops_the_child() {
+        // a directory big enough to keep rg busy
+        let tmp = std::env::temp_dir().join("quarry_cancel_test");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        for i in 0..2000 {
+            fs::write(tmp.join(format!("f{i}.txt")), "needle\n".repeat(1000)).unwrap();
+        }
+        let root = tmp.to_str().unwrap().to_string();
+        let handle = thread::spawn(move || {
+            let _ = search(&root, "needle", 100000, false, false);
+        });
+        // give rg time to start
+        thread::sleep(std::time::Duration::from_millis(200));
+        cancel_active_search();
+        let _ = handle.join();
+        // active pid cleared
+        assert_eq!(ACTIVE_RG.load(Ordering::SeqCst), 0);
+        let _ = fs::remove_dir_all(&tmp);
+    }
 }

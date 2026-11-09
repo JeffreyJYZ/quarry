@@ -9,6 +9,7 @@ pub use std::fs;
 pub use std::io::{BufRead, BufReader, Read};
 pub use std::path::{Path, PathBuf};
 pub use std::process::{Child, Command, ExitStatus, Stdio};
+pub use std::sync::atomic::{AtomicU32, Ordering};
 pub use std::thread::{self, JoinHandle};
 pub use std::time::Instant;
 
@@ -24,6 +25,17 @@ pub fn require_query(query: &str) -> Result<String, String> {
     Ok(query.to_string())
 }
 /// Runs ripgrep and reports. Called on a blocking thread so the async runtime stays free.
+/// pid of the ripgrep child currently running for a search, if any. 0 means none.
+pub static ACTIVE_RG: AtomicU32 = AtomicU32::new(0);
+
+/// Kill the ripgrep child of a search that is still running, if any.
+pub fn cancel_active_search() {
+    let pid = ACTIVE_RG.swap(0, Ordering::SeqCst);
+    if pid != 0 {
+        let _ = Command::new("kill").arg("-9").arg(pid.to_string()).status();
+    }
+}
+
 pub fn search(
     root: &str,
     query: &str,
@@ -31,6 +43,9 @@ pub fn search(
     case_sensitive: bool,
     fixed_strings: bool,
 ) -> Result<SearchReport, String> {
+    // A newer query (or an explicit cancel) owns the slot: stop any rg still running.
+    cancel_active_search();
+
     let started = Instant::now();
     let root = absolute_root(root);
 
@@ -47,6 +62,9 @@ pub fn search(
         .spawn()
         .map_err(|error| format!("cannot run {binary}: {error}"))?;
 
+    let child_id = child.id();
+    ACTIVE_RG.store(child_id, Ordering::SeqCst);
+
     let stderr = drain_stderr(&mut child);
     let (mut matches, truncated) = read_matches(&mut child, &root, max_results);
 
@@ -57,11 +75,23 @@ pub fn search(
     let status = child
         .wait()
         .map_err(|error| format!("cannot wait for {binary}: {error}"))?;
+
+    // release the slot if this search still owns it
+    let _ = ACTIVE_RG.compare_exchange(child_id, 0, Ordering::SeqCst, Ordering::SeqCst);
     let stderr = stderr
         .and_then(|handle| handle.join().ok())
         .unwrap_or_default();
 
     if !truncated && !status.success() {
+        // Terminated by signal: this search was cancelled by a newer query; report it as a
+        // cancellation (empty result) rather than a failure.
+        if status.code().is_none() {
+            return Ok(SearchReport {
+                matches: Vec::new(),
+                truncated: false,
+                duration_ms: elapsed_ms(started),
+            });
+        }
         // rg exits 1 when there are simply no matches; only 2 (and anything else) is a failure.
         if status.code() != Some(1) {
             return Err(ripgrep_error(&binary, &status, &stderr));

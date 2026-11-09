@@ -3,6 +3,7 @@ import {
 	applyReplacement,
 	buildPreview,
 	isPreviewStale,
+	isStaleSearch,
 	revealTarget,
 	searchFlags,
 	transformQuery,
@@ -108,5 +109,14 @@ describe("revealTarget", () => {
 
 	test("a column past the first character is not clamped to the line start", () => {
 		expect(revealTarget(3, 40).character).toBe(39);
+	});
+});
+
+describe("isStaleSearch", () => {
+	test("a run whose ticket differs from the current sequence is stale", () => {
+		expect(isStaleSearch(1, 2)).toBe(true);
+	});
+	test("a run whose ticket still matches is fresh", () => {
+		expect(isStaleSearch(3, 3)).toBe(false);
 	});
 });

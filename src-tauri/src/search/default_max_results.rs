@@ -118,6 +118,12 @@ pub fn replace(
 }
 
 #[tauri::command]
+pub async fn cancel_search() -> Result<(), String> {
+    cancel_active_search();
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn search_project(
     root: String,
     query: String,

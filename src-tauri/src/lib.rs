@@ -79,6 +79,7 @@ pub fn run() {
             format::format_document,
             format::formatter_for,
             search::search_project,
+            search::cancel_search,
             search::replace_project,
             dap::dap_launch,
             dap::dap_attach,
