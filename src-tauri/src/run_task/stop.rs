@@ -18,7 +18,7 @@ use super::*;
 pub const TERM_GRACE: Duration = Duration::from_millis(1500);
 
 /// Longest the hard kill gets before the stop returns and the reap is handed to its own thread.
-pub const KILL_GRACE: Duration = Duration::from_millis(500);
+pub use crate::teardown::{KILL_GRACE, until_gone};
 
 /// A unix child is spawned as its own process-group leader, so a signal to `-pid` reaches every
 /// process it started; `cargo build`'s `rustc` is one of those.
@@ -112,16 +112,7 @@ fn ended(child: &mut Child) -> bool {
 
 /// Wait up to `grace` for the child to be reaped; `true` proves the process is gone.
 fn drained(child: &mut Child, grace: Duration) -> bool {
-    let deadline = Instant::now() + grace;
-    loop {
-        if ended(child) {
-            return true;
-        }
-        if Instant::now() >= deadline {
-            return false;
-        }
-        thread::sleep(WAIT_INTERVAL);
-    }
+    until_gone(|| ended(child), grace)
 }
 
 /// The polite signal on unix, the hard one everywhere; the hard one is a group signal on unix.

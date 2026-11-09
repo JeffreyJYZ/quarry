@@ -22,6 +22,9 @@ pub use impl_session::*;
 mod shell_program;
 pub use shell_program::*;
 
+mod pump;
+pub use pump::*;
+
 mod spawned_child;
 mod utf8_stream;
 pub use output_event::*;
@@ -33,6 +36,9 @@ pub use validate_cwd::*;
 
 mod tests_items;
 pub use tests_items::*;
+
+mod tests_lifecycle;
+pub use tests_lifecycle::*;
 
 mod tests_locks;
 pub use tests_locks::*;

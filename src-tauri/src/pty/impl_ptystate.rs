@@ -43,10 +43,28 @@ impl PtyState {
 
     /// Kills every shell. Called when the app exits: a live PTY keeps the process group alive, and
     /// macOS then shows the app as still running in the background after its window is gone.
+    /// The map is emptied under its guard and released before any kill, so a shell that cannot be
+    /// reaped blocks at most `KILL_GRACE` and never another terminal command.
     pub fn shutdown_all(&self) {
-        let sessions: Vec<Arc<Session>> = lock(&self.sessions).values().cloned().collect();
+        let sessions: Vec<Arc<Session>> = {
+            let mut map = lock(&self.sessions);
+            map.drain().map(|(_, session)| session).collect()
+        };
         for session in sessions {
             kill_spawned(&session.child);
         }
     }
+}
+
+/// Removes `id` only while it still maps to `session`. A pump that finishes after its id was reused
+/// must not retire the session that reused it, so identity is the handle, never the id.
+pub fn retire(sessions: &Sessions, id: &str, session: &Arc<Session>) -> bool {
+    let mut map = lock(sessions);
+    let own = map
+        .get(id)
+        .is_some_and(|current| Arc::ptr_eq(current, session));
+    if own {
+        map.remove(id);
+    }
+    own
 }

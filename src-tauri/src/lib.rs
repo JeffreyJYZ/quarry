@@ -19,6 +19,7 @@ mod run_config;
 mod run_task;
 mod search;
 mod settings;
+mod teardown;
 #[cfg(test)]
 pub mod test_support;
 mod test_task;

@@ -29,7 +29,8 @@ pub const STDERR: &str = "stderr";
 pub const MAX_LINE_BYTES: usize = 8 * 1024;
 
 /// How often the waiter asks the child for its status; a kill needs the lock, so it stays short.
-pub const WAIT_INTERVAL: Duration = Duration::from_millis(20);
+/// The interval every bounded wait in the app polls at, owned by `teardown` so there is one value.
+pub use crate::teardown::WAIT_INTERVAL;
 
 /// Live children by run id. The map is shared with the waiter threads, which drop their own entry.
 pub type Runs = HashMap<String, Arc<Mutex<Option<Child>>>>;
