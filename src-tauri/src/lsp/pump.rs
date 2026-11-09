@@ -142,12 +142,24 @@ pub fn pump(
 
         if message.get("id").is_some() {
             let response = server_request_response(&message);
-            let mut guard = lock(&session);
-            if guard.pipe.send(&response).is_err() {
-                guard.dead = true;
-                drop(guard);
+            if lock(&session).pipe.send(&response).is_err() {
                 break;
             }
         }
     }
+
+    server_gone(&session);
+}
+
+/// The reader is finished: the frame channel closed because the server exited, or a write to it
+/// failed because its stdin is gone.
+///
+/// Marking the session dead makes later commands fail fast in [`session_for`], and clearing
+/// `pending` drops each waiter's sender, which the waiting side reads as "the language server
+/// closed the connection" — so a request already in flight wakes now instead of waiting out
+/// [`REQUEST_TIMEOUT`] for an answer that will never come.
+pub fn server_gone(session: &Arc<Mutex<Session>>) {
+    let mut guard = lock(session);
+    guard.dead = true;
+    guard.pending.clear();
 }

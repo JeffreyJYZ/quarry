@@ -64,10 +64,7 @@ pub async fn pty_resize(
 pub async fn pty_close(state: State<'_, PtyState>, id: String) -> Result<(), String> {
     let session = lock(&state.sessions).remove(&id);
     if let Some(session) = session {
-        if let Some(mut child) = lock(&session.child).take() {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
+        kill_spawned(&session.child);
         // Drop the master and writer so their descriptors do not leak per closed tab.
         drop(session.writer);
         drop(session.master);

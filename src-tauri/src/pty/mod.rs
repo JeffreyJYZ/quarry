@@ -13,8 +13,13 @@ pub use tauri::{AppHandle, Emitter, State};
 
 mod output_event;
 
+mod shell_program;
+pub use shell_program::*;
+
+mod spawned_child;
 mod utf8_stream;
 pub use output_event::*;
+pub use spawned_child::*;
 pub use utf8_stream::*;
 
 mod validate_cwd;
