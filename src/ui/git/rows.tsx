@@ -1,4 +1,5 @@
 import type { GitStatusEntry } from "@/lib/project/api";
+import { SHORT_HASH_LEN } from "@/lib/consts/git";
 import { dirOf, nameOf, STATUS_CLASS, STATUS_LETTER } from "./labels";
 
 type ChangeRowProps = {
@@ -120,7 +121,7 @@ type CopyHashButtonProps = {
 
 /** The short-hash copy affordance shared by the history list and the blame groups. */
 export function CopyHashButton({ hash, onCopy }: CopyHashButtonProps) {
-	const short = hash.slice(0, 7);
+	const short = hash.slice(0, SHORT_HASH_LEN);
 	return (
 		<button
 			type="button"

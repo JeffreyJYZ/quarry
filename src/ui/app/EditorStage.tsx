@@ -8,6 +8,7 @@ import TabStrip from "@/ui/components/TabStrip";
 import Welcome from "@/ui/components/Welcome";
 import DisasmPane from "@/ui/debug/memory/DisasmPane";
 import Splitter from "@/ui/layout/Splitter";
+import { PANEL_LIMITS } from "@/lib/consts/layout";
 import type { Location, ProjectInfo } from "@/lib/project/api";
 import type { RefObject } from "react";
 
@@ -131,8 +132,8 @@ export default function EditorStage(props: EditorStageProps) {
 							axis="x"
 							invert
 							value={props.disasm.width}
-							min={240}
-							max={1200}
+							min={PANEL_LIMITS.disasmWidth.min}
+							max={PANEL_LIMITS.disasmWidth.max}
 							label="Resize disassembly"
 							onChange={props.disasm.onWidthChange}
 						/>

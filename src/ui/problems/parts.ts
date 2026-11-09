@@ -1,3 +1,5 @@
+import { SEVERITIES } from "@/lib/consts/problems";
+
 export { SEVERITY_CLASS, SEVERITY_LABEL } from "@/lib/consts/problems";
 
 const GROUPING_KEY = "quarry.problems.groupByFile";
@@ -25,12 +27,12 @@ export function storeGrouping(grouped: boolean): void {
 export function storedAllowed(): Set<number> {
 	try {
 		const raw = window.localStorage.getItem(ALLOWED_KEY);
-		if (raw === null) return new Set([1, 2, 3, 4]);
+		if (raw === null) return new Set(SEVERITIES);
 		const parsed = JSON.parse(raw);
-		if (!Array.isArray(parsed)) return new Set([1, 2, 3, 4]);
+		if (!Array.isArray(parsed)) return new Set(SEVERITIES);
 		return new Set(parsed.filter((value) => typeof value === "number"));
 	} catch {
-		return new Set([1, 2, 3, 4]);
+		return new Set(SEVERITIES);
 	}
 }
 

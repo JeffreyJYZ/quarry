@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { exitStatusText } from "@/lib/run/exitStatus";
+import { TOAST_MS } from "@/lib/consts/tests";
 
 /** One console line; the id makes a repeated line a distinct row. */
 export type RunLine = { id: number; stream: "stdout" | "stderr"; line: string };
@@ -63,7 +64,7 @@ export default function RunLog({
 		statusTimer.current = window.setTimeout(() => {
 			statusTimer.current = null;
 			setCopyStatus(null);
-		}, 2000);
+		}, TOAST_MS);
 	};
 
 	const copyOutput = async () => {
