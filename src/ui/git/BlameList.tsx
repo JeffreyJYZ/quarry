@@ -1,4 +1,5 @@
 import { groupBlame } from "@/lib/git/blame";
+import { SHORT_HASH_LEN } from "@/lib/consts/git";
 import type { BlameLine } from "@/lib/project/api";
 import { CopyHashButton } from "./rows";
 
@@ -51,7 +52,9 @@ export default function BlameList({
 								onClick={() => onToggle(groupIndex)}
 								title={group.subject}
 							>
-								<span className="git-commit-hash">{group.hash.slice(0, 7)}</span>
+								<span className="git-commit-hash">
+									{group.hash.slice(0, SHORT_HASH_LEN)}
+								</span>
 								<span className="git-row-name" title={group.subject}>
 									{group.subject}
 								</span>

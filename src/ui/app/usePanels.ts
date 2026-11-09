@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { DEFAULT_PANEL_SIZES } from "@/lib/consts/layout";
 import type { StatusText } from "@/ui/app/status";
 import type { DockTab } from "@/ui/tests/TestsDock";
 
@@ -18,7 +19,7 @@ export function usePanels() {
 	/** The assembly split beside the editor; its address follows the selected frame. */
 	const [disasmOpen, setDisasmOpen] = useState(false);
 	/** Width of the assembly split in px; the handle between it and the editor owns the value. */
-	const [disasmWidth, setDisasmWidth] = useState(520);
+	const [disasmWidth, setDisasmWidth] = useState(DEFAULT_PANEL_SIZES.disasmWidth);
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	/** Which settings tab a shortcut asked for. */
 	const [settingsTab, setSettingsTab] = useState<"user" | "project">("user");

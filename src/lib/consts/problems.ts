@@ -15,3 +15,6 @@ export const SEVERITY_LABEL: Record<Diagnostic["severity"], string> = {
 	3: "information",
 	4: "hint",
 };
+
+/** Every severity the label table names, so a filter set cannot list them a second time. */
+export const SEVERITIES: ReadonlySet<number> = new Set(Object.keys(SEVERITY_LABEL).map(Number));

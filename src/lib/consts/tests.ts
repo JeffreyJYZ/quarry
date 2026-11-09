@@ -1,4 +1,4 @@
-/** The dock's tabs in display order, and the glyph and cap the run and test panels share. */
+/** The dock's tabs in display order, and the glyph, cap and status timing the run and test panels share. */
 
 import type { DockTab } from "@/ui/tests/parts";
 
@@ -7,3 +7,5 @@ export const DOCK_TABS: DockTab[] = ["problems", "tests", "run", "debugger", "co
 
 export const OUTPUT_LINE_CAP = 200;
 export const RUNNING_GLYPH = "◦";
+/** How long a "Copied" note stays up, shared by the run log, the tests dock and the test rows. */
+export const TOAST_MS = 2000;

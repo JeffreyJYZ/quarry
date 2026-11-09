@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { TestItem, TestReport } from "@/lib/project/api";
+import { TOAST_MS } from "@/lib/consts/tests";
 import { dotClass, failureReason, RUNNING_GLYPH, splitName } from "./parts";
 import { TestOutput } from "./TestOutput";
 
@@ -28,7 +29,7 @@ export function TestRow({ item, result, running, highlighted, onRun }: TestRowPr
 			}
 			await navigator.clipboard.writeText(result.output);
 			setCopyNote("Copied");
-			window.setTimeout(() => setCopyNote(null), 2000);
+			window.setTimeout(() => setCopyNote(null), TOAST_MS);
 		} catch (error) {
 			setCopyNote(error instanceof Error ? error.message : "copy failed");
 		}
@@ -42,7 +43,7 @@ export function TestRow({ item, result, running, highlighted, onRun }: TestRowPr
 			}
 			await navigator.clipboard.writeText(item.name);
 			setCopyNote("Copied");
-			window.setTimeout(() => setCopyNote(null), 2000);
+			window.setTimeout(() => setCopyNote(null), TOAST_MS);
 		} catch (error) {
 			setCopyNote(error instanceof Error ? error.message : "copy failed");
 		}

@@ -8,6 +8,7 @@ export const DEFAULT_PANEL_SIZES: PanelSizes = {
 	terminalHeight: 180,
 	terminalWidth: 380,
 	outlineHeight: 200,
+	disasmWidth: 520,
 };
 
 export const PANEL_LIMITS: Record<PanelName, { min: number; max: number }> = {
@@ -16,6 +17,7 @@ export const PANEL_LIMITS: Record<PanelName, { min: number; max: number }> = {
 	terminalHeight: { min: 100, max: 900 },
 	terminalWidth: { min: 240, max: 900 },
 	outlineHeight: { min: 80, max: 600 },
+	disasmWidth: { min: 240, max: 1200 },
 };
 
 /** Keyboard steps for a separator: a small nudge, and a page-sized jump with Shift. */

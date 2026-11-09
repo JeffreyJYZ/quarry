@@ -1,4 +1,5 @@
 import type { GitCommitEntry } from "@/lib/project/api";
+import { HISTORY_LIMIT, HISTORY_PAGE_SIZE, SHORT_HASH_LEN } from "@/lib/consts/git";
 import { relativeTime } from "./labels";
 import { CopyHashButton } from "./rows";
 
@@ -51,7 +52,9 @@ export default function HistoryList({
 								onClick={() => onSelect(index, entry.hash)}
 								title={entry.subject}
 							>
-								<span className="git-commit-hash">{entry.hash.slice(0, 7)}</span>
+								<span className="git-commit-hash">
+									{entry.hash.slice(0, SHORT_HASH_LEN)}
+								</span>
 								<span className="git-row-name" title={entry.subject}>
 									{entry.subject}
 								</span>
@@ -63,12 +66,15 @@ export default function HistoryList({
 					))}
 				</ul>
 			) : null}
-			{entries !== null && entries.length > 0 && entries.length < 500 && limit < 500 ? (
+			{entries !== null &&
+			entries.length > 0 &&
+			entries.length < HISTORY_LIMIT &&
+			limit < HISTORY_LIMIT ? (
 				<button
 					type="button"
 					className="git-refresh"
 					disabled={loading}
-					onClick={() => onLoadMore(Math.min(limit + 50, 500))}
+					onClick={() => onLoadMore(Math.min(limit + HISTORY_PAGE_SIZE, HISTORY_LIMIT))}
 				>
 					Load more
 				</button>

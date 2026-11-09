@@ -15,6 +15,8 @@ export type PanelSizes = {
 	terminalWidth: number;
 	/** Height of the outline under the file tree, so a long file list cannot swallow it. */
 	outlineHeight: number;
+	/** Width of the assembly split beside the editor. */
+	disasmWidth: number;
 };
 
 export type PanelName = keyof PanelSizes;
@@ -48,6 +50,7 @@ export function clampPanelSizes(input: unknown): PanelSizes {
 		terminalHeight: read("terminalHeight"),
 		terminalWidth: read("terminalWidth"),
 		outlineHeight: read("outlineHeight"),
+		disasmWidth: read("disasmWidth"),
 	};
 }
 

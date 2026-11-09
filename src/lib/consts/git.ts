@@ -2,6 +2,13 @@
 
 import type { GitStatusEntry } from "@/lib/project/api";
 
+/** Commit hashes are shown and copied short; the history, blame and copy button agree here. */
+export const SHORT_HASH_LEN = 7;
+
+/** The history list's first page and its ceiling, so "Load more" cannot promise rows it hides. */
+export const HISTORY_PAGE_SIZE = 50;
+export const HISTORY_LIMIT = 500;
+
 export const STATUS_LETTER: Record<GitStatusEntry["status"], string> = {
 	modified: "M",
 	added: "A",

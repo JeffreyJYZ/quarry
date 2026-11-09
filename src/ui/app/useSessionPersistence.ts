@@ -14,6 +14,9 @@ import { openProject } from "@/lib/project/api";
 
 export type { SessionSnapshot };
 
+/** A pause this long ends the burst of keystrokes that one write has to cover. */
+const SESSION_WRITE_DEBOUNCE_MS = 400;
+
 export type SessionSetters = {
 	onPreferences: (value: Settings["preferences"]) => void;
 	onRailCollapsed: (value: boolean) => void;
@@ -136,7 +139,7 @@ export function useSessionPersistence(options: {
 	}
 	// biome-ignore lint/correctness/useExhaustiveDependencies: changeCounter is a ref-derived change token
 	useEffect(() => {
-		const timer = window.setTimeout(write, 400);
+		const timer = window.setTimeout(write, SESSION_WRITE_DEBOUNCE_MS);
 		return () => window.clearTimeout(timer);
 	}, [changeCounter.current]);
 

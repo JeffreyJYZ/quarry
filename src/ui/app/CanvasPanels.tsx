@@ -4,6 +4,7 @@ import CallsPanel from "@/ui/calls/CallsPanel";
 import TypeHierarchyPanel from "@/ui/lsp/TypeHierarchyPanel";
 import BottomDock from "@/ui/app/BottomDock";
 import Splitter from "@/ui/layout/Splitter";
+import { PANEL_LIMITS } from "@/lib/consts/layout";
 import type { ShellModel } from "@/ui/app/useShell";
 
 const Terminal = lazy(() => import("@/ui/terminal/Terminal"));
@@ -27,8 +28,8 @@ export default function CanvasPanels({ model }: { model: ShellModel }) {
 				<Splitter
 					axis="y"
 					value={terminalHeight}
-					min={100}
-					max={900}
+					min={PANEL_LIMITS.terminalHeight.min}
+					max={PANEL_LIMITS.terminalHeight.max}
 					invert
 					label="Resize terminal"
 					onChange={(next) => settings.handlePanelResize("terminalHeight", next)}

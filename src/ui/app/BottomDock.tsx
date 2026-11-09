@@ -3,6 +3,7 @@ import { Suspense, lazy } from "react";
 import type { DebugController } from "@/lib/debug/session";
 import type { RunControls } from "@/ui/app/runControlsTypes";
 import Splitter from "@/ui/layout/Splitter";
+import { PANEL_LIMITS } from "@/lib/consts/layout";
 import TestsDock, { type DockTab, type TestsDockProps } from "@/ui/tests/TestsDock";
 import type { ShortcutGroup } from "@/ui/shortcuts/ShortcutSheet";
 
@@ -42,8 +43,8 @@ export default function BottomDock(props: DockProps) {
 				<Splitter
 					axis="y"
 					value={props.dockHeight}
-					min={120}
-					max={900}
+					min={PANEL_LIMITS.dockHeight.min}
+					max={PANEL_LIMITS.dockHeight.max}
 					invert
 					label="Resize bottom dock"
 					onChange={props.onResize}

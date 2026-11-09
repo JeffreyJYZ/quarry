@@ -8,6 +8,7 @@ import SideRail from "@/ui/app/SideRail";
 import IconRail from "@/ui/app/IconRail";
 import EditorColumn from "@/ui/app/EditorColumn";
 import Splitter from "@/ui/layout/Splitter";
+import { PANEL_LIMITS } from "@/lib/consts/layout";
 import { useFileWatch } from "@/ui/app/useFileWatch";
 import type { ShellModel } from "@/ui/app/useShell";
 
@@ -109,8 +110,8 @@ export default function AppBody({ model }: { model: ShellModel }) {
 				<Splitter
 					axis="x"
 					value={railWidth}
-					min={160}
-					max={560}
+					min={PANEL_LIMITS.railWidth.min}
+					max={PANEL_LIMITS.railWidth.max}
 					label="Resize explorer"
 					onChange={(next) => settings.handlePanelResize("railWidth", next)}
 				/>
@@ -125,8 +126,8 @@ export default function AppBody({ model }: { model: ShellModel }) {
 					<Splitter
 						axis="x"
 						value={terminalWidth}
-						min={240}
-						max={900}
+						min={PANEL_LIMITS.terminalWidth.min}
+						max={PANEL_LIMITS.terminalWidth.max}
 						invert
 						label="Resize terminal"
 						onChange={(next) => settings.handlePanelResize("terminalWidth", next)}

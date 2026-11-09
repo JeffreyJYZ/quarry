@@ -12,6 +12,7 @@ import {
 	type SortDir,
 } from "@/lib/tests/filterTests";
 import type { TestItem } from "@/lib/project/api";
+import { TOAST_MS } from "@/lib/consts/tests";
 import type { TestsController } from "@/lib/tests/useTests";
 import { countByBinary } from "./parts";
 import type { DockTab } from "./parts";
@@ -159,10 +160,10 @@ export function useDockFilters({
 			}
 			await navigator.clipboard.writeText(lines.join("\n"));
 			setCopyStatus("Copied");
-			window.setTimeout(() => setCopyStatus(null), 2000);
+			window.setTimeout(() => setCopyStatus(null), TOAST_MS);
 		} catch (error) {
 			setCopyStatus(error instanceof Error ? error.message : "copy failed");
-			window.setTimeout(() => setCopyStatus(null), 2000);
+			window.setTimeout(() => setCopyStatus(null), TOAST_MS);
 		}
 	};
 
