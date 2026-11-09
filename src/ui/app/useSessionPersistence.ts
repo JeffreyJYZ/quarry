@@ -52,11 +52,9 @@ export function useSessionPersistence(options: {
 		let cancelled = false;
 		void (async () => {
 			try {
-				const read = await readSettings();
+				// A repaired file reports through the one notice channel; the snapshot stays a Settings.
+				const settings = await readSettings((message) => setters.onNotice(message));
 				if (cancelled) return;
-				// The file kept a setting it could not parse; say so rather than forgetting it.
-				if (read.warning !== null) setters.onNotice(read.warning);
-				const settings = read.settings;
 				preserved.current = settings;
 				setters.onPreferences(normalizePreferences(settings.preferences));
 				setters.onRailCollapsed(settings.railCollapsed ?? false);
