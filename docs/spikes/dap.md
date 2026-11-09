@@ -97,9 +97,11 @@ Two caveats worth knowing before P3 builds on it. `hitBreakpointIds` is `null` o
 
 ## `evaluate` without a frame id is broken for Rust — superseded, see the note
 
-> **Superseded (2026-10-27).** The failures below were measured with requests that omitted `frameId`.
-> With the stopped frame's id attached, `watch` evaluates Rust (and C) correctly, so this is not an
-> open gap. See `docs/spikes/evaluate.md`.
+> **Superseded (2026-10-27, re-measured 2026-11-09).** The failures below were measured with requests
+> that omitted `frameId`. With the stopped frame's id attached, `watch`, `variables`, `clipboard` and
+> an omitted context evaluate Rust (and C) correctly; `hover` answers a bare variable but refuses
+> operators; locals, arithmetic and index access answer, while method calls and casts stay outside
+> lldb's parser. See `docs/spikes/evaluate.md`.
 
 `evaluate` with `{"expression": "*raw@8", "context": "watch"}`:
 
@@ -117,12 +119,12 @@ So a Rust watch/expression pane cannot rely on `evaluate` **without a frame id**
 - **Ship `initCommands` as a default, not a nicety.** `rust-lldb` parity depends on it, and the regression is invisible in the protocol: the same `variables` call simply returns `buf`/`len` instead of elements.
 - **Do not gate memory or disassembly on `supportsMemoryReferences`.** It is `false` here while frames carry `instructionPointerReference` and both `readMemory` and `disassemble` work; treat it as an advertisement, not a gate.
 - **Data breakpoints are viable**, but P3 must match stops by `description`/address rather than `hitBreakpointIds` (null), and P4's gutter should show the watchpoint stop on the reported line even though it sits just past the store.
-- **Do not build a Rust watch pane on `evaluate` yet.** It errors with `Expression evaluation in Rust not supported` and falls back to Objective-C++; verify a workaround before scoping evaluate/watch into P3.
+- **A Rust watch pane can use `evaluate`, with two preconditions.** The request must carry the stopped frame's `frameId`, and the expression must be inside lldb's parser subset: locals, arithmetic and index access answer, while method calls and `as` casts fall back to Objective-C++ and error. See `docs/spikes/evaluate.md`.
 
 ## Unverified
 
 - Any adapter other than Xcode's LLVM 21.0.0 `lldb-dap`; the Linux/LLVM upstream build and older Xcode versions were not run.
-- A Rust-side workaround for `evaluate` (other `context` values, a DAP `expressions` request, or lldb's `frame variable` escape hatches) — measured as broken, not measured as unfixable.
+- Rust expressions beyond a local, arithmetic, a field read and an index: closures, `&mut` borrows and side effects were not attempted. Method calls and casts were, and fail.
 - Conditional breakpoints, log points, hit conditions: advertised `yes`, never exercised.
 - `setDataBreakpoints` with `accessType: "read"` or `"readWrite"`, and the missing `canPersist` field (absent in the response).
 - Attach to a running process; only `launch` was tested.
@@ -134,7 +136,9 @@ So a Rust watch/expression pane cannot rely on `evaluate` **without a frame id**
 
 `mktemp -d` yields `/var/folders/…`, which is a symlink to `/private/var/folders/…`. LLDB canonicalises the DWARF source path, so `setBreakpoints` sent with the `/var/…` path never verifies. Resolve the project directory with `realpath` before launching, or every breakpoint stays pending.
 
-## Evaluate probe (2026-10-22)
+## Evaluate probe (2026-10-22), corrected 2026-11-09
+
+The table below records that run verbatim. The readings under it were wrong and are corrected at the end of this section: `bun run scripts/dap-eval-contexts.ts` is now the measurement of record.
 
 Reproduce with `bun run scripts/dap-eval-probe.ts`. Throwaway cargo project, stopped at `dap_spike::inspect` line 12, rustup providers loaded. One session per initCommands set.
 
@@ -144,19 +148,21 @@ Reproduce with `bun run scripts/dap-eval-probe.ts`. Throwaway cargo project, sto
 | (b) `context: "watch"`, expr `*raw@8`                                        | FAIL                                    | `evaluate failed: can't evaluate expressions when the process is running.`                                                   |
 | (c) `context: "hover"`, expr `n`                                             | FAIL                                    | `evaluate failed: error: No value`                                                                                           |
 | (d) same three after `initCommands` adds `settings set target.language rust` | repl OK (empty); watch FAIL; hover FAIL | watch: `evaluate failed: can't evaluate expressions when the process is running.`; hover: `evaluate failed: error: No value` |
-| (e) `evaluate` with top-frame `frameId`, expr `n`, repl                      | FAIL                                    | `OK error: Command requires a process which is currently stopped.`                                                           |
+| (e) `evaluate` with top-frame `frameId`, expr `n`, repl                      | success, error string                   | `OK error: Command requires a process which is currently stopped.`                                                           |
 | (f) `expressions` request, repl                                              | FAIL                                    | `OK error: Command requires a process which is currently stopped.`                                                           |
 | (f) `expressions` request, watch                                             | FAIL                                    | `evaluate failed: can't evaluate expressions when the process is running.`                                                   |
 | (i) `variables` default vs `filter: "named"`                                 | OK both                                 | count=6, same names (`tag,v,s,o,raw,n`) in both                                                                              |
 | (ii) `setExpression` then `variables`                                        | FAIL                                    | crashes lldb-dap (adapter exited)                                                                                            |
 | (iii) `readMemory` via `raw` pointer from `variables` output                 | OK                                      | bytes `de ad be ef 00 11 22 33`                                                                                              |
 
-Verdict: **Rust expression evaluation cannot be made to work through lldb-dap here** — every variant either returns empty/`No value`, reports the process as running, or crashes the adapter. `settings set target.language rust` is not a usable escape hatch (adapter's own response unchanged). `setExpression` is unusable (kills the adapter).
+Corrected verdict (2026-11-09): **Rust expression evaluation works through `lldb-dap` here when the request carries the stopped frame's `frameId`.** Every failure in the table is either a request without a frame id — (b), (c), (d), (f) — or a session already left in a bad state by one of those — (e), which returned `error: Command requires a process which is currently stopped.` inside a successful response. Re-measured in a fresh session, the no-frame-id request is refused as the _first_ request on a stopped process, and the same session answers once the frame id is attached: `n` is `4`, `n + 1` is `5`, `s` is `"quarry"`. Rust is still a parser subset — locals, arithmetic and index access answer, while a method call (`v.len()`) and an `as` cast fall back to Objective-C++ and error. `settings set target.language rust` is not a substitute for the frame id. `setExpression` is unusable (kills the adapter). `docs/spikes/evaluate.md` has the table.
 
 What a watch pane can do instead:
 
+- Evaluate through `evaluate` with the stopped frame's `frameId`. That is the shipped Evaluate field's request shape, and it answers `n`, `n + 1`, `s` and `v[0]` in `watch`, `variables`, `clipboard` and the omitted context; `hover` answers a bare variable but refuses operators (see `docs/spikes/evaluate.md`).
 - Use `variables` (default or `filter: "named"`) for locals — both return the same set here; no expression needed.
 - Render a `Vec<u8>` as bytes via `readMemory` using the pointer taken from the `raw`/`ptr` variable's value (leading `0x…` token) — measured working (`de ad be ef 00 11 22 33`).
 - Use `dataBreakpointInfo`/`setDataBreakpoints` for watchpoints instead of `evaluate`-based watches.
+- Do not promise arbitrary Rust expressions: method calls and `as` casts fall back to Objective-C++ and error.
 
-Unverified: whether a different adapter (Linux/LLVM upstream, other Xcode) behaves differently; whether `evaluate` works with a `frameId` on a process that stays stopped (here it reported "process which is currently stopped" required, suggesting state drift); C/C++ targets not tested.
+Unverified: whether a different adapter (Linux/LLVM upstream, other Xcode) behaves differently; Rust closures, `&mut` borrows and side effects; a stale `frameId` from a previous stop. C/C++ targets were measured by `scripts/dap-eval-contexts.ts` and answer the same way.

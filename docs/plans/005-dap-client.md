@@ -33,7 +33,7 @@ Rules carried from the spike:
 - `dataId` arrives without `0x`; pass it through untouched, `accessType: "write"`.
 - `hitBreakpointIds` is null on a watchpoint stop — attribute by `description` and address.
 - Do not gate memory or disassembly on `supportsMemoryReferences`.
-- No `evaluate`: it falls back to Objective-C++ and errors on Rust.
+- No `evaluate` without a `frameId`: the adapter refuses every expression then. With the frame id it works; Rust method calls and casts still fall back to Objective-C++.
 - Watchpoint stops report the line after the store; the UI draws the stop where the adapter says.
 
 ## Next slice

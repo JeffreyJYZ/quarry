@@ -22,7 +22,7 @@ Run the scripts under `scripts/`. Each exercises real toolchains, not mocks.
 - `bun run scripts/lsp-smoke.ts` — initialize handshake against a language server. Depends on `rust-analyzer` installed and on `PATH`.
 - `bun run scripts/lsp-ux-smoke.ts` — navigation response shapes (hover, completion, definition, references). Verified against rust-analyzer 1.99.0.
 - `bun run scripts/dap-spike.ts` — debugger capabilities, memory, breakpoints and formatters. Depends on `lldb-dap` reached through `xcrun`, and on the Rust pretty-printer `initCommands` loading `lldb_lookup.py`.
-- `bun run scripts/dap-eval-probe.ts` — Rust evaluate attempts. Expected to report failures; that is its result, not a regression.
+- `bun run scripts/dap-eval-probe.ts` — Rust evaluate attempts. Its 2026-10-22 failures came from requests without a `frameId`; `bun run scripts/dap-eval-contexts.ts` is the measurement to run, and it passes.
 - `bun run scripts/cxx-smoke.ts` — clang diagnostic shape and the missing-cmake path. Depends on `clang` (via `xcrun`) and on `cmake`/`ninja` being absent on this machine, which exercises the missing-toolchain branch.
 
 Environment facts that must hold: rust-analyzer component installed; `cmake` and `ninja` absent, so C/C++ builds fall back to the plain clang path in `src-tauri/src/build_task.rs`; `lldb-dap` and `clang-format` reachable only through `xcrun`.
@@ -86,7 +86,7 @@ The updater endpoint is `https://github.com/JeffreyJYZ/quarry/releases/latest/do
 
 Quote only provable facts:
 
-- Rust expression evaluation is unusable: `evaluate` returns nothing usable across `repl`/`watch`/`hover`, `settings set target.language rust` changes nothing, and `setExpression` kills the adapter. No watch-expression pane ships; only variables-tree watching and memory views.
+- Rust expression evaluation needs the stopped frame's `frameId`, and lldb's Rust parser is a subset: method calls and `as` casts fall back to Objective-C++ and error. `setExpression` kills the adapter. Only variables-tree watching, the Evaluate field and memory views ship; there is no saved watch-expression list.
 - Remote development, embedded targets, profilers and a plugin API are absent (explicit non-goals).
 - C/C++ builds need clang or cmake; when cmake is absent the fallback is a plain clang build, and cmake and ninja are not installed on this machine.
 - The embedded terminal and the debugger were not exercised in a real desktop window by any automated test; the backend and components are present but window-level verification is manual.

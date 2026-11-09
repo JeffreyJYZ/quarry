@@ -130,8 +130,9 @@ Run and measured: [`dap.md`](../spikes/dap.md), reproducible with `bun run scrip
   `instructionPointerReference` and `disassemble` accepts it.
 - Data breakpoints fire, but `hitBreakpointIds` is `null` and the stop lands on the line after the store,
   so stops are attributed by `description` and address.
-- `evaluate` is unusable for Rust: lldb-dap falls back to Objective-C++ and errors. No watch-expression
-  pane until a workaround is measured.
+- `evaluate` works for Rust when the request carries the stopped frame's `frameId`; without it lldb-dap
+  refuses every expression. lldb's Rust parser is a subset, so method calls and `as` casts still fall
+  back to Objective-C++ and error.
 - `realpath` the project directory before `launch`, or DWARF path canonicalisation leaves every
   breakpoint unverified.
 

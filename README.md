@@ -145,14 +145,17 @@ failures` writes one `path::test_name` line per failed test; per-test failure ou
   views, each level is fetched only when a node is expanded, arrow keys and `Enter` work the tree,
   `Escape` closes it, and a server that reports no hierarchy for the symbol says so instead of erroring.
 
+- **Expression evaluation**: the dock's Evaluate field answers for Rust and C alike — `n`, `n + 1`
+  and a Rust `String` render — because every request carries the stopped frame's `frameId`. Without
+  one lldb-dap refuses each expression with `can't evaluate expressions when the process is running`,
+  which is exactly what the earlier "broken for Rust" verdict measured. `watch`, `variables`,
+  `clipboard` and an omitted context answer every expression; `hover` answers a bare variable but
+  refuses operators (lldb's legacy expression mode); `repl` answers but prefixes lldb's `$0 =`. lldb's
+  Rust parser is a subset: method calls (`v.len()`) and `as` casts fall back to Objective-C++ and
+  report the adapter's "not supported" message. See `docs/spikes/evaluate.md`.
+
 Still missing, and named here so it is not mistaken for done:
 
-- **Expression evaluation works, within measured limits** — `evaluate` answers in `watch`, `repl` and
-  `variables` against Xcode's `lldb-dap` as long as the request carries a `frameId`; the dock always sends
-  one, so `n`, `n + 1` and a Rust `String` evaluate. The earlier "broken for Rust" verdict came from
-  requests that omitted `frameId`, where LLDB answers "process is running" (see
-  `docs/spikes/evaluate.md`). Not measured: `context: "hover"` and `"clipboard"`, closures, `&mut`
-  borrows, and side effects such as `x += 1`.
 - **No run panel beyond args, cwd, env and output** — `run_program` / `stop_program` stream `run://output`; `src/run/` covers program, args, cwd, environment variables and an argv preview, but there is no richer run configuration UI.
 - **No remote development, embedded targets, profilers, databases, Docker, AI assistance or plugin API.**
 

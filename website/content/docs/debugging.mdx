@@ -25,11 +25,14 @@ unverified.
   reports the store's line, which is often the line after the assignment you had in mind.
 
 <Callout tone="note" title="Expression evaluation needs a frame">
-	`evaluate` works for Rust and C through this adapter as long as the request carries a `frameId`
-	— without one, LLDB answers "process is running" and the earlier reading of that message as
-	"Rust is broken" was wrong. The dock always sends the frame it is showing, so `n`, `n + 1` and a
-	Rust `String` evaluate. Not measured: `hover` and `clipboard` contexts, closures, `&mut`
-	borrows, and side effects such as `x += 1`.
+	`evaluate` works for Rust and C through this adapter as long as the request carries the stopped
+	frame's id — without one LLDB refuses every expression with "can't evaluate expressions when the
+	process is running", and reading that message as "Rust is broken" was wrong. The dock always
+	sends the frame it is showing, so `n`, `n + 1`, a Rust `String` and `v[0]` evaluate in every
+	context: `watch`, `variables`, `clipboard` and the omitted case; `hover` answers a bare variable
+	but refuses operators. It is not full Rust: lldb falls back to Objective-C++ for method calls
+	(`v.len()`) and `as` casts and reports its "not supported" message. Not measured: closures,
+	`&mut` borrows, and side effects such as `x += 1`.
 </Callout>
 
 ## Frames, scopes and stepping

@@ -1,17 +1,20 @@
 /**
- * Which DAP `evaluate` context actually works on this machine, for C and for Rust.
+ * Which DAP `evaluate` shapes actually work on this machine, for C and for Rust.
  *
- * The spike recorded that `evaluate` fails for Rust (`Expression evaluation in Rust not supported`,
- * falling back to Objective-C++). The Evaluate field in the variables dock has to pick one default
- * context and has to report the adapter's own message when it fails, so the two facts it depends on
- * are measured here rather than assumed:
+ * Two readings of this used to fight each other: `docs/spikes/dap.md` recorded that `evaluate`
+ * fails for Rust (`Expression evaluation in Rust not supported`, Objective-C++ fallback), while the
+ * dock ships a working Evaluate field. Both were measured, of different requests. This script
+ * separates the variables in a fixed order:
  *
- * 1. Every attempt either yields a non-empty value or a non-empty error message — never a silent
- *    empty success, which would leave the field blank with nothing to report.
- * 2. The context the UI defaults to (`DEFAULT_CONTEXT` below) returns a value on the C target.
+ * 1. No `frameId`, as the FIRST request on a freshly stopped process — so a refusal cannot be state
+ *    drift left by an earlier call. Then the same session asks again WITH the frame id.
+ * 2. Every `context` with the stopped frame's id, plus the omitted case.
+ * 3. The same requests without a frame id, after successes, to show the shape is what matters.
+ * 4. Rust syntax beyond a local: a method call and an `as` cast, which lldb's parser does not accept.
  *
- * A Rust target that evaluates nothing is a recorded outcome, not a failure of this script; the
- * exact adapter message is printed and written into `docs/spikes/evaluate.md`.
+ * Every attempt must answer with a value or with a message — never a silent empty success, which
+ * would leave the field blank with nothing to report. The context the UI defaults to
+ * (`DEFAULT_CONTEXT` below) must return a value on both targets.
  *
  * Usage: bun run scripts/dap-eval-contexts.ts
  */
@@ -22,7 +25,7 @@ import { join } from "node:path";
 
 /** The context `dap_evaluate` sends when the UI passes none. Change with `docs/spikes/evaluate.md`. */
 const DEFAULT_CONTEXT = "watch";
-const CONTEXTS = ["repl", "watch", "variables"] as const;
+const CONTEXTS = ["repl", "watch", "variables", "hover", "clipboard"] as const;
 
 const C_SOURCE = `#include <stdio.h>
 
@@ -154,6 +157,8 @@ type Target = {
 	initCommands: string[];
 	/** The expressions the dock would send, with the value each must produce under the default context. */
 	expressions: Array<{ expression: string; expected: string }>;
+	/** Syntax beyond a local, measured once with a frame id; `null` expected value set for all of them. */
+	syntax?: string[];
 };
 
 type Outcome = {
@@ -229,6 +234,8 @@ async function buildRust(): Promise<Target> {
 			// The rustup formatters are what make this a string rather than a raw struct.
 			{ expression: "s", expected: '"quarry"' },
 		],
+		// lldb's Rust expression parser is a subset: indexing works, a method call and a cast do not.
+		syntax: ["v[0]", "v.len()", "tag as u32"],
 	};
 }
 
@@ -304,6 +311,35 @@ async function attempt(
 	}
 }
 
+/**
+ * A fresh session per target, so the shape of the first request is the only variable: it omits
+ * `frameId` while the process is stopped, then the same session asks again with it. That is what
+ * separates "the adapter needs a frame id" from "an earlier call left the process running".
+ */
+async function measureOrder(target: Target, outcomes: Outcome[]): Promise<void> {
+	const { client, frameId } = await stopOn(target);
+	const first = target.expressions[0];
+	const refused = await attempt(client, null, first.expression, DEFAULT_CONTEXT);
+	outcomes.push({
+		language: target.label,
+		context: "no-frame-first",
+		expression: first.expression,
+		...refused,
+	});
+	const recovered = await attempt(client, frameId, first.expression, DEFAULT_CONTEXT);
+	outcomes.push({
+		language: target.label,
+		context: "frame-after-refusal",
+		expression: first.expression,
+		...recovered,
+	});
+	for (const expression of target.syntax ?? []) {
+		const outcome = await attempt(client, frameId, expression, DEFAULT_CONTEXT);
+		outcomes.push({ language: target.label, context: "syntax", expression, ...outcome });
+	}
+	await client.stop();
+}
+
 async function measure(target: Target, outcomes: Outcome[]): Promise<void> {
 	const { client, frameId } = await stopOn(target);
 	const language = target.label;
@@ -333,12 +369,21 @@ async function main(): Promise<void> {
 	const c = await buildC();
 	const rust = await buildRust();
 	const outcomes: Outcome[] = [];
-	await measure(c, outcomes);
-	await measure(rust, outcomes);
+	for (const target of [c, rust]) {
+		await measureOrder(target, outcomes);
+		await measure(target, outcomes);
+	}
 
 	for (const language of ["c", "rust"] as const) {
 		console.log(`\n${language}`);
-		for (const context of [...CONTEXTS, "omitted", "no-frame-id"]) {
+		for (const context of [
+			"no-frame-first",
+			"frame-after-refusal",
+			...CONTEXTS,
+			"omitted",
+			"no-frame-id",
+			"syntax",
+		]) {
 			for (const outcome of outcomes.filter(
 				(entry) => entry.language === language && entry.context === context,
 			)) {
