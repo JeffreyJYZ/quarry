@@ -7,7 +7,7 @@
 
 use crate::shutdown;
 use crate::startup::{process_start, startup_enabled};
-use tauri::{AppHandle, Manager, RunEvent, Runtime};
+use tauri::{AppHandle, RunEvent, Runtime};
 
 /// Handles one run event. Installed as the closure `.run(...)` would otherwise hold.
 pub fn on_run_event<R: Runtime>(handle: &AppHandle<R>, event: RunEvent) {
