@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-
+import { SESSION_SEPARATOR } from "@/lib/consts/lsp";
 /** One node of a type hierarchy, exactly as `lsp_prepare_type_hierarchy` returns it. */
 export type TypeHierarchyNode = {
 	name: string;
@@ -25,7 +25,7 @@ export type Cursor = { line: number; character: number };
 
 /** `textDocument/prepareTypeHierarchy`: the types at one position, as hierarchy roots. */
 function requireSessionId(wrapper: string, root: string): void {
-	if (import.meta.env.DEV && !root.includes("::")) {
+	if (import.meta.env.DEV && !root.includes(SESSION_SEPARATOR)) {
 		throw new Error(`${wrapper} expects a session id, got a path`);
 	}
 }

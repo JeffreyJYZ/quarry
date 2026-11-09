@@ -6,7 +6,7 @@ import { dapStop } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
 import type { TransportGate } from "@/lib/debug/transportGate";
 import type { BreakpointEntry, StopView, StepKind, WatchRow } from "./sessionTypes";
-
+import type { BuildProfile } from "@/lib/debug/profile";
 type Setter<T> = (updater: T | ((current: T) => T)) => void;
 
 export type TransportDeps = {
@@ -25,7 +25,7 @@ export type TransportDeps = {
 	setLaunching: Setter<boolean>;
 	setRestarting: Setter<boolean>;
 	setRestarted: Setter<boolean>;
-	setSessionBuildProfile: Setter<"debug" | "release" | null>;
+	setSessionBuildProfile: Setter<BuildProfile | null>;
 	setChildren: Setter<Map<number, import("@/lib/project/api").DapVariable[]>>;
 	setExpanded: Setter<Set<string>>;
 	setSelectedVariable: Setter<import("./sessionTypes").VariableRow | null>;

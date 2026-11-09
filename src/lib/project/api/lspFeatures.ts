@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { SESSION_SEPARATOR } from "@/lib/consts/lsp";
 import type {
 	CallHierarchyNode,
 	CodeAction,
@@ -14,7 +15,7 @@ import type {
 } from "@/lib/project/api/lsp-types";
 
 function requireSessionId(wrapper: string, root: string): void {
-	if (import.meta.env.DEV && !root.includes("::")) {
+	if (import.meta.env.DEV && !root.includes(SESSION_SEPARATOR)) {
 		throw new Error(`${wrapper} expects a session id, got a path`);
 	}
 }

@@ -1,8 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
 
-/** LSP `FileChangeType`: what the watcher saw happen to a path. */
-export type FileChangeKind = 1 | 2 | 3;
+/** LSP `FileChangeType.Created`. */
+export const FILE_CHANGE_CREATED = 1;
+/** LSP `FileChangeType.Changed`. */
+export const FILE_CHANGE_CHANGED = 2;
+/** LSP `FileChangeType.Deleted`. */
+export const FILE_CHANGE_DELETED = 3;
 
+/** LSP `FileChangeType`: what the watcher saw happen to a path. */
+export type FileChangeKind =
+	typeof FILE_CHANGE_CREATED | typeof FILE_CHANGE_CHANGED | typeof FILE_CHANGE_DELETED;
 export type WatchedFileChange = { path: string; kind: FileChangeKind };
 
 /**

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-
+import type { StepKind } from "@/lib/debug/sessionTypes";
 /**
  * Continue or step on a named thread.
  *
@@ -14,11 +14,7 @@ export function dapContinueOn(session: string, threadId?: number): Promise<void>
 	);
 }
 
-export function dapStepOn(
-	session: string,
-	kind: "next" | "stepIn" | "stepOut",
-	threadId?: number,
-): Promise<void> {
+export function dapStepOn(session: string, kind: StepKind, threadId?: number): Promise<void> {
 	return invoke<void>(
 		"dap_step",
 		threadId === undefined ? { session, kind } : { session, kind, threadId },

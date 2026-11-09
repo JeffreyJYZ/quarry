@@ -4,6 +4,7 @@ import { onDapStopped, onDapTerminated } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
 import type { Pin, PinResult } from "@/lib/debug/watch";
 import type { BreakpointEntry, StopView, VariableRow, WatchRow } from "./sessionTypes";
+import type { BuildProfile } from "@/lib/debug/profile";
 import { dropTemporary } from "./breakpointTypes";
 
 type Setter<T> = (updater: T | ((current: T) => T)) => void;
@@ -20,7 +21,7 @@ export type EventDeps = {
 	setLaunching: Setter<boolean>;
 	setRestarting: Setter<boolean>;
 	setStopView: Setter<StopView | null>;
-	setSessionBuildProfile: Setter<"debug" | "release" | null>;
+	setSessionBuildProfile: Setter<BuildProfile | null>;
 	setChildren: Setter<Map<number, DapVariable[]>>;
 	setExpanded: Setter<Set<string>>;
 	setSelectedVariable: Setter<VariableRow | null>;
