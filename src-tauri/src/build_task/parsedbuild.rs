@@ -101,7 +101,13 @@ pub fn under_deps(path: &str) -> bool {
     path.split(['/', '\\']).any(|segment| segment == "deps")
 }
 
-/// The diagnostic's own message, plus any error or warning child, all at the anchor span.
+/// The diagnostic's own message, plus every child, each at the child's own span.
+///
+/// A child can point at another file or line — the "declared here" note points at the declaration,
+/// not at the use that failed — so anchoring it at the parent showed the wrong site and the real
+/// one never appeared. The panel renders one flat list with no child rows, so a child that was
+/// skipped lost its text entirely: rustc's notes and help are kept as information rows, which is
+/// where they belong, instead of being discarded.
 pub fn diagnostics_for(message: &Value, build_root: &Path) -> Vec<Diagnostic> {
     let Some(anchor) = anchor_span(message, build_root) else {
         return Vec::new();
@@ -113,12 +119,13 @@ pub fn diagnostics_for(message: &Value, build_root: &Path) -> Vec<Diagnostic> {
 
     for child in message["children"].as_array().into_iter().flatten() {
         let child_level = child["level"].as_str().unwrap_or_default();
-        if !matches!(child_level, "error" | "warning") {
+        let child_text = child["message"].as_str().unwrap_or_default();
+        if child_text.is_empty() {
             continue;
         }
-        let child_text = child["message"].as_str().unwrap_or_default();
+        let site = anchor_span(child, build_root);
         diagnostics.push(diagnostic_at(
-            &anchor,
+            site.as_ref().unwrap_or(&anchor),
             severity(child_level),
             format!("{child_level}: {child_text}"),
         ));

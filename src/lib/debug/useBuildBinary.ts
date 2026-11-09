@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { buildProject } from "@/lib/project/api";
+import { buildOnce } from "@/lib/project/buildOnce";
 import { describeError } from "@/lib/project/errors";
 import { type BuildProfile, resolveDebugArtifact } from "@/lib/debug/profile";
 
@@ -32,7 +32,7 @@ export function useBuildBinary(options: {
 		options.setError(null);
 		let program: string | null = null;
 		try {
-			const report = await buildProject(rootNow, buildProfile);
+			const report = await buildOnce(rootNow, buildProfile);
 			if (!report.success) {
 				options.setError(`Build: ${report.summary}`);
 				options.setBuildNeeded(message);

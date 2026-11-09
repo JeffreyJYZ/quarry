@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { buildProject, type Diagnostic } from "@/lib/project/api";
+import type { Diagnostic } from "@/lib/project/api";
+import { buildOnce } from "@/lib/project/buildOnce";
 import { describeError } from "@/lib/project/errors";
 
 /**
@@ -62,7 +63,7 @@ export function useBuild(options: {
 		const mine = generation.current;
 		const current = () => generation.current === mine;
 		try {
-			const result = await buildProject(root, profile);
+			const result = await buildOnce(root, profile);
 			if (!current()) return;
 			onDiagnostics(result.diagnostics);
 			if (result.diagnostics.length === 0) onNotice(result.summary);

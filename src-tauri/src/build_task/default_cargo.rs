@@ -24,6 +24,9 @@ pub const SUMMARY_LIMIT: usize = 200;
 
 pub const DEFAULT_SUMMARY: &str = "cargo build succeeded";
 
+/// Status-bar summary for a failed cargo build that printed nothing at all.
+pub const FAILED_SUMMARY: &str = "cargo build failed";
+
 /// Program that builds CMake projects; the tool must be installed on the machine.
 pub const CMAKE_PROGRAM: &str = "cmake";
 
@@ -85,10 +88,15 @@ pub fn require_cargo(kind: ProjectKind) -> Result<(), String> {
     }
 }
 
+/// The cargo branch was handed a C/C++ project it does not build.
+///
+/// The C/C++ kinds have their own branches and are shipped, so reaching this gate means the
+/// dispatch chose the wrong branch. Saying the feature is "not wired yet" told the user a working
+/// build was missing; the message now names what actually happened.
 pub fn cpp_not_wired(marker: &str) -> String {
     format!(
-        "C/C++ builds are not wired yet (detected {marker}) in the cargo branch: \
-         the cargo branch builds Cargo projects only"
+        "the cargo branch cannot build a C/C++ project (detected {marker}): cargo builds Cargo \
+         projects only, so this build was dispatched to the wrong branch"
     )
 }
 
@@ -131,12 +139,13 @@ pub fn run_build(build_root: &str, release: bool) -> Result<BuildReport, String>
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     let parsed = parse_cargo_json(&stdout, Path::new(build_root));
+    let success = parsed.success.unwrap_or_else(|| output.status.success());
 
     Ok(BuildReport {
-        success: parsed.success.unwrap_or_else(|| output.status.success()),
+        success,
         diagnostics: parsed.diagnostics,
         duration_ms,
-        summary: summarize(&stderr, &parsed.unlocated),
+        summary: summarize(&stderr, &parsed.unlocated, success),
         // Cargo names the executable of the unit it built, so there is nothing to guess and no
         // filesystem walk: a `target/` sweep would find build scripts and dependency binaries,
         // and launching one of those is worse than reporting that the build produced no program.

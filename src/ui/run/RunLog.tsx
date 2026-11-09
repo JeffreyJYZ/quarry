@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { exitStatusText } from "@/lib/run/exitStatus";
+import { sticksToBottom } from "@/lib/run/stick";
 import { TOAST_MS } from "@/lib/consts/tests";
 import type { RunExit, RunLine } from "@/lib/run/runOutput";
 import { copyText, lineClass, stopLabel } from "@/ui/run/view";
@@ -48,13 +49,30 @@ export default function RunLog({
 		}
 	}, [lines, exited]);
 
+	// The pane can change height without a scroll event — a splitter drag, a window resize, the dock
+	// collapsing — and a stick flag computed for the old height snapped a reader who was just above
+	// the bottom down on the next line. Recompute it against the geometry that is on screen now.
+	useEffect(() => {
+		const el = ref.current;
+		if (el === null) {
+			return;
+		}
+		const observer = new ResizeObserver(() => {
+			stickRef.current = sticksToBottom(el);
+			if (stickRef.current) {
+				el.scrollTop = el.scrollHeight;
+			}
+		});
+		observer.observe(el);
+		return () => observer.disconnect();
+	}, []);
+
 	const onScroll = () => {
 		const el = ref.current;
 		if (el === null) {
 			return;
 		}
-		const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
-		stickRef.current = atBottom;
+		stickRef.current = sticksToBottom(el);
 	};
 
 	const showStatus = (text: string) => {
