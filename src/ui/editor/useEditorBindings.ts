@@ -29,7 +29,7 @@ type Actions = {
 	runInlay: () => Promise<void>;
 	toggleHints: () => void;
 	renameOpen: boolean;
-	codeMenuOpen: boolean;
+	codeMenuOpenRef: { current: boolean };
 	setRenameValue: (value: string) => void;
 	setRenameOpen: (value: boolean) => void;
 	setCodeActions: (actions: CodeAction[]) => void;
@@ -84,7 +84,7 @@ export function useEditorBindings(options: {
 		runSig: actions.runSig,
 		clearOccurrences: actions.clearOccurrences,
 		renameOpen: actions.renameOpen,
-		codeMenuOpen: actions.codeMenuOpen,
+		codeMenuOpenRef: actions.codeMenuOpenRef,
 		setRenameValue: actions.setRenameValue,
 		setRenameOpen: actions.setRenameOpen,
 		setCodeActions: actions.setCodeActions,

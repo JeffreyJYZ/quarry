@@ -100,6 +100,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		codeActions,
 		setCodeActions,
 		codeMenuOpen,
+		codeMenuOpenRef,
 		setCodeMenuOpen,
 		apply: applyCodeAction,
 	} = useCodeActionMenu({ onApplyEdits: onApplyEditsRef, rootRef, onNotice: onNoticeRef });
@@ -147,7 +148,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 			runInlay,
 			toggleHints: inlay.toggle,
 			renameOpen,
-			codeMenuOpen,
+			codeMenuOpenRef,
 			setRenameValue,
 			setRenameOpen,
 			setCodeActions,

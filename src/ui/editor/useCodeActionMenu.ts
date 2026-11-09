@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { lspExecuteCommand } from "@/lib/project/api/lsp";
 import type { CodeAction, FileEdit } from "@/lib/project/api";
 
@@ -10,6 +10,9 @@ export function useCodeActionMenu(options: {
 }) {
 	const [codeActions, setCodeActions] = useState<CodeAction[]>([]);
 	const [codeMenuOpen, setCodeMenuOpen] = useState(false);
+	/** The same flag, for the keymap built at mount: Escape has to see the menu opened later. */
+	const codeMenuOpenRef = useRef(false);
+	codeMenuOpenRef.current = codeMenuOpen;
 
 	const apply = (action: CodeAction) => {
 		setCodeMenuOpen(false);
@@ -30,5 +33,12 @@ export function useCodeActionMenu(options: {
 		}
 	};
 
-	return { codeActions, setCodeActions, codeMenuOpen, setCodeMenuOpen, apply };
+	return {
+		codeActions,
+		setCodeActions,
+		codeMenuOpen,
+		codeMenuOpenRef,
+		setCodeMenuOpen,
+		apply,
+	};
 }
