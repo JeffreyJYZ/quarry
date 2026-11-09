@@ -1,4 +1,6 @@
-import { describe, expect, test } from "bun:test";
+import "@/test/dom";
+import { afterEach, describe, expect, mock, test } from "bun:test";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { FileBuffer } from "@/lib/project/buffer";
 import TabStrip from "@/ui/components/TabStrip";
@@ -56,5 +58,52 @@ describe("the open-file tab strip", () => {
 		const html = markup("/p/b.rs");
 		expect(tabFor(html, "/p/a.rs")).toContain('aria-selected="false"');
 		expect(tabFor(html, "/p/b.rs")).toContain('aria-selected="true"');
+	});
+});
+
+afterEach(() => {
+	cleanup();
+});
+
+describe("the open-file tab strip keyboard model", () => {
+	function strip() {
+		const onActivate = mock((_path: string) => {});
+		const view = render(
+			<TabStrip
+				buffers={buffers}
+				activePath="/p/a.rs"
+				saving={new Set()}
+				confirmClose={null}
+				onActivate={onActivate}
+				onClose={() => {}}
+				onSaveClose={() => {}}
+				onDiscardClose={() => {}}
+				onCancelClose={() => {}}
+			/>,
+		);
+		return { view, onActivate };
+	}
+
+	test("only the selected tab owns the tab stop", () => {
+		const { view } = strip();
+		const tabs = view.getAllByRole("tab");
+		expect(tabs.map((tab) => tab.getAttribute("tabindex"))).toEqual(["0", "-1"]);
+	});
+
+	test("arrows step and wrap, Home and End jump to the ends", () => {
+		const { view, onActivate } = strip();
+		const first = view.getAllByRole("tab")[0] as HTMLElement;
+
+		fireEvent.keyDown(first, { key: "ArrowRight" });
+		expect(onActivate).toHaveBeenLastCalledWith("/p/b.rs");
+
+		fireEvent.keyDown(first, { key: "ArrowLeft" });
+		expect(onActivate).toHaveBeenLastCalledWith("/p/b.rs");
+
+		fireEvent.keyDown(first, { key: "Home" });
+		expect(onActivate).toHaveBeenLastCalledWith("/p/a.rs");
+
+		fireEvent.keyDown(first, { key: "End" });
+		expect(onActivate).toHaveBeenLastCalledWith("/p/b.rs");
 	});
 });

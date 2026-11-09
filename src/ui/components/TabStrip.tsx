@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { type FileBuffer, isDirty } from "@/lib/project/buffer";
+import { rovingIndex } from "@/lib/tabs/roving";
 
 export type TabStripProps = {
 	buffers: FileBuffer[];
@@ -26,6 +27,22 @@ export default function TabStrip({
 	onDiscardClose,
 	onCancelClose,
 }: TabStripProps) {
+	/** One tab owns the tab stop; the others are reachable with the arrow keys. */
+	const tabButtons = useRef<(HTMLButtonElement | null)[]>([]);
+	const selectedIndex = Math.max(
+		0,
+		buffers.findIndex((buffer) => buffer.path === activePath),
+	);
+	const onTabKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+		const next = rovingIndex(event.key, selectedIndex, buffers.length);
+		if (next === null) return;
+		const target = buffers[next];
+		if (target === undefined) return;
+		event.preventDefault();
+		onActivate(target.path);
+		tabButtons.current[next]?.focus();
+	};
+
 	/** Escape backs out of a pending close, matching the inline choice's own "keep it open". */
 	useEffect(() => {
 		if (confirmClose === null) {
@@ -43,7 +60,7 @@ export default function TabStrip({
 
 	return (
 		<div className="tabstrip" role="tablist" aria-label="Open files">
-			{buffers.map((buffer) => {
+			{buffers.map((buffer, index) => {
 				const active = buffer.path === activePath;
 				const confirming = buffer.path === confirmClose;
 				const pending = saving.has(buffer.path);
@@ -79,11 +96,16 @@ export default function TabStrip({
 							<>
 								<button
 									type="button"
+									ref={(node) => {
+										tabButtons.current[index] = node;
+									}}
 									className="tab-name"
 									title={buffer.path}
 									role="tab"
 									aria-selected={active}
+									tabIndex={index === selectedIndex ? 0 : -1}
 									onClick={() => onActivate(buffer.path)}
+									onKeyDown={onTabKeyDown}
 								>
 									{isDirty(buffer) ? (
 										<span className="dirty" title="unsaved changes">

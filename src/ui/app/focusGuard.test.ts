@@ -1,31 +1,40 @@
+import "@/test/dom";
 import { afterEach, describe, expect, test } from "bun:test";
 import { inEditableTarget, inTerminal } from "./focusGuard";
 
+/** The stub lives on the real document, so a later component test still finds one. */
+const original = Object.getOwnPropertyDescriptor(document, "activeElement");
+
+function focus(activeElement: unknown) {
+	Object.defineProperty(document, "activeElement", {
+		configurable: true,
+		get: () => activeElement,
+	});
+}
+
 describe("focusGuard", () => {
 	afterEach(() => {
-		delete (globalThis as { document?: unknown }).document;
+		if (original === undefined) {
+			delete (document as { activeElement?: unknown }).activeElement;
+		} else {
+			Object.defineProperty(document, "activeElement", original);
+		}
 	});
 	test("body focus is not editable or terminal", () => {
-		(globalThis as { document?: unknown }).document = {
-			activeElement: { tagName: "BODY", getAttribute: () => null },
-		};
+		focus({ tagName: "BODY", getAttribute: () => null });
 		expect(inEditableTarget()).toBe(false);
 		expect(inTerminal()).toBe(false);
 	});
 	test("input tag is editable", () => {
-		(globalThis as { document?: unknown }).document = {
-			activeElement: { tagName: "INPUT", getAttribute: () => null },
-		};
+		focus({ tagName: "INPUT", getAttribute: () => null });
 		expect(inEditableTarget()).toBe(true);
 	});
 	test("terminal closest detection", () => {
-		(globalThis as { document?: unknown }).document = {
-			activeElement: {
-				tagName: "DIV",
-				getAttribute: () => null,
-				closest: (s: string) => (s === ".xterm" ? {} : null),
-			},
-		};
+		focus({
+			tagName: "DIV",
+			getAttribute: () => null,
+			closest: (s: string) => (s === ".xterm" ? {} : null),
+		});
 		expect(inTerminal()).toBe(true);
 	});
 });
