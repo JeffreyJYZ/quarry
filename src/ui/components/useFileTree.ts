@@ -109,11 +109,15 @@ export function useFileTree({
 		(entry: FileEntry, action: "new-file" | "new-folder" | "rename" | "delete") => {
 			if (action === "new-file") {
 				setExpanded((current) => new Set(current).add(entry.path));
-				void load(entry.path);
+				void load(entry.path).catch((error: unknown) => {
+					onNotice?.(`new file failed: ${describeError(error)}`);
+				});
 				setEditing({ kind: "create-file", parent: entry.path });
 			} else if (action === "new-folder") {
 				setExpanded((current) => new Set(current).add(entry.path));
-				void load(entry.path);
+				void load(entry.path).catch((error: unknown) => {
+					onNotice?.(`new folder failed: ${describeError(error)}`);
+				});
 				setEditing({ kind: "create-dir", parent: entry.path });
 			} else if (action === "rename") {
 				setEditing({ kind: "rename", target: entry.path });
@@ -121,7 +125,7 @@ export function useFileTree({
 				setDeleteConfirm(entry.path);
 			}
 		},
-		[load],
+		[load, onNotice],
 	);
 
 	const commitEdit = useCallback(

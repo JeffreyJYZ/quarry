@@ -100,7 +100,8 @@ export default function SourceControl({
 
 	const staged = status.entries.filter((entry) => entry.staged);
 	const changeEntries = status.entries.filter((entry) => !entry.staged);
-	const isRepo = (branches.branches ?? []).length > 0;
+	// A failed branch read leaves the list empty; the menu still opens so its error line is reachable.
+	const isRepo = (branches.branches ?? []).length > 0 || changes.error !== null;
 
 	return (
 		<aside className="rail">

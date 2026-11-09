@@ -1,6 +1,8 @@
 import { BREADCRUMB_TAIL, BREADCRUMB_VISIBLE } from "@/lib/consts/breadcrumb";
 import { useEffect, useRef, useState } from "react";
 import { type DocumentSymbol as LspSymbol, lspSymbols } from "@/lib/project/api";
+import { describeError } from "@/lib/project/errors";
+import { lspErrorMessage } from "@/lib/lsp/paths";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
 import { ALL_SERVER_KINDS } from "@/lib/consts/lsp";
 
@@ -17,6 +19,7 @@ export type BreadcrumbProps = {
 
 export default function Breadcrumb({ root, activePath, cursor, onNavigate }: BreadcrumbProps) {
 	const [symbols, setSymbols] = useState<LspSymbol[]>([]);
+	const [symbolError, setSymbolError] = useState<string | null>(null);
 	const [copyError, setCopyError] = useState<string | null>(null);
 	const cacheRef = useRef<Map<string, LspSymbol[]>>(new Map());
 	const seqRef = useRef(0);
@@ -35,11 +38,13 @@ export default function Breadcrumb({ root, activePath, cursor, onNavigate }: Bre
 	useEffect(() => {
 		if (activePath === null) {
 			setSymbols([]);
+			setSymbolError(null);
 			return;
 		}
 		const cached = cacheRef.current.get(activePath);
 		if (cached !== undefined) {
 			setSymbols(cached);
+			setSymbolError(null);
 			return;
 		}
 		const seq = ++seqRef.current;
@@ -47,6 +52,7 @@ export default function Breadcrumb({ root, activePath, cursor, onNavigate }: Bre
 		const kind = servedByRunningServer(activePath, running);
 		if (kind === null) {
 			setSymbols([]);
+			setSymbolError(null);
 			return;
 		}
 		const sid = sessionId(kind, root);
@@ -56,9 +62,11 @@ export default function Breadcrumb({ root, activePath, cursor, onNavigate }: Bre
 				if (seqRef.current !== seq) return;
 				cacheRef.current.set(activePath, result);
 				setSymbols(result);
-			} catch {
+				setSymbolError(null);
+			} catch (error) {
 				if (seqRef.current !== seq) return;
 				setSymbols([]);
+				setSymbolError(`symbols unavailable: ${lspErrorMessage(describeError(error))}`);
 			}
 		})();
 	}, [root, activePath]);
@@ -136,6 +144,7 @@ export default function Breadcrumb({ root, activePath, cursor, onNavigate }: Bre
 					copy chain
 				</button>
 			) : null}
+			{symbolError !== null ? <span className="breadcrumb-error">{symbolError}</span> : null}
 			{copyError !== null ? <span className="breadcrumb-error">{copyError}</span> : null}
 		</nav>
 	);
