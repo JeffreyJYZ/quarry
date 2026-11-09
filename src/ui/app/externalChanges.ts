@@ -10,14 +10,25 @@
 
 import type { Dispatch, RefObject, SetStateAction } from "react";
 import { listDir, readTextFile } from "@/lib/project/api";
-import type { FileBuffer } from "@/lib/project/buffer";
+import { type FileBuffer, isDirty } from "@/lib/project/buffer";
 import { describeError } from "@/lib/project/errors";
 import { baseName, planWatchBatch } from "@/lib/project/watch";
 
-/** The buffer after a clean reload, or `null` when replacing it is no longer safe or needed. */
+/**
+ * The buffer after a disk read, or `null` when the read changes nothing it is safe to apply.
+ *
+ * Three cases, each decided on the text rather than the dirty marker alone:
+ *
+ * - the disk already holds the in-memory text: it becomes the saved text, so a file whose write
+ *   landed (or which someone else saved to the same content) is not left dirty and cannot prompt;
+ * - the buffer is dirty and the disk differs: `null`, because the in-memory text wins;
+ * - the buffer is clean: take the disk text and bump `loadId`, which is what tells the editor the
+ *   document it holds is not the one its undo history describes.
+ */
 export function reloaded(entry: FileBuffer, text: string): FileBuffer | null {
-	if (entry.text !== entry.loaded || entry.loaded === text) return null;
-	return { ...entry, text, loaded: text };
+	if (entry.text === text) return entry.loaded === text ? null : { ...entry, loaded: text };
+	if (isDirty(entry)) return null;
+	return { ...entry, text, loaded: text, loadId: (entry.loadId ?? 0) + 1 };
 }
 
 /** The live tree the handler reads: injectable so the batch decision is testable without Tauri. */
@@ -89,24 +100,35 @@ export function externalChangeHandler(
 
 		const plan = planWatchBatch(buffers, paths, existing);
 		for (const message of plan.notices) onNotice(message);
-		if (plan.conflicts.length > 0) {
-			const names = plan.conflicts.map((buffer) => buffer.name).join(", ");
-			onNotice(`Changed on disk: ${names} (unsaved changes kept)`);
-		}
 
+		// A conflict is read too: the disk text decides whether the edit is really still unsaved, so a
+		// file whose write landed is cleaned up instead of prompting on close.
+		const reloadSet = new Set(plan.reload.map((buffer) => buffer.path));
 		const texts = new Map<string, string>();
 		await Promise.all(
-			plan.reload.map(async (buffer) => {
+			[...plan.reload, ...plan.conflicts].map(async (buffer) => {
 				try {
 					texts.set(buffer.path, await io.read(buffer.path));
 				} catch (error) {
-					if (refs.mounted.current) {
+					// Only a buffer that was going to be replaced has lost a reload; a conflict that
+					// cannot be read simply stays dirty and keeps its row.
+					if (refs.mounted.current && reloadSet.has(buffer.path)) {
 						onNotice(`Could not reload ${buffer.name}: ${describeError(error)}`);
 					}
 				}
 			}),
 		);
 		if (!refs.mounted.current) return;
+
+		const unsaved = plan.conflicts.filter((buffer) => {
+			const text = texts.get(buffer.path);
+			const next = text === undefined ? null : reloaded(buffer, text);
+			return next === null ? isDirty(buffer) : isDirty(next);
+		});
+		if (unsaved.length > 0) {
+			const names = unsaved.map((buffer) => buffer.name).join(", ");
+			onNotice(`Changed on disk: ${names} (unsaved changes kept)`);
+		}
 
 		const moves = new Map(plan.moves.map((move) => [move.buffer.path, move]));
 		const closed = new Set(plan.close.map((buffer) => buffer.path));
@@ -119,6 +141,8 @@ export function externalChangeHandler(
 					next.push({ ...entry, path: move.to, name: move.name });
 					continue;
 				}
+				// `reloaded` runs against the live entry, not the one the batch was planned on, so an
+				// edit that landed after the read is still never thrown away.
 				const text = texts.get(entry.path);
 				next.push(text === undefined ? entry : (reloaded(entry, text) ?? entry));
 			}

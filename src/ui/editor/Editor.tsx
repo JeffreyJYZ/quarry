@@ -44,6 +44,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		tabSize = 4,
 		fontSize = 13,
 		fontFamily = "",
+		documentId = null,
 	}: EditorProps,
 	ref,
 ): JSX.Element {
@@ -153,7 +154,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 			inlayTimerRef,
 		},
 	});
-	useEditorMount({ refs, deps, behaviour });
+	useEditorMount({ refs, deps, behaviour, documentId });
 
 	useDocumentSync({ viewRef, value, emittedRef });
 	useBreakpointGutter({

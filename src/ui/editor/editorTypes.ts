@@ -35,6 +35,12 @@ export type EditorProps = {
 	fontSize?: number;
 	/** Editor font family; empty keeps the built-in monospace stack. */
 	fontFamily?: string;
+	/**
+	 * The document this mount belongs to (`path#loadId`). Its editor state is saved on unmount and
+	 * restored by a later mount of the same id, so a tab switch keeps undo, caret and scroll; a
+	 * reload changes the id and starts empty.
+	 */
+	documentId?: string | null;
 };
 
 export type EditorHandle = {

@@ -12,7 +12,13 @@ function bufferAt(path: string, text = "same", loaded = text): FileBuffer {
 }
 
 /** Run one batch against a fake disk and record every buffer-list and side-effect update. */
-function harness(initial: readonly FileBuffer[], existing: readonly string[]) {
+function harness(
+	initial: readonly FileBuffer[],
+	existing: readonly string[],
+	diskText = "from disk",
+	/** Runs while the disk read is in flight, which is where a keystroke can land. */
+	duringRead?: (buffers: FileBuffer[]) => FileBuffer[],
+) {
 	let buffers = [...initial];
 	const there = new Set(existing);
 	const notices: string[] = [];
@@ -28,7 +34,13 @@ function harness(initial: readonly FileBuffer[], existing: readonly string[]) {
 		},
 		setBuffers,
 		(message) => notices.push(message),
-		{ read: async () => "from disk", exists: async (path) => there.has(path) },
+		{
+			read: async () => {
+				if (duringRead !== undefined) buffers = duringRead(buffers);
+				return diskText;
+			},
+			exists: async (path) => there.has(path),
+		},
 		{ onClosed: (path) => closed.push(path), onMoved: (from, to) => moved.push([from, to]) },
 	);
 	return { handler, notices, closed, moved, current: () => buffers };
@@ -39,6 +51,23 @@ describe("reloaded", () => {
 		const next = reloaded(buffer("old", "old"), "new from disk");
 		expect(next?.text).toBe("new from disk");
 		expect(next?.loaded).toBe("new from disk");
+		expect(isDirty(next as FileBuffer)).toBe(false);
+	});
+
+	test("a reload is a new document, so the editor starts a fresh history", () => {
+		const next = reloaded(buffer("old", "old"), "new from disk");
+		expect(next?.loadId).toBe(1);
+	});
+
+	test("a dirty buffer whose disk text already matches stops being dirty", () => {
+		const next = reloaded(buffer("same", "old"), "same");
+		expect(next?.text).toBe("same");
+		expect(next?.loaded).toBe("same");
+		expect(isDirty(next as FileBuffer)).toBe(false);
+	});
+
+	test("the same match keeps the document id, since the text never changed", () => {
+		expect(reloaded({ ...buffer("same", "old"), loadId: 2 }, "same")?.loadId).toBe(2);
 	});
 
 	test("a buffer edited during the read is left alone", () => {
@@ -96,5 +125,46 @@ describe("externalChangeHandler", () => {
 			refreshes += 1;
 		});
 		expect(refreshes).toBe(1);
+	});
+
+	test("a dirty buffer the disk already holds stops being dirty, so closing cannot prompt", async () => {
+		const dirty = bufferAt("/project/src/main.rs", "same", "older");
+		const run = harness([dirty], [dirty.path], "same");
+		await run.handler([dirty.path]);
+		const entry = run.current()[0];
+		expect(entry?.text).toBe("same");
+		expect(entry !== undefined && isDirty(entry)).toBe(false);
+		expect(run.notices.join(" ").toLowerCase()).not.toContain("unsaved");
+	});
+
+	test("a dirty buffer whose disk text differs keeps its text and says so", async () => {
+		const dirty = bufferAt("/project/src/main.rs", "mine", "older");
+		const run = harness([dirty], [dirty.path], "from disk");
+		await run.handler([dirty.path]);
+		const entry = run.current()[0];
+		expect(entry?.text).toBe("mine");
+		expect(entry !== undefined && isDirty(entry)).toBe(true);
+		expect(run.notices.join(" ")).toContain("unsaved changes kept");
+	});
+
+	test("a clean reload marks the buffer as a new document for the editor", async () => {
+		const clean = bufferAt("/project/src/main.rs", "old", "old");
+		const run = harness([clean], [clean.path], "new from disk");
+		await run.handler([clean.path]);
+		const entry = run.current()[0];
+		expect(entry?.text).toBe("new from disk");
+		expect(entry?.loadId).toBe(1);
+	});
+
+	test("a keystroke landing while the disk is read wins over the reload", async () => {
+		const clean = bufferAt("/project/src/main.rs", "old", "old");
+		const run = harness([clean], [clean.path], "new from disk", (current) =>
+			current.map((entry) => ({ ...entry, text: "typed while reading" })),
+		);
+		await run.handler([clean.path]);
+		const entry = run.current()[0];
+		expect(entry?.text).toBe("typed while reading");
+		expect(entry?.loaded).toBe("old");
+		expect(entry !== undefined && isDirty(entry)).toBe(true);
 	});
 });
