@@ -111,6 +111,9 @@ pub use lsp_rename::*;
 mod parse_code_actions;
 pub use parse_code_actions::*;
 
+mod code_action_params;
+pub use code_action_params::*;
+
 mod lsp_signature_help;
 pub use lsp_signature_help::*;
 

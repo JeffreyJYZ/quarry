@@ -116,6 +116,35 @@ export function combineDiagnostics(server: DiagnosticMap, build: DiagnosticMap):
 	return next;
 }
 
+/**
+ * The diagnostics a `textDocument/codeAction` request carries for a caret at `line`/`character`.
+ *
+ * Only the ones whose range contains the caret are sent: a server answers a quick fix for a
+ * diagnostic it finds in this list, and an unrelated finding at another line would ask for the
+ * wrong one. `path` is dropped because the protocol identifies the document in `textDocument.uri`.
+ */
+export function codeActionDiagnostics(
+	diagnostics: Diagnostic[],
+	line: number,
+	character: number,
+): Array<Omit<Diagnostic, "path">> {
+	const point = { line, character };
+	return diagnostics
+		.filter(
+			(diagnostic) =>
+				comparePosition(diagnostic.range.start, point) <= 0 &&
+				comparePosition(point, diagnostic.range.end) <= 0,
+		)
+		.map(({ path: _path, ...wire }) => wire);
+}
+
+function comparePosition(
+	left: { line: number; character: number },
+	right: { line: number; character: number },
+): number {
+	return left.line - right.line || left.character - right.character;
+}
+
 /** LSP `DiagnosticSeverity.Error`. */
 export const DIAGNOSTIC_SEVERITY_ERROR = 1;
 /** LSP `DiagnosticSeverity.Warning`. */

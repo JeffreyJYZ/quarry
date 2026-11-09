@@ -48,6 +48,7 @@ export function useEditorBindings(options: {
 	search: Refs;
 	actions: Actions;
 	runningRef?: { current: ReadonlySet<import("@/lib/lsp/served").ServerKind> };
+	diagnosticsRef?: { current: import("@/lib/project/api").Diagnostic[] };
 }): {
 	deps: KeymapDeps;
 	behaviour: BehaviourDeps;
@@ -56,6 +57,7 @@ export function useEditorBindings(options: {
 	const runningRef = options.runningRef ?? {
 		current: new Set(ALL_SERVER_KINDS),
 	};
+	const diagnosticsRef = options.diagnosticsRef ?? { current: [] };
 	const counters = { completionSeq: 0, hoverSeq: 0 };
 
 	const deps: KeymapDeps = {
@@ -76,6 +78,7 @@ export function useEditorBindings(options: {
 		closeSearchRef: search.closeSearchRef,
 		stepRef: search.stepRef,
 		toggleBreakpointRef: refs.toggleRef,
+		diagnosticsRef,
 		applyInlay: actions.applyInlay,
 		hideSig: actions.hideSig,
 		runSig: actions.runSig,

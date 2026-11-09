@@ -1,9 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { SESSION_SEPARATOR } from "@/lib/consts/lsp";
+import { codeActionDiagnostics } from "@/lib/lsp/diagnostics";
 import type {
 	CallHierarchyNode,
 	CodeAction,
 	CompletionList,
+	Diagnostic,
 	FileEdit,
 	HoverInfo,
 	InlayHint,
@@ -96,26 +98,6 @@ export function lspSymbols(root: string, path: string): Promise<DocumentSymbol[]
 	return invoke<DocumentSymbol[]>("lsp_symbols", { root, path });
 }
 
-/** One semantic token: a position the grammar cannot classify on its own. */
-export type SemanticToken = {
-	line: number;
-	start: number;
-	length: number;
-	kind: string;
-	modifiers: string[];
-};
-
-/**
- * Every semantic token in a file, for highlighting names the grammar cannot tell apart.
- *
- * An empty list is the normal answer from a server with no semantic tokens, so callers treat it as
- * "no extra colour", never as an error.
- */
-export function lspSemanticTokens(root: string, path: string): Promise<SemanticToken[]> {
-	requireSessionId("lsp_semantic_tokens", root);
-	return invoke<SemanticToken[]>("lsp_semantic_tokens", { root, path });
-}
-
 /** Project-wide symbol search, the backend for go-to-class. */
 export function lspWorkspaceSymbols(root: string, query: string): Promise<WorkspaceSymbol[]> {
 	requireSessionId("lsp_workspace_symbols", root);
@@ -138,9 +120,18 @@ export function lspCodeActions(
 	path: string,
 	line: number,
 	character: number,
+	diagnostics: Diagnostic[] = [],
 ): Promise<CodeAction[]> {
 	requireSessionId("lsp_code_actions", root);
-	return invoke<CodeAction[]>("lsp_code_actions", { root, path, line, character });
+	// The server offers a diagnostic-bound quick fix only for a diagnostic in this list, so the
+	// caller sends the findings it holds for the range instead of the empty list that hid them.
+	return invoke<CodeAction[]>("lsp_code_actions", {
+		root,
+		path,
+		line,
+		character,
+		diagnostics: codeActionDiagnostics(diagnostics, line, character),
+	});
 }
 
 export function lspSignatureHelp(

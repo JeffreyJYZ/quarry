@@ -110,7 +110,9 @@ read off `src-tauri/src/lib.rs` and `src/`:
   `recentRoots`, and writes them back via `writeSettings`. A row's path can be copied to the
   clipboard, and removing the last entry leaves the `No recent projects` empty state.
 - **Problems quick fixes**: each Problems entry carries a `Fix` button that opens code actions from
-  `lsp_code_actions` in `src/problems/ProblemsPanel.tsx`.
+  `lsp_code_actions` in `src/problems/ProblemsPanel.tsx`, sending the diagnostics at that position
+  in the request, since clangd and rust-analyzer only offer a diagnostic-bound fix whose diagnostic
+  is in the context.
 - **Tests**: `list_tests` and `run_test` feed a Tests dock with pass/fail status, filtering by
   binary and result, sorting, and run-all scoped to the filtered set
   (`src/tests/filterTests.ts`). Result filtering covers all, failed, passed and not-run; `copy

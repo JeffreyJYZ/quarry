@@ -58,6 +58,7 @@ export function ProblemsList({
 									key={diagnosticKey(diagnostic)}
 									path={file.path}
 									diagnostic={diagnostic}
+									diagnostics={file.diagnostics}
 									actions={actions}
 									onSelect={onSelect}
 									selected={index === selected}

@@ -158,6 +158,7 @@ export function lspBindings(deps: KeymapDeps): KeyBinding[] {
 							currentPath,
 							line,
 							character,
+							deps.diagnosticsRef.current,
 						);
 					} catch {
 						actions = [];

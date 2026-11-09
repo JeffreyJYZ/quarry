@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import type { EditorView } from "@codemirror/view";
 import type { Compartment } from "@codemirror/state";
-import type { FileEdit, Location } from "@/lib/project/api";
+import type { Diagnostic, FileEdit, Location } from "@/lib/project/api";
 import type { EditorProps } from "@/ui/editor/editorTypes";
 
 type Cursor = { line: number; character: number };
@@ -62,6 +62,9 @@ export function useEditorRefs(props: EditorProps) {
 	onApplyEditsRef.current = props.onApplyEdits ?? null;
 	const lastCursorRef = useRef<Cursor | null>(null);
 	const revealTokenRef = useRef<number | null>(null);
+	/** The document's own findings, read live by the quick-fix binding built with the view. */
+	const diagnosticsRef = useRef<Diagnostic[]>(props.diagnostics ?? []);
+	diagnosticsRef.current = props.diagnostics ?? [];
 
 	return {
 		hostRef,
@@ -83,6 +86,7 @@ export function useEditorRefs(props: EditorProps) {
 		lastCursorRef,
 		revealTokenRef,
 		emittedRef,
+		diagnosticsRef,
 	};
 }
 

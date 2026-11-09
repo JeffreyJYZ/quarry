@@ -74,6 +74,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		onApplyEditsRef,
 		lastCursorRef,
 		emittedRef,
+		diagnosticsRef,
 	} = refs;
 	const search = useEditorSearch(viewRef);
 	const { open: openSearch, close: closeSearch, step: stepMatch } = search;
@@ -153,6 +154,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 			setCodeMenuOpen,
 			inlayTimerRef,
 		},
+		diagnosticsRef,
 	});
 	useEditorMount({ refs, deps, behaviour, documentId });
 

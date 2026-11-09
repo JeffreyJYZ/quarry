@@ -1,7 +1,7 @@
 import type { ServerKind } from "@/lib/lsp/served";
 import type { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
-import type { CodeAction, Location } from "@/lib/project/api";
+import type { CodeAction, Diagnostic, Location } from "@/lib/project/api";
 
 import type { InlayHint } from "@/lib/project/api";
 
@@ -27,6 +27,8 @@ export type KeymapDeps = {
 	stepRef: { current: (delta: number) => void };
 	/** Toggles a breakpoint on a 1-based line; null until the shell has a file to act on. */
 	toggleBreakpointRef: { current: ((line: number) => void) | null };
+	/** The open document's findings, which a quick-fix request must carry to get its action. */
+	diagnosticsRef: { current: Diagnostic[] };
 	applyInlay: (hints: InlayHint[] | null) => void;
 	hideSig: () => void;
 	runSig: () => Promise<void>;

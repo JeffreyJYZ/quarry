@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FileBuffer } from "@/lib/project/buffer";
-import { type CodeAction, lspCodeActions } from "@/lib/project/api";
+import { type CodeAction, type Diagnostic, lspCodeActions } from "@/lib/project/api";
 import { sessionForContext } from "@/lib/lsp/context";
 import { documentVersionOf } from "@/lib/lsp/documentVersions";
 import { applyFileEdits, refusalNotice } from "@/lib/refactor/apply";
@@ -16,7 +16,12 @@ export type ProblemActions = {
 	menuError: string | null;
 	menuIndex: number;
 	applied: string | null;
-	openMenu: (path: string, line: number, character: number) => Promise<void>;
+	openMenu: (
+		path: string,
+		line: number,
+		character: number,
+		diagnostics?: Diagnostic[],
+	) => Promise<void>;
 	closeMenu: () => void;
 	applyAction: (action: CodeAction) => Promise<void>;
 	setMenuIndex: (index: number) => void;
@@ -73,7 +78,7 @@ export function useProblemActions({
 	}, []);
 
 	const fetchActions = useCallback(
-		async (path: string, line: number, character: number) => {
+		async (path: string, line: number, character: number, diagnostics: Diagnostic[] = []) => {
 			const key = cacheKey(path, line, character);
 			const cached = cache.current.get(key);
 			if (cached !== undefined) {
@@ -86,7 +91,7 @@ export function useProblemActions({
 			if (session === null) {
 				throw new Error("No language server for this file: quick fixes unavailable");
 			}
-			const actions = await lspCodeActions(session, path, line, character);
+			const actions = await lspCodeActions(session, path, line, character, diagnostics);
 			cache.current.set(key, actions);
 			return actions;
 		},
@@ -94,7 +99,7 @@ export function useProblemActions({
 	);
 
 	const openMenu = useCallback(
-		async (path: string, line: number, character: number) => {
+		async (path: string, line: number, character: number, diagnostics: Diagnostic[] = []) => {
 			const key = cacheKey(path, line, character);
 			setMenuKey(key);
 			setMenuActions([]);
@@ -102,7 +107,7 @@ export function useProblemActions({
 			setMenuLoading(true);
 			setMenuIndex(0);
 			try {
-				const actions = await fetchActions(path, line, character);
+				const actions = await fetchActions(path, line, character, diagnostics);
 				setMenuActions(actions);
 				if (actions.length === 0) {
 					showError("No code actions available for this diagnostic");

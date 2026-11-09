@@ -59,7 +59,9 @@ pub fn uri_to_path(uri: &str) -> Option<String> {
     let mut index = 0;
 
     while index < bytes.len() {
-        if bytes[index] == b'%' && index + 2 < bytes.len() {
+        // A complete escape is `%` plus two hex digits and spans up to `index + 3`, so this check
+        // covers the final byte of the URI as well as every earlier one.
+        if bytes[index] == b'%' && index + 3 <= bytes.len() {
             let hex = std::str::from_utf8(&bytes[index + 1..index + 3]).ok()?;
             decoded.push(u8::from_str_radix(hex, 16).ok()?);
             index += 3;
