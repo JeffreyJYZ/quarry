@@ -150,5 +150,6 @@ that fills its canvas is what makes it render oversized beside every other app.
 
 ## Non-goals
 
-Compound configurations, "Run with coverage", remote debugging, attach on launch, and the
-`evaluate` watch pane (measured broken for Rust).
+Compound configurations, "Run with coverage", remote debugging, attach on launch, and a saved
+watch-expression list over `evaluate` (the field works with a stopped frame; lldb's Rust parser
+rejects method calls and casts).

@@ -18,6 +18,6 @@ it is evidence rather than direction.
 
 ## Spike
 
-| File                                   | Measures                                                                                                                                                  |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`../spikes/dap.md`](../spikes/dap.md) | Xcode's `lldb-dap` against a Rust binary: memory, disassembly and data breakpoints work; Rust pretty printing needs `initCommands`; `evaluate` is broken. |
+| File                                   | Measures                                                                                                                                                                                                                                          |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`../spikes/dap.md`](../spikes/dap.md) | Xcode's `lldb-dap` against a Rust binary: memory, disassembly and data breakpoints work; Rust pretty printing needs `initCommands`; `evaluate` works with the stopped frame's `frameId`, while method calls and casts stay outside lldb's parser. |

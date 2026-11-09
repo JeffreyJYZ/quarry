@@ -62,8 +62,10 @@ says so instead of erroring.
 
 - Sync is full-document. Incremental sync is not implemented; it is worth doing only when a stall is
   measured, not in advance.
-- `evaluate` is still broken for Rust through `lldb-dap`, which is why watch expressions are pinned
-  variables rather than arbitrary expressions. See [Debugging](/docs/debugging).
+- `evaluate` works for Rust as long as the request carries the stopped frame's `frameId`; without it
+  lldb-dap refuses every expression with "can't evaluate expressions when the process is running".
+  lldb's Rust parser is a subset — method calls and `as` casts fall back to Objective-C++ and report
+  the adapter's "not supported" message. See [Debugging](/docs/debugging).
 
 ## Next
 

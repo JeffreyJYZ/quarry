@@ -41,8 +41,8 @@ export function PinsSection({ debug }: { debug: DebugController }) {
 				</ul>
 			)}
 			<p className="debug-note dimmed">
-				Expression evaluation is unavailable for Rust, so only pinned in-scope variables can
-				be watched.
+				Type an expression in the Evaluate field above: it sends the stopped frame's id, so
+				Rust evaluates too. Pinning tracks a variable's value on each stop.
 			</p>
 		</>
 	);
@@ -77,7 +77,9 @@ export function WatchPointsSection({ debug }: { debug: DebugController }) {
 					))}
 				</ul>
 			)}
-			<p className="debug-note">Evaluate is unavailable for Rust, so no watch expressions.</p>
+			<p className="debug-note">
+				Watch points stop on a memory write. Use the Evaluate field above to inspect values.
+			</p>
 		</>
 	);
 }
