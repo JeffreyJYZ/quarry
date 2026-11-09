@@ -39,6 +39,9 @@ pub use handshake_timeout::*;
 mod start_lsp;
 pub use start_lsp::*;
 
+mod start_session;
+pub use start_session::*;
+
 mod impl_lspstate;
 pub use impl_lspstate::*;
 
@@ -77,6 +80,9 @@ pub use tests_5::*;
 
 mod tests_6;
 pub use tests_6::*;
+
+mod tests_7;
+pub use tests_7::*;
 
 mod format_start_failure;
 pub use format_start_failure::*;
