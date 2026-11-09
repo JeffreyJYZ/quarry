@@ -42,15 +42,16 @@ export function useBranches({
 				const list = await gitBranches(root);
 				if (cancelled) return;
 				setBranches(list);
-			} catch {
+			} catch (err) {
 				if (cancelled) return;
+				setError(`branch list failed: ${describeError(err)}`);
 				setBranches([]);
 			}
 		})();
 		return () => {
 			cancelled = true;
 		};
-	}, [root]);
+	}, [root, setError]);
 
 	const switchBranch = useCallback(
 		async (branch: string) => {

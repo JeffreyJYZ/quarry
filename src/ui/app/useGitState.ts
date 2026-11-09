@@ -83,13 +83,15 @@ export function useGitState(options: {
 				}));
 				setBlameByPath((current) => new Map(current).set(activePath, annotations));
 			})
-			.catch(() => {
-				if (!cancelled) setBlameOn(false);
+			.catch((error: unknown) => {
+				if (cancelled) return;
+				setBlameOn(false);
+				onNotice?.(`git blame failed: ${describeError(error)}`);
 			});
 		return () => {
 			cancelled = true;
 		};
-	}, [blameOn, root, activePath]);
+	}, [blameOn, root, activePath, onNotice]);
 
 	const forgetBlame = useCallback((path: string) => {
 		setBlameByPath((current) => {
