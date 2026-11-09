@@ -31,7 +31,11 @@ export function TestRow({ item, result, running, highlighted, onRun }: TestRowPr
 			setCopyNote("Copied");
 			window.setTimeout(() => setCopyNote(null), TOAST_MS);
 		} catch (error) {
-			setCopyNote(error instanceof Error ? error.message : "copy failed");
+			setCopyNote(
+				error instanceof Error
+					? error.message
+					: "Copy failed: could not copy to clipboard.",
+			);
 		}
 	};
 
@@ -45,7 +49,11 @@ export function TestRow({ item, result, running, highlighted, onRun }: TestRowPr
 			setCopyNote("Copied");
 			window.setTimeout(() => setCopyNote(null), TOAST_MS);
 		} catch (error) {
-			setCopyNote(error instanceof Error ? error.message : "copy failed");
+			setCopyNote(
+				error instanceof Error
+					? error.message
+					: "Copy failed: could not copy to clipboard.",
+			);
 		}
 	};
 

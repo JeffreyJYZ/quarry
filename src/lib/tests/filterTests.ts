@@ -66,6 +66,18 @@ export function truncateFailureOutput(
 	return { text: lines.slice(0, limit).join("\\n"), truncated: true };
 }
 
+export function emptyTestsMessage(
+	itemsLength: number,
+	textFilter: string,
+	binaryFilter: string | null,
+	resultFilter: ResultFilter,
+): string {
+	const noFilter =
+		textFilter === "" && binaryFilter === null && resultFilter === "all" && itemsLength === 0;
+	if (noFilter) return "No tests discovered";
+	return `No tests match "${textFilter}" · "${binaryFilter ?? "All binaries"}" · "${resultLabel(resultFilter)}"`;
+}
+
 export function applyTestFilters(
 	items: TestItem[],
 	results: ReadonlyMap<string, TestReport>,

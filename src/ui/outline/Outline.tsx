@@ -22,6 +22,7 @@ export default function Outline({ root, activePath, onNavigate, cursor }: Outlin
 	const [symbols, setSymbols] = useState<LspSymbol[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [noServer, setNoServer] = useState(false);
 	const seqRef = useRef(0);
 	const [filter, setFilter] = useState("");
 	const [kbIndex, setKbIndex] = useState(0);
@@ -38,19 +39,23 @@ export default function Outline({ root, activePath, onNavigate, cursor }: Outlin
 			// The server indexes one root; a tab from outside it would come back as an internal error.
 			setSymbols([]);
 			setError(null);
+			setNoServer(false);
 			setLoading(false);
 			return;
 		}
 		const seq = ++seqRef.current;
 		setLoading(true);
 		setError(null);
+		setNoServer(false);
 		const running = new Set(ALL_SERVER_KINDS);
 		const kind = servedByRunningServer(activePath, running);
 		if (kind === null) {
 			setSymbols([]);
+			setNoServer(true);
 			setLoading(false);
 			return;
 		}
+		setNoServer(false);
 		const sid = sessionId(kind, root);
 		const timer = window.setTimeout(() => {
 			void (async () => {
@@ -146,6 +151,8 @@ export default function Outline({ root, activePath, onNavigate, cursor }: Outlin
 						<p className="empty">loading…</p>
 					) : error !== null ? (
 						<p className="tree-note error">{error}</p>
+					) : noServer ? (
+						<p className="empty">No language server for this file</p>
 					) : symbols.length === 0 ? (
 						<p className="empty">No symbols.</p>
 					) : shownSymbols.length === 0 ? (

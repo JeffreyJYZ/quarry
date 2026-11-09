@@ -3,11 +3,19 @@ import { directoryOf, fileName, separatorOf } from "@/lib/project/paths";
 
 export type RefsPanelProps = {
 	locations: Location[];
+	loading?: boolean;
+	error?: string | null;
 	onNavigate: (path: string, line: number, character: number) => void;
 	onClose: () => void;
 };
 
-export default function RefsPanel({ locations, onNavigate, onClose }: RefsPanelProps) {
+export default function RefsPanel({
+	locations,
+	loading = false,
+	error = null,
+	onNavigate,
+	onClose,
+}: RefsPanelProps) {
 	return (
 		<section className="refs-panel" aria-label="References">
 			<div className="refs-head">
@@ -18,7 +26,11 @@ export default function RefsPanel({ locations, onNavigate, onClose }: RefsPanelP
 				</button>
 			</div>
 			<div className="refs-body">
-				{locations.length === 0 ? (
+				{loading ? (
+					<p className="refs-empty">Loading references…</p>
+				) : error !== null ? (
+					<p className="refs-empty error">{error}</p>
+				) : locations.length === 0 ? (
 					<p className="refs-empty">No references</p>
 				) : (
 					locations.map((location) => {

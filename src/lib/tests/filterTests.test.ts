@@ -3,6 +3,7 @@ import type { TestItem, TestReport } from "@/lib/project/api";
 import {
 	applyTestFilters,
 	composeFailureLines,
+	emptyTestsMessage,
 	matchesTestFilter,
 	resultLabel,
 	statusOf,
@@ -138,5 +139,15 @@ describe("truncateFailureOutput", () => {
 		const result = truncateFailureOutput(output, 2);
 		expect(result.truncated).toBe(false);
 		expect(result.text).toBe(output);
+	});
+});
+
+describe("emptyTestsMessage", () => {
+	test("no tests and no filter says no tests discovered", () => {
+		expect(emptyTestsMessage(0, "", null, "all")).toBe("No tests discovered");
+	});
+	test("with items or filter reports a filter miss", () => {
+		expect(emptyTestsMessage(3, "foo", null, "all")).toContain("No tests match");
+		expect(emptyTestsMessage(0, "", null, "failed")).toContain("No tests match");
 	});
 });

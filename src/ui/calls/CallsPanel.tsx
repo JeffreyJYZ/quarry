@@ -24,6 +24,7 @@ export default function CallsPanel({ root, path, cursor, onNavigate, onClose }: 
 	const [prepared, setPrepared] = useState<CallHierarchyNode[] | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
+	const [noServer, setNoServer] = useState(false);
 	const [children, setChildren] = useState<Map<number, CallHierarchyNode[]>>(() => new Map());
 	const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
 	const [loadingNodes, setLoadingNodes] = useState<Set<number>>(() => new Set());
@@ -33,16 +34,19 @@ export default function CallsPanel({ root, path, cursor, onNavigate, onClose }: 
 		setLoading(true);
 		setError(null);
 		setPrepared(null);
+		setNoServer(false);
 		setChildren(new Map());
 		setExpanded(new Set());
 		setLoadingNodes(new Set());
 		const running = new Set(ALL_SERVER_KINDS);
 		const kind = servedByRunningServer(path, running);
 		if (kind === null) {
-			setPrepared([]);
+			setPrepared(null);
+			setNoServer(true);
 			setLoading(false);
 			return;
 		}
+		setNoServer(false);
 		const sid = sessionId(kind, root);
 		void lspCallHierarchyPrepare(sid, path, cursor.line, cursor.character)
 			.then((nodes) => {
@@ -177,6 +181,8 @@ export default function CallsPanel({ root, path, cursor, onNavigate, onClose }: 
 					<p className="calls-loading">Loading calls…</p>
 				) : error ? (
 					<p className="calls-error">{error}</p>
+				) : noServer ? (
+					<p className="calls-empty">No language server for this file</p>
 				) : prepared === null || prepared.length === 0 ? (
 					<p className="calls-empty">
 						{direction === "incoming" ? "No incoming calls" : "No outgoing calls"}

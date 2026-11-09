@@ -92,6 +92,13 @@ export default function CanvasPanels({ model }: { model: ShellModel }) {
 				/>
 			);
 		}
+		return (
+			<section className="type-hierarchy-panel" aria-label="Type hierarchy">
+				<div className="calls-body">
+					<p className="calls-empty">Place the caret on a symbol</p>
+				</div>
+			</section>
+		);
 	}
 
 	if (project === null) return null;

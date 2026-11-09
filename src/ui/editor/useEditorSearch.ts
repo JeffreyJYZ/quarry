@@ -48,7 +48,7 @@ export function useEditorSearch(viewRef: { current: EditorView | null }) {
 		} catch {
 			setMatches([]);
 			setActive(0);
-			setError("invalid regex");
+			setError(`invalid regular expression: ${q}`);
 			view.dispatch({ effects: setSearchMatches.of(emptySearchState) });
 			return;
 		}

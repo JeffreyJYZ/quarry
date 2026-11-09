@@ -76,7 +76,11 @@ export default function RunLog({
 			await navigator.clipboard.writeText(text);
 			showStatus("Copied");
 		} catch (error) {
-			showStatus(error instanceof Error ? error.message : "copy failed");
+			showStatus(
+				error instanceof Error
+					? error.message
+					: "Copy failed: could not copy to clipboard.",
+			);
 		}
 	};
 
@@ -88,7 +92,11 @@ export default function RunLog({
 			await navigator.clipboard.writeText(argv);
 			showStatus("Copied");
 		} catch (error) {
-			showStatus(error instanceof Error ? error.message : "copy failed");
+			showStatus(
+				error instanceof Error
+					? error.message
+					: "Copy failed: could not copy to clipboard.",
+			);
 		}
 	};
 

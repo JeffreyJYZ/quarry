@@ -47,7 +47,9 @@ export default function DebugDockBody({
 			 */}
 			<div className={debug.error === null ? "dock-debug-strip" : "dock-debug-strip error"}>
 				<span className="dock-debug-strip-text" title={offer ?? undefined}>
-					{offer ?? session ?? "no debug session"}
+					{offer ??
+						session ??
+						"No debug session is running. Start one with Run → Debug (F5)."}
 				</span>
 				{debug.buildNeeded === null ? null : (
 					<button
