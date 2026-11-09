@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { readSettings, readTextFile, settingsForWrite, writeSettings } from "@/lib/project/api";
 import type { FileBuffer } from "@/lib/project/buffer";
-import { fileName } from "@/lib/problems/model";
+import { fileName } from "@/lib/project/paths";
 import { normalizePreferences } from "@/lib/settings/model";
 import { describeError } from "@/lib/project/errors";
 import type { Settings } from "@/lib/project/api";

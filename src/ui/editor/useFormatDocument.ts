@@ -1,17 +1,9 @@
 import type { EditorView } from "@codemirror/view";
+import { extensionOf } from "@/lib/consts/extensions";
 import { formatDocument, formatterFor } from "@/lib/project/api";
 import { formatJsonText } from "@/lib/project/save";
 import { describeError } from "@/lib/project/errors";
-
-function baseName(path: string): string {
-	const slash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-	return slash >= 0 ? path.slice(slash + 1) : path;
-}
-
-function extensionOf(path: string): string {
-	const dot = path.lastIndexOf(".");
-	return dot >= 0 ? path.slice(dot + 1).toLowerCase() : "";
-}
+import { fileName } from "@/lib/project/paths";
 
 /** The format action: ask which formatter this file has, then run it over the whole document. */
 export function useFormatDocument(options: {
@@ -32,7 +24,7 @@ export function useFormatDocument(options: {
 
 		if (ext === "json" || ext === "jsonc") {
 			try {
-				return formatJsonText(view.state.doc.toString(), baseName(currentPath));
+				return formatJsonText(view.state.doc.toString(), fileName(currentPath));
 			} catch (error) {
 				notify?.(describeError(error));
 				return null;

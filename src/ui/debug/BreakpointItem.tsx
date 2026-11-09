@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { BreakpointField, BreakpointRow } from "@/lib/debug/session";
-import { fileName } from "@/lib/problems/model";
+import { fileName } from "@/lib/project/paths";
 
 const FIELDS: { field: BreakpointField; label: string; title: string }[] = [
 	{ field: "condition", label: "cond", title: "Break only when the condition is true" },

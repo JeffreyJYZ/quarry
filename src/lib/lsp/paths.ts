@@ -6,11 +6,11 @@
  * keep such requests from being made and turn the ones that still fail into one readable line.
  */
 
+import { isUnder } from "@/lib/project/paths";
+
 /** True when `path` is `root` itself or sits underneath it. */
 export function isInsideRoot(root: string, path: string): boolean {
-	if (root === "" || path === "") return false;
-	const prefix = root.endsWith("/") ? root : `${root}/`;
-	return path === root || path.startsWith(prefix);
+	return isUnder(root, path);
 }
 
 /**

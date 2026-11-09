@@ -11,11 +11,13 @@ export function runCwd(cwd: string, root: string): string {
 	return cwd.trim() === "" ? root : cwd;
 }
 
+import { isAbsolute } from "@/lib/project/paths";
+
 /**
  * Whether a path is absolute on this platform: a leading slash on POSIX, or a Windows drive letter
  * followed by either separator. The backend checks with `Path::is_absolute`, so a drive-letter path
  * must pass here or a Windows build would refuse every run before the command is even invoked.
  */
 export function isAbsoluteRunPath(path: string): boolean {
-	return path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path);
+	return isAbsolute(path);
 }

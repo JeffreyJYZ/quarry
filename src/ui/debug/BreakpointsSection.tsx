@@ -1,6 +1,6 @@
 import BreakpointItem from "@/ui/debug/BreakpointItem";
 import type { DebugController } from "@/lib/debug/session";
-import { fileName } from "@/lib/problems/model";
+import { fileName } from "@/lib/project/paths";
 
 /**
  * Every set breakpoint, grouped by file. Body only: the column header carries the Add button,

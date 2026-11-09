@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { SESSION_SEPARATOR } from "@/lib/consts/lsp";
+import { isAbsolute } from "@/lib/project/paths";
+
 /** One node of a type hierarchy, exactly as `lsp_prepare_type_hierarchy` returns it. */
 export type TypeHierarchyNode = {
 	name: string;
@@ -69,7 +71,7 @@ export function hierarchyKey(node: TypeHierarchyNode): string {
 
 /** A node with no file behind it cannot be opened. */
 export function isSelectable(node: TypeHierarchyNode): boolean {
-	return node.path.startsWith("/");
+	return isAbsolute(node.path);
 }
 
 /** What the copy action carries: the server's detail when it has one, else the plain name. */

@@ -1,5 +1,6 @@
 import { feedChunk } from "@/lib/terminal/ansi";
 import { DEFAULT_FONT_SIZE } from "@/lib/terminal/fontSize";
+import { segments } from "@/lib/project/paths";
 
 /** Session bookkeeping for the terminal panel: pure helpers, no React. */
 
@@ -54,16 +55,10 @@ export function appendData(prev: Session, data: string): Session {
 	return { ...prev, lines: next, dropped };
 }
 
-export function dirOf(path: string): string {
-	const idx = path.lastIndexOf("/");
-	return idx > 0 ? path.slice(0, idx) : path;
-}
-
 /** Two trailing path segments, so a tab stays narrow on a deep checkout. */
 export function shortCwd(cwd: string): string {
-	const parts = cwd.split("/").filter((p) => p.length > 0);
-	const tail = parts.slice(-2).join("/");
-	return `…/${tail}`;
+	const parts = segments(cwd);
+	return `…/${parts.slice(-2).join("/")}`;
 }
 
 /** Visible tab name: a user rename wins, otherwise the directory's short form. */

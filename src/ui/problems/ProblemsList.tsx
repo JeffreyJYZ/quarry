@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { diagnosticKey } from "@/lib/lsp/diagnostics";
-import { directoryOf, type ProblemFile } from "@/lib/problems/model";
+import { directoryOf } from "@/lib/project/paths";
+import type { ProblemFile } from "@/lib/problems/model";
 import { ProblemRow } from "./ProblemRow";
 import { rowKeyNav } from "./rowKeyNav";
 import type { ProblemActions } from "./useProblemActions";

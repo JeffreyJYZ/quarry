@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { FileEntry } from "@/lib/project/api";
+import { fileName } from "@/lib/project/paths";
 import { TreeLevel } from "./TreeLevel";
 import TreeContextMenu from "./TreeContextMenu";
 import { useFileTree } from "./useFileTree";
@@ -40,7 +41,7 @@ export default function FileTree(props: FileTreeProps) {
 				if (event.target !== event.currentTarget) return;
 				event.preventDefault();
 				setMenu({
-					entry: { path: root, name: root.split("/").pop() ?? root, isDir: true },
+					entry: { path: root, name: fileName(root) || root, isDir: true },
 					x: event.clientX,
 					y: event.clientY,
 				});

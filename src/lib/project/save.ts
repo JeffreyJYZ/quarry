@@ -1,6 +1,8 @@
 import { formatDocument, formatterFor, writeTextFile } from "@/lib/project/api";
 import { type FileBuffer, markSaved } from "@/lib/project/buffer";
+import { extensionOf } from "@/lib/consts/extensions";
 import { describeError } from "@/lib/project/errors";
+import { fileName } from "@/lib/project/paths";
 
 export type SaveOutcome = {
 	/** The buffer as persisted: text and saved text both match what reached the disk. */
@@ -9,22 +11,7 @@ export type SaveOutcome = {
 	warning: string | null;
 };
 
-/**
- * Formats when the path has a formatter, then writes.
- *
- * The formatted text only reaches the buffer once the write resolved, and a failed write rejects
- * with the buffer untouched, so an error never costs the user their edit.
- */
-function extensionOf(path: string): string {
-	const dot = path.lastIndexOf(".");
-	return dot >= 0 ? path.slice(dot + 1).toLowerCase() : "";
-}
-
-function baseName(path: string): string {
-	const slash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-	return slash >= 0 ? path.slice(slash + 1) : path;
-}
-
+/** Re-indent JSON to the file's own indent, leaving text that does not parse to the caller. */
 export function formatJsonText(text: string, name: string): string {
 	const lines = text.split("\n");
 	let indent: string = "\t";
@@ -69,6 +56,12 @@ export function formatJsonText(text: string, name: string): string {
 	return formatted;
 }
 
+/**
+ * Formats when the path has a formatter, then writes.
+ *
+ * The formatted text only reaches the buffer once the write resolved, and a failed write rejects
+ * with the buffer untouched, so an error never costs the user their edit.
+ */
 export async function saveBuffer(root: string, buffer: FileBuffer): Promise<SaveOutcome> {
 	let text = buffer.text;
 	let warning: string | null = null;
@@ -76,10 +69,10 @@ export async function saveBuffer(root: string, buffer: FileBuffer): Promise<Save
 
 	if (ext === "json" || ext === "jsonc") {
 		try {
-			text = formatJsonText(buffer.text, baseName(buffer.path));
+			text = formatJsonText(buffer.text, fileName(buffer.path));
 		} catch (error) {
 			text = buffer.text;
-			warning = `${baseName(buffer.path)}: ${describeError(error)}`;
+			warning = `${fileName(buffer.path)}: ${describeError(error)}`;
 		}
 		await writeTextFile(buffer.path, text);
 		return { buffer: markSaved(buffer, text), warning };

@@ -1,5 +1,6 @@
 import type { ProjectInfo } from "@/lib/project/api";
 import { kindLabel } from "@/lib/project/kind";
+import { segments } from "@/lib/project/paths";
 
 export type WelcomeProps = {
 	project: ProjectInfo | null;
@@ -11,7 +12,7 @@ export type WelcomeProps = {
 
 /** The last two segments of a path, which is what tells two projects apart. */
 function shortRoot(root: string): string {
-	const parts = root.split("/").filter((part) => part !== "");
+	const parts = segments(root);
 	return parts.slice(-2).join("/") || root;
 }
 

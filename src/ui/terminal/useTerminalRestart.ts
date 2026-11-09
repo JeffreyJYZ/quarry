@@ -1,7 +1,8 @@
 import { useCallback } from "react";
 import { ptyClose, ptyOpen } from "@/lib/project/api";
 import { DEFAULT_FONT_SIZE } from "@/lib/terminal/fontSize";
-import { dirOf, ptySize, type Session } from "@/lib/terminal/sessions";
+import { parentDir } from "@/lib/project/paths";
+import { ptySize, type Session } from "@/lib/terminal/sessions";
 
 /**
  * Restarts a tab in place: same cwd, same font size, a fresh shell.
@@ -26,7 +27,9 @@ export function useTerminalRestart(options: {
 		}
 		const cwd =
 			session?.cwd ??
-			(activePath !== null && activePath !== undefined ? dirOf(activePath) : root);
+			(activePath !== null && activePath !== undefined
+				? (parentDir(activePath) ?? root)
+				: root);
 		updateSession(activeId, (s) => ({
 			...s,
 			ptyId: null,

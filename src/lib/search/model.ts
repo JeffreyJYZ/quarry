@@ -1,4 +1,4 @@
-import { directoryOf, fileName } from "@/lib/problems/model";
+import { directoryOf, fileName } from "@/lib/project/paths";
 import type { SearchMatch, SearchReport } from "@/lib/project/api";
 
 import { SEARCH_RENDER_LIMIT } from "@/lib/consts/search";

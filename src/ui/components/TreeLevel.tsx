@@ -1,4 +1,5 @@
 import type { FileEntry, GitStatusEntry } from "@/lib/project/api";
+import { parentDir } from "@/lib/project/paths";
 import type { DirState, EditState } from "./FileTreeTypes";
 import { indent } from "./FileTreeIcons";
 import { CreateInputRow } from "./TreeCreateInput";
@@ -77,9 +78,9 @@ export function TreeLevel({
 	for (const p of Object.keys(changes)) {
 		for (let cur = p; ;) {
 			changedDirs.add(cur);
-			const i = cur.lastIndexOf("/");
-			if (i <= 0) break;
-			cur = cur.slice(0, i);
+			const up = parentDir(cur);
+			if (up === null) break;
+			cur = up;
 		}
 	}
 	const showCreateInput =
