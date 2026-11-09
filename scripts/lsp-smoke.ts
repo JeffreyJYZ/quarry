@@ -13,10 +13,26 @@
  */
 
 import { type ChildProcess, spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-const SERVER_BINARY = "/opt/homebrew/opt/rustup/bin/rust-analyzer";
+/** Resolve `rust-analyzer` the way detect-tools does: PATH first, then the usual install dirs. */
+function findServerBinary(): string {
+	const dirs = [
+		...(process.env.PATH ?? "").split(":").filter(Boolean),
+		"/opt/homebrew/opt/rustup/bin",
+		"/opt/homebrew/bin",
+		"/usr/local/bin",
+		`${process.env.HOME}/.cargo/bin`,
+	];
+	for (const dir of dirs) {
+		const candidate = join(dir, "rust-analyzer");
+		if (existsSync(candidate)) return candidate;
+	}
+	return "rust-analyzer";
+}
+
+const SERVER_BINARY = findServerBinary();
 const ROOT = join(import.meta.dir, "..", "src-tauri");
 const SOURCE = join(ROOT, "src", "main.rs");
 const TIMEOUT_MS = 15_000;
