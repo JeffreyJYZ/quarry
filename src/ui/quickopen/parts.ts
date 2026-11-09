@@ -1,8 +1,5 @@
-export { RECENT_LIMIT, STALE_MS } from "@/lib/consts/quickopen";
+export { RECENT_LIMIT } from "@/lib/consts/quickopen";
 
-export type CacheEntry = { files: string[]; fetchedAt: number };
-
-export const cache = new Map<string, CacheEntry>();
 export const recent: string[] = [];
 
 export function recordRecent(path: string): void {

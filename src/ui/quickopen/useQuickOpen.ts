@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { listFiles } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
+import { clampActive } from "@/lib/quickopen/active";
+import { cachedFileList, rememberFileList } from "@/lib/quickopen/files";
 import { rankFiles, splitQuery as splitQueryRank } from "@/lib/quickopen/rank";
-import { cache, recent, recordRecent, RECENT_LIMIT, STALE_MS } from "./parts";
+import { recent, recordRecent, RECENT_LIMIT } from "./parts";
 
 export type QuickOpenController = {
 	query: string;
@@ -51,9 +53,9 @@ export function useQuickOpen({
 
 	const fetchFiles = useCallback(
 		async (force: boolean) => {
-			const cached = cache.get(root);
-			if (!force && cached !== undefined && Date.now() - cached.fetchedAt < STALE_MS) {
-				setFiles(cached.files);
+			const cached = cachedFileList(root, Date.now());
+			if (!force && cached !== null) {
+				setFiles(cached);
 				return;
 			}
 			const token = ++fetchTokenRef.current;
@@ -62,7 +64,7 @@ export function useQuickOpen({
 			try {
 				const next = await listFiles(root);
 				if (token !== fetchTokenRef.current) return;
-				cache.set(root, { files: next, fetchedAt: Date.now() });
+				rememberFileList(root, next, Date.now());
 				setFiles(next);
 			} catch (failure) {
 				if (token !== fetchTokenRef.current) return;
@@ -75,9 +77,7 @@ export function useQuickOpen({
 	);
 
 	useEffect(() => {
-		const cached = cache.get(root);
-		const stale = cached === undefined || Date.now() - cached.fetchedAt > STALE_MS;
-		void fetchFiles(stale);
+		void fetchFiles(cachedFileList(root, Date.now()) === null);
 	}, [root, fetchFiles]);
 
 	useEffect(() => {
@@ -135,6 +135,12 @@ export function useQuickOpen({
 			? [...recent.filter((p) => files.includes(p)).slice(0, RECENT_LIMIT), ...mainList]
 			: ranked;
 
+	// A refetch can leave the selection past the end of a shorter list, where Enter used to find
+	// nothing at all.
+	useEffect(() => {
+		setActive((current) => clampActive(current, displayList.length));
+	}, [displayList.length]);
+
 	useEffect(() => {
 		const host = listRef.current;
 		if (host === null) return;
@@ -147,7 +153,7 @@ export function useQuickOpen({
 	};
 
 	const submit = () => {
-		const path = displayList[active];
+		const path = displayList[clampActive(active, displayList.length)];
 		if (path === undefined) return;
 		recordRecent(path);
 		onOpen(path);
