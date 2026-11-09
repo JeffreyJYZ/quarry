@@ -89,6 +89,11 @@ pub struct PanelSizes {
     )]
     pub dock_height: f64,
     #[serde(
+        default = "default_outline_height",
+        deserialize_with = "deserialize_panel_outline_height"
+    )]
+    pub outline_height: f64,
+    #[serde(
         default = "default_terminal_height",
         deserialize_with = "deserialize_panel_terminal_height"
     )]
@@ -112,6 +117,19 @@ pub fn default_dock_height() -> f64 {
     260.0
 }
 
+/// The outline sits under the tree; the panel keeps it so a long file list cannot swallow it.
+pub fn default_outline_height() -> f64 {
+    200.0
+}
+
+pub fn deserialize_panel_outline_height<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = f64::deserialize(deserializer).unwrap_or(200.0);
+    Ok(value.clamp(80.0, 600.0))
+}
+
 pub fn default_terminal_height() -> f64 {
     180.0
 }
@@ -126,6 +144,7 @@ impl Default for PanelSizes {
             rail_width: 240.0,
             debug_width: 320.0,
             dock_height: 260.0,
+            outline_height: 200.0,
             terminal_height: 180.0,
             terminal_width: 380.0,
         }
@@ -139,5 +158,29 @@ impl PanelSizes {
         self.dock_height = self.dock_height.clamp(120.0, 900.0);
         self.terminal_height = self.terminal_height.clamp(100.0, 900.0);
         self.terminal_width = self.terminal_width.clamp(240.0, 900.0);
+    }
+}
+
+#[cfg(test)]
+mod tests_outline_height {
+    use super::*;
+
+    #[test]
+    fn the_outline_height_survives_a_round_trip() {
+        // The bug this pins: the TS PanelSizes has outlineHeight and this struct did not, so the
+        // height the user dragged was dropped on the next read and the outline snapped back to 200.
+        let json = serde_json::json!({ "outlineHeight": 320 });
+        let sizes: PanelSizes = serde_json::from_value(json).expect("parses");
+        assert_eq!(sizes.outline_height, 320.0);
+    }
+
+    #[test]
+    fn the_outline_height_is_clamped_and_defaulted() {
+        let tall: PanelSizes =
+            serde_json::from_value(serde_json::json!({ "outlineHeight": 5000 })).expect("parses");
+        assert_eq!(tall.outline_height, 600.0);
+
+        let absent: PanelSizes = serde_json::from_value(serde_json::json!({})).expect("parses");
+        assert_eq!(absent.outline_height, 200.0);
     }
 }
