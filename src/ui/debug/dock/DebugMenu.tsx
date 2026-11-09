@@ -95,6 +95,12 @@ export default function DebugMenu({ debug }: { debug: DebugController }) {
 								<button
 									type="button"
 									className="button"
+									disabled={session !== null}
+									title={
+										session !== null
+											? "Stop the session before editing configurations"
+											: undefined
+									}
 									onClick={() => setEditing(true)}
 								>
 									Edit configurations…

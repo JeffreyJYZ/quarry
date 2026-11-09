@@ -23,3 +23,14 @@ export function sessionForContext(path: string | null): string | null {
 	if (kind === null) return null;
 	return sessionId(kind, current.root);
 }
+
+/**
+ * Every running session id for the project.
+ *
+ * A shell-wide notification — files changed on disk — has no single path to derive a session from,
+ * so it goes to each server that is running: rust-analyzer for the crate, clangd for the C sources.
+ */
+export function runningSessions(): string[] {
+	if (current.root === null) return [];
+	return [...current.running].map((kind) => sessionId(kind, current.root as string));
+}

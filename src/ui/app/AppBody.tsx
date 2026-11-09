@@ -1,6 +1,8 @@
 import { Suspense, lazy } from "react";
 import type { CSSProperties } from "react";
 import { fileName } from "@/lib/problems/model";
+import { runningSessions } from "@/lib/lsp/context";
+import { notifyWatchedFiles } from "@/lib/lsp/watchedFiles";
 import { isDirty } from "@/lib/project/buffer";
 import SideRail from "@/ui/app/SideRail";
 import IconRail from "@/ui/app/IconRail";
@@ -18,7 +20,21 @@ export default function AppBody({ model }: { model: ShellModel }) {
 	const project = workspace.project;
 	const watch = useFileWatch({
 		root: project?.root ?? null,
-		onPaths: (paths) => void workspace.applyExternalChanges(paths),
+		onPaths: (paths) => {
+			// A server that saw this file only when it was opened must hear about the change too,
+			// or it keeps analysing text that is no longer on disk.
+			const changes = paths.map((path) => ({ path, kind: 2 as const }));
+			for (const session of runningSessions()) {
+				void notifyWatchedFiles(session, changes).catch(() => {
+					/* a server that died is reported by its own commands */
+				});
+			}
+			void workspace.applyExternalChanges(paths, () => {
+				// One refresh per batch: the focus handler bumps the same token, so the burst of a
+				// rename never asks the source-control view to read git once per path.
+				if (panels.gitOpen) git.setRefreshToken((current) => current + 1);
+			});
+		},
 		onError: model.setNotice,
 	});
 

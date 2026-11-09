@@ -1,18 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
-import {
-	type FileEdit,
-	type FileEntry,
-	type ProjectInfo,
-	openProject,
-	readTextFile,
-	rememberRoot,
-} from "@/lib/project/api";
+import { type FileEdit, type ProjectInfo, openProject, rememberRoot } from "@/lib/project/api";
 import type { FileBuffer } from "@/lib/project/buffer";
 import { describeError } from "@/lib/project/errors";
 import { applyEditsWithNotice } from "@/ui/app/applyEdits";
 import { externalChangeHandler } from "@/ui/app/externalChanges";
 import { useTabClose } from "@/ui/app/useTabClose";
+import { followExternalChanges } from "@/ui/app/recentsFollow";
+import { useFileOpening } from "@/ui/app/useFileOpening";
 import { useFileNavigation } from "@/ui/app/useFileNavigation";
 export type Reveal = { line: number; character: number };
 export type WorkspaceOptions = {
@@ -78,53 +72,18 @@ export function useWorkspace(options: WorkspaceOptions) {
 		},
 		[options],
 	);
-	const handleOpenProject = useCallback(async () => {
-		try {
-			const picked = await open({ directory: true, multiple: false, title: "Open project" });
-			const nextRoot = typeof picked === "string" ? picked : null;
-			if (nextRoot !== null) await openRoot(nextRoot);
-		} catch (error) {
-			options.onNotice(describeError(error));
-		}
-	}, [openRoot, options]);
-	const openPath = useCallback(
-		async (path: string, name: string) => {
-			setRecentFiles((current) =>
-				[path, ...current.filter((entry) => entry !== path)].slice(0, 20),
-			);
-			if (buffersRef.current.some((buffer) => buffer.path === path)) {
-				setActivePath(path);
-				return;
-			}
-			if (reading.current.has(path)) return;
-			reading.current.add(path);
-			try {
-				const text = await readTextFile(path);
-				if (!mountedRef.current) return;
-				setBuffers((current) =>
-					current.some((buffer) => buffer.path === path)
-						? current
-						: [...current, { path, name, text, loaded: text }],
-				);
-				setActivePath(path);
-				options.onNotice(null);
-			} catch (error) {
-				if (mountedRef.current)
-					options.onNotice(`Could not open ${name}: ${describeError(error)}`);
-			} finally {
-				reading.current.delete(path);
-			}
-		},
-		[options],
-	);
+	// Openers live in their own module: this hook is at the file-size limit.
+	const { openPath, handleOpenFile, handleOpenProject } = useFileOpening({
+		options,
+		buffersRef,
+		mountedRef,
+		reading,
+		setBuffers,
+		setActivePath,
+		setRecentFiles,
+		openRoot,
+	});
 
-	const handleOpenFile = useCallback(
-		(entry: FileEntry) => {
-			options.setRevealTarget(null);
-			void openPath(entry.path, entry.name);
-		},
-		[openPath, options],
-	);
 	const navigation = useFileNavigation({
 		openPath,
 		activePathRef,
@@ -148,9 +107,20 @@ export function useWorkspace(options: WorkspaceOptions) {
 		[options],
 	);
 
-	// The watcher reports paths; this turns them into buffer text, never touching a dirty one.
+	// The watcher reports paths; this turns them into buffer text, never touching a dirty one. A
+	// close or a move also leaves the recents list and the active tab pointing somewhere real.
 	const bufferRefs = { buffers: buffersRef, mounted: mountedRef };
-	const applyExternalChanges = externalChangeHandler(bufferRefs, setBuffers, options.onNotice);
+	const applyExternalChanges = externalChangeHandler(
+		bufferRefs,
+		setBuffers,
+		options.onNotice,
+		undefined,
+		followExternalChanges({
+			activePath: () => activePathRef.current,
+			setActivePath,
+			setRecentFiles,
+		}),
+	);
 
 	const tabs = useTabClose({
 		buffersRef,
