@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 import { spawnSync } from "node:child_process";
-// Bumps the version in package.json, src-tauri/tauri.conf.json and
-// src-tauri/Cargo.toml in lockstep, refreshes Cargo.lock, and prints the
-// new version on the last line of stdout. Exit non-zero on any failure.
+// Bumps the version in package.json, src-tauri/tauri.conf.json,
+// src-tauri/Cargo.toml, src-tauri/Cargo.lock and website/package.json in
+// lockstep and prints the new version on the last line of stdout. Exit
+// non-zero on any failure.
 import { readFileSync, writeFileSync } from "node:fs";
 
 const bump = (process.argv[2] ?? "patch").toLowerCase();
@@ -29,7 +30,7 @@ const tauriV = readVersion(TAURI, /"version"\s*:\s*"([^"]+)"/);
 const cargoV = readVersion(CARGO, /^version\s*=\s*"([^"]+)"/m);
 const siteV = readVersion(SITE, /"version"\s*:\s*"([^"]+)"/);
 
-// All three must agree before bumping.
+// All five must agree before bumping.
 if (pkgV !== tauriV || pkgV !== cargoV || pkgV !== siteV) {
 	console.error(
 		`version sources disagree: package.json=${pkgV} tauri.conf.json=${tauriV} Cargo.toml=${cargoV} website=${siteV}`,
@@ -85,7 +86,7 @@ if (r.status !== 0) {
 	process.exit(r.status ?? 1);
 }
 
-// Verify all three agree after bump.
+// Verify all five agree after bump.
 const afterPkg = readVersion(PKG, /"version"\s*:\s*"([^"]+)"/);
 const afterTauri = readVersion(TAURI, /"version"\s*:\s*"([^"]+)"/);
 const afterCargo = readVersion(CARGO, /^version\s*=\s*"([^"]+)"/m);

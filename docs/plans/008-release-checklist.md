@@ -55,15 +55,19 @@ Launch smoke step (automated, run after the build):
 
 ## 4. Version bumping
 
-The version lives in three places and they must agree before release. Checked against the current tree (all agree at `0.1.0`):
+The version lives in five files and they must all agree before release:
 
-- `package.json`: `"version": "0.1.0"`
-- `src-tauri/Cargo.toml`: `version = "0.1.0"`
-- `src-tauri/tauri.conf.json`: `"version": "0.1.0"`
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/Cargo.lock`
+- `src-tauri/tauri.conf.json`
+- `website/package.json`
 
-Bump all three together. A mismatch between them leaves the bundle, the crate and the npm metadata disagreeing. Run `bun run verify:bundle` afterwards to confirm all three agree.
+A mismatch between them leaves the bundle, the crate, the npm metadata and the deployed docs site
+disagreeing.
 
-`bun scripts/bump-version.ts <patch|minor|major>` does the three files in lockstep, refreshes `src-tauri/Cargo.lock`, refuses to run when the sources already disagree, and prints the new version as its last line.
+`bun scripts/bump-version.ts <patch|minor|major|alpha>` does all five in lockstep, refuses to run when
+the sources already disagree, and prints the new version as its last line.
 
 ## 5. Publishing a release and the updater
 
