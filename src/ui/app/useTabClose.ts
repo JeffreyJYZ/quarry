@@ -16,11 +16,15 @@ export function useTabClose(options: {
 	savePaths: (paths: string[]) => Promise<boolean>;
 	setConfirmClose: (path: string | null) => void;
 	clearReveal: () => void;
+	/** The tab really closed, so whatever described the file must go with it. */
+	onClosed?: (path: string) => void;
 }) {
-	const { buffersRef, activePathRef, setBuffers, setActivePath, setConfirmClose } = options;
+	const { buffersRef, activePathRef, setBuffers, setActivePath, setConfirmClose, onClosed } =
+		options;
 
 	const closeNow = useCallback(
 		(path: string) => {
+			const present = buffersRef.current.some((buffer) => buffer.path === path);
 			setBuffers((current) => {
 				const index = current.findIndex((buffer) => buffer.path === path);
 				if (index === -1) return current;
@@ -33,8 +37,9 @@ export function useTabClose(options: {
 				}
 				return remaining;
 			});
+			if (present) onClosed?.(path);
 		},
-		[activePathRef, setActivePath, setBuffers],
+		[activePathRef, buffersRef, onClosed, setActivePath, setBuffers],
 	);
 
 	const close = useCallback(

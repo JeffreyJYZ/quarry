@@ -18,6 +18,13 @@ export type DiagnosticsEvent = {
 	diagnostics: Diagnostic[];
 };
 
+/** Payload of the `lsp://session-ended` event: one server's reader thread has finished. */
+export type SessionEndedEvent = {
+	root: string;
+	/** `rust-analyzer` or `clangd`. */
+	server: string;
+};
+
 export type LspStatus = {
 	root: string;
 	server: string;

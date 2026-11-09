@@ -5,13 +5,18 @@ export type DiagnosticMap = Map<string, Diagnostic[]>;
 
 export type SeverityCounts = { errors: number; warnings: number };
 
-/** Stable identity for one problem: two sources reporting the same span and text are one row. */
+/**
+ * Stable identity for one problem: two sources reporting the same span in the same words are one
+ * row.
+ *
+ * `source` is deliberately absent. clangd says `clangd` and the build parser says `clang` for the
+ * same error, so including it let one problem draw two squiggles and two panel rows.
+ */
 export function diagnosticKey(diagnostic: Diagnostic): string {
 	const { start, end } = diagnostic.range;
 	return [
 		diagnostic.severity,
 		`${start.line}:${start.character}-${end.line}:${end.character}`,
-		diagnostic.source ?? "",
 		diagnostic.message,
 	].join("|");
 }
@@ -76,6 +81,14 @@ export function groupDiagnostics(diagnostics: Diagnostic[]): DiagnosticMap {
 	return grouped;
 }
 
+/**
+ * The two sources as one map.
+ *
+ * The server's copy wins an identity clash because it is live: it follows the text as it is edited,
+ * while a build report is a snapshot of the last compile. A build entry is kept only for a problem
+ * the server does not report at all, so neither source can silently overwrite the other's distinct
+ * findings and neither is lost when the two disagree.
+ */
 export function combineDiagnostics(server: DiagnosticMap, build: DiagnosticMap): DiagnosticMap {
 	const next = new Map<string, Diagnostic[]>();
 	for (const [path, list] of server) {

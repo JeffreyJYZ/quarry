@@ -81,6 +81,11 @@ export default function AppBody({ model }: { model: ShellModel }) {
 						),
 					);
 					if (model.activePath === oldPath) workspace.setActivePath(newPath);
+					model.diagnostics.applyEvent({
+						type: "rename",
+						from: oldPath,
+						to: newPath,
+					});
 				}}
 				onFileDeleted={(path) => {
 					const buffer = workspace.buffers.find((entry) => entry.path === path);
@@ -91,6 +96,7 @@ export default function AppBody({ model }: { model: ShellModel }) {
 						current.filter((entry) => entry.path !== path),
 					);
 					if (model.activePath === path) workspace.setActivePath(null);
+					model.diagnostics.applyEvent({ type: "close", path });
 				}}
 				onReveal={() => panels.setFileRevealToken((current) => current + 1)}
 				onRefresh={git.refresh}

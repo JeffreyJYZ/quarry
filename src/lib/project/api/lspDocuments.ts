@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { DiagnosticsEvent, LspStatus } from "@/lib/project/api/lsp-types";
+import type { DiagnosticsEvent, LspStatus, SessionEndedEvent } from "@/lib/project/api/lsp-types";
 
 export function startLsp(
 	root: string,
@@ -39,6 +39,16 @@ export async function onDiagnostics(
 	handler: (event: DiagnosticsEvent) => void,
 ): Promise<() => void> {
 	const unlisten = await listen<DiagnosticsEvent>("lsp://diagnostics", (event) => {
+		handler(event.payload);
+	});
+	return unlisten;
+}
+
+/** A server that stopped, so its findings describe a program nothing analyses any more. */
+export async function onSessionEnded(
+	handler: (event: SessionEndedEvent) => void,
+): Promise<() => void> {
+	const unlisten = await listen<SessionEndedEvent>("lsp://session-ended", (event) => {
 		handler(event.payload);
 	});
 	return unlisten;

@@ -95,6 +95,16 @@ pub struct DiagnosticsEvent {
     pub diagnostics: Vec<Diagnostic>,
 }
 
+/// Payload of the `lsp://session-ended` event: one server's reader thread has finished, so every
+/// finding it published describes a program nothing is analysing any more.
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionEndedEvent {
+    pub root: String,
+    /// `rust-analyzer` or `clangd`.
+    pub server: String,
+}
+
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LspStatus {

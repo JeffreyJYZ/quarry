@@ -29,6 +29,11 @@ export function servedExtensions(kind: ServerKind): readonly string[] {
 	return EXTENSIONS[kind];
 }
 
+/** Whether a server name that arrived over the wire is one this build knows. */
+export function isServerKind(value: string): value is ServerKind {
+	return value === "rust-analyzer" || value === "clangd";
+}
+
 /** Compose the session id a server is keyed by. Single source of truth. */
 export function sessionId(kind: ServerKind, root: string): string {
 	return `${kind}::${root}`;
