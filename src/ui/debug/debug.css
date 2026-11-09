@@ -54,18 +54,6 @@
 	letter-spacing: 0.04em;
 }
 
-.debug-head-right {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-}
-
-.debug-session {
-	font-family: var(--mono);
-	font-size: 10px;
-	color: var(--muted);
-}
-
 /* A row being edited keeps its controls on a second line instead of squeezing them. */
 .debug-bp-editing {
 	flex-wrap: wrap;
