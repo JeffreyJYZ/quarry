@@ -5,25 +5,14 @@ import { fileName } from "@/lib/problems/model";
 import { normalizePreferences } from "@/lib/settings/model";
 import { describeError } from "@/lib/project/errors";
 import type { Settings } from "@/lib/project/api";
+import { settingsFromSnapshot, type SessionSnapshot } from "@/ui/app/sessionSettings";
 import type { DockTab } from "@/ui/tests/TestsDock";
 import { isDockTab } from "@/ui/tests/parts";
 import type { ProjectInfo, RunConfiguration } from "@/lib/project/api";
 import { snapshotSignature } from "@/ui/app/sessionSignature";
 import { openProject } from "@/lib/project/api";
 
-export type SessionSnapshot = {
-	project: ProjectInfo | null;
-	buffers: FileBuffer[];
-	activePath: string | null;
-	railCollapsed: boolean;
-	gitOpen: boolean;
-	panelOpen: boolean | null;
-	dockTab: DockTab;
-	runConfigurations: RunConfiguration[];
-	preferences: Settings["preferences"];
-	recentFiles: string[];
-	newProjectParent: string;
-};
+export type { SessionSnapshot };
 
 export type SessionSetters = {
 	onPreferences: (value: Settings["preferences"]) => void;
@@ -129,18 +118,7 @@ export function useSessionPersistence(options: {
 		if (!restoredRef.current) return;
 		const snapshot = snapshotRef.current;
 		if (snapshot === null) return;
-		const settings: Settings = {
-			lastRoot: snapshot.project?.root ?? null,
-			openFiles: snapshot.buffers.map((buffer) => buffer.path),
-			activeFile: snapshot.activePath,
-			railCollapsed: snapshot.railCollapsed,
-			gitOpen: snapshot.gitOpen,
-			dockTab: snapshot.dockTab as Settings["dockTab"],
-			dockExpanded: snapshot.panelOpen,
-			runConfigurations: snapshot.runConfigurations,
-			preferences: snapshot.preferences,
-			recentFiles: snapshot.recentFiles,
-		};
+		const settings: Settings = settingsFromSnapshot(snapshot);
 		void writeSettings(settingsForWrite(preserved.current, settings)).catch(() => {
 			/* a failed write is retried by the next change */
 		});
