@@ -14,7 +14,18 @@ import {
 	effectiveTerminalPreferences,
 	normalizeTerminalPreferences,
 } from "@/lib/settings/terminal";
+import { MAX_FONT_SIZE, MIN_FONT_SIZE } from "@/lib/consts/terminal";
 import { normalizeThemePreferences, type ThemePreferences } from "@/lib/themes/preferences";
+
+/**
+ * The terminal panel has its own size range (9-20), tighter than the editor's (9-24). Clamping it
+ * through the editor range let Settings store 24 while the panel rendered 20 — the control lied.
+ */
+function clampTerminalFontSize(value: unknown, fallback: number): number {
+	const number = typeof value === "number" ? value : Number.NaN;
+	if (!Number.isFinite(number)) return fallback;
+	return Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, number));
+}
 
 export type BuildProfile = "debug" | "release";
 export type TerminalPlacement = "bottom" | "right";
@@ -110,7 +121,7 @@ export function normalizePreferences(input: unknown): Preferences {
 		...normalizeThemePreferences(source),
 		editorFontSize: clampFontSize(source.editorFontSize, DEFAULT_PREFERENCES.editorFontSize),
 		editorTabSize: readTabSize(source.editorTabSize) ?? DEFAULT_PREFERENCES.editorTabSize,
-		terminalFontSize: clampFontSize(
+		terminalFontSize: clampTerminalFontSize(
 			source.terminalFontSize,
 			DEFAULT_PREFERENCES.terminalFontSize,
 		),

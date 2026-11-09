@@ -38,6 +38,14 @@ describe("normalizePreferences", () => {
 		expect(preferences.formatOnSave).toBe(true);
 	});
 
+	// The terminal panel renders at most 20pt (MIN_FONT_SIZE..MAX_FONT_SIZE); clamping it through
+	// the editor's 9..24 range let Settings store 24 while the panel drew 20 — the control lied.
+	test("the terminal font size is clamped to the terminal's own range", () => {
+		expect(normalizePreferences({ terminalFontSize: 24 }).terminalFontSize).toBe(20);
+		expect(normalizePreferences({ terminalFontSize: 40 }).terminalFontSize).toBe(20);
+		expect(normalizePreferences({ terminalFontSize: 12 }).terminalFontSize).toBe(12);
+	});
+
 	test("rejects a tab size and profile the UI never offers", () => {
 		const preferences = normalizePreferences({
 			editorTabSize: 3,
