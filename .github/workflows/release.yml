@@ -112,6 +112,10 @@ jobs:
             - name: Install frontend dependencies
               run: bun install --frozen-lockfile
 
+            # A tag push does not run ci.yml, so without this a red tree could ship.
+            - name: Gate
+              run: bun run gate
+
             - name: Resolve and verify the release version
               id: release
               shell: bash
@@ -119,7 +123,7 @@ jobs:
                   TAG: ${{ needs.version.outputs.tag || github.ref_name }}
               run: |
                   set -euo pipefail
-                  got="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+                  got="$(bun -e 'console.log(JSON.parse(await Bun.file("src-tauri/tauri.conf.json").text()).version)')"
                   # Alpha tags carry the counter, not the version: `quarry-alpha3` must ship
                   # `X.Y.Z-alpha.3`. A stable tag carries the whole version: `vX.Y.Z`.
                   case "$TAG" in
