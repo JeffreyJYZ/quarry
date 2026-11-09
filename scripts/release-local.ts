@@ -127,13 +127,22 @@ function fail(message: string): never {
  * The notes published with a release, taken from the commits since the last tag.
  *
  * The tag being cut lives on the server until `gh release create` makes it, so it cannot anchor the
- * range: the previous tag reachable from HEAD does, and the commits after it are this release.
+ * range: the previous tag reachable from `commit` does, and the commits after it are this release.
  * Version bumps are dropped because they say nothing about the change.
+ *
+ * `commit` is passed in rather than read from HEAD: the notes are rendered after a build that takes
+ * minutes, and a checkout that moved in the meantime used to add commits to a release whose artefact
+ * was built from the earlier tree.
  */
-function notesFromGit(): string {
+function notesFromGit(commit: string): string {
 	try {
-		const previous = run("git", ["describe", "--tags", "--abbrev=0", "HEAD"]).trim();
-		const log = run("git", ["log", "--no-merges", "--pretty=format:%s", `${previous}..HEAD`])
+		const previous = run("git", ["describe", "--tags", "--abbrev=0", commit]).trim();
+		const log = run("git", [
+			"log",
+			"--no-merges",
+			"--pretty=format:%s",
+			`${previous}..${commit}`,
+		])
 			.split("\n")
 			.map((line) => line.trim())
 			.filter((line) => line !== "" && !/^chore: bump to /.test(line));
@@ -166,6 +175,16 @@ async function main(): Promise<number> {
 	}
 
 	const sha = run("git", ["rev-parse", "HEAD"]).trim();
+	// The build reads the working tree, not the commit, so uncommitted edits to tracked files would
+	// ship unversioned. Untracked files are excluded: a report or a scratch note does not enter a build.
+	if (process.argv.includes("--allow-dirty") === false) {
+		const dirty = run("git", ["status", "--porcelain", "--untracked-files=no"]).trim();
+		if (dirty !== "") {
+			fail(
+				`the working tree has uncommitted changes: the build reads the tree, not the commit\n${dirty.split("\n").slice(0, 5).join("\n")}\ncommit them or pass --allow-dirty`,
+			);
+		}
+	}
 	if (process.argv.includes("--skip-ci")) {
 		log(`WARNING: skipping CI check for ${sha} (--skip-ci)`);
 	} else {
@@ -273,6 +292,15 @@ async function main(): Promise<number> {
 		fail("the updater archive is older than the app binary: rebuild before publishing");
 	}
 
+	// The build takes minutes and reads the tree as it goes: a checkout that moved means the bytes in
+	// the bundle are not the bytes of this commit, so the tag would name an artefact nobody can rebuild.
+	const headNow = run("git", ["rev-parse", "HEAD"]).trim();
+	if (headNow !== sha) {
+		fail(
+			`the checkout moved during the build (${sha.slice(0, 7)} -> ${headNow.slice(0, 7)}): the artefact does not match ${sha.slice(0, 7)}, rebuild from it`,
+		);
+	}
+
 	const entry = {
 		signature,
 		url: assetUrl(tag, "quarry.app.tar.gz"),
@@ -288,7 +316,7 @@ async function main(): Promise<number> {
 	writeFileSync(LATEST, `${JSON.stringify(latest, null, 2)}\n`);
 
 	if (arg("--notes") === null) {
-		const notes = notesFromGit();
+		const notes = notesFromGit(sha);
 		latest.notes = notes;
 		writeFileSync(LATEST, `${JSON.stringify(latest, null, 2)}\n`);
 	}
