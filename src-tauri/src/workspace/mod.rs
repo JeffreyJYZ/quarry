@@ -22,6 +22,12 @@ pub use max_text_bytes::*;
 mod fill_temp_file;
 pub use fill_temp_file::*;
 
+mod roots;
+pub use roots::*;
+
+mod roots_tests;
+pub use roots_tests::*;
+
 mod tests_1;
 pub use tests_1::*;
 

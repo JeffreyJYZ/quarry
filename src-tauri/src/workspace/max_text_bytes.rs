@@ -23,6 +23,7 @@ pub static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[tauri::command]
 pub fn list_dir(path: String) -> Result<Vec<FileEntry>, String> {
+    contained(Path::new(&path))?;
     let directory = Path::new(&path)
         .canonicalize()
         .map_err(|error| format!("cannot list {path}: {error}"))?;
@@ -62,6 +63,7 @@ pub fn list_dir(path: String) -> Result<Vec<FileEntry>, String> {
 
 #[tauri::command]
 pub fn read_text_file(path: String) -> Result<String, String> {
+    contained(Path::new(&path))?;
     let file = Path::new(&path);
     let metadata = fs::metadata(file).map_err(|error| format!("cannot read {path}: {error}"))?;
     if !metadata.is_file() {

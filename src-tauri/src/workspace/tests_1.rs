@@ -23,6 +23,7 @@ pub fn write_text_file(path: String, text: String) -> Result<(), String> {
     if !target.is_absolute() {
         return Err(format!("cannot write {path}: not an absolute path"));
     }
+    contained(target)?;
     let size = text.len() as u64;
     if size > MAX_TEXT_BYTES {
         return Err(format!(
