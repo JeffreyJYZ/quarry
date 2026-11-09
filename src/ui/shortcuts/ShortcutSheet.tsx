@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useDialogFocus } from "@/ui/app/useDialogFocus";
 
 export type ShortcutEntry = {
 	keys: string[];
@@ -35,7 +35,7 @@ const GROUPS: ShortcutGroup[] = [
 ];
 
 export default function ShortcutSheet({ groups, onClose }: ShortcutSheetProps) {
-	const containerRef = useRef<HTMLDivElement | null>(null);
+	const { panelRef, onKeyDown } = useDialogFocus(true, { onClose });
 	const mergedGroups: ShortcutGroup[] = groups.some((group) => group.title === "Editing")
 		? groups.map((group) =>
 				group.title === "Editing"
@@ -46,49 +46,24 @@ export default function ShortcutSheet({ groups, onClose }: ShortcutSheetProps) {
 					: group,
 			)
 		: [...groups, ...GROUPS];
-	const previousFocus = useRef<HTMLElement | null>(null);
-
-	useEffect(() => {
-		previousFocus.current =
-			document.activeElement instanceof HTMLElement ? document.activeElement : null;
-		containerRef.current?.focus();
-		return () => {
-			previousFocus.current?.focus();
-		};
-	}, []);
-
-	useEffect(() => {
-		const handleEscape = (event: KeyboardEvent) => {
-			if (event.key === "Escape") {
-				event.preventDefault();
-				onClose();
-			}
-		};
-		window.addEventListener("keydown", handleEscape);
-		return () => window.removeEventListener("keydown", handleEscape);
-	}, [onClose]);
 
 	return (
 		<button
 			type="button"
 			className="shortcut-backdrop"
 			onClick={onClose}
-			onKeyDown={(event) => {
-				if (event.key === "Escape" || event.key === "Enter") {
-					onClose();
-				}
-			}}
 			aria-label="Close shortcuts"
 			tabIndex={-1}
 		>
 			<div
 				className="shortcut-sheet"
 				role="dialog"
+				aria-modal="true"
 				aria-label="Keyboard shortcuts"
 				tabIndex={-1}
-				ref={containerRef}
+				ref={panelRef}
 				onClick={(event) => event.stopPropagation()}
-				onKeyDown={() => {}}
+				onKeyDown={onKeyDown}
 			>
 				<div className="shortcut-head">
 					<span className="label">shortcuts</span>
