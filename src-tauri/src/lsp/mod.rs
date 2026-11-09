@@ -45,6 +45,9 @@ pub use impl_lspstate::*;
 mod incremental_sync;
 pub use incremental_sync::*;
 
+mod lsp_watched_files;
+pub use lsp_watched_files::*;
+
 mod lsp_close_document;
 pub use lsp_close_document::*;
 
