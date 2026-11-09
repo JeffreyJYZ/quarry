@@ -4,6 +4,7 @@ import { type FileEntry, listDir } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
 import { createDir, createFile, deletePath, renamePath } from "@/lib/project/fileOps";
 import { parentDir } from "@/lib/project/paths";
+import { planToggle } from "@/lib/tree/toggle";
 import { useWatchRefresh } from "./useWatchRefresh";
 import type { DirState, EditState, FileTreeProps } from "./FileTreeTypes";
 
@@ -53,15 +54,20 @@ export function useFileTree({
 		return promise;
 	}, []);
 
+	// A settled listing is a cache, so forgetting it is what lets the next read go to disk.
+	const forgetDir = useCallback((path: string) => {
+		settled.current.delete(path);
+		promises.current.delete(path);
+	}, []);
+
 	const refreshDir = useCallback(
 		(path: string) => {
-			settled.current.delete(path);
-			promises.current.delete(path);
+			forgetDir(path);
 			void load(path).catch((error: unknown) => {
 				onNotice?.(`refresh failed: ${describeError(error)}`);
 			});
 		},
-		[load, onNotice],
+		[forgetDir, load, onNotice],
 	);
 
 	useEffect(() => {
@@ -76,21 +82,19 @@ export function useFileTree({
 
 	const toggle = useCallback(
 		(path: string) => {
-			const isOpen = expanded.has(path);
-			setExpanded((current) => {
-				const next = new Set(current);
-				if (isOpen) next.delete(path);
-				else next.add(path);
-				return next;
-			});
-			if (!isOpen) {
+			const plan = planToggle(expanded, path);
+			setExpanded(plan.expanded);
+			if (plan.relist) {
+				// The folder may have been renamed or edited while it was collapsed, so its settled
+				// listing is forgotten before the read instead of being reused.
+				forgetDir(path);
 				void load(path).catch(() => {
 					/* surfaces through the tree */
 				});
 			}
 			setHighlightedPath(null);
 		},
-		[expanded, load],
+		[expanded, load, forgetDir],
 	);
 
 	const openFile = useCallback(
@@ -156,6 +160,9 @@ export function useFileTree({
 				onFileDeleted?.(path);
 			} catch (error) {
 				onNotice?.(describeError(error));
+				// The delete failed, so the row is still there: read the directory again rather than
+				// leaving a listing that never learns the file survived.
+				refreshDir(parentDir(path) ?? root);
 			}
 		},
 		[root, refreshDir, onFileDeleted, onNotice],

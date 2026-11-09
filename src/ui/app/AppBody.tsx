@@ -1,6 +1,8 @@
 import { Suspense, lazy } from "react";
 import type { CSSProperties } from "react";
 import { fileName } from "@/lib/project/paths";
+import { remapBuffers, remapPath } from "@/lib/project/rename";
+import { invalidateFileList } from "@/lib/quickopen/files";
 import { runningSessions } from "@/lib/lsp/context";
 import { notifyWatchedFiles } from "@/lib/lsp/watchedFiles";
 import { isDirty } from "@/lib/project/buffer";
@@ -35,6 +37,9 @@ export default function AppBody({ model }: { model: ShellModel }) {
 				// rename never asks the source-control view to read git once per path.
 				if (panels.gitOpen) git.setRefreshToken((current) => current + 1);
 			});
+			// The project changed, so quick open's cached file list is stale even when no open tab
+			// was touched.
+			if (project !== null) invalidateFileList(project.root);
 		},
 		onError: model.setNotice,
 	});
@@ -74,19 +79,26 @@ export default function AppBody({ model }: { model: ShellModel }) {
 				onOpenGitFile={(path) => void workspace.openPath(path, fileName(path))}
 				onNotice={settings.onNotice}
 				onFileRenamed={(oldPath, newPath) => {
-					workspace.setBuffers((current) =>
-						current.map((buffer) =>
-							buffer.path === oldPath
-								? { ...buffer, path: newPath, name: fileName(newPath) }
-								: buffer,
-						),
-					);
-					if (model.activePath === oldPath) workspace.setActivePath(newPath);
-					model.diagnostics.applyEvent({
-						type: "rename",
-						from: oldPath,
-						to: newPath,
-					});
+					// A folder rename moves every buffer under it, so each path is remapped through
+					// the path helpers instead of compared with the renamed path itself.
+					const moved = workspace.buffers
+						.map((buffer) => ({
+							from: buffer.path,
+							to: remapPath(buffer.path, oldPath, newPath),
+						}))
+						.filter((pair) => pair.from !== pair.to);
+					workspace.setBuffers((current) => remapBuffers(current, oldPath, newPath));
+					if (model.activePath !== null) {
+						const next = remapPath(model.activePath, oldPath, newPath);
+						if (next !== model.activePath) workspace.setActivePath(next);
+					}
+					for (const pair of moved) {
+						model.diagnostics.applyEvent({
+							type: "rename",
+							from: pair.from,
+							to: pair.to,
+						});
+					}
 				}}
 				onFileDeleted={(path) => {
 					const buffer = workspace.buffers.find((entry) => entry.path === path);
