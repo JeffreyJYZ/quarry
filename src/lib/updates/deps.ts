@@ -65,6 +65,9 @@ export async function fetchLatestRelease(
 		return null;
 	} finally {
 		clearTimeout(timer);
+		// The timer is not guaranteed to have run before the race settles, so a timed-out call aborts
+		// here instead of relying on it: the request must be cancelled, not merely abandoned.
+		if (Date.now() >= deadline) controller.abort();
 	}
 }
 
