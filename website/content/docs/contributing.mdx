@@ -53,12 +53,19 @@ They need a real `rust-analyzer`, `lldb-dap` and `clangd`, which is why CI does 
 
 ## Releasing
 
-Alphas publish from a Mac:
+Alphas publish from a Mac, and land like any other change: `main` is protected, so the bump goes
+through a pull request and the tag is cut on the merged commit.
 
 ```sh
-bun scripts/bump-version.ts alpha     # 0.1.0-alpha.N across the three version files
-git tag quarry-alphaN && git push origin main quarry-alphaN
-bun run release:local                  # gate, signed universal build, release, manifest check
+git switch -c release/alpha.N                     # never push to main, it is protected
+bun scripts/bump-version.ts alpha                 # 0.1.0-alpha.N across the five version files
+git commit -am "chore: bump to 0.1.0-alpha.N"
+git push origin HEAD:refs/heads/release/alpha.N
+gh pr create --fill                               # one approving review is required
+gh pr merge --squash
+git switch main && git pull
+git tag quarry-alphaN && git push origin quarry-alphaN
+bun run release:local                             # gate, signed universal build, release, manifest check
 ```
 
 `release:local` refuses a commit whose CI run failed or was cancelled, runs the gate itself, signs the
