@@ -81,6 +81,28 @@ pub fn split_position(head: &str) -> Option<(String, u32, u32)> {
     Some((path.to_string(), line, column))
 }
 
+/// Resolve `.` and `..` lexically, without touching the filesystem.
+///
+/// The compiler prints paths relative to the build root (`../src/main.cpp`), and a plain join keeps
+/// the `..` in the string. The OS opens that fine, but it is not the same string as the path the tree
+/// and the language server key the file by — so a diagnostic lands in a second tab for a file that is
+/// already open, and its squiggle never appears in the real one.
+fn normalize_lexical(path: &Path) -> std::path::PathBuf {
+    let mut out = std::path::PathBuf::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::ParentDir => {
+                if !out.pop() && !out.is_absolute() {
+                    out.push("..");
+                }
+            }
+            std::path::Component::CurDir => {}
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
+}
+
 /// The compiler prints paths relative to the build root; the UI keys diagnostics by absolute path.
 pub fn absolute_text_path(path: &str, build_root: &Path) -> String {
     let candidate = Path::new(path);
@@ -89,5 +111,5 @@ pub fn absolute_text_path(path: &str, build_root: &Path) -> String {
     } else {
         build_root.join(candidate)
     };
-    resolved.to_string_lossy().into_owned()
+    normalize_lexical(&resolved).to_string_lossy().into_owned()
 }
