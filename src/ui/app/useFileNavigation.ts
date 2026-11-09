@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { fileName } from "@/lib/problems/model";
+import { revealTarget } from "@/lib/search/model";
 
 /**
  * Navigation targets: a search hit, a quick-open pick, a problem row, or a language-server jump.
@@ -29,11 +30,13 @@ export function useFileNavigation(options: {
 	);
 
 	const openMatch = useCallback(
-		(path: string) => {
+		(path: string, line: number, column: number) => {
 			options.setSearchOpen(false);
 			if (path !== activePathRef.current) void openPath(path, fileName(path));
+			setRevealTarget(revealTarget(line, column));
+			setRevealToken((current) => current + 1);
 		},
-		[openPath, activePathRef, options],
+		[openPath, activePathRef, options, setRevealTarget, setRevealToken],
 	);
 
 	const openQuick = useCallback(

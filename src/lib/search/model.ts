@@ -15,6 +15,17 @@ export type SearchOptions = {
 	wholeWord: boolean;
 };
 
+/**
+ * The editor's reveal target for a search match.
+ *
+ * A match is reported with a 1-based line and a 1-based byte column, because that is what ripgrep
+ * prints; the reveal target counts from 0. Converting in one place keeps a click from landing on the
+ * line above the hit or one character to its left.
+ */
+export function revealTarget(line: number, column: number): { line: number; character: number } {
+	return { line: line - 1, character: column - 1 };
+}
+
 export type SearchRow = {
 	match: SearchMatch;
 	/** Position in the flat, capped result list; the palette's highlight index. */

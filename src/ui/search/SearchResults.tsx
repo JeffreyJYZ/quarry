@@ -11,7 +11,7 @@ export function SearchResults({
 	groups: SearchGroup[];
 	active: number;
 	onActive: (index: number) => void;
-	onOpen: (path: string) => void;
+	onOpen: (path: string, line: number, column: number) => void;
 	listRef: RefObject<HTMLDivElement | null>;
 }) {
 	return (
@@ -30,7 +30,7 @@ export function SearchResults({
 							className={row.index === active ? "search-row active" : "search-row"}
 							data-index={row.index}
 							title={`${row.match.path}:${row.match.line}:${row.match.column}`}
-							onClick={() => onOpen(row.match.path)}
+							onClick={() => onOpen(row.match.path, row.match.line, row.match.column)}
 							onMouseEnter={() => onActive(row.index)}
 						>
 							<span className="search-pos">
