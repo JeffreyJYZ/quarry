@@ -1,0 +1,52 @@
+#![allow(unused_imports)]
+
+use super::*;
+
+// Lock order is one-way: the map lock is taken only to clone or move an `Arc<Session>`, and it is
+// always released before a session's own `writer`/`master`/`child` lock is taken. No path here holds
+// both, so a stalled terminal cannot block the map and the map cannot deadlock against a session.
+impl PtyState {
+    /// Clones the handle and lets the map guard drop before any session I/O. Holding the map across
+    /// `write_all`, `flush` or `resize` stalls every other terminal command.
+    pub fn session(&self, id: &str) -> Result<Arc<Session>, String> {
+        let sessions = lock(&self.sessions);
+        sessions
+            .get(id)
+            .cloned()
+            .ok_or_else(|| format!("unknown pty session: {id}"))
+    }
+
+    pub fn insert_session(&self, id: String, session: Arc<Session>) {
+        lock(&self.sessions).insert(id, session);
+    }
+
+    pub fn take_session(&self, id: &str) -> Option<Arc<Session>> {
+        lock(&self.sessions).remove(id)
+    }
+
+    pub fn write(&self, id: &str, data: &[u8]) -> Result<(), String> {
+        self.session(id)?.write(id, data)
+    }
+
+    pub fn resize(&self, id: &str, rows: u16, cols: u16) -> Result<(), String> {
+        self.session(id)?.resize(id, rows, cols)
+    }
+
+    /// Drops the session once every clone is gone; that final drop closes the master and writer
+    /// descriptors, so closing a tab does not leak them.
+    pub fn close(&self, id: &str) -> Result<(), String> {
+        if let Some(session) = self.take_session(id) {
+            kill_spawned(&session.child);
+        }
+        Ok(())
+    }
+
+    /// Kills every shell. Called when the app exits: a live PTY keeps the process group alive, and
+    /// macOS then shows the app as still running in the background after its window is gone.
+    pub fn shutdown_all(&self) {
+        let sessions: Vec<Arc<Session>> = lock(&self.sessions).values().cloned().collect();
+        for session in sessions {
+            kill_spawned(&session.child);
+        }
+    }
+}
