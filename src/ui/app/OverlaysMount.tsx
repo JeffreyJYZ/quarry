@@ -3,6 +3,7 @@ import { serverKindForPath } from "@/lib/lsp/served";
 import { DEFAULT_PROJECT_SETTINGS } from "@/lib/settings/model";
 import { languageLabel } from "@/lib/editor/languageLabel";
 import { Suspense, lazy } from "react";
+import { serverSurface, statusChip } from "@/lib/status/model";
 import AppOverlays from "@/ui/app/AppOverlays";
 const ReleaseNotes = lazy(() => import("@/ui/updates/ReleaseNotes"));
 import { useCurrentVersion } from "@/ui/updates/useCurrentVersion";
@@ -14,6 +15,15 @@ export default function OverlaysMount({ model }: { model: ShellModel }) {
 	const cursor = overlays.cursor;
 	const version = useCurrentVersion();
 	const active = model.active;
+	// One decision, from live state: the chip can only describe work that is still happening.
+	const status = statusChip({
+		server: serverSurface(
+			model.root === null ? null : serverKindForPath(model.activePath),
+			model.lspStatuses,
+		),
+		building: build.building || model.runDebug.busy,
+		running: runs.running !== null,
+	});
 
 	return (
 		<>
@@ -35,18 +45,7 @@ export default function OverlaysMount({ model }: { model: ShellModel }) {
 				}
 				language={languageLabel(model.activePath)}
 				tabSize={settings.effective.editorTabSize}
-				server={
-					model.root === null
-						? null
-						: (() => {
-								const kind = serverKindForPath(model.activePath);
-								if (kind === null) return null;
-								const status = model.lspStatuses?.[kind];
-								if (status === undefined) return "lsp starting";
-								if (status === null) return null;
-								return status.server;
-							})()
-				}
+				status={status}
 				onOpenSettings={() => panels.setSettingsOpen(true)}
 				railCollapsed={panels.railCollapsed}
 				terminalOpen={panels.terminalOpen}

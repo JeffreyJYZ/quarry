@@ -13,7 +13,7 @@ export type ShellDiagnosticsOptions = {
 	overrides: Partial<Record<ServerKind, { path?: string; args?: string[] }>>;
 	runningRef: MutableRefObject<ReadonlySet<ServerKind>>;
 	restartToken: number;
-	onRestarted: () => void;
+	onRestarted: (token: number) => void;
 	onError: (message: string) => void;
 };
 
@@ -21,7 +21,8 @@ export type ShellDiagnosticsOptions = {
  * The language servers and the diagnostics they publish, as one unit.
  *
  * They are built together because the store has to hear about a server that stops: `running` is
- * what tells it which published findings just lost the program that produced them.
+ * what tells it which published findings just lost the program that produced them, and the same
+ * end-of-session event takes the status chip down.
  */
 export function useShellDiagnostics(options: ShellDiagnosticsOptions): {
 	lspStatuses: LspStatusMap;
@@ -40,6 +41,7 @@ export function useShellDiagnostics(options: ShellDiagnosticsOptions): {
 	const diagnostics = useDiagnosticsState({
 		root: options.root,
 		running: lsp.running,
+		onServerEnd: lsp.markEnded,
 		onError: options.onError,
 	});
 	return { lspStatuses: lsp.statuses, diagnostics };

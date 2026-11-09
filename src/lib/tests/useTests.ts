@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listTests, runTest, type TestItem, type TestReport } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
+import { runAllSummary, runAllTests } from "@/lib/tests/runAll";
 
 const NO_RESULTS: ReadonlyMap<string, TestReport> = new Map();
 const NO_RUNNING: ReadonlySet<string> = new Set();
@@ -52,6 +53,8 @@ export function useTests(root: string | null): TestsController {
 	const loadedFor = useRef<string | null>(null);
 	const runningRef = useRef<Set<string>>(new Set());
 	const runningAll = useRef(false);
+	/** Bumped when the project changes, so a walk for the previous one can be retired. */
+	const runAllToken = useRef(0);
 
 	/* A different project starts from an empty list and no results. */
 	useEffect(() => {
@@ -65,6 +68,8 @@ export function useTests(root: string | null): TestsController {
 		setRunAllProgress(null);
 		loadedFor.current = null;
 		runningRef.current = new Set();
+		runAllToken.current += 1;
+		runningAll.current = false;
 	}, [root]);
 
 	const load = useCallback(() => {
@@ -128,37 +133,26 @@ export function useTests(root: string | null): TestsController {
 				return;
 			}
 			runningAll.current = true;
+			runAllToken.current += 1;
+			const token = runAllToken.current;
+			const current = () => runAllToken.current === token;
 			setRunAllProgress({ done: 0, total: names.length });
-			let passed = 0;
-			let failed = 0;
-			let stopped: string | null = null;
-			let done = 0;
 			try {
-				for (const name of names) {
-					const report = await runOne(name);
-					done += 1;
-					setRunAllProgress({ done, total: names.length });
-					if (report === null) {
-						continue;
-					}
-					if (report.passed) {
-						passed += 1;
-						continue;
-					}
-					failed += 1;
-					stopped = name;
-					break;
-				}
+				const result = await runAllTests({
+					names,
+					runOne,
+					onProgress: (done, total) => {
+						if (current()) setRunAllProgress({ done, total });
+					},
+					isCurrent: current,
+				});
+				if (result !== null && current()) setSummary(runAllSummary(result));
 			} finally {
-				runningAll.current = false;
-				setRunAllProgress(null);
+				if (current()) {
+					runningAll.current = false;
+					setRunAllProgress(null);
+				}
 			}
-			const total = passed + failed;
-			setSummary(
-				stopped === null
-					? `${passed} of ${total} passed`
-					: `${passed} of ${total} passed, stopped at ${stopped}`,
-			);
 		},
 		[root, runOne],
 	);

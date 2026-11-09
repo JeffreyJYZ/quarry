@@ -17,6 +17,9 @@ export type LaunchSource = "run" | "debug";
  * A failure goes out whole — the compiler's diagnostics included — and names which button asked,
  * because a run's failure belongs in the console where its output would have been while a debug
  * launch has none to print into.
+ *
+ * A project switch cancels the launch: the build describes the old tree and must not start anything
+ * here, and its busy flag must not keep the new project's buttons disabled.
  */
 export function useRunLauncher(options: {
 	root: string | null;
@@ -31,13 +34,17 @@ export function useRunLauncher(options: {
 	const inFlight = useRef(false);
 	const generation = useRef(0);
 
-	// A launch still running when the widget unmounts must not set state on the dead component.
+	// One launch per root: a new root starts idle, and the cleanup guards a launch that is still
+	// running when the widget unmounts from setting state on the dead component.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the reset runs on a root change only
 	useEffect(() => {
 		generation.current += 1;
+		inFlight.current = false;
+		setBusy(false);
 		return () => {
 			generation.current += 1;
 		};
-	}, []);
+	}, [root]);
 
 	const launch = useCallback(
 		async (start: (config: LaunchConfig) => void, source: LaunchSource) => {
@@ -68,8 +75,10 @@ export function useRunLauncher(options: {
 					source,
 				);
 			} finally {
-				inFlight.current = false;
-				if (generation.current === mine) setBusy(false);
+				if (generation.current === mine) {
+					inFlight.current = false;
+					setBusy(false);
+				}
 			}
 		},
 		[root, targetId, profile, onFailure],

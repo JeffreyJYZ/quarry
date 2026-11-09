@@ -2,6 +2,7 @@ import { memo } from "react";
 import { plural } from "@/lib/problems/model";
 import type { GitStatus, ProjectInfo } from "@/lib/project/api";
 import { kindLabel } from "@/lib/project/kind";
+import type { StatusChip } from "@/lib/status/model";
 import { StatusTools } from "@/ui/components/StatusBarIcons";
 
 export type StatusBarProps = {
@@ -19,8 +20,8 @@ export type StatusBarProps = {
 	language?: string | null;
 	/** Indent width the editor is using. */
 	tabSize?: number;
-	/** Language server name once it is up, "starting" while it comes up, "unavailable" when it failed. */
-	server?: string | null;
+	/** The status chip: the server serving this file, or the build/run that is in flight. */
+	status?: StatusChip | null;
 	onOpenSettings: () => void;
 	/** Which regions the icon row reports as open. */
 	railCollapsed: boolean;
@@ -58,7 +59,7 @@ export default function StatusBar({
 	caret = null,
 	language = null,
 	tabSize = 4,
-	server = null,
+	status = null,
 	onOpenSettings,
 	railCollapsed,
 	terminalOpen,
@@ -144,9 +145,9 @@ export default function StatusBar({
 				) : null}
 			</span>
 			<span className="status-right">
-				{server === null ? null : (
-					<span className="status-server" title="Language server">
-						{server}
+				{status === null ? null : (
+					<span className="status-server" title={status.title}>
+						{status.label}
 					</span>
 				)}
 				<CaretSegment caret={caret} />

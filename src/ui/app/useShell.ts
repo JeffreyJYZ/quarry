@@ -3,7 +3,6 @@ import { useCallback, useRef, useState } from "react";
 import { useDebugSession } from "@/lib/debug/session";
 import { lspOverridesFrom } from "@/ui/app/lspOverrides";
 import type { DiagnosticsLifecycleEvent } from "@/lib/lsp/lifecycle";
-import { RESTART_NOTICE } from "@/lib/lsp/restart";
 import { useLspRestart } from "@/ui/app/useLspRestart";
 import { useShellDiagnostics } from "@/ui/app/useShellDiagnostics";
 import type { RunConfiguration } from "@/lib/project/api";
@@ -91,14 +90,14 @@ export function useShell() {
 	const reportNotice = useCallback((message: string) => setNotice(message), []);
 	const active = workspace.buffers.find((buffer) => buffer.path === activePath) ?? null;
 	const lspOverrides = lspOverridesFrom(effective);
-	const lspRestart = useLspRestart(reportNotice);
+	const lspRestart = useLspRestart(setNotice);
 	const { lspStatuses, diagnostics } = useShellDiagnostics({
 		root,
 		activePath: active?.path ?? null,
 		activeText: active?.text ?? "",
 		report: reportNotice,
 		overrides: lspOverrides,
-		onRestarted: () => setNotice((current) => (current === RESTART_NOTICE ? null : current)),
+		onRestarted: lspRestart.settled,
 		runningRef: lspRunningRef,
 		restartToken: lspRestart.token,
 		onError: reportNotice,

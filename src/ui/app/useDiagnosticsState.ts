@@ -26,6 +26,8 @@ export function useDiagnosticsState(options: {
 	root: string | null;
 	/** Server kinds answering right now; a kind that leaves took its findings with it. */
 	running: ReadonlySet<ServerKind>;
+	/** The same end-of-session event, for the status chip rather than for findings. */
+	onServerEnd?: (kind: ServerKind) => void;
 	onError: (message: string) => void;
 }) {
 	const [server, setServer] = useState<DiagnosticMap>(() => new Map());
@@ -42,9 +44,11 @@ export function useDiagnosticsState(options: {
 
 	const endSession = useCallback(
 		(server: string) => {
-			if (isServerKind(server)) applyEvent({ type: "session-end", kind: server });
+			if (!isServerKind(server)) return;
+			applyEvent({ type: "session-end", kind: server });
+			options.onServerEnd?.(server);
 		},
-		[applyEvent],
+		[applyEvent, options.onServerEnd],
 	);
 
 	useDiagnosticsFeed({

@@ -1,25 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-	type LspStatus,
-	lspChangeDocument,
-	lspCloseDocument,
-	lspOpenDocument,
-	startLsp,
-	stopLsp,
-} from "@/lib/project/api";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isMissingSessionError } from "@/lib/lsp/errors";
-import { describeError } from "@/lib/project/errors";
 import {
-	serverKindForPath,
-	serversForRoot,
-	sessionId as makeSessionId,
 	type RootSignals,
 	type ServerKind,
+	serversForRoot,
+	sessionId as makeSessionId,
 } from "@/lib/lsp/served";
+import { startLsp, stopLsp } from "@/lib/project/api";
+import { describeError } from "@/lib/project/errors";
+import type { ServerState, ServerStates } from "@/lib/status/model";
 
-const CHANGE_DEBOUNCE_MS = 350;
+export type { ServerState, ServerStates } from "@/lib/status/model";
 
-export type LspStatusMap = Partial<Record<ServerKind, LspStatus | null>>;
+/** One entry per kind, always: an absent server is state, not a missing key. */
+export type LspStatusMap = ServerStates;
+
+const ABSENT: ServerState = { phase: "absent" };
+const STARTING: ServerState = { phase: "starting" };
+const ENDED: ServerState = { phase: "ended" };
 
 function useOneServer(
 	root: string | null,
@@ -29,30 +27,35 @@ function useOneServer(
 	path: string,
 	args: string[],
 	restartToken: number,
-): LspStatus | null {
-	const [status, setStatus] = useState<LspStatus | null>(null);
+): { state: ServerState; end: () => void } {
+	const [state, setState] = useState<ServerState>(ABSENT);
 	const reportRef = useRef(report);
 	reportRef.current = report;
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: effect runs per session identity
 	useEffect(() => {
-		setStatus(null);
 		if (root === null || !enabled) {
+			setState(ABSENT);
 			return;
 		}
+		setState(STARTING);
 		const sessionId = makeSessionId(kind, root);
 		let live = true;
 		startLsp(sessionId, path, args).then(
 			(next) => {
-				if (live) setStatus(next);
+				if (live) setState({ phase: "ready", status: next });
 			},
 			(error) => {
-				if (live) reportRef.current(`${kind}: ${describeError(error)}`);
+				if (!live) return;
+				// A start that failed has no session to name: leaving the last status here would make
+				// the chip claim a server the project does not have.
+				setState(ENDED);
+				reportRef.current(`${kind}: ${describeError(error)}`);
 			},
 		);
 		return () => {
 			live = false;
-			setStatus(null);
+			setState(ABSENT);
 			stopLsp(sessionId).catch((error: unknown) => {
 				if (isMissingSessionError(error)) return;
 				reportRef.current(`${kind} stop: ${describeError(error)}`);
@@ -60,7 +63,12 @@ function useOneServer(
 		};
 	}, [root, kind, enabled, path, args.join(" "), restartToken]);
 
-	return status;
+	/** The server's reader thread finished: its last answer describes a process that is gone. */
+	const end = useCallback(() => {
+		setState((current) => (current.phase === "ready" ? ENDED : current));
+	}, []);
+
+	return { state, end };
 }
 
 export function useLspServers(
@@ -69,131 +77,41 @@ export function useLspServers(
 	report: (message: string) => void,
 	overrides: Partial<Record<ServerKind, { path?: string; args?: string[] }>> = {},
 	restartToken = 0,
-): LspStatusMap {
+): { statuses: LspStatusMap; markEnded: (kind: ServerKind) => void } {
 	const kinds = signals === null ? [] : serversForRoot(signals);
-	const rustEnabled = kinds.includes("rust-analyzer");
-	const clangEnabled = kinds.includes("clangd");
-	const rustOverrides = overrides["rust-analyzer"] ?? {};
-	const clangOverrides = overrides.clangd ?? {};
-	const rustStatus = useOneServer(
+	const rust = useOneServer(
 		root,
 		"rust-analyzer",
-		rustEnabled,
+		kinds.includes("rust-analyzer"),
 		report,
-		rustOverrides.path ?? "",
-		rustOverrides.args ?? [],
+		overrides["rust-analyzer"]?.path ?? "",
+		overrides["rust-analyzer"]?.args ?? [],
 		restartToken,
 	);
-	const clangStatus = useOneServer(
+	const clang = useOneServer(
 		root,
 		"clangd",
-		clangEnabled,
+		kinds.includes("clangd"),
 		report,
-		clangOverrides.path ?? "",
-		clangOverrides.args ?? [],
+		overrides.clangd?.path ?? "",
+		overrides.clangd?.args ?? [],
 		restartToken,
 	);
 	// A stable map: `useDocumentSync` keys its open/close effect on it, so a fresh object each render
 	// would close and reopen the document on every render — and a close publishes empty diagnostics,
 	// which clears the very findings the reopen brings back.
-	return useMemo(() => {
-		const out: LspStatusMap = {};
-		if (rustEnabled) {
-			out["rust-analyzer"] = rustStatus;
-		}
-		if (clangEnabled) {
-			out.clangd = clangStatus;
-		}
-		return out;
-	}, [rustEnabled, clangEnabled, rustStatus, clangStatus]);
-}
-
-export type DocumentSyncOptions = {
-	root: string | null;
-	path: string | null;
-	text: string;
-	report: (message: string) => void;
-	ready: boolean;
-	statuses: LspStatusMap;
-};
-
-export function useDocumentSync({
-	root,
-	path,
-	text,
-	report,
-	ready,
-	statuses,
-}: DocumentSyncOptions): void {
-	const latest = useRef({ text, report });
-	latest.current = { text, report };
-	const opened = useRef<{ root: string; path: string; text: string } | null>(null);
-	// One value per running server, not the map's identity: the effects below open and close the
-	// document, and a close publishes empty diagnostics for the file.
-	const kind = serverKindForPath(path);
-	const status = kind === null ? null : (statuses[kind] ?? null);
-
-	useEffect(() => {
-		if (root === null || path === null || kind === null || status === null || !ready) {
-			return;
-		}
-		const sessionId = makeSessionId(kind, root);
-		const initial = latest.current.text;
-		let live = true;
-		lspOpenDocument(sessionId, path, initial).then(
-			() => {
-				if (!live) return;
-				opened.current = { root, path, text: initial };
-				const current = latest.current.text;
-				if (current !== initial) {
-					lspChangeDocument(sessionId, path, current).catch((error) => {
-						latest.current.report(`Sync document: ${describeError(error)}`);
-					});
-				}
-			},
-			(error) => {
-				if (live) latest.current.report(`Open document: ${describeError(error)}`);
-			},
-		);
-		return () => {
-			live = false;
-			const open = opened.current;
-			if (open !== null && open.root === root && open.path === path) {
-				opened.current = null;
-				lspCloseDocument(sessionId, path).catch((error) => {
-					if (isMissingSessionError(error)) return;
-					latest.current.report(`Close document: ${describeError(error)}`);
-				});
-			}
-		};
-	}, [root, path, kind, status, ready]);
-
-	useEffect(() => {
-		if (root === null || path === null || kind === null || status === null) {
-			return;
-		}
-		const sessionId = makeSessionId(kind, root);
-		const open = opened.current;
-		if (open !== null && open.root === root && open.path === path && open.text === text) {
-			return;
-		}
-		const timer = setTimeout(() => {
-			const open = opened.current;
-			if (open !== null && open.root === root && open.path === path && open.text === text) {
-				return;
-			}
-			lspChangeDocument(sessionId, path, text).then(
-				() => {
-					const current = opened.current;
-					if (current !== null && current.root === root && current.path === path) {
-						current.text = text;
-					}
-				},
-				(error) => {
-					latest.current.report(`Sync document: ${describeError(error)}`);
-				},
-			);
-		}, CHANGE_DEBOUNCE_MS);
-		return () => clearTimeout(timer);
-	}, [root, path, text, kind, status]);
+	const statuses = useMemo<LspStatusMap>(
+		() => ({ "rust-analyzer": rust.state, clangd: clang.state }),
+		[rust.state, clang.state],
+	);
+	const rustEnd = rust.end;
+	const clangEnd = clang.end;
+	const markEnded = useCallback(
+		(kind: ServerKind) => {
+			if (kind === "rust-analyzer") rustEnd();
+			else clangEnd();
+		},
+		[rustEnd, clangEnd],
+	);
+	return { statuses, markEnded };
 }
