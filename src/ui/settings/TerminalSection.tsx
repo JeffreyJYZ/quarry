@@ -2,6 +2,11 @@ import type { JSX } from "react";
 import { useEffect, useState } from "react";
 import { FONT_SIZE_RANGE, type Preferences, type TerminalPlacement } from "@/lib/settings/model";
 import {
+	TERMINAL_LETTER_SPACING_RANGE,
+	TERMINAL_LINE_HEIGHT_RANGE,
+	TERMINAL_SCROLLBACK_RANGE,
+} from "@/lib/consts/terminal";
+import {
 	TERMINAL_CURSOR_STYLES,
 	type TerminalCursorStyle,
 	clampLetterSpacing,
@@ -132,8 +137,8 @@ export function TerminalSection(props: {
 				<NumberField
 					id="settings-terminal-line-height"
 					value={user.terminalLineHeight}
-					min={1}
-					max={2}
+					min={TERMINAL_LINE_HEIGHT_RANGE.min}
+					max={TERMINAL_LINE_HEIGHT_RANGE.max}
 					step={0.1}
 					clamp={clampLineHeight}
 					onChange={(next) => onChange({ terminalLineHeight: next })}
@@ -144,8 +149,8 @@ export function TerminalSection(props: {
 				<NumberField
 					id="settings-terminal-letter-spacing"
 					value={user.terminalLetterSpacing}
-					min={-2}
-					max={4}
+					min={TERMINAL_LETTER_SPACING_RANGE.min}
+					max={TERMINAL_LETTER_SPACING_RANGE.max}
 					step={1}
 					clamp={clampLetterSpacing}
 					onChange={(next) => onChange({ terminalLetterSpacing: next })}
@@ -156,16 +161,18 @@ export function TerminalSection(props: {
 				<NumberField
 					id="settings-terminal-scrollback"
 					value={user.terminalScrollback}
-					min={500}
-					max={50000}
+					min={TERMINAL_SCROLLBACK_RANGE.min}
+					max={TERMINAL_SCROLLBACK_RANGE.max}
 					step={500}
 					clamp={clampScrollback}
 					onChange={(next) => onChange({ terminalScrollback: next })}
 				/>
 			</div>
 			<p className="settings-hint" style={{ color: "var(--muted)" }}>
-				Line height 1.0–2.0, letter spacing -2 to 4 px, scrollback 500–50 000 lines. Values
-				clamp on input.
+				Line height {TERMINAL_LINE_HEIGHT_RANGE.min}–{TERMINAL_LINE_HEIGHT_RANGE.max},
+				letter spacing {TERMINAL_LETTER_SPACING_RANGE.min} to{" "}
+				{TERMINAL_LETTER_SPACING_RANGE.max} px, scrollback {TERMINAL_SCROLLBACK_RANGE.min}–
+				{TERMINAL_SCROLLBACK_RANGE.max} lines. Values clamp on input.
 			</p>
 		</section>
 	);
