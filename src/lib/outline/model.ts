@@ -1,20 +1,5 @@
 import type { DocumentSymbol as LspSymbol } from "@/lib/project/api";
-
-export function containsRange(
-	symbol: LspSymbol,
-	cursor: { line: number; character: number },
-): boolean {
-	const r = symbol.range;
-	if (cursor.line < r.start.line || cursor.line > r.end.line) return false;
-	if (cursor.line === r.start.line && cursor.character < r.start.character) return false;
-	if (cursor.line === r.end.line && cursor.character > r.end.character) return false;
-	return true;
-}
-
-export function rangeSize(symbol: LspSymbol): number {
-	const r = symbol.range;
-	return (r.end.line - r.start.line) * 1000000 + (r.end.character - r.start.character);
-}
+import { containsRange, rangeSize } from "@/lib/lsp/ranges";
 
 export function caretSymbolIndex(
 	symbols: readonly LspSymbol[],

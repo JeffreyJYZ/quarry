@@ -1,4 +1,5 @@
 import type { RefObject } from "react";
+import { useStableCallback } from "@/lib/react/useStableCallback";
 import { QuickOpenRow } from "./QuickOpenRow";
 
 export function QuickOpenResults({
@@ -24,6 +25,10 @@ export function QuickOpenResults({
 	onPick: (path: string) => void;
 	listRef: RefObject<HTMLDivElement | null>;
 }) {
+	// One handler per event, holding the latest closure, so a memoised row is not re-rendered by a
+	// parent that rebuilds its callbacks on every query keystroke.
+	const pick = useStableCallback((path: string) => onPick(path));
+	const activate = useStableCallback((index: number) => onActive(index));
 	const recentCount = recentPaths.length;
 	return (
 		<div className="search-results" ref={listRef}>
@@ -40,8 +45,8 @@ export function QuickOpenResults({
 									index={index}
 									active={index === active}
 									isOpen={openPaths.has(path)}
-									onSelect={() => onPick(path)}
-									onHover={() => onActive(index)}
+									onSelect={pick}
+									onHover={activate}
 								/>
 							))}
 						</>
@@ -57,8 +62,8 @@ export function QuickOpenResults({
 								index={globalIndex}
 								active={globalIndex === active}
 								isOpen={openPaths.has(path)}
-								onSelect={() => onPick(path)}
-								onHover={() => onActive(globalIndex)}
+								onSelect={pick}
+								onHover={activate}
 							/>
 						);
 					})}
@@ -73,8 +78,8 @@ export function QuickOpenResults({
 						active={index === active}
 						isOpen={openPaths.has(path)}
 						query={primary}
-						onSelect={() => onPick(path)}
-						onHover={() => onActive(index)}
+						onSelect={pick}
+						onHover={activate}
 					/>
 				))
 			)}
