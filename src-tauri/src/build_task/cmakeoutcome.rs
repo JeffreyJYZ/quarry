@@ -61,9 +61,10 @@ pub const PLAIN_CLANG_SOURCE_CAP: usize = 200;
 /// How deep the plain-clang walk goes below the project root.
 pub const PLAIN_CLANG_MAX_DEPTH: usize = 6;
 
-/// Directories skipped while gathering sources.
-pub const PLAIN_CLANG_IGNORED_DIRS: [&str; 5] =
-    ["target", "node_modules", ".git", ".quarry", "build"];
+/// Directories the build walker skips beyond the crate-wide list in `crate::ignore`: a plain-clang
+/// project's own `build/` output. The shared list decides everything else, so the build cannot walk
+/// a tree every other walker skips.
+pub const PLAIN_CLANG_EXTRA_IGNORED_DIRS: [&str; 1] = ["build"];
 
 /// Diagnostics from a plain-clang build carry this source.
 pub const PLAIN_CLANG_SOURCE: &str = "clang";

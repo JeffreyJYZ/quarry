@@ -83,7 +83,7 @@ pub fn language_id(path: &str) -> &'static str {
 
     match extension.as_str() {
         "rs" => "rust",
-        "c" | "h" | "cc" | "cpp" | "hpp" | "cxx" | "hh" => "cpp",
+        other if crate::extensions::CPP_EXTENSIONS.contains(&other) => "cpp",
         _ => "plaintext",
     }
 }

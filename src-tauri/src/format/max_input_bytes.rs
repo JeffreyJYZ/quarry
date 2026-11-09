@@ -21,9 +21,6 @@ pub const TAPLO: &str = "taplo";
 /// A formatter's stderr line can be a whole diagnostic block, so it is cut for the status bar.
 pub const STDERR_LIMIT: usize = 300;
 
-/// Extensions clang-format owns. Rust has exactly one; everything else is left alone.
-pub const C_FAMILY: [&str; 7] = ["c", "h", "cc", "cpp", "cxx", "hh", "hpp"];
-
 /// Which formatter a document maps to, and the empty case that means "no formatter".
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Formatter {
@@ -68,7 +65,9 @@ pub fn formatter_for_path(path: &str) -> Formatter {
 
     match extension.as_deref() {
         Some("rs") => Formatter::Rustfmt,
-        Some(extension) if C_FAMILY.contains(&extension) => Formatter::ClangFormat,
+        Some(extension) if crate::extensions::CPP_EXTENSIONS.contains(&extension) => {
+            Formatter::ClangFormat
+        }
         Some("toml") => Formatter::Taplo,
         _ => Formatter::None,
     }

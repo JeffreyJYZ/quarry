@@ -113,4 +113,65 @@ mod tests {
         fs::write(root.join("src/main.hpp"), "#pragma once\n").expect("write header");
         assert_eq!(names(&root), vec!["src/main.cpp"]);
     }
+
+    #[test]
+    fn a_cxx_source_is_collected() {
+        let root = fixture("cxx");
+        touch(&root, "src/main.cxx");
+        assert_eq!(names(&root), vec!["src/main.cxx"]);
+    }
+
+    #[test]
+    fn a_cxx_source_builds_and_reports_its_artifact() {
+        if crate::resolve::resolve("clang++").is_none() {
+            return;
+        }
+        let root = fixture("cxx-build");
+        fs::write(root.join("main.cxx"), "int main() { return 0; }\n").expect("write source");
+
+        let report =
+            run_plain_clang_build(&root.display().to_string(), "cxx-app").expect("build run");
+        assert!(report.success, "a .cxx project must build");
+        let artifact = plain_clang_build_dir(&root).join("cxx-app");
+        assert_eq!(report.artifact, Some(artifact.display().to_string()));
+        assert!(artifact.is_file(), "the reported artifact exists on disk");
+    }
+
+    #[test]
+    fn the_reported_artifact_is_the_file_the_compile_writes() {
+        if crate::resolve::resolve("clang").is_none() {
+            return;
+        }
+        let root = fixture("artifact");
+        fs::write(root.join("main.c"), "int main(void) { return 0; }\n").expect("write source");
+
+        let report =
+            run_plain_clang_build(&root.display().to_string(), "hello").expect("build run");
+        assert!(report.success, "a plain C project must build");
+        let artifact = plain_clang_build_dir(&root).join("hello");
+        assert_eq!(report.artifact, Some(artifact.display().to_string()));
+        assert!(
+            artifact.is_file(),
+            "the compiler wrote where the report points"
+        );
+    }
+
+    #[test]
+    fn output_directories_are_not_walked() {
+        let root = fixture("output");
+        touch(&root, "src/main.cpp");
+        touch(&root, "dist/bundle.cpp");
+        touch(&root, "out/generated.cpp");
+        assert_eq!(names(&root), vec!["src/main.cpp"]);
+    }
+
+    #[test]
+    fn the_walker_skips_every_shared_ignored_directory() {
+        let root = fixture("shared-ignored");
+        for name in crate::ignore::DIRS {
+            touch(&root, &format!("{name}/hidden.cpp"));
+        }
+        touch(&root, "src/main.cpp");
+        assert_eq!(names(&root), vec!["src/main.cpp"]);
+    }
 }
