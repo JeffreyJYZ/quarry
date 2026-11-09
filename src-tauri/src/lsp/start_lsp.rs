@@ -70,67 +70,42 @@ pub async fn start_lsp_session(
     let root = root.to_string();
     // Atomic check-and-reserve: a concurrent start for the same root waits instead of spawning a
     // second server (which would leak the first child/pipe).
-    loop {
-        {
-            let sessions = lock(&state.sessions);
-            if let Some(existing) = sessions.get(&root).cloned() {
-                let server = lock(&existing).server.clone();
-                return Ok(LspStatus {
-                    root,
-                    server,
-                    version: None,
-                });
-            }
-        }
-        {
-            let mut flight = lock(&state.in_flight);
-            if !flight.contains(&root) {
-                flight.insert(root.clone());
-                break;
-            }
-        }
-        thread::sleep(Duration::from_millis(10));
+    if let Some(existing) = claim_start(state, &root).await {
+        let server = lock(&existing).server.clone();
+        return Ok(LspStatus {
+            root,
+            server,
+            version: None,
+        });
     }
 
     // The `root` argument is a session id of the form `{server}::{path}`. Strip the prefix to get
     // the real project root and pick the server from the prefix.
-    let (server, actual_root) = if let Some((prefix, rest)) = root.split_once("::") {
-        (prefix.to_string(), rest.to_string())
-    } else {
+    let Some((server, actual_root)) = root.split_once("::") else {
         return Err(format!("invalid session id: {root}"));
     };
-    let info = open_project(actual_root.clone())?;
-    let server = server.as_str();
+    let server = server.to_string();
+    let actual_root = actual_root.to_string();
 
-    // A path from settings wins over discovery; it is how a second toolchain or a wrapper script is
-    // used without touching `PATH`.
-    let binary = if overrides.path.trim().is_empty() {
-        resolve_server(server)?
-    } else {
-        overrides.path.trim().to_string()
-    };
-    let root_uri = path_to_uri(&info.root);
+    // Resolving the binary, spawning the server and the handshake are all blocking — the handshake
+    // alone can wait `HANDSHAKE_TIMEOUT` for a server that never answers — so they run on the
+    // blocking pool and the async worker stays free for unrelated IPC.
+    let started = {
+        let name = server.clone();
+        let overrides = StartOverrides {
+            path: overrides.path.clone(),
+            args: overrides.args.clone(),
+        };
+        tauri::async_runtime::spawn_blocking(move || launch(&name, &actual_root, &overrides))
+            .await
+            .map_err(|error| format!("cannot start the {server} language server: {error}"))?
+    }?;
 
-    let mut command = Command::new(&binary);
-    command.current_dir(&info.root);
-    command.env("PATH", server_path(&binary));
-    command.args(&overrides.args);
-    let (mut pipe, stderr) = ProcessPipe::spawn_with_stderr(&mut command).map_err(|error| {
-        format_start_failure(server, &format!("cannot start ({binary}): {error}"), "")
-    })?;
-
-    // The handshake runs on the receiver before any session exists, so no mutex is held while it
-    // waits for the server.
-    let legend = match handshake(&mut pipe, &root_uri, &info.name) {
-        Ok(types) => types,
-        Err(reason) => {
-            // The child is already gone, so its stderr ends within a moment; wait for it briefly so
-            // the message can carry the server's own reason.
-            let said = stderr.wait(STDERR_WAIT);
-            return Err(format_start_failure(server, &reason, &said));
-        }
-    };
-
+    let Started {
+        root: project_root,
+        mut pipe,
+        legend,
+    } = started;
     let frames = pipe.take_frames();
     let session = Arc::new(Mutex::new(Session {
         server: server.to_string(),
@@ -153,7 +128,7 @@ pub async fn start_lsp_session(
     // every publish whose root is not the canonical project root, so a session id here silenced the
     // whole diagnostics pipeline. It is also the canonical path (`/private/var` over `/var`), which
     // is what `open_project` reported to the window in the first place.
-    let pump_root = info.root.clone();
+    let pump_root = project_root;
     thread::Builder::new()
         .name("quarry-lsp-pump".to_string())
         .spawn(move || pump(app, pump_root, frames, pump_session))
