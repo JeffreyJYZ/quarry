@@ -83,14 +83,16 @@ pub fn replace(
             let path = entry.path();
             let name = entry.file_name().to_string_lossy().to_string();
             if path.is_dir() {
-                if matches!(
-                    name.as_str(),
-                    "target" | "node_modules" | "dist" | ".git" | ".quarry"
-                ) {
+                // The same list search uses: a replace that walks `.cache`, `CMakeFiles` or a
+                // `cmake-build-*` directory edits files the search it came from never showed.
+                if ignore::is_dir(&name) {
                     continue;
                 }
                 stack.push(path);
             } else if path.is_file() {
+                if ignore::is_file(&name) {
+                    continue;
+                }
                 let text = match fs::read_to_string(&path) {
                     Ok(t) => t,
                     Err(_) => continue,

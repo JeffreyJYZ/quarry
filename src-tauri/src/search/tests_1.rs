@@ -147,4 +147,30 @@ pub mod tests_group_1 {
         );
         let _ = fs::remove_dir_all(&dir);
     }
+
+    #[test]
+    pub fn replace_skips_the_directories_search_skips() {
+        // The bug this pins: replace walked its own list of four names, so a replace-all edited
+        // `.cache` and `cmake-build-*` files that search never showed.
+        let dir = std::env::temp_dir().join("quarry_replace_ignored");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join(".cache")).unwrap();
+        fs::create_dir_all(dir.join("cmake-build-debug")).unwrap();
+        fs::write(dir.join("kept.txt"), "foo\n").unwrap();
+        fs::write(dir.join(".cache/generated.txt"), "foo\n").unwrap();
+        fs::write(dir.join("cmake-build-debug/object.txt"), "foo\n").unwrap();
+
+        let report = replace(dir.to_str().unwrap(), "foo", "qux", false, true).unwrap();
+
+        assert_eq!(report.files_changed, 1);
+        assert_eq!(
+            fs::read_to_string(dir.join(".cache/generated.txt")).unwrap(),
+            "foo\n"
+        );
+        assert_eq!(
+            fs::read_to_string(dir.join("cmake-build-debug/object.txt")).unwrap(),
+            "foo\n"
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
 }
