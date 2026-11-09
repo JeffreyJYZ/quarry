@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { formatAddress, parseAddress } from "@/lib/debug/memory/hex";
 import { resolveAddress } from "@/lib/debug/memory/resolve";
 import { type DisassembledInstruction, dapDisassemble } from "@/lib/project/api";
@@ -35,7 +35,7 @@ export type DisasmPaneProps = {
  * while frames still carry `instructionPointerReference`; the caller passes that address straight
  * through, so nothing here inspects capabilities.
  */
-export default function DisasmPane({ session, address, frameId }: DisasmPaneProps) {
+function DisasmPane({ session, address, frameId }: DisasmPaneProps) {
 	const [request, setRequest] = useState<Request | null>(() => requestFor(address));
 	const [input, setInput] = useState(() => formatAddress(parseAddress(address)));
 	const [rows, setRows] = useState<DisassembledInstruction[] | null>(null);
@@ -181,3 +181,10 @@ export default function DisasmPane({ session, address, frameId }: DisasmPaneProp
 		</div>
 	);
 }
+
+/**
+ * Memoised because the shell re-renders on every keystroke while this pane is open, and its three
+ * props only move on a new stop. Its own state — the typed address, the fetched rows — still renders
+ * as usual; nothing here compares or withholds them.
+ */
+export default memo(DisasmPane);
