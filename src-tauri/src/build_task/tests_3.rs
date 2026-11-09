@@ -128,6 +128,28 @@ pub mod tests_group_3 {
     }
 
     #[test]
+    pub fn a_relative_path_resolves_out_of_the_build_root() {
+        // CMake runs the compiler inside the build directory and prints `../src/main.cpp`: the file
+        // must key as the same path the tree opened, or the diagnostic gets its own tab.
+        let text = "../src/main.cpp:7:3: warning: unused variable";
+
+        let diagnostics = parse_text_diagnostics(text, build_root());
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].path, "/projects/src/main.cpp");
+    }
+
+    #[test]
+    pub fn a_dotted_path_inside_the_build_root_is_tidied() {
+        let text = "./src/generated.cpp:2:1: error: boom";
+
+        let diagnostics = parse_text_diagnostics(text, build_root());
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].path, "/projects/demo/src/generated.cpp");
+    }
+
+    #[test]
     pub fn identical_text_diagnostics_are_deduplicated() {
         let text = concat!(
             "src/main.cpp:12:5: error: expected ';'\n",
