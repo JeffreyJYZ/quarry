@@ -5,7 +5,7 @@ pub use serde_json::{Value, json};
 pub use std::collections::HashMap;
 pub use std::io::{self, BufRead, BufReader, ErrorKind, Read};
 pub use std::path::{Path, PathBuf};
-pub use std::process::{Child, Command, Stdio};
+pub use std::process::{Child, Command, ExitStatus, Stdio};
 pub use std::sync::atomic::{AtomicU64, Ordering};
 pub use std::sync::{Arc, Mutex, MutexGuard};
 pub use std::thread;
@@ -94,28 +94,4 @@ pub fn run_id(number: u64) -> String {
 
 pub fn next_id(counter: &AtomicU64) -> String {
     run_id(counter.fetch_add(1, Ordering::SeqCst).saturating_add(1))
-}
-
-pub fn output_payload(run_id: &str, stream: &str, line: String) -> Value {
-    json!({ "runId": run_id, "stream": stream, "line": line })
-}
-
-/// A `None` code is a kill by signal, which JSON carries as `null`.
-pub fn exited_payload(run_id: &str, code: Option<i32>) -> Value {
-    json!({ "runId": run_id, "code": code })
-}
-
-/// One thread per stream, detached: it ends at EOF, so a shutdown never waits on it.
-pub fn spawn_reader<R: Read + Send + 'static>(
-    app: &AppHandle,
-    run_id: &str,
-    stream: &'static str,
-    reader: R,
-) -> io::Result<()> {
-    let app = app.clone();
-    let run_id = run_id.to_string();
-    thread::Builder::new()
-        .name(format!("{run_id}-{stream}"))
-        .spawn(move || pump(reader, &app, &run_id, stream))
-        .map(drop)
 }

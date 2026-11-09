@@ -30,8 +30,22 @@ export type RunTarget = {
 	target: string;
 };
 
-export type RunOutputEvent = { runId: string; stream: "stdout" | "stderr"; line: string };
-export type RunExitedEvent = { runId: string; code: number | null };
+export type RunOutputEvent = {
+	runId: string;
+	/** Unique within the run, strictly increasing: the emitter's order, which is the program's. */
+	seq: number;
+	stream: "stdout" | "stderr";
+	line: string;
+	/** The same row continues in the next chunk of this stream (a line with no newline yet). */
+	more: boolean;
+};
+export type RunExitedEvent = {
+	runId: string;
+	seq: number;
+	code: number | null;
+	/** The signal that killed the child, or null when it exited on its own. */
+	signal: number | null;
+};
 export type EnvVar = { name: string; value: string };
 
 export function readLaunchConfig(root: string): Promise<LaunchFile> {

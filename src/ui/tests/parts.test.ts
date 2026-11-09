@@ -16,14 +16,20 @@ describe("runTabStatus", () => {
 		expect(runTabStatus({ running: false, exited: { code: 101 } })).toBe("exit 101");
 	});
 
-	test("reports a kill as killed, whatever the code says", () => {
+	test("reports a stop as stopped, whatever the code says", () => {
 		expect(runTabStatus({ running: false, exited: { code: null, killed: true } })).toBe(
-			"killed",
+			"stopped",
 		);
 		expect(runTabStatus({ running: false, exited: { code: 137, killed: true } })).toBe(
-			"killed",
+			"stopped",
 		);
-		expect(runTabStatus({ running: false, exited: { code: null } })).toBe("killed");
+		expect(runTabStatus({ running: false, exited: { code: null } })).toBe("terminated");
+	});
+
+	test("names the signal that killed the process", () => {
+		expect(runTabStatus({ running: false, exited: { code: null, signal: 11 } })).toBe(
+			"SIGSEGV",
+		);
 	});
 });
 

@@ -5,8 +5,9 @@ pub use serde_json::{Value, json};
 pub use std::collections::HashMap;
 pub use std::io::{self, BufRead, BufReader, ErrorKind, Read};
 pub use std::path::{Path, PathBuf};
-pub use std::process::{Child, Command, Stdio};
+pub use std::process::{Child, Command, ExitStatus, Stdio};
 pub use std::sync::atomic::{AtomicU64, Ordering};
+pub use std::sync::mpsc::{self, Receiver, Sender};
 pub use std::sync::{Arc, Mutex, MutexGuard};
 pub use std::thread;
 pub use std::time::Duration;
@@ -92,14 +93,17 @@ pub async fn run_program(
     let entry: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(Some(child)));
     lock(&state.runs).insert(run_id.clone(), Arc::clone(&entry));
 
-    let streams = [
-        spawn_reader(&app, &run_id, STDOUT, stdout),
-        spawn_reader(&app, &run_id, STDERR, stderr),
-    ];
-    let failure = streams
-        .into_iter()
-        .find_map(Result::err)
-        .or_else(|| spawn_waiter(&app, &run_id, entry, Arc::clone(&state.runs)).err());
+    // One channel per run: both readers write into it, the emitter drains it in order.
+    let (events, receiver) = mpsc::channel::<RunEvent>();
+    let failure = [
+        spawn_reader(&run_id, STDOUT, stdout, events.clone()),
+        spawn_reader(&run_id, STDERR, stderr, events.clone()),
+    ]
+    .into_iter()
+    .find_map(Result::err)
+    .or_else(|| spawn_waiter(&run_id, entry, Arc::clone(&state.runs), events.clone()).err())
+    .or_else(|| spawn_emitter(&app, &run_id, receiver).err());
+    drop(events);
 
     if let Some(error) = failure {
         discard(&state.runs, &run_id);

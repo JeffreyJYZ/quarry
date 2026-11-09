@@ -1,7 +1,7 @@
 import type { EnvVar, LaunchConfig, RunConfiguration } from "@/lib/project/api";
-import type { RunLine } from "@/ui/run/RunLog";
+import type { RunExit, RunLine } from "@/lib/run/runOutput";
 
-export type RunExit = { code: number | null; killed?: boolean };
+export type { RunExit, RunLine } from "@/lib/run/runOutput";
 
 export type RunControls = {
 	panelOpen: boolean;
@@ -10,6 +10,8 @@ export type RunControls = {
 	openPanel: () => void;
 	closePanel: () => void;
 	running: string | null;
+	/** Stop was sent and the backend has not reported the exit yet. */
+	stopping: boolean;
 	lines: RunLine[];
 	exited: RunExit | null;
 	program: string;
