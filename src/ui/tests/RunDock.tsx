@@ -65,6 +65,7 @@ export default function RunDock({ runs }: { runs: RunControls }) {
 					onStop={() => void runs.stop()}
 					onRerun={() => void runs.run()}
 					onClear={runs.clearLog}
+					onStdin={(text) => void runs.sendStdin(text)}
 				/>
 			) : null}
 			{showEmpty ? (

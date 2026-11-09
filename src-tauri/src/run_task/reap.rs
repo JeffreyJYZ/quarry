@@ -99,7 +99,8 @@ pub fn wait_for_exit(entry: &Mutex<Option<Child>>) -> Exit {
 }
 
 /// Roll back a run whose threads could not start: kill the group, reap, forget.
-pub fn discard(runs: &Mutex<Runs>, run_id: &str) {
+pub fn discard(runs: &Mutex<Runs>, stdin: &Mutex<StdinHandles>, run_id: &str) {
+    lock(stdin).remove(run_id);
     let Some(entry) = lock(runs).remove(run_id) else {
         return;
     };

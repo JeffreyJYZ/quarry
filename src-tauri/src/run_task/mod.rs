@@ -22,9 +22,9 @@
 pub use serde::{Deserialize, Serialize};
 pub use serde_json::{Value, json};
 pub use std::collections::HashMap;
-pub use std::io::{self, BufRead, BufReader, ErrorKind, Read};
+pub use std::io::{self, BufRead, BufReader, ErrorKind, Read, Write};
 pub use std::path::{Path, PathBuf};
-pub use std::process::{Child, Command, ExitStatus, Stdio};
+pub use std::process::{Child, ChildStdin, Command, ExitStatus, Stdio};
 pub use std::sync::atomic::{AtomicU64, Ordering};
 pub use std::sync::mpsc::{self, Receiver, Sender};
 pub use std::sync::{Arc, Mutex, MutexGuard};
@@ -53,6 +53,9 @@ pub use impl_runstate::*;
 mod stop;
 pub use stop::*;
 
+mod stdin;
+pub use stdin::*;
+
 mod tests_items;
 pub use tests_items::*;
 
@@ -61,3 +64,6 @@ pub use tests_stream::*;
 
 mod tests_stop;
 pub use tests_stop::*;
+
+mod tests_stdin;
+pub use tests_stdin::*;

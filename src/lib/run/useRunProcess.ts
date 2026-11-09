@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { type EnvVar, onRunExited, onRunOutput, runProgram, stopProgram } from "@/lib/project/api";
+import {
+	type EnvVar,
+	onRunExited,
+	onRunOutput,
+	runProgram,
+	sendRunStdin,
+	stopProgram,
+} from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
 import type { RunLine, RunExit } from "@/lib/run/runOutput";
 import { appendNotice, appendOutput, bufferedFor, type PendingEvent } from "@/lib/run/runOutput";
@@ -27,6 +34,8 @@ export function useRunProcess(onNotice: (message: string) => void): {
 	start: (program: string, args: string[], cwd: string, env: EnvVar[]) => Promise<boolean>;
 	stop: () => Promise<void>;
 	clear: () => void;
+	/** One line to the live program's stdin; a refusal is written into the console. */
+	sendStdin: (text: string) => Promise<void>;
 	/** Write lines the process never printed, such as why it could not be started. */
 	append: (lines: string[]) => void;
 } {
@@ -173,5 +182,19 @@ export function useRunProcess(onNotice: (message: string) => void): {
 		setExited(null);
 	}, []);
 
-	return { running, stopping, lines, exited, start, stop, clear, append };
+	/** The console keeps a refused line: a program that exited between the keypress and the send is
+	 * only visible there, and a toast is gone before it can be copied. */
+	const sendStdin = useCallback(async (text: string) => {
+		const id = runningRef.current;
+		if (id === null) return;
+		try {
+			await sendRunStdin(id, text);
+		} catch (error) {
+			setLines((current) =>
+				appendNotice(current, [`cannot send input: ${describeError(error)}`]),
+			);
+		}
+	}, []);
+
+	return { running, stopping, lines, exited, start, stop, clear, sendStdin, append };
 }

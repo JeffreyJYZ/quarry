@@ -34,6 +34,8 @@ export type RunControls = {
 	runConfig: (config: LaunchConfig) => Promise<void>;
 	stop: () => Promise<void>;
 	clearLog: () => void;
+	/** One line to the live program's stdin; the row that calls it is disabled when idle. */
+	sendStdin: (text: string) => Promise<void>;
 	/** Write lines into the console and open it: a failed build never started a process. */
 	appendLog: (lines: string[]) => void;
 	replaceConfigurations: (next: RunConfiguration[]) => void;
