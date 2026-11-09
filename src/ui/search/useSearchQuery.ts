@@ -4,6 +4,7 @@ import { searchProject, type SearchReport } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
 import {
 	groupMatches,
+	isStaleSearch,
 	type SearchGroup,
 	type SearchOptions,
 	type SearchRow,
@@ -105,14 +106,14 @@ export function useSearchQuery({
 					flags.caseSensitive,
 					flags.fixedStrings,
 				);
-				if (ticket !== sequence.current) {
+				if (isStaleSearch(ticket, sequence.current)) {
 					return;
 				}
 				setReport(result);
 				setRanQuery(next);
 				setActive(0);
 			} catch (failure) {
-				if (ticket !== sequence.current) {
+				if (isStaleSearch(ticket, sequence.current)) {
 					return;
 				}
 				setReport(null);
@@ -120,7 +121,7 @@ export function useSearchQuery({
 				setActive(0);
 				setError(describeError(failure));
 			} finally {
-				if (ticket === sequence.current) {
+				if (!isStaleSearch(ticket, sequence.current)) {
 					setBusy(false);
 				}
 			}
