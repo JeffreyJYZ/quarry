@@ -1,4 +1,5 @@
 import type { FileEntry, GitStatusEntry } from "@/lib/project/api";
+import { rowDomId } from "@/lib/tree/keys";
 import { FolderIcon, indent } from "./FileTreeIcons";
 import FileTypeIcon from "./FileTypeIcon";
 
@@ -6,6 +7,8 @@ export type TreeRowProps = {
 	entry: FileEntry;
 	depth: number;
 	isOpen: boolean;
+	selected: boolean;
+	tabIndex: number;
 	status: GitStatusEntry["status"] | undefined;
 	activePath: string | null;
 	highlightedPath: string | null;
@@ -13,6 +16,7 @@ export type TreeRowProps = {
 	onToggle: (path: string) => void;
 	onOpenFile: (entry: FileEntry) => void;
 	onMenu: (entry: FileEntry, x: number, y: number) => void;
+	onFocus: () => void;
 };
 
 export function badgeFor(status: GitStatusEntry["status"] | undefined) {
@@ -48,6 +52,8 @@ export function TreeRow({
 	entry,
 	depth,
 	isOpen,
+	selected,
+	tabIndex,
 	status,
 	activePath,
 	highlightedPath,
@@ -55,6 +61,7 @@ export function TreeRow({
 	onToggle,
 	onOpenFile,
 	onMenu,
+	onFocus,
 }: TreeRowProps) {
 	/** Right click and the keyboard's menu key both open the row's menu at the row's edge. */
 	const openMenuFromKeyboard = (event: React.KeyboardEvent<HTMLButtonElement>) => {
@@ -75,15 +82,21 @@ export function TreeRow({
 				: "tree-row file";
 
 	return (
-		<div className="tree-row-wrap">
+		<div className="tree-row-wrap" role="none">
 			<button
 				type="button"
+				id={rowDomId(entry.path)}
+				role="treeitem"
+				aria-level={depth + 1}
+				aria-selected={selected}
+				tabIndex={tabIndex}
 				data-path={entry.path}
 				className={className}
 				style={indent(depth)}
 				title={entry.path}
 				aria-expanded={entry.isDir ? isOpen : undefined}
 				onClick={() => (entry.isDir ? onToggle(entry.path) : onOpenFile(entry))}
+				onFocus={onFocus}
 				onContextMenu={(event) => {
 					event.preventDefault();
 					onMenu(entry, event.clientX, event.clientY);

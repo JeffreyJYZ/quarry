@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { ancestorDirs, isInside } from "./revealTarget";
 
 export function useReveal(
@@ -10,8 +10,12 @@ export function useReveal(
 	setHighlightedPath: (v: string | null) => void,
 	highlightTimer: { current: number | null },
 ) {
+	// The reveal button bumps the token; the first render and a plain active-file change do not, so
+	// mounting the app never steals focus from the editor.
+	const lastToken = useRef<number | null>(null);
+
 	const reveal = useCallback(
-		async (target: string | null) => {
+		async (target: string | null, moveFocus: boolean) => {
 			if (target === null) return;
 			if (!isInside(root, target)) return;
 			const ancestors = ancestorDirs(root, target);
@@ -33,7 +37,10 @@ export function useReveal(
 			}, 1500);
 			requestAnimationFrame(() => {
 				const row = document.querySelector(`[data-path="${CSS.escape(target)}"]`);
-				if (row instanceof HTMLElement) row.scrollIntoView({ block: "nearest" });
+				if (!(row instanceof HTMLElement)) return;
+				row.scrollIntoView({ block: "nearest" });
+				// A revealed row is the keyboard's new roving position, so focus follows it.
+				if (moveFocus) row.focus({ preventScroll: true });
 			});
 		},
 		[root, load, setExpanded, setHighlightedPath, highlightTimer],
@@ -41,7 +48,9 @@ export function useReveal(
 
 	useEffect(() => {
 		if (revealToken === undefined) return;
-		void reveal(activePath);
+		const moveFocus = lastToken.current !== null && lastToken.current !== revealToken;
+		lastToken.current = revealToken;
+		void reveal(activePath, moveFocus);
 	}, [revealToken, reveal, activePath]);
 
 	return reveal;
