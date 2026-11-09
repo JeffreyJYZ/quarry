@@ -1,4 +1,4 @@
-import { type JSX, useState } from "react";
+import { type JSX, useEffect, useState } from "react";
 import type { Preferences } from "@/lib/settings/model";
 import { BUILTIN_THEMES } from "@/lib/themes/builtin";
 import { DEFAULT_THEME_ID } from "@/lib/themes/model";
@@ -9,6 +9,10 @@ import { parseThemeJson } from "@/lib/themes/parse";
  *
  * Every edit goes through `onChange` as a preference patch, so the shell persists it and `useTheme`
  * repaints on the same render — there is no draft of the active theme here.
+ *
+ * The picker and the delete action both write `theme`, so only one of them is armed at a time: a
+ * delete landing while a pick was still in flight would clobber it, and last-write-wins is not a
+ * conflict resolution.
  */
 export function AppearanceSection(props: {
 	user: Preferences;
@@ -17,8 +21,17 @@ export function AppearanceSection(props: {
 	const { user, onChange } = props;
 	const [draft, setDraft] = useState("");
 	const [error, setError] = useState<string | null>(null);
+	const [pending, setPending] = useState<"theme" | "delete" | null>(null);
 	const imported = user.customThemes;
 	const active = [...BUILTIN_THEMES, ...imported].find((theme) => theme.id === user.theme);
+
+	// A landed write is the shell handing the new preferences back, which clears the guard. The
+	// update itself is synchronous state, so the window is short — but it is the window a second
+	// writer could land in.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the landed values are the trigger — a write is done when the shell hands them back, and reading them here would not change the reset.
+	useEffect(() => {
+		setPending(null);
+	}, [user.theme, user.customThemes]);
 
 	const handleImport = () => {
 		const result = parseThemeJson(draft);
@@ -38,6 +51,8 @@ export function AppearanceSection(props: {
 	};
 
 	const handleDelete = (id: string) => {
+		if (pending !== null) return;
+		setPending("delete");
 		onChange({
 			customThemes: imported.filter((theme) => theme.id !== id),
 			theme: user.theme === id ? DEFAULT_THEME_ID : user.theme,
@@ -53,7 +68,12 @@ export function AppearanceSection(props: {
 					id="settings-theme"
 					className="settings-select"
 					value={active?.id ?? DEFAULT_THEME_ID}
-					onChange={(event) => onChange({ theme: event.target.value })}
+					disabled={pending !== null}
+					onChange={(event) => {
+						if (pending !== null || event.target.value === user.theme) return;
+						setPending("theme");
+						onChange({ theme: event.target.value });
+					}}
 				>
 					<optgroup label="Built-in">
 						{BUILTIN_THEMES.map((theme) => (
@@ -82,6 +102,7 @@ export function AppearanceSection(props: {
 							<button
 								type="button"
 								className="settings-theme-delete"
+								disabled={pending !== null}
 								onClick={() => handleDelete(theme.id)}
 							>
 								Delete

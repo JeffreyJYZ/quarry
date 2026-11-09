@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import { clampFontSize } from "@/lib/settings/model";
+import { stepValue } from "@/lib/settings/step";
 
 /** A number field with −/+ buttons, clamped to the given range. */
 export function Stepper(props: {
@@ -18,7 +18,7 @@ export function Stepper(props: {
 				className="settings-step"
 				aria-label={`Decrease ${label}`}
 				disabled={value <= min}
-				onClick={() => onChange(clampFontSize(value - 1, min))}
+				onClick={() => onChange(stepValue(value, -1, min, max, value))}
 			>
 				−
 			</button>
@@ -28,14 +28,16 @@ export function Stepper(props: {
 				min={min}
 				max={max}
 				value={value}
-				onChange={(event) => onChange(clampFontSize(Number(event.target.value), value))}
+				onChange={(event) =>
+					onChange(stepValue(Number(event.target.value), 0, min, max, value))
+				}
 			/>
 			<button
 				type="button"
 				className="settings-step"
 				aria-label={`Increase ${label}`}
 				disabled={value >= max}
-				onClick={() => onChange(clampFontSize(value + 1, max))}
+				onClick={() => onChange(stepValue(value, 1, min, max, value))}
 			>
 				+
 			</button>
