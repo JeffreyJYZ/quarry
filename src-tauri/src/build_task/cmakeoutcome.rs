@@ -58,6 +58,9 @@ pub fn missing_cmake_error() -> String {
 /// Cap on source files gathered for a plain-clang build.
 pub const PLAIN_CLANG_SOURCE_CAP: usize = 200;
 
+/// How deep the plain-clang walk goes below the project root.
+pub const PLAIN_CLANG_MAX_DEPTH: usize = 6;
+
 /// Directories skipped while gathering sources.
 pub const PLAIN_CLANG_IGNORED_DIRS: [&str; 5] =
     ["target", "node_modules", ".git", ".quarry", "build"];
