@@ -10,9 +10,9 @@ import { parseThemeJson } from "@/lib/themes/parse";
  * Every edit goes through `onChange` as a preference patch, so the shell persists it and `useTheme`
  * repaints on the same render — there is no draft of the active theme here.
  *
- * The picker and the delete action both write `theme`, so only one of them is armed at a time: a
- * delete landing while a pick was still in flight would clobber it, and last-write-wins is not a
- * conflict resolution.
+ * The picker, the delete action and the import box all write `theme`, so only one of them is armed
+ * at a time: a delete landing while a pick was still in flight would clobber it, and
+ * last-write-wins is not a conflict resolution.
  */
 export function AppearanceSection(props: {
 	user: Preferences;
@@ -21,7 +21,7 @@ export function AppearanceSection(props: {
 	const { user, onChange } = props;
 	const [draft, setDraft] = useState("");
 	const [error, setError] = useState<string | null>(null);
-	const [pending, setPending] = useState<"theme" | "delete" | null>(null);
+	const [pending, setPending] = useState<"theme" | "delete" | "import" | null>(null);
 	const imported = user.customThemes;
 	const active = [...BUILTIN_THEMES, ...imported].find((theme) => theme.id === user.theme);
 
@@ -34,6 +34,7 @@ export function AppearanceSection(props: {
 	}, [user.theme, user.customThemes]);
 
 	const handleImport = () => {
+		if (pending !== null) return;
 		const result = parseThemeJson(draft);
 		if (!result.ok) {
 			setError(result.error);
@@ -47,6 +48,7 @@ export function AppearanceSection(props: {
 		}
 		setError(null);
 		setDraft("");
+		setPending("import");
 		onChange({ customThemes: merged, theme: result.themes[0].id });
 	};
 
@@ -128,7 +130,7 @@ export function AppearanceSection(props: {
 				<button
 					type="button"
 					className="settings-button"
-					disabled={draft.trim() === ""}
+					disabled={draft.trim() === "" || pending !== null}
 					onClick={handleImport}
 				>
 					Import
