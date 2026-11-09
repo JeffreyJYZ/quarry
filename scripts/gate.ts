@@ -72,8 +72,8 @@ function run(step: Step): Promise<void> {
 				maxBuffer: 64 * 1024 * 1024,
 			},
 			(error, stdout, stderr) => {
-				const seconds = ((performance.now() - started) / 1000).toFixed(1);
-				line(`  ${error === null ? "PASS" : "FAIL"}  ${step.name}  (${seconds}s)`);
+				const milliseconds = Math.round(performance.now() - started);
+				line(`  ${error === null ? "PASS" : "FAIL"}  ${step.name}  (${milliseconds}ms)`);
 				if (error !== null) {
 					const output = `${stdout}${stderr}`.trim() || error.message;
 					failures.push({ name: step.name, output });
