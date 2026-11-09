@@ -7,12 +7,12 @@ pub use tauri::{AppHandle, Manager};
 
 use super::*;
 
-pub fn deserialize_panel_debug_width<'de, D>(deserializer: D) -> Result<f64, D::Error>
+pub fn deserialize_panel_disasm_width<'de, D>(deserializer: D) -> Result<f64, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    let value = f64::deserialize(deserializer).unwrap_or(320.0);
-    Ok(value.clamp(200.0, 640.0))
+    let value = f64::deserialize(deserializer).unwrap_or(520.0);
+    Ok(value.clamp(240.0, 1200.0))
 }
 
 pub fn deserialize_panel_dock_height<'de, D>(deserializer: D) -> Result<f64, D::Error>
@@ -79,10 +79,10 @@ pub struct PanelSizes {
     )]
     pub rail_width: f64,
     #[serde(
-        default = "default_debug_width",
-        deserialize_with = "deserialize_panel_debug_width"
+        default = "default_disasm_width",
+        deserialize_with = "deserialize_panel_disasm_width"
     )]
-    pub debug_width: f64,
+    pub disasm_width: f64,
     #[serde(
         default = "default_dock_height",
         deserialize_with = "deserialize_panel_dock_height"
@@ -109,8 +109,8 @@ pub fn default_rail_width() -> f64 {
     240.0
 }
 
-pub fn default_debug_width() -> f64 {
-    320.0
+pub fn default_disasm_width() -> f64 {
+    520.0
 }
 
 pub fn default_dock_height() -> f64 {
@@ -142,7 +142,7 @@ impl Default for PanelSizes {
     fn default() -> Self {
         Self {
             rail_width: 240.0,
-            debug_width: 320.0,
+            disasm_width: 520.0,
             dock_height: 260.0,
             outline_height: 200.0,
             terminal_height: 180.0,
@@ -154,7 +154,7 @@ impl Default for PanelSizes {
 impl PanelSizes {
     pub(crate) fn normalize(&mut self) {
         self.rail_width = self.rail_width.clamp(160.0, 560.0);
-        self.debug_width = self.debug_width.clamp(200.0, 640.0);
+        self.disasm_width = self.disasm_width.clamp(240.0, 1200.0);
         self.dock_height = self.dock_height.clamp(120.0, 900.0);
         self.terminal_height = self.terminal_height.clamp(100.0, 900.0);
         self.terminal_width = self.terminal_width.clamp(240.0, 900.0);

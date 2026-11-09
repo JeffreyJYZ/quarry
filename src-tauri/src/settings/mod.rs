@@ -15,8 +15,8 @@ pub use tauri::{AppHandle, Manager};
 mod settings_file;
 pub use settings_file::*;
 
-mod deserialize_panel_debug_width;
-pub use deserialize_panel_debug_width::*;
+mod panel_sizes;
+pub use panel_sizes::*;
 
 mod deserialize_terminal_prefs;
 pub use deserialize_terminal_prefs::*;
