@@ -43,8 +43,7 @@
 
 /* Server name, save line and build summary: one ellipsis treatment, all quiet. */
 .statusbar .status-server,
-.statusbar .status-save,
-.statusbar .status-build {
+.statusbar .status-save {
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;

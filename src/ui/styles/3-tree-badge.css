@@ -35,11 +35,6 @@
 	transform: rotate(90deg);
 }
 
-.tree-row .spacer {
-	flex: 0 0 auto;
-	width: 4px;
-}
-
 .tree-note {
 	display: block;
 	width: 100%;

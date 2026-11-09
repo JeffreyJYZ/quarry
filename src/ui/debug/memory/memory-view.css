@@ -1,24 +1,5 @@
 /* Memory view: labelled sections, the offset column and the disassembly bar. Dark first. */
 
-/* Section notes sit beside the section label and never push the pane wider. */
-
-.debug-pane-section .debug-section-head {
-	display: flex;
-	align-items: baseline;
-	gap: 8px;
-	min-width: 0;
-}
-
-.debug-pane-section .debug-mem {
-	flex: 1 1 auto;
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	text-transform: none;
-	letter-spacing: 0;
-}
-
 /* Column headers, so the three columns say what they are. */
 
 .memory-row-head {
@@ -34,14 +15,6 @@
 	background: var(--panel);
 }
 
-.memory-offset {
-	flex: 0 0 auto;
-	min-width: 5ch;
-	color: var(--muted);
-	text-align: right;
-	user-select: none;
-}
-
 .memory-row-head .memory-addr {
 	position: static;
 	padding-right: 0;
@@ -55,16 +28,6 @@
 
 .memory-row-head .memory-ascii {
 	color: var(--muted);
-}
-
-/* The panes stack dump over disassembly; each keeps its own scroll area. */
-
-.debug-pane .memory-pane {
-	max-height: 320px;
-}
-
-.debug-pane .memory-pane + .memory-pane {
-	border-top: 1px solid var(--line);
 }
 
 /* The address field is the first thing the eye should find in either pane. */

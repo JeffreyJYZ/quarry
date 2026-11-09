@@ -157,18 +157,6 @@
 	color: var(--text);
 }
 
-.debug-pane-section {
-	flex: 0 0 auto;
-}
-
-.debug-pane {
-	flex: 0 0 96px;
-	height: 96px;
-	min-height: 0;
-	overflow: auto;
-	padding-bottom: 4px;
-}
-
 /* Layout guards: header, dock and status bar never shrink; only the editor absorbs height. */
 .titlebar {
 	flex: 0 0 auto;
@@ -177,9 +165,4 @@
 .titlebar .button {
 	flex: 0 0 auto;
 	white-space: nowrap;
-}
-
-.recent-projects {
-	position: relative;
-	flex: 0 0 auto;
 }

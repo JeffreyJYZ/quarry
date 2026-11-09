@@ -75,13 +75,6 @@
 	outline-offset: -1px;
 }
 
-.problems-filter {
-	display: inline-flex;
-	align-items: center;
-	gap: 2px;
-	margin-left: 8px;
-}
-
 .problems-filter-option {
 	padding: 1px 6px;
 	border: 1px solid var(--line);
@@ -104,26 +97,6 @@
 .problems-filter-option:focus-visible {
 	outline: 1px solid var(--accent);
 	outline-offset: 1px;
-}
-
-.problems-file-toggle {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	flex: 1 1 auto;
-	min-width: 0;
-	padding: 0;
-	border: 0;
-	background: none;
-	color: inherit;
-	font: inherit;
-	text-align: left;
-	cursor: pointer;
-}
-
-.problems-file-toggle:focus-visible {
-	outline: 1px solid var(--accent);
-	outline-offset: -1px;
 }
 
 .problems-file-copy {
