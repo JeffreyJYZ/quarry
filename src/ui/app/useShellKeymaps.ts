@@ -68,6 +68,7 @@ export function useShellKeymaps(options: {
 		setRailCollapsed: panels.setRailCollapsed,
 		setPanelOpen: panels.setPanelOpen,
 		showDebugger: panels.showDebugger,
+		showTodos: panels.showTodos,
 		setGitOpen: panels.setGitOpen,
 		setCommandPaletteOpen: overlays.setCommandPaletteOpen,
 		setFileRevealToken: panels.setFileRevealToken,

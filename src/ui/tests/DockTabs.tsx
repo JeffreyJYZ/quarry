@@ -9,6 +9,7 @@ const LABELS: Record<DockTab, string> = {
 	debugger: "Debugger",
 	console: "Console",
 	memory: "Memory",
+	todo: "TODO",
 };
 
 export function DockTabs({
@@ -19,6 +20,7 @@ export function DockTabs({
 	testsCount,
 	failed,
 	problemsErrors,
+	todoCount,
 	debugStatus,
 	runStatus,
 }: {
@@ -29,6 +31,8 @@ export function DockTabs({
 	testsCount: number;
 	failed: number;
 	problemsErrors: number;
+	/** How many markers the TODO scan is holding, so the tab says it while collapsed. */
+	todoCount: number;
 	debugStatus: DebugStatus;
 	/** The run tab's suffix: `running`, the exit code, or nothing before the first run. */
 	runStatus: string | null;
@@ -53,6 +57,9 @@ export function DockTabs({
 					{problemsErrors}
 				</span>
 			);
+		}
+		if (value === "todo") {
+			return <span className="dock-tab-count">{todoCount}</span>;
 		}
 		if (value === "debugger") {
 			return <span className={`dock-tab-status ${debugStatus}`}>{debugStatus}</span>;

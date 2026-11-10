@@ -2,6 +2,7 @@ import type { Command } from "@/ui/palette/CommandPalette";
 import type { CommandContext } from "./commands";
 import { lspCommands } from "./lspPaletteCommand";
 import { navigationCommands } from "./navigationCommands";
+import { todoCommands } from "./todoCommands";
 
 /**
  * The command palette's list.
@@ -179,6 +180,7 @@ export function buildCommands(context: CommandContext): Command[] {
 			hint: "",
 			run: context.checkUpdates,
 		},
+		...todoCommands(context),
 		...navigationCommands(context, {
 			root,
 			activePath,

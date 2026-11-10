@@ -8,7 +8,7 @@
  * the shell wherever focus sits — a text field and the terminal are still excluded.
  */
 
-export type LayoutToggle = "rail" | "dock" | "debugger" | "source-control";
+export type LayoutToggle = "rail" | "dock" | "debugger" | "source-control" | "todo";
 
 /** What holds the keyboard, as far as the layout toggles care. */
 export type FocusKind = "other" | "editor" | "input" | "terminal";
@@ -26,6 +26,9 @@ export function resolveLayoutToggle(event: Chord, focus: FocusKind): LayoutToggl
 	if (focus === "terminal") return null;
 	const key = event.key.toLowerCase();
 	if (!event.shiftKey) {
+		/* Cmd+6 selects the TODO tool window the way an IDE numbers its tool windows. Nothing else
+		   claims it, so it answers from inside a file and from a text field too. */
+		if (key === "6") return "todo";
 		/* `Cmd+B` is the webview's own bold and `Cmd+J` the text surface's; neither is ours to take. */
 		if (focus === "editor" || focus === "input") return null;
 		if (key === "b") return "rail";

@@ -52,6 +52,11 @@ export const ICONS = {
 			<path d="M6.6 10.4 8.2 12l3.2-3.4" />
 		</Glyph>
 	),
+	todo: (
+		<Glyph>
+			<path d="M2.8 5h1.6M6.6 5h8.6M2.8 9h1.6M6.6 9h8.6M2.8 13h1.6M6.6 13h5.4" />
+		</Glyph>
+	),
 	debugger: (
 		<Glyph>
 			<rect x="5.6" y="5.4" width="6.8" height="8" rx="3.4" />

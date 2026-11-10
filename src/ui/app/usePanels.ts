@@ -44,6 +44,12 @@ export function usePanels() {
 		setPanelOpen(true);
 	}, []);
 
+	/** The TODO list is a dock tab too, and the shortcut opens it the same way. */
+	const showTodos = useCallback(() => {
+		setDockTab("todo");
+		setPanelOpen(true);
+	}, []);
+
 	return {
 		railCollapsed,
 		setRailCollapsed,
@@ -79,6 +85,7 @@ export function usePanels() {
 		setFileRevealToken,
 		showDebugger,
 		showRun,
+		showTodos,
 	};
 }
 

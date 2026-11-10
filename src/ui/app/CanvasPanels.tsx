@@ -127,6 +127,7 @@ export default function CanvasPanels({ model }: { model: ShellModel }) {
 			onNavigate={workspace.handleNavigate}
 			tests={model.tests}
 			runs={model.runs}
+			todo={model.todos}
 		/>
 	);
 }

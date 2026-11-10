@@ -24,6 +24,7 @@ export type KeybindingContext = {
 	setRailCollapsed: (updater: (current: boolean) => boolean) => void;
 	setPanelOpen: (next: boolean) => void;
 	showDebugger: () => void;
+	showTodos: () => void;
 	setGitOpen: (updater: (current: boolean) => boolean) => void;
 	setCommandPaletteOpen: (open: boolean) => void;
 	setFileRevealToken: (updater: (current: number) => number) => void;
@@ -142,8 +143,8 @@ export function useKeybindings(context: KeybindingContext): void {
 				context.setPanelOpen(!panelExpanded);
 				return;
 			}
-			if (toggle === "debugger") {
-				context.showDebugger();
+			if (toggle === "debugger" || toggle === "todo") {
+				(toggle === "debugger" ? context.showDebugger : context.showTodos)();
 				return;
 			}
 			const showing = !context.railCollapsed && context.gitOpen;
@@ -159,6 +160,7 @@ export function useKeybindings(context: KeybindingContext): void {
 		context.setRailCollapsed,
 		context.setPanelOpen,
 		context.showDebugger,
+		context.showTodos,
 		context.setGitOpen,
 	]);
 

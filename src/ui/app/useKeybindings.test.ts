@@ -9,6 +9,7 @@ type Handlers = {
 	setRailCollapsed: ReturnType<typeof mock>;
 	setPanelOpen: ReturnType<typeof mock>;
 	showDebugger: ReturnType<typeof mock>;
+	showTodos: ReturnType<typeof mock>;
 	setGitOpen: ReturnType<typeof mock>;
 };
 
@@ -17,6 +18,7 @@ function keybindings(): Handlers {
 	const setRailCollapsed = mock((_updater: (current: boolean) => boolean) => {});
 	const setPanelOpen = mock((_open: boolean) => {});
 	const showDebugger = mock(() => {});
+	const showTodos = mock(() => {});
 	const setGitOpen = mock((_updater: (current: boolean) => boolean) => {});
 	const context: KeybindingContext = {
 		root: "/tmp/project",
@@ -34,6 +36,7 @@ function keybindings(): Handlers {
 		setRailCollapsed,
 		setPanelOpen,
 		showDebugger,
+		showTodos,
 		setGitOpen,
 		setCommandPaletteOpen: mock(() => {}),
 		setFileRevealToken: mock(() => {}),
@@ -50,7 +53,15 @@ function keybindings(): Handlers {
 		restartLsp: mock(() => {}),
 	};
 	renderHook(() => useKeybindings(context));
-	return { context, setShortcutsOpen, setRailCollapsed, setPanelOpen, showDebugger, setGitOpen };
+	return {
+		context,
+		setShortcutsOpen,
+		setRailCollapsed,
+		setPanelOpen,
+		showDebugger,
+		showTodos,
+		setGitOpen,
+	};
 }
 
 /** A caret inside a file: CodeMirror's contenteditable content, the way the editor holds focus. */
@@ -102,6 +113,16 @@ describe("the layout toggles", () => {
 
 		expect(handled).toBe(false);
 		expect(keys.showDebugger).toHaveBeenCalledTimes(1);
+	});
+
+	test("Cmd+6 selects the TODO tool window from inside a file", () => {
+		const keys = keybindings();
+		const content = focusEditor();
+
+		const handled = fireEvent.keyDown(content, { key: "6", metaKey: true });
+
+		expect(handled).toBe(false);
+		expect(keys.showTodos).toHaveBeenCalledTimes(1);
 	});
 
 	test("Cmd+Shift+G toggles source control from inside a file", () => {
