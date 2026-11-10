@@ -10,6 +10,19 @@ export type TodoGutterProps = {
 	onOpen: (marker: TodoComment) => void;
 };
 
+/**
+ * The debugger as the editor sees it: where it stopped, and how to run to a line.
+ *
+ * `path`/`line` are the top frame's, so an editor paints the stop only when its own file matches.
+ */
+export type EditorDebug = {
+	/** True while a session is stopped, which is the only time Run to cursor acts. */
+	stopped: boolean;
+	path: string | null;
+	line: number;
+	runToCursor: (path: string, line: number) => void;
+};
+
 export type EditorProps = {
 	/** Absolute path of the open file, or null for an empty buffer. */
 	path: string | null;
@@ -47,6 +60,8 @@ export type EditorProps = {
 	onCursor?: (position: { line: number; character: number }) => void;
 	/** Per-line blame annotations; null/undefined clears them. */
 	blame?: { line: number; label: string }[] | null;
+	/** The stopped location and the debug session's actions; absent outside the debugger. */
+	debug?: EditorDebug;
 	/** Apply a batch of file edits produced by rename or code actions. */
 	onApplyEdits?: (edits: FileEdit[]) => void;
 	/** Indent width in spaces; 4 when absent. */

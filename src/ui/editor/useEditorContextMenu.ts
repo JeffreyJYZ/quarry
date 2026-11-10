@@ -1,11 +1,33 @@
 import { type MutableRefObject, useCallback, useState } from "react";
 import type { EditorView } from "@codemirror/view";
 import type { MenuItem } from "@/ui/components/ContextMenu";
+import type { EditorDebug } from "@/ui/editor/editorTypes";
 
 type MenuState = { x: number; y: number; line: number; hasSelection: boolean };
 
 /** Just enough of a pointer event to place the menu: a React one and a native one both fit. */
 type PointerEvent = { preventDefault: () => void; clientX: number; clientY: number };
+
+/**
+ * The menu's debug entry: always listed so the feature is findable, inert until a session stops.
+ *
+ * The line is the one the right click landed on and the path is the open editor's, so Run to cursor
+ * acts on what the user is looking at even when the debuggee stopped in another file.
+ */
+export function runToCursorItem(
+	line: number,
+	path: string | null,
+	debug: EditorDebug | undefined,
+): MenuItem {
+	const run = debug?.runToCursor;
+	const pick = path === null || run === undefined ? undefined : (at: number) => run(path, at);
+	return {
+		label: "Run to cursor",
+		separated: true,
+		disabled: debug?.stopped !== true || pick === undefined,
+		onSelect: () => pick?.(line),
+	};
+}
 
 /**
  * The editor's right-click menu: clipboard, breakpoint, format.
@@ -20,11 +42,15 @@ type PointerEvent = { preventDefault: () => void; clientX: number; clientY: numb
  */
 export function useEditorContextMenu({
 	viewRef,
+	path,
+	debug,
 	onToggleBreakpoint,
 	onFormat,
 	onNotice,
 }: {
 	viewRef: MutableRefObject<EditorView | null>;
+	path: string | null;
+	debug?: EditorDebug;
 	onToggleBreakpoint?: (line: number) => void;
 	onFormat: () => void;
 	onNotice?: (message: string | null) => void;
@@ -120,6 +146,7 @@ export function useEditorContextMenu({
 			disabled: onToggleBreakpoint === undefined,
 			onSelect: () => onToggleBreakpoint?.(current.line),
 		},
+		runToCursorItem(current.line, path, debug),
 		{ label: "Format document", onSelect: onFormat },
 	];
 

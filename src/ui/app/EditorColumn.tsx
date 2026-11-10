@@ -1,7 +1,9 @@
 import { useEffect, useMemo, type CSSProperties } from "react";
 import { setDisassemblyOpener } from "@/lib/debug/disasm";
+import { stopLocation } from "@/lib/debug/stopLocation";
 import type { TestMarker } from "@/lib/tests/gutter";
 import { todoLines } from "@/lib/todo/lines";
+import type { EditorDebug } from "@/ui/editor/editorTypes";
 import EditorStage from "@/ui/app/EditorStage";
 import { Palettes } from "@/ui/app/BottomDock";
 import CanvasPanels from "@/ui/app/CanvasPanels";
@@ -14,6 +16,15 @@ import type { ShellModel } from "@/ui/app/useShell";
 export default function EditorColumn({ model }: { model: ShellModel }) {
 	const { workspace, overlays, settings, diagnostics, editorActions, git, panels } = model;
 	const { dockHeight, terminalHeight } = settings.panels;
+	// The stop is read once, from the top frame, and handed to both panes: each one paints it only
+	// when its own file is the stopped one.
+	const stop = stopLocation(model.debug.status, model.debug.stopView);
+	const debugStop: EditorDebug = {
+		stopped: model.debug.status === "stopped",
+		path: stop?.path ?? null,
+		line: stop?.line ?? 0,
+		runToCursor: model.debug.runToCursor,
+	};
 
 	// The dock's frame rows open the split through this registry; it is the shell's one owner of
 	// "what is open", so the dock never needs a setter drilled through its columns.
@@ -114,6 +125,7 @@ export default function EditorColumn({ model }: { model: ShellModel }) {
 				todo={todo}
 				blameOn={git.blameOn}
 				blameByPath={git.blameByPath}
+				debug={debugStop}
 				revealTarget={overlays.revealTarget}
 				revealToken={overlays.revealToken}
 				onActivate={workspace.handleActivate}

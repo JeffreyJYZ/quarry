@@ -43,4 +43,20 @@ describe("dropTemporary", () => {
 		expect(paths).toEqual([]);
 		expect(next).toEqual(map);
 	});
+
+	test("a run-to-cursor landing clears its own temporary entry and keeps the rest", () => {
+		/* The stop the temporary breakpoint produced: the entry is gone, its permanent neighbour not. */
+		const map = new Map([
+			[
+				"/a.rs",
+				new Map([
+					[11, entry(false)],
+					[12, entry(true)],
+				]),
+			],
+		]);
+		const { next, paths } = dropTemporary(map);
+		expect(paths).toEqual(["/a.rs"]);
+		expect([...(next.get("/a.rs")?.keys() ?? [])]).toEqual([11]);
+	});
 });
