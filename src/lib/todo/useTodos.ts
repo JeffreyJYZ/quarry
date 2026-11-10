@@ -48,6 +48,9 @@ export function useTodos(root: string | null): TodoController {
 	filesRef.current = files;
 
 	useEffect(() => {
+		// `scanToken` is a re-scan trigger, not a value the scan reads: a refresh bumps it so this
+		// effect runs again without the hook keeping a second callback.
+		void scanToken;
 		const ticket = sequence.current + 1;
 		sequence.current = ticket;
 		setError(null);
