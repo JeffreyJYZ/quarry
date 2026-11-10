@@ -45,6 +45,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		onCursor,
 		onApplyEdits,
 		blame = null,
+		debug,
 		tabSize = 4,
 		fontSize = 13,
 		fontFamily = "",
@@ -121,6 +122,8 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 	useEditorHandle({ ref, viewRef, latestRef, runFormatText });
 	const menu = useEditorContextMenu({
 		viewRef,
+		path,
+		debug,
 		onToggleBreakpoint,
 		onFormat: () => void runFormatText(),
 		onNotice: (message) => onNoticeRef.current?.(message),
@@ -164,7 +167,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 	useEditorMount({ refs, deps, behaviour, documentId, testMarkers });
 
 	useDocumentSync({ viewRef, value, emittedRef });
-	useGutterMarkers(refs, { breakpointLines, unverifiedLines, bookmarkLines }, todo);
+	useGutterMarkers(refs, { path, breakpointLines, unverifiedLines, bookmarkLines, debug }, todo);
 	useDiagnosticsPublish({ viewRef, diagnostics, publishedRef });
 
 	useEditorEffects({

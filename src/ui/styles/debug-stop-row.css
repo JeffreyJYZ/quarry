@@ -1,0 +1,40 @@
+/* The stopped line as the debugger draw it: the breakpoints header names the stop, and the row the
+   debuggee rests on carries an accent dot and bar. Both are read from the top frame's path and
+   line, so an adjacent breakpoint is never marked by accident. */
+
+.debug-bp.current {
+	box-shadow: inset 2px 0 0 0 var(--accent);
+}
+
+.debug-bp.current .debug-pos {
+	color: var(--accent);
+}
+
+.debug-bp.current .debug-pos::before {
+	content: "";
+	display: inline-block;
+	width: 6px;
+	height: 6px;
+	margin-right: 5px;
+	border-radius: 50%;
+	background: var(--accent);
+	vertical-align: middle;
+}
+
+/* The header keeps its label and the stop on one line, with the Add button on the far edge. */
+.dock-debug-head-group {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+
+.dock-debug-stop {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: var(--mono);
+	font-size: 10px;
+	color: var(--accent);
+}

@@ -21,6 +21,7 @@ import { history } from "@codemirror/commands";
 import { blameField } from "@/lib/editor/blame";
 import { bookmarkGutter } from "@/lib/bookmarks/gutter";
 import { breakpointGutter } from "@/lib/editor/breakpoints";
+import { stopLineGutter } from "@/lib/editor/stopLine";
 import { cppEditing } from "@/lib/editor/cppEditing";
 import { inlayHintsField } from "@/lib/editor/inlayHints";
 import { languageForPath } from "@/lib/editor/languages";
@@ -68,6 +69,7 @@ export function createEditorView(options: {
 	const extensions: Extension = [
 		bookmarkGutter,
 		breakpointGutter,
+		stopLineGutter,
 		searchField,
 		searchDecorations,
 		inlayHintsField,

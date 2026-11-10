@@ -1,7 +1,7 @@
 import type { DiagnosticMap } from "@/lib/lsp/diagnostics";
 import { type FileBuffer, documentId } from "@/lib/project/buffer";
 import type { Preferences } from "@/lib/settings/model";
-import type { EditorHandle } from "@/ui/editor/Editor";
+import type { EditorDebug, EditorHandle } from "@/ui/editor/editorTypes";
 import Breadcrumb from "@/ui/breadcrumb/Breadcrumb";
 import LazyEditor from "@/ui/editor/LazyEditor";
 import TabStrip from "@/ui/components/TabStrip";
@@ -46,6 +46,8 @@ export type EditorStageProps = {
 	bookmarkLines: number[];
 	blameOn: boolean;
 	blameByPath: Map<string, { line: number; label: string }[]>;
+	/** Where the debuggee is stopped and how to run to a line; undefined without the debugger. */
+	debug?: EditorDebug;
 	revealTarget: { line: number; character: number } | null;
 	revealToken: number;
 
@@ -139,6 +141,7 @@ export default function EditorStage(props: EditorStageProps) {
 					fontSize={props.effective.editorFontSize}
 					fontFamily={props.effective.editorFontFamily}
 					blame={props.blameOn ? (props.blameByPath.get(active.path) ?? null) : null}
+					debug={props.debug}
 					reveal={reveal}
 				/>
 				{props.split === null ? null : (
@@ -152,6 +155,7 @@ export default function EditorStage(props: EditorStageProps) {
 						breakpointLines={props.breakpointLines}
 						unverifiedLines={props.unverifiedLines}
 						bookmarkLines={props.bookmarkLines}
+						debug={props.debug}
 						onChange={props.onChangeFor}
 						onNavigate={props.onNavigate}
 						onReferences={props.onReferences}

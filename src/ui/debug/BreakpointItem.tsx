@@ -23,11 +23,13 @@ function markerFor(row: BreakpointRow): { text: string; title: string } | null {
 
 type Props = {
 	row: BreakpointRow;
+	/** True while the top frame sits on this exact path and line. */
+	current?: boolean;
 	onEdit: (field: BreakpointField, value: string | null) => void;
 	onRemove: (path: string, line: number) => void;
 };
 
-export default function BreakpointItem({ row, onEdit, onRemove }: Props) {
+export default function BreakpointItem({ row, current = false, onEdit, onRemove }: Props) {
 	const [editing, setEditing] = useState<BreakpointField | null>(null);
 	const [draft, setDraft] = useState("");
 	const settled = useRef(false);
@@ -83,13 +85,14 @@ export default function BreakpointItem({ row, onEdit, onRemove }: Props) {
 
 	return (
 		<li
-			className={
-				row.verified === false
-					? "debug-item debug-bp unverified"
-					: row.verified === null
-						? "debug-item debug-bp pending"
-						: "debug-item debug-bp"
-			}
+			className={[
+				"debug-item debug-bp",
+				row.verified === false ? "unverified" : row.verified === null ? "pending" : "",
+				current ? "current" : "",
+			]
+				.filter(Boolean)
+				.join(" ")}
+			aria-current={current ? "true" : undefined}
 			title={row.message ?? row.path}
 		>
 			<span className="debug-pos">

@@ -3,6 +3,7 @@ import { type FileBuffer, documentId } from "@/lib/project/buffer";
 import type { DiagnosticMap } from "@/lib/lsp/diagnostics";
 import { PANEL_LIMITS } from "@/lib/consts/layout";
 import type { TestMarker } from "@/lib/tests/gutter";
+import type { EditorDebug } from "@/ui/editor/editorTypes";
 import LazyEditor from "@/ui/editor/LazyEditor";
 import SplitPicker from "@/ui/app/SplitPicker";
 import Splitter from "@/ui/layout/Splitter";
@@ -38,6 +39,8 @@ export type SplitPaneProps = {
 	breakpointLines: number[];
 	unverifiedLines: number[];
 	bookmarkLines: number[];
+	/** The stopped location and Run-to-cursor, from the same debugger the left pane uses. */
+	debug?: EditorDebug;
 	/** Text reported by this pane, written to `path` rather than to the active buffer. */
 	onChange: (path: string, text: string) => void;
 	onNavigate: (path: string, line: number, character: number) => void;
@@ -122,6 +125,7 @@ export default function SplitPane(props: SplitPaneProps) {
 							onTestMarker={props.onTestMarker}
 							bookmarkLines={props.bookmarkLines}
 							onToggleBookmark={props.onToggleBookmark}
+							debug={props.debug}
 							onNavigate={props.onNavigate}
 							onReferences={props.onReferences}
 							onCursor={props.onCursor}

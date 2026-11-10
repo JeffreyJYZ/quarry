@@ -2,6 +2,7 @@ import type { Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { editorMetrics, palette } from "@/lib/consts/editor";
 import { bookmarkStyles, breakpointStyles, foldStyles, lintStyles } from "@/lib/editor/themeStyles";
+import { stopLineStyles } from "@/lib/editor/stopLineStyles";
 import { themeVar, type ThemeToken } from "@/lib/themes/model";
 
 /**
@@ -138,6 +139,7 @@ export const quarryTheme: Extension = EditorView.theme(
 		...lintStyles,
 		...breakpointStyles,
 		...bookmarkStyles,
+		...stopLineStyles,
 		...foldStyles,
 		".cm-occurrence": {
 			backgroundColor: "rgba(116, 173, 232, 0.14)",

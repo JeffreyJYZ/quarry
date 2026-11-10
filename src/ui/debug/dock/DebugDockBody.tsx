@@ -6,6 +6,7 @@ import { PinsSection, WatchPointsSection } from "@/ui/debug/WatchSections";
 import TransportRail from "@/ui/debug/dock/TransportRail";
 import Splitter from "@/ui/layout/Splitter";
 import { useDebugDockWidths } from "@/ui/debug/dock/dockWidths";
+import { stopLabel, stopLocation } from "@/lib/debug/stopLocation";
 import type { DebugController } from "@/lib/debug/session";
 
 /**
@@ -27,6 +28,7 @@ export default function DebugDockBody({
 }) {
 	const view = debug.stopView;
 	const top = view === null ? null : (view.frames[0] ?? null);
+	const stopText = stopLabel(stopLocation(debug.status, view));
 	const { framesWidth, setFramesWidth, breakpointsWidth, setBreakpointsWidth } =
 		useDebugDockWidths();
 	const canAddBreakpoint = debug.status === "stopped" && top !== null && top.source !== null;
@@ -131,7 +133,14 @@ export default function DebugDockBody({
 					style={{ flex: "0 0 auto", width: `${breakpointsWidth}px` }}
 				>
 					<header className="dock-debug-head">
-						<span className="dock-debug-label">breakpoints</span>
+						<span className="dock-debug-head-group">
+							<span className="dock-debug-label">breakpoints</span>
+							{stopText === null ? null : (
+								<span className="dock-debug-stop" title={stopText}>
+									{stopText}
+								</span>
+							)}
+						</span>
 						<button
 							type="button"
 							className="dock-action"

@@ -1,5 +1,6 @@
 import BreakpointItem from "@/ui/debug/BreakpointItem";
 import type { DebugController } from "@/lib/debug/session";
+import { isCurrentBreakpoint, stopLocation } from "@/lib/debug/stopLocation";
 import { fileName } from "@/lib/project/paths";
 
 /**
@@ -7,6 +8,9 @@ import { fileName } from "@/lib/project/paths";
  * which adds the top frame's line.
  */
 export default function BreakpointsSection({ debug }: { debug: DebugController }) {
+	// The row identity is path and line: lldb-dap sends `hitBreakpointIds: null`, so a stop is
+	// attributed by the top frame alone.
+	const stop = stopLocation(debug.status, debug.stopView);
 	if (debug.breakpoints.length === 0) {
 		return <p className="debug-note">None. Click the editor gutter to set one.</p>;
 	}
@@ -25,6 +29,7 @@ export default function BreakpointsSection({ debug }: { debug: DebugController }
 								<BreakpointItem
 									key={breakpoint.key}
 									row={breakpoint}
+									current={isCurrentBreakpoint(breakpoint, stop)}
 									onEdit={(field, value) =>
 										debug.setBreakpointField(
 											breakpoint.path,
