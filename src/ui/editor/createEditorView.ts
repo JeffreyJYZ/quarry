@@ -55,6 +55,8 @@ export function createEditorView(options: {
 	indentation: Compartment;
 	/** Holds the test column; empty until the file has markers to draw. */
 	testGutter: Compartment;
+	/** Holds the TODO column; empty until the file carries a marker. */
+	todoGutter: Compartment;
 	initialValue: string;
 	initialPath: string | null;
 	tabSize: number;
@@ -85,6 +87,7 @@ export function createEditorView(options: {
 		foldGutter(),
 		indentation.of([indentUnit.of(" ".repeat(tabSize)), EditorState.tabSize.of(tabSize)]),
 		options.testGutter.of([]),
+		options.todoGutter.of([]),
 		keymap.of([
 			...completionBindings(options.deps),
 			...lspBindings(options.deps),

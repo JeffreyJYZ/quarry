@@ -1,16 +1,22 @@
+import type { TodoGutterProps } from "@/ui/editor/editorTypes";
 import type { EditorRefs } from "@/ui/editor/useEditorRefs";
 import { useBookmarkGutter } from "@/ui/editor/useBookmarkGutter";
 import { useBreakpointGutter } from "@/ui/editor/useBreakpointGutter";
+import { useTodoGutter } from "@/ui/editor/useTodoGutter";
+
+/** No markers, and a shape the hook can read without asking again whether the prop is there. */
+const NO_TODO: TodoGutterProps = { markers: [], onOpen: () => undefined };
 
 /**
- * Publishes both gutter columns in one place.
+ * Publishes every gutter column in one place.
  *
- * The breakpoint and bookmark columns are the same shape — a line list pushed into a state field
- * plus a toggle ref — so the surface mounts them together instead of repeating the wiring twice.
+ * The columns are the same shape — data pushed into a state field, plus the click channel back to
+ * the caller — so the surface mounts them together instead of repeating the wiring per column.
  */
 export function useGutterMarkers(
 	refs: EditorRefs,
 	lines: { breakpointLines: number[]; unverifiedLines: number[]; bookmarkLines: number[] },
+	todo: TodoGutterProps | undefined,
 ): void {
 	useBreakpointGutter({
 		viewRef: refs.viewRef,
@@ -25,4 +31,14 @@ export function useGutterMarkers(
 		markersRef: refs.bookmarkMarkersRef,
 		toggleRef: refs.bookmarkToggleRef,
 	});
+	const column = todo ?? NO_TODO;
+	useTodoGutter(
+		{
+			viewRef: refs.viewRef,
+			gutterRef: refs.todoGutterRef,
+			markersRef: refs.todoMarkersRef,
+		},
+		column.markers,
+		column.onOpen,
+	);
 }

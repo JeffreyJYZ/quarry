@@ -1,0 +1,30 @@
+/* The TODO column: one square per line carrying a TODO/FIXME/HACK/XXX comment.
+   The colours are the theme's own tokens, so the light and the dark theme both resolve. */
+
+.cm-todo-gutter {
+	width: 1.1em;
+	cursor: pointer;
+}
+
+.cm-todo-gutter:hover {
+	background: var(--hover);
+}
+
+.cm-todo-gutter .cm-gutterElement {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+}
+
+.cm-todo-marker {
+	width: 6px;
+	height: 6px;
+	border-radius: 1px;
+	background: var(--muted);
+}
+
+.cm-todo-marker:hover,
+.cm-todo-gutter:hover .cm-todo-marker {
+	background: var(--accent);
+}

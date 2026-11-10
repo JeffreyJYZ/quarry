@@ -59,6 +59,9 @@ export function useEditorRefs(props: EditorProps) {
 		props.onToggleBookmark ?? null,
 	);
 	bookmarkToggleRef.current = props.onToggleBookmark ?? null;
+	/** Holds the TODO column; empty until the buffer carries a marker. */
+	const todoGutterRef = useRef<Compartment | null>(null);
+	const todoMarkersRef = useRef("");
 	const rootRef = useRef<string | null>(props.root ?? null);
 	rootRef.current = props.root ?? null;
 	const navigateRef = useRef<((path: string, line: number, character: number) => void) | null>(
@@ -99,6 +102,8 @@ export function useEditorRefs(props: EditorProps) {
 		onTestMarkerRef,
 		bookmarkMarkersRef,
 		bookmarkToggleRef,
+		todoGutterRef,
+		todoMarkersRef,
 		rootRef,
 		navigateRef,
 		referencesRef,

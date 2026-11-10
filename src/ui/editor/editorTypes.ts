@@ -1,5 +1,14 @@
 import type { Diagnostic, FileEdit, Location } from "@/lib/project/api";
 import type { TestMarker } from "@/lib/tests/gutter";
+import type { TodoComment } from "@/lib/todo/lines";
+
+/** The comment markers of the open buffer, and what a click on one does. */
+export type TodoGutterProps = {
+	/** 1-based lines carrying a marker; empty draws no gutter column at all. */
+	markers: readonly TodoComment[];
+	/** A click on a marker, which is where the TODO window opens. */
+	onOpen: (marker: TodoComment) => void;
+};
 
 export type EditorProps = {
 	/** Absolute path of the open file, or null for an empty buffer. */
@@ -22,6 +31,8 @@ export type EditorProps = {
 	bookmarkLines?: number[];
 	/** Clicking the bookmark gutter reports a 1-based line; the caller owns the set. */
 	onToggleBookmark?: (line: number) => void;
+	/** Comment markers for this file, drawn in their own gutter column; absent draws no column. */
+	todo?: TodoGutterProps;
 	/** Open project root; null disables all LSP requests. */
 	root?: string | null;
 	/** Navigate to a definition location. */

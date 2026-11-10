@@ -1,6 +1,7 @@
-import { useEffect, type CSSProperties } from "react";
+import { useEffect, useMemo, type CSSProperties } from "react";
 import { setDisassemblyOpener } from "@/lib/debug/disasm";
 import type { TestMarker } from "@/lib/tests/gutter";
+import { todoLines } from "@/lib/todo/lines";
 import EditorStage from "@/ui/app/EditorStage";
 import { Palettes } from "@/ui/app/BottomDock";
 import CanvasPanels from "@/ui/app/CanvasPanels";
@@ -38,6 +39,12 @@ export default function EditorColumn({ model }: { model: ShellModel }) {
 		else model.tests.runOne(marker.name);
 		model.panels.showTests();
 	};
+	// The active buffer's own markers: the TODO window's pattern over the text the editor already
+	// holds, so the gutter follows an edit without a project scan. The click opens that window.
+	const todo = useMemo(() => {
+		const markers = todoLines(model.active?.text ?? "");
+		return { markers, onOpen: () => panels.showTodos() };
+	}, [model.active?.text, panels.showTodos]);
 	const disasm = useDisasmSplit({
 		open: panels.disasmOpen,
 		width: panels.disasmWidth,
@@ -104,6 +111,7 @@ export default function EditorColumn({ model }: { model: ShellModel }) {
 				unverifiedLines={editorActions.unverifiedLines}
 				testMarkers={testMarkers}
 				onTestMarker={runTestMarker}
+				todo={todo}
 				blameOn={git.blameOn}
 				blameByPath={git.blameByPath}
 				revealTarget={overlays.revealTarget}
