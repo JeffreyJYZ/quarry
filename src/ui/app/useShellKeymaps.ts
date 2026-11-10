@@ -12,6 +12,7 @@ import type { useSaveBuffers } from "@/ui/app/useSaveBuffers";
 import { useSelectionKeybindings } from "@/ui/app/useSelectionKeybindings";
 import type { useSettings } from "@/ui/app/useSettings";
 import { useSplitKey } from "@/ui/app/useSplitKey";
+import { useBookmarkNavKey } from "@/ui/app/useBookmarkNavKey";
 import { useTabKeys } from "@/ui/app/useTabKeys";
 import type { useWorkspace } from "@/ui/app/useWorkspace";
 
@@ -41,6 +42,8 @@ export function useShellKeymaps(options: {
 		stop: () => void;
 	};
 	toggleSplit: () => void;
+	/** Next or previous bookmark from the caret, whichever shell focus the window has. */
+	stepBookmark: (direction: 1 | -1) => void;
 	root: string | null;
 	activePath: string | null;
 	cursor: Cursor;
@@ -53,6 +56,7 @@ export function useShellKeymaps(options: {
 	const tabKeys = useTabKeys(workspace);
 	useGotoLineKey({ activePath, open: () => overlays.setLineOpen(true) });
 	useSplitKey({ toggle: options.toggleSplit });
+	useBookmarkNavKey({ step: options.stepBookmark });
 
 	useKeybindings({
 		root,

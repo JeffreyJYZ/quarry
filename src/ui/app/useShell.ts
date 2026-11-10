@@ -54,7 +54,7 @@ export function useShell() {
 	});
 	const root = workspace.project?.root ?? null;
 	const activePath = workspace.activePath;
-	const split = useSplit({ buffers: workspace.buffers, activePath, onNotice: setNotice });
+	const split = useSplit({ buffers: workspace.buffers, activePath });
 	const todos = useTodos(root);
 	const git = useGitState({ root, activePath, onNotice: setNotice });
 	const runs = useRunControls({
@@ -153,6 +153,7 @@ export function useShell() {
 		diagnostics,
 		debug,
 		tests,
+		bookmarks,
 		split,
 		root,
 		activePath,

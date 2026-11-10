@@ -97,6 +97,8 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
 				keys: ["Cmd", "Alt", "K"],
 				action: "Toggle a bookmark on the caret line",
 			},
+			{ keys: ["Cmd", "Alt", "N"], action: "Next bookmark" },
+			{ keys: ["Cmd", "Alt", "P"], action: "Previous bookmark" },
 			{ keys: ["Shift", "F12"], action: "Find references" },
 			{ keys: ["Cmd", "Click"], action: "Go to definition" },
 		],

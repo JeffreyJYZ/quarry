@@ -59,16 +59,18 @@ export default function EditorColumn({ model }: { model: ShellModel }) {
 		results: model.tests.results,
 		running: model.tests.running,
 	});
-	const split =
-		splitBuffer === null
-			? null
-			: {
-					buffer: splitBuffer,
-					width: model.split.width,
-					testMarkers: splitMarkers,
-					onWidthChange: model.split.setWidth,
-					onClose: model.split.close,
-				};
+	const split = model.split.open
+		? {
+				buffer: splitBuffer,
+				buffers: workspace.buffers,
+				blockedPath: model.activePath,
+				onPick: model.split.setPath,
+				width: model.split.width,
+				testMarkers: splitMarkers,
+				onWidthChange: model.split.setWidth,
+				onClose: model.split.close,
+			}
+		: null;
 
 	return (
 		<main

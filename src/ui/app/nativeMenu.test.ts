@@ -27,6 +27,9 @@ const IDLE_CONTEXT: CommandContext = {
 	save: noop,
 	saveAll: noop,
 	format: noop,
+	nextBookmark: noop,
+	previousBookmark: noop,
+	bookmarkCount: 0,
 	runToCursor: noop,
 	showDebugger: noop,
 	showTodos: noop,
@@ -120,6 +123,42 @@ describe("split editor", () => {
 	test("is unavailable with no project open", () => {
 		const command = buildCommands(IDLE_CONTEXT).find((entry) => entry.id === "toggle-split");
 		expect(command?.disabled).toBe(true);
+	});
+});
+
+describe("bookmark steps", () => {
+	test("are palette rows that walk the list both ways", () => {
+		const seen: string[] = [];
+		const commands = buildCommands({
+			...IDLE_CONTEXT,
+			root: "/p",
+			bookmarkCount: 3,
+			nextBookmark: () => seen.push("next"),
+			previousBookmark: () => seen.push("previous"),
+		});
+		const next = commands.find((entry) => entry.id === "next-bookmark");
+		const previous = commands.find((entry) => entry.id === "previous-bookmark");
+		expect(next?.label).toBe("Next bookmark");
+		expect(next?.hint).toBe("Cmd+Alt+N");
+		expect(previous?.label).toBe("Previous bookmark");
+		expect(previous?.hint).toBe("Cmd+Alt+P");
+		expect(next?.disabled).toBe(false);
+		expect(previous?.disabled).toBe(false);
+		next?.run();
+		previous?.run();
+		expect(seen).toEqual(["next", "previous"]);
+	});
+
+	test("say why they are unavailable with no project or no bookmarks", () => {
+		const noProject = buildCommands(IDLE_CONTEXT).find((entry) => entry.id === "next-bookmark");
+		expect(noProject?.disabled).toBe(true);
+		const none = buildCommands({
+			...IDLE_CONTEXT,
+			root: "/p",
+			bookmarkCount: 0,
+		}).find((entry) => entry.id === "previous-bookmark");
+		expect(none?.disabled).toBe(true);
+		expect(none?.disabledReason).toBe("No bookmarks in this project");
 	});
 });
 

@@ -16,6 +16,11 @@ export type CommandContext = {
 	save: () => void;
 	saveAll: () => void;
 	format: () => void;
+	/** Walk the project's bookmarks from the caret, wrapping at either end. */
+	nextBookmark: () => void;
+	previousBookmark: () => void;
+	/** How many bookmarks the project has, so the two rows can say why they are unavailable. */
+	bookmarkCount: number;
 	runToCursor: (path: string, line: number) => void;
 	showDebugger: () => void;
 	showTodos: () => void;
