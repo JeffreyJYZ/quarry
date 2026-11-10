@@ -88,6 +88,14 @@ export default function IconRail({ model }: { model: ShellModel }) {
 			onClick: () => toggleDockTab("tests"),
 		},
 		{
+			id: "todo",
+			label: "TODO",
+			hint: "Cmd+6",
+			active: hasProject && dockShown("todo"),
+			disabled: !hasProject,
+			onClick: () => toggleDockTab("todo"),
+		},
+		{
 			id: "debugger",
 			label: "Debugger",
 			hint: "Cmd+Shift+D",

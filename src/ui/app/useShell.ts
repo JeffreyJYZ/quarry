@@ -7,6 +7,7 @@ import { useLspRestart } from "@/ui/app/useLspRestart";
 import { useShellDiagnostics } from "@/ui/app/useShellDiagnostics";
 import type { RunConfiguration } from "@/lib/project/api";
 import { useTests } from "@/lib/tests/useTests";
+import { useTodos } from "@/lib/todo/useTodos";
 import { useBuild } from "@/ui/app/useBuild";
 import type { EditorHandle } from "@/ui/editor/Editor";
 import { useEditorActions } from "@/ui/app/useEditorActions";
@@ -50,7 +51,7 @@ export function useShell() {
 	});
 	const root = workspace.project?.root ?? null;
 	const activePath = workspace.activePath;
-
+	const todos = useTodos(root);
 	const git = useGitState({ root, activePath, onNotice: setNotice });
 	const runs = useRunControls({
 		root,
@@ -82,7 +83,7 @@ export function useShell() {
 		setSaving: workspace.setSaving,
 		setSaveStatus: panels.setSaveStatus,
 		setFormatting: panels.setFormatting,
-		onSaved: (path) => git.forgetBlame(path),
+		onSaved: (path) => [git.forgetBlame(path), todos.noteSaved(path)],
 		onBatchSaved: () => git.markSaved(),
 	});
 	savePathsRef.current = save.savePaths;
@@ -132,7 +133,6 @@ export function useShell() {
 		settings.report?.tools.filter((tool) => tool.source === "missing").length ?? 0;
 	/** Only a failed save earns a slot in the bar; a successful one is not news. */
 	const saveError = panels.saveStatus?.failed === true ? panels.saveStatus.text : null;
-
 	// Everything that belonged to the previous project, cleared when a new one opens.
 	projectOpenedRef.current = () =>
 		resetProjectState({ git, panels, overlays, diagnostics, runs });
@@ -180,6 +180,7 @@ export function useShell() {
 		diagnostics,
 		debug,
 		tests,
+		todos,
 		lspStatuses,
 		restartLsp: lspRestart.restart,
 		notice,

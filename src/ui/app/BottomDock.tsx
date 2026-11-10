@@ -32,6 +32,7 @@ export type DockProps = {
 	onNavigate: (path: string, line: number, character: number) => void;
 	tests: TestsDockProps["tests"];
 	runs: RunControls;
+	todo: TestsDockProps["todo"];
 };
 
 /** The bottom dock: problems, tests and the debugger share one region and one header. */
@@ -71,6 +72,7 @@ export default function BottomDock(props: DockProps) {
 				}}
 				tests={props.tests}
 				runs={props.runs}
+				todo={props.todo}
 			/>
 		</>
 	);

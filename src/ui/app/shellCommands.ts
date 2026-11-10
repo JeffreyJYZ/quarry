@@ -58,6 +58,7 @@ export function shellCommands(options: {
 		format: () => void save.formatActive(),
 		runToCursor: (path, line) => debug.runToCursor(path, line),
 		showDebugger: () => panels.showDebugger(),
+		showTodos: () => panels.showTodos(),
 		showDisassembly: () => openDisassembly(),
 		toggleGit: () => panels.setGitOpen((current) => !current),
 		openSearch: () => overlays.setSearchOpen(true),

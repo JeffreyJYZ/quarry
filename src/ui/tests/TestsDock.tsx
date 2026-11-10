@@ -14,7 +14,9 @@ import DebugMenu from "@/ui/debug/dock/DebugMenu";
 import { activeFrame, memoryAddressOf } from "@/ui/debug/dock/addresses";
 import ProblemsPanel from "@/ui/problems/ProblemsPanel";
 import TestsPanel from "@/ui/tests/TestsPanel";
+import TodoPanel from "@/ui/todo/TodoPanel";
 import type { TestsController } from "@/lib/tests/useTests";
+import type { TodoController } from "@/lib/todo/useTodos";
 import "@/ui/debug/dock/dock-debug.css";
 import "@/ui/debug/debug.css";
 
@@ -41,6 +43,7 @@ export type TestsDockProps = {
 	};
 	tests: TestsController;
 	runs: RunControls;
+	todo: TodoController;
 };
 
 /** The bottom dock: diagnostics, tests and the debug session's own views share one header. */
@@ -56,6 +59,7 @@ export default function TestsDock({
 	problems,
 	tests,
 	runs,
+	todo,
 }: TestsDockProps) {
 	const dock = useDockFilters({ tests, tab, expanded });
 	const bodyClass =
@@ -76,6 +80,7 @@ export default function TestsDock({
 					testsCount={tests.items.length}
 					failed={dock.failed}
 					problemsErrors={problems.errors}
+					todoCount={todo.count}
 					debugStatus={debug.status}
 					runStatus={runTabStatus({
 						running: runs.running !== null,
@@ -126,6 +131,12 @@ export default function TestsDock({
 						<RunDock runs={runs} />
 					) : tab === "console" ? (
 						<ConsoleSection session={debug.sessionId} />
+					) : tab === "todo" ? (
+						<TodoPanel
+							todo={todo}
+							activePath={problems.activePath}
+							onSelect={problems.onSelect}
+						/>
 					) : (
 						<MemoryPanes
 							session={debug.sessionId}
