@@ -32,6 +32,7 @@ pub async fn lsp_rename(
     new_name: String,
 ) -> Result<Vec<FileEdit>, String> {
     let session = session_for(&state, &root)?;
+    ensure_open_for(&session, &path)?;
     let params = json!({
         "textDocument": { "uri": path_to_uri(&path) },
         "position": { "line": line, "character": character },
@@ -51,6 +52,7 @@ pub async fn lsp_code_actions(
     diagnostics: Option<Vec<Value>>,
 ) -> Result<Vec<CodeAction>, String> {
     let session = session_for(&state, &root)?;
+    ensure_open_for(&session, &path)?;
     let params = code_action_params(&path, line, character, &diagnostics.unwrap_or_default());
     let result = send_request(&session, "textDocument/codeAction", params).await?;
     Ok(parse_code_actions(&result))

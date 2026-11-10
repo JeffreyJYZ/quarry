@@ -54,6 +54,9 @@ pub use document_sync::*;
 mod document_sync_tests;
 pub use document_sync_tests::*;
 
+mod ensure_open_tests;
+pub use ensure_open_tests::*;
+
 mod lsp_watched_files;
 pub use lsp_watched_files::*;
 

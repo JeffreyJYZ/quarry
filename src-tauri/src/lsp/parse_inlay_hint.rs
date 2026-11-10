@@ -75,6 +75,7 @@ pub async fn lsp_call_hierarchy_prepare(
     character: u32,
 ) -> Result<Vec<CallHierarchyNode>, String> {
     let session = session_for(&state, &root)?;
+    ensure_open_for(&session, &path)?;
     let result = send_request(
         &session,
         "textDocument/prepareCallHierarchy",

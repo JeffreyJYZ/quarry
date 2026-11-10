@@ -45,6 +45,42 @@ pub fn open_document(session: &mut Session, path: &str, text: String) -> Result<
     Ok(version)
 }
 
+/// Guarantees the server has heard of `path` before a request names it in `textDocument`.
+///
+/// A document-scoped request for a file the session never opened leaves clangd answering
+/// `-32602` ("trying to get AST for non-added document") and rust-analyzer answering empty, which
+/// reads as a broken feature after a server restart, a project switch, or a request that races the
+/// editor's own open. A path the session already holds is left alone: its text is the buffer's, and
+/// re-announcing it would hand the server an older copy than the one it is analysing.
+pub fn ensure_open(session: &mut Session, path: &str) -> Result<(), String> {
+    if session.documents.contains_key(path) {
+        return Ok(());
+    }
+    let text = read_document(path)?;
+    open_document(session, path, text).map(|_| ())
+}
+
+/// [`ensure_open`] for a command that holds its session behind the mutex.
+pub fn ensure_open_for(session: &Arc<Mutex<Session>>, path: &str) -> Result<(), String> {
+    ensure_open(&mut lock(session), path)
+}
+
+/// The file's text, read the way the workspace read does and bounded before it is loaded.
+fn read_document(path: &str) -> Result<String, String> {
+    let metadata =
+        std::fs::metadata(path).map_err(|error| format!("cannot read {path}: {error}"))?;
+    if !metadata.is_file() {
+        return Err(format!("cannot read {path}: not a file"));
+    }
+    if let Some(error) =
+        payload_too_large(path, usize::try_from(metadata.len()).unwrap_or(usize::MAX))
+    {
+        return Err(error);
+    }
+    let bytes = std::fs::read(path).map_err(|error| format!("cannot read {path}: {error}"))?;
+    String::from_utf8(bytes).map_err(|_| format!("cannot read {path}: not valid UTF-8"))
+}
+
 /// Sends the buffer's new text, refusing one above the payload cap.
 ///
 /// A document that grows past the cap leaves the server the way a closed one does, so it never

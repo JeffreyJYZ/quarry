@@ -19,7 +19,7 @@ pub mod tests_document_sync {
     use super::*;
 
     const PATH: &str = "/project/src/main.rs";
-    const FRAME_WAIT: Duration = Duration::from_secs(5);
+    pub(crate) const FRAME_WAIT: Duration = Duration::from_secs(5);
 
     #[test]
     fn a_document_at_the_cap_is_opened() {
@@ -90,7 +90,7 @@ pub mod tests_document_sync {
     }
 
     /// A session over a real `cat`, which owns a pipe without being a language server.
-    fn session_on_cat() -> Arc<Mutex<Session>> {
+    pub(crate) fn session_on_cat() -> Arc<Mutex<Session>> {
         let mut command = Command::new("cat");
         let pipe = ProcessPipe::spawn(&mut command).expect("starts cat");
         Arc::new(Mutex::new(Session {
@@ -108,5 +108,41 @@ pub mod tests_document_sync {
             semantic_types: Vec::new(),
             semantic_modifiers: Vec::new(),
         }))
+    }
+
+    /// Every frame the session sent before a marker this helper writes itself.
+    ///
+    /// The marker bounds the wait, so a test that expects no frame finishes at once instead of
+    /// waiting out the echo timeout, and it can never read a later test's traffic.
+    pub(crate) fn sent_before(
+        guard: &mut Session,
+        frames: &Receiver<Result<Value, FrameError>>,
+    ) -> Vec<Value> {
+        let marker = notification("quarry/marker", json!({}));
+        send(guard, "quarry/marker", &marker).expect("sends the marker");
+
+        let mut sent = Vec::new();
+        while let Ok(frame) = frames.recv_timeout(FRAME_WAIT) {
+            let frame = frame.expect("a frame");
+            if frame["method"] == "quarry/marker" {
+                break;
+            }
+            sent.push(frame);
+        }
+        sent
+    }
+
+    /// A file on disk holding `text`, named so two tests in one run cannot collide.
+    pub(crate) fn file_holding(name: &str, text: &str) -> String {
+        let dir = std::env::temp_dir().join(format!("quarry-ensure-open-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("creates the fixture directory");
+        let path = dir.join(name);
+        std::fs::write(&path, text).expect("writes the fixture");
+        path.to_string_lossy().into_owned()
+    }
+
+    /// The method of a frame the session sent, for an ordering assertion.
+    pub(crate) fn method(frame: &Value) -> String {
+        frame["method"].as_str().unwrap_or_default().to_string()
     }
 }

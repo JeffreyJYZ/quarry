@@ -76,6 +76,7 @@ pub async fn lsp_prepare_type_hierarchy(
         .or(root)
         .ok_or_else(|| "no project root given".to_string())?;
     let session = session_for(&state, &root)?;
+    ensure_open_for(&session, &path)?;
     let result = send_request(
         &session,
         "textDocument/prepareTypeHierarchy",

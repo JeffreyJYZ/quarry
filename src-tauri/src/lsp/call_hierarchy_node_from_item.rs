@@ -156,6 +156,7 @@ pub async fn lsp_document_highlights(
     character: u32,
 ) -> Result<Vec<Range>, String> {
     let session = session_for(&state, &root)?;
+    ensure_open_for(&session, &path)?;
     let result = send_request(
         &session,
         "textDocument/documentHighlight",
