@@ -10,6 +10,7 @@ import DisasmSplitPane from "@/ui/app/DisasmSplitPane";
 import SplitPane, { type SplitView } from "@/ui/app/SplitPane";
 import type { Location, ProjectInfo } from "@/lib/project/api";
 import type { TestMarker } from "@/lib/tests/gutter";
+import type { TodoGutterProps } from "@/ui/editor/editorTypes";
 import type { RefObject } from "react";
 import { type DisasmSplit, useEditorReveal } from "@/ui/app/useStableProps";
 
@@ -40,6 +41,8 @@ export type EditorStageProps = {
 	unverifiedLines: number[];
 	/** Run buttons for the active file's tests, drawn in the editor's own gutter. */
 	testMarkers: TestMarker[];
+	/** Comment markers for the active buffer, drawn in the editor's own gutter. */
+	todo?: TodoGutterProps;
 	bookmarkLines: number[];
 	blameOn: boolean;
 	blameByPath: Map<string, { line: number; label: string }[]>;
@@ -127,6 +130,7 @@ export default function EditorStage(props: EditorStageProps) {
 					onTestMarker={props.onTestMarker}
 					bookmarkLines={props.bookmarkLines}
 					onToggleBookmark={props.onToggleBookmark}
+					todo={props.todo}
 					onNavigate={props.onNavigate}
 					onReferences={props.onReferences}
 					onCursor={props.onCursor}

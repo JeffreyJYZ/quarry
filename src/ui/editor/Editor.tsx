@@ -36,6 +36,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		testMarkers = [],
 		bookmarkLines = NO_LINES,
 		onToggleBookmark,
+		todo,
 		root = null,
 		onNavigate,
 		onReferences,
@@ -163,7 +164,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 	useEditorMount({ refs, deps, behaviour, documentId, testMarkers });
 
 	useDocumentSync({ viewRef, value, emittedRef });
-	useGutterMarkers(refs, { breakpointLines, unverifiedLines, bookmarkLines });
+	useGutterMarkers(refs, { breakpointLines, unverifiedLines, bookmarkLines }, todo);
 	useDiagnosticsPublish({ viewRef, diagnostics, publishedRef });
 
 	useEditorEffects({

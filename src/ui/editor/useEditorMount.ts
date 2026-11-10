@@ -39,6 +39,8 @@ export function useEditorMount(options: {
 		refs.indentRef.current = indentation;
 		const testGutter = new Compartment();
 		refs.testGutterRef.current = testGutter;
+		const todoGutter = new Compartment();
+		refs.todoGutterRef.current = todoGutter;
 		const value = refs.latestRef.current.value;
 		const saved =
 			documentId === null ? null : restoreDocument(documentCache, documentId, value);
@@ -47,6 +49,7 @@ export function useEditorMount(options: {
 			language,
 			indentation,
 			testGutter,
+			todoGutter,
 			initialValue: value,
 			initialPath: refs.latestRef.current.path,
 			tabSize: refs.tabSizeRef.current,
@@ -64,6 +67,8 @@ export function useEditorMount(options: {
 			refs.languageRef.current = null;
 			refs.testGutterRef.current = null;
 			refs.testMarkersRef.current = "";
+			refs.todoGutterRef.current = null;
+			refs.todoMarkersRef.current = "";
 			refs.markersRef.current = { view: null, lines: [], unverified: new Set() };
 			if (documentId !== null) {
 				saveDocument(documentCache, documentId, {
