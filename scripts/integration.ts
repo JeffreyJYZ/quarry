@@ -25,6 +25,9 @@ interface Probe {
 	manualReason?: string;
 }
 
+/** How many trailing output lines a failed probe may print, so one probe cannot bury the run. */
+const TAIL_LINES = 20;
+
 const PROBES: Probe[] = [
 	{ name: "lsp-smoke", file: "lsp-smoke.ts", requires: ["rust-analyzer"] },
 	{ name: "lsp-ux-smoke", file: "lsp-ux-smoke.ts", requires: ["rust-analyzer"] },
@@ -74,6 +77,14 @@ function findTool(name: string): string | null {
 	return null;
 }
 
+/** One probe run, output captured so a failure can say why. */
+function run(probe: Probe) {
+	return spawnSync("bun", [join("scripts", probe.file)], {
+		stdio: "pipe",
+		encoding: "utf8",
+	});
+}
+
 let failed = false;
 for (const probe of PROBES) {
 	if (probe.manualOnly) {
@@ -85,15 +96,26 @@ for (const probe of PROBES) {
 		console.log(`SKIP  ${probe.name} (no tool: ${missing.join(", ")})`);
 		continue;
 	}
-	const result = spawnSync("bun", [join("scripts", probe.file)], {
-		stdio: "pipe",
-		encoding: "utf8",
-	});
+	let result = run(probe);
+	if (result.status !== 0) {
+		// These probes index a cold project on a shared runner, and the first run after checkout can
+		// outlast a language server's warm-up window. One retry separates that from a real breakage:
+		// a probe that is genuinely wrong fails both times.
+		console.log(`RETRY ${probe.name}`);
+		result = run(probe);
+	}
 	if (result.status === 0) {
 		console.log(`PASS  ${probe.name}`);
 	} else {
 		console.log(`FAIL  ${probe.name}`);
-		if (result.stderr) console.log(result.stderr.split("\n").slice(0, 5).join("\n"));
+		// A probe that fails almost always explains itself on stdout, which was dropped here: CI
+		// then reported only "FAIL" and no reason. Keep the tail of both streams, bounded so one
+		// chatty probe cannot bury the rest of the run.
+		for (const stream of [result.stderr, result.stdout]) {
+			const lines = (stream ?? "").trim().split("\n").filter(Boolean);
+			if (lines.length === 0) continue;
+			console.log(lines.slice(-TAIL_LINES).join("\n"));
+		}
 		failed = true;
 	}
 }
