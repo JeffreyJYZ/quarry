@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { readSettings, readTextFile, settingsForWrite, writeSettings } from "@/lib/project/api";
-import type { FileBuffer } from "@/lib/project/buffer";
+import { type FileBuffer, encodingLabel, isLegacyEncoding } from "@/lib/project/buffer";
 import { fileName } from "@/lib/project/paths";
 import { normalizePreferences } from "@/lib/settings/model";
 import { describeError } from "@/lib/project/errors";
@@ -75,17 +75,30 @@ export function useSessionPersistence(options: {
 					setters.onActivePath(null);
 					/** Tabs a read did not give back, named with the reason: a silent skip loses work. */
 					const unreadable: string[] = [];
+					/** Restored tabs that are not UTF-8, so the run is not silent about a legacy file. */
+					const legacy: string[] = [];
 					for (const path of settings.openFiles) {
 						if (cancelled) return;
 						const name = fileName(path);
 						try {
-							const text = await readTextFile(path);
+							const file = await readTextFile(path);
 							if (cancelled) return;
 							setters.onBuffers((current) =>
 								current.some((buffer) => buffer.path === path)
 									? current
-									: [...current, { path, name, text, loaded: text }],
+									: [
+											...current,
+											{
+												path,
+												name,
+												text: file.text,
+												loaded: file.text,
+												encoding: file.encoding,
+											},
+										],
 							);
+							if (isLegacyEncoding(file.encoding))
+								legacy.push(`${name} (${encodingLabel(file.encoding)})`);
 						} catch (error) {
 							unreadable.push(`${name}: ${describeError(error)}`);
 						}
@@ -96,6 +109,8 @@ export function useSessionPersistence(options: {
 						setters.onNotice(
 							`could not reopen ${unreadable.length} ${tabs}: ${unreadable.join("; ")}`,
 						);
+					} else if (legacy.length > 0) {
+						setters.onNotice(`reopened not as UTF-8: ${legacy.join(", ")}`);
 					}
 					if (
 						settings.activeFile !== null &&

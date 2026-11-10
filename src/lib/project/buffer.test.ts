@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { documentId, isDirty, markSaved, settleSave, withBufferText } from "@/lib/project/buffer";
+import {
+	documentId,
+	encodingNotice,
+	isDirty,
+	markSaved,
+	settleSave,
+	withBufferText,
+} from "@/lib/project/buffer";
 
 describe("isDirty", () => {
 	test("false when text equals loaded", () => {
@@ -104,5 +111,33 @@ describe("documentId", () => {
 	test("a save keeps the id, so undo survives saving", () => {
 		const saved = markSaved({ path: "/p/a.rs", name: "a.rs", text: "t", loaded: "t" }, "t2");
 		expect(documentId(saved)).toBe(documentId({ path: "/p/a.rs" }));
+	});
+});
+
+describe("encoding", () => {
+	test("a save keeps the encoding the buffer carries", () => {
+		const saved = markSaved(
+			{ path: "/p/a.cpp", name: "a.cpp", text: "x", loaded: "x", encoding: "gb18030" },
+			"y",
+		);
+		expect(saved.encoding).toBe("gb18030");
+	});
+
+	test("a GB18030 file is reported once, naming the encoding and that saves keep it", () => {
+		expect(encodingNotice("legacy.cpp", "gb18030")).toBe(
+			"legacy.cpp: opened as GB18030, saves keep GB18030",
+		);
+	});
+
+	test("UTF-16 is reported with its byte order", () => {
+		expect(encodingNotice("wide.cpp", "utf16-be")).toBe(
+			"wide.cpp: opened as UTF-16 BE, saves keep UTF-16 BE",
+		);
+	});
+
+	test("UTF-8 is not news, with or without a mark", () => {
+		expect(encodingNotice("a.rs", "utf8")).toBeNull();
+		expect(encodingNotice("a.rs", "utf8-bom")).toBeNull();
+		expect(encodingNotice("a.rs", undefined)).toBeNull();
 	});
 });

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { FileEncoding } from "@/lib/project/buffer";
 import type { StopReport } from "@/lib/project/api/run";
 
 export type ToolSource = "path" | "xcrun" | "missing";
@@ -30,6 +31,12 @@ export type FileEntry = {
 	name: string;
 	path: string;
 	isDir: boolean;
+};
+
+/** A file as read: the decoded text, plus the encoding it must be written back as. */
+export type TextFile = {
+	text: string;
+	encoding: FileEncoding;
 };
 
 export type BuildReport = {
@@ -69,12 +76,22 @@ export function listDir(path: string): Promise<FileEntry[]> {
 	return invoke<FileEntry[]>("list_dir", { path });
 }
 
-export function readTextFile(path: string): Promise<string> {
-	return invoke<string>("read_text_file", { path });
+export function readTextFile(path: string): Promise<TextFile> {
+	return invoke<TextFile>("read_text_file", { path });
 }
 
-export function writeTextFile(path: string, text: string): Promise<void> {
-	return invoke<void>("write_text_file", { path, text });
+/**
+ * Writes `text` in `encoding`, the label the buffer was read with.
+ *
+ * A `null` encoding writes UTF-8 with no byte-order mark; an unknown label is refused by the
+ * backend rather than being written as UTF-8 behind the user's back.
+ */
+export function writeTextFile(
+	path: string,
+	text: string,
+	encoding: FileEncoding | null = null,
+): Promise<void> {
+	return invoke<void>("write_text_file", { path, text, encoding });
 }
 
 export function listFiles(root: string): Promise<string[]> {

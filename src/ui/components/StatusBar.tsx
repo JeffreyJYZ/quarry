@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { plural } from "@/lib/problems/model";
+import { type FileEncoding, encodingLabel, isLegacyEncoding } from "@/lib/project/buffer";
 import type { GitStatus, ProjectInfo } from "@/lib/project/api";
 import { kindLabel } from "@/lib/project/kind";
 import type { StatusChip } from "@/lib/status/model";
@@ -19,6 +20,8 @@ export type StatusBarProps = {
 	caret?: { line: number; column: number } | null;
 	/** File extension shown as a language chip, e.g. "rust" or "c++". */
 	language?: string | null;
+	/** The encoding the active buffer was read in; hidden for plain UTF-8. */
+	encoding?: FileEncoding | null;
 	/** Indent width the editor is using. */
 	tabSize?: number;
 	/** The status chip: the server serving this file, or the build/run that is in flight. */
@@ -62,6 +65,7 @@ export default function StatusBar({
 	saveError = null,
 	caret = null,
 	language = null,
+	encoding = null,
 	tabSize = 4,
 	status = null,
 	onOpenSettings,
@@ -143,6 +147,11 @@ export default function StatusBar({
 					</span>
 				)}
 				<CaretSegment caret={caret} />
+				{encoding !== null && isLegacyEncoding(encoding) ? (
+					<span className="status-encoding" title="File encoding">
+						{encodingLabel(encoding)}
+					</span>
+				) : null}
 				{language === null ? null : (
 					<span className="status-language" title="Language">
 						{language}

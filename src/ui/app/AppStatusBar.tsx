@@ -19,6 +19,7 @@ export default function AppStatusBar(props: OverlaysProps) {
 			errors={props.counts.errors}
 			warnings={props.counts.warnings}
 			language={props.language}
+			encoding={props.encoding}
 			tabSize={props.tabSize}
 			status={props.status}
 			onOpenSettings={props.onOpenSettings}

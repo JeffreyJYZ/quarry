@@ -1,4 +1,5 @@
 import type { GenerateItem } from "@/lib/generate/model";
+import type { FileEncoding } from "@/lib/project/buffer";
 import type { GitStatus, Location, ProjectInfo } from "@/lib/project/api";
 import type { Preferences, ProjectSettings } from "@/lib/settings/model";
 import type { StatusChip } from "@/lib/status/model";
@@ -17,6 +18,8 @@ export type OverlaysProps = {
 	saveError: string | null;
 	caret: { line: number; column: number } | null;
 	language: string | null;
+	/** The encoding the active buffer was read in; `null` with no editor or a plain UTF-8 file. */
+	encoding: FileEncoding | null;
 	tabSize: number;
 	/** The one status chip decision: language server name, or the work that is in flight. */
 	status: StatusChip | null;

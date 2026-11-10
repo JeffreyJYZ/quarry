@@ -74,7 +74,7 @@ export async function saveBuffer(root: string, buffer: FileBuffer): Promise<Save
 			text = buffer.text;
 			warning = `${fileName(buffer.path)}: ${describeError(error)}`;
 		}
-		await writeTextFile(buffer.path, text);
+		await writeTextFile(buffer.path, text, buffer.encoding ?? null);
 		return { buffer: markSaved(buffer, text), warning };
 	}
 
@@ -94,7 +94,7 @@ export async function saveBuffer(root: string, buffer: FileBuffer): Promise<Save
 		}
 	}
 
-	await writeTextFile(buffer.path, text);
+	await writeTextFile(buffer.path, text, buffer.encoding ?? null);
 
 	return { buffer: markSaved(buffer, text), warning };
 }

@@ -68,8 +68,12 @@ pub fn list_dir(path: String) -> Result<Vec<FileEntry>, String> {
     Ok(entries)
 }
 
+/// One file as text, plus the encoding it must be written back as.
+///
+/// The decoding order is UTF-8 behind a mark, UTF-16 by its mark, plain UTF-8, then GB18030 — the
+/// superset of GBK that most non-UTF-8 Chinese sources are in — and nothing else is guessed at.
 #[tauri::command]
-pub fn read_text_file(path: String) -> Result<String, String> {
+pub fn read_text_file(path: String) -> Result<TextFile, String> {
     contained(Path::new(&path))?;
     let file = Path::new(&path);
     let metadata = fs::metadata(file).map_err(|error| format!("cannot read {path}: {error}"))?;
@@ -84,5 +88,10 @@ pub fn read_text_file(path: String) -> Result<String, String> {
     }
 
     let bytes = fs::read(file).map_err(|error| format!("cannot read {path}: {error}"))?;
-    String::from_utf8(bytes).map_err(|_| format!("cannot read {path}: not valid UTF-8"))
+    let (text, encoding) =
+        decode_text(&bytes).map_err(|reason| format!("cannot read {path}: {reason}"))?;
+    Ok(TextFile {
+        text,
+        encoding: encoding.label(),
+    })
 }

@@ -104,7 +104,8 @@ pub mod workspace_tests {
         let fixture = Fixture::new("write-new");
         let target = fixture.path.join("fresh.txt");
 
-        write_text_file(fixture.path("fresh.txt"), "one\ntwo\n".to_string()).expect("write file");
+        write_text_file(fixture.path("fresh.txt"), "one\ntwo\n".to_string(), None)
+            .expect("write file");
 
         assert_eq!(
             fs::read_to_string(&target).expect("read back"),
@@ -121,7 +122,7 @@ pub mod workspace_tests {
         fixture.file("kept.txt", "before\n");
         fs::set_permissions(&target, fs::Permissions::from_mode(0o600)).expect("set fixture mode");
 
-        write_text_file(fixture.path("kept.txt"), "after\n".to_string()).expect("write file");
+        write_text_file(fixture.path("kept.txt"), "after\n".to_string(), None).expect("write file");
 
         assert_eq!(fs::read_to_string(&target).expect("read back"), "after\n");
         assert_eq!(mode(&target), 0o600);

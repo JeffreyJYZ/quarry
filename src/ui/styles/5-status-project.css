@@ -9,9 +9,10 @@
 	white-space: nowrap;
 }
 
-/* Caret, language, indent and the git/diagnostic counters never wrap. */
+/* Caret, language, encoding, indent and the git/diagnostic counters never wrap. */
 .status-caret,
 .status-language,
+.status-encoding,
 .status-indent,
 .statusbar .count,
 .statusbar .status-ahead,
@@ -19,7 +20,8 @@
 	white-space: nowrap;
 }
 
-.status-language {
+.status-language,
+.status-encoding {
 	color: var(--text);
 }
 

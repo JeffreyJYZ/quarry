@@ -1,9 +1,10 @@
 //! Filesystem reads and writes for the project tree and the editor.
 //!
 //! Lists exactly one directory level, never recurses, never follows symlinked directories,
-//! directories first then files, case-insensitive by name. Reads a file as UTF-8 text, refusing
-//! anything above the size cap. Writes a file through a sibling temporary file and a rename, so a
-//! half-written file is never visible.
+//! directories first then files, case-insensitive by name. Reads a file as text in the encoding it
+//! is in — UTF-8, UTF-16 by its mark, or GB18030 — and reports which, refusing anything above the
+//! size cap. Writes a file back in that same encoding, through a sibling temporary file and a
+//! rename, so a half-written file is never visible and a legacy file is never converted to UTF-8.
 
 #![allow(unused_imports)]
 pub(crate) use crate::ignore;
@@ -24,6 +25,12 @@ pub use fill_temp_file::*;
 
 mod roots;
 pub use roots::*;
+
+mod encoding;
+pub use encoding::*;
+
+#[cfg(test)]
+mod encoding_tests;
 
 mod roots_tests;
 pub use roots_tests::*;

@@ -1,3 +1,6 @@
+/** The encodings the backend reads and writes, named exactly as it labels them. */
+export type FileEncoding = "utf8" | "utf8-bom" | "utf16-le" | "utf16-be" | "gb18030";
+
 /** One open file held in memory, independent of every other tab. */
 export type FileBuffer = {
 	path: string;
@@ -6,9 +9,47 @@ export type FileBuffer = {
 	text: string;
 	/** Text as it was read from disk or last written; the dirty marker compares against this. */
 	loaded: string;
+	/**
+	 * The encoding the file was read in, carried on the buffer itself rather than in a map keyed by
+	 * path: a rename, a reload or a project switch can never attach another file's encoding to it.
+	 */
+	encoding?: FileEncoding;
 	/** How many times disk has replaced `text`; part of the identity the editor keys a fresh history on. */
 	loadId?: number;
 };
+
+/** How an encoding is named to the user. */
+export function encodingLabel(encoding: FileEncoding): string {
+	switch (encoding) {
+		case "utf8-bom":
+			return "UTF-8 with BOM";
+		case "utf16-le":
+			return "UTF-16 LE";
+		case "utf16-be":
+			return "UTF-16 BE";
+		case "gb18030":
+			return "GB18030";
+		default:
+			return "UTF-8";
+	}
+}
+
+/** Whether a file in this encoding is worth telling the user about: a BOM is still UTF-8. */
+export function isLegacyEncoding(encoding: FileEncoding | undefined): boolean {
+	return encoding !== undefined && encoding !== "utf8" && encoding !== "utf8-bom";
+}
+
+/**
+ * The one-line notice for a file that is not plain UTF-8, or `null` when it is.
+ *
+ * A save keeps the encoding, so saying it once on open is the whole message: the user learns the
+ * file is not UTF-8 without a dialog, and the status bar carries the label afterwards.
+ */
+export function encodingNotice(name: string, encoding: FileEncoding | undefined): string | null {
+	if (!isLegacyEncoding(encoding) || encoding === undefined) return null;
+	const label = encodingLabel(encoding);
+	return `${name}: opened as ${label}, saves keep ${label}`;
+}
 
 export function isDirty(buffer: FileBuffer): boolean {
 	return buffer.text !== buffer.loaded;
