@@ -8,6 +8,10 @@ export type TestsPanelProps = {
 	totalCount?: number;
 	loading: boolean;
 	loadError: string | null;
+	/** The gtest program discovery asked, when it asked one. */
+	program?: string | null;
+	/** One plain sentence per source that could not be listed, or listed nothing. */
+	notes?: string[];
 	results: ReadonlyMap<string, TestReport>;
 	running: ReadonlySet<string>;
 	summary: string | null;
@@ -26,6 +30,8 @@ export default function TestsPanel({
 	totalCount,
 	loading,
 	loadError,
+	program = null,
+	notes = [],
 	results,
 	running,
 	summary,
@@ -47,6 +53,8 @@ export default function TestsPanel({
 	}).length;
 	const notRunCount = items.filter((item) => results.get(item.name) === undefined).length;
 	const emptyMessage = emptyTestsMessage(items.length, textFilter, binaryFilter, resultFilter);
+	// A note already explains why the list is empty; "No tests discovered" beside it says nothing.
+	const explained = notes.length > 0 && items.length === 0;
 
 	return (
 		<div className="tests">
@@ -55,10 +63,16 @@ export default function TestsPanel({
 					{items.length} of {total} tests · {failedCount} failed · {notRunCount} not run
 				</p>
 			)}
+			{program === null ? null : <p className="tests-source">tests from {program}</p>}
+			{notes.map((note) => (
+				<p key={note} className="tests-note">
+					{note}
+				</p>
+			))}
 			{summary === null ? null : <p className={`tests-summary${summaryClass}`}>{summary}</p>}
 			{loading ? <p className="problems-empty">Loading tests…</p> : null}
 			{loadError === null ? null : <p className="problems-empty error">{loadError}</p>}
-			{loading || loadError !== null ? null : (
+			{loading || loadError !== null || explained ? null : (
 				<TestGroups
 					groups={groups}
 					results={results}

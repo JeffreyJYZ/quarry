@@ -104,14 +104,19 @@ pub mod tests_group_1 {
     }
 
     #[test]
-    pub fn timeout_error_names_the_operation_and_the_limit() {
-        let discovery = timeout_error("list tests", LIST_TIMEOUT);
+    pub fn timeout_error_names_the_operation_the_limit_and_the_program() {
+        let discovery = timeout_error("list tests", LIST_TIMEOUT, "cargo");
         assert!(discovery.contains("list tests"), "unexpected: {discovery}");
         assert!(discovery.contains("timed out"), "unexpected: {discovery}");
         assert!(discovery.contains("120 s"), "unexpected: {discovery}");
+        assert!(
+            discovery.contains("cargo was killed"),
+            "unexpected: {discovery}"
+        );
 
-        let run = timeout_error("run a test", RUN_TIMEOUT);
+        let run = timeout_error("run a test", RUN_TIMEOUT, "/p/build/t");
         assert!(run.contains("300 s"), "unexpected: {run}");
+        assert!(run.contains("/p/build/t was killed"), "unexpected: {run}");
     }
 
     #[test]

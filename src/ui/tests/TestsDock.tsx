@@ -102,6 +102,8 @@ export default function TestsDock({
 							totalCount={tests.items.length}
 							loading={tests.loading}
 							loadError={tests.loadError}
+							program={tests.program}
+							notes={tests.notes}
 							results={tests.results}
 							running={tests.running}
 							summary={tests.summary}

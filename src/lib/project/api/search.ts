@@ -51,11 +51,26 @@ export function replaceProject(
 	});
 }
 
-export type TestItem = { name: string; binary: string };
+export type TestItem = {
+	name: string;
+	/** Test binary a name belongs to: a Cargo source path, or the gtest program. */
+	binary: string;
+	/** Which suite owns the name: `cargo` or `gtest`. */
+	suite: string;
+};
 export type TestReport = { name: string; passed: boolean; output: string; durationMs: number };
 
-export function listTests(root: string): Promise<TestItem[]> {
-	return invoke<TestItem[]>("list_tests", { root });
+/** One discovery pass: the cases, the program a gtest list asked, and empty-list sentences. */
+export type TestDiscovery = {
+	items: TestItem[];
+	/** The gtest program that was asked, when one was; null for a Cargo-only project. */
+	program: string | null;
+	/** One plain sentence per source that could not be listed, or that listed nothing. */
+	notes: string[];
+};
+
+export function listTests(root: string): Promise<TestDiscovery> {
+	return invoke<TestDiscovery>("list_tests", { root });
 }
 
 export function runTest(root: string, name: string): Promise<TestReport> {

@@ -31,8 +31,8 @@ const LIB = [
 const PATH = "/project/src/lib.rs";
 
 const ITEMS: TestItem[] = [
-	{ name: "tests::adds", binary: "src/lib.rs" },
-	{ name: "tests::inner::nested", binary: "src/lib.rs" },
+	{ name: "tests::adds", binary: "src/lib.rs", suite: "cargo" },
+	{ name: "tests::inner::nested", binary: "src/lib.rs", suite: "cargo" },
 ];
 
 function report(name: string, passed: boolean): TestReport {
@@ -82,7 +82,7 @@ describe("the test gutter's markers", () => {
 		const markers = testMarkers({
 			path: PATH,
 			text: LIB,
-			items: [{ name: "tests::inner::nested", binary: "src/lib.rs" }],
+			items: [{ name: "tests::inner::nested", binary: "src/lib.rs", suite: "cargo" }],
 			results: new Map(),
 			running: new Set(),
 		});
@@ -144,7 +144,7 @@ describe("the test gutter's markers", () => {
 		const elsewhere = testMarkers({
 			path: PATH,
 			text: LIB,
-			items: [{ name: "tests::adds", binary: "src/main.rs" }],
+			items: [{ name: "tests::adds", binary: "src/main.rs", suite: "cargo" }],
 			results: new Map(),
 			running: new Set(),
 		});
@@ -165,7 +165,7 @@ describe("the test gutter's markers", () => {
 		const markers = testMarkers({
 			path: PATH,
 			text: LIB,
-			items: [{ name: "quarry_lib::tests::adds", binary: "src/lib.rs" }],
+			items: [{ name: "quarry_lib::tests::adds", binary: "src/lib.rs", suite: "cargo" }],
 			results: new Map(),
 			running: new Set(),
 		});

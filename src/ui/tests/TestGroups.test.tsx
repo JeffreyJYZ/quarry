@@ -4,14 +4,14 @@ import { cleanup, fireEvent, render } from "@/test/render";
 import { TestGroups } from "@/ui/tests/TestGroups";
 
 const TESTS: TestItem[] = [
-	{ name: "tests::adds", binary: "src/lib.rs" },
-	{ name: "tests::inner::nested", binary: "src/lib.rs" },
+	{ name: "tests::adds", binary: "src/lib.rs", suite: "cargo" },
+	{ name: "tests::inner::nested", binary: "src/lib.rs", suite: "cargo" },
 ];
 
 function panel(onRunGroup: (names: string[]) => void, collapsed: boolean) {
 	return render(
 		<TestGroups
-			groups={[{ binary: "src/lib.rs", tests: TESTS }]}
+			groups={[{ binary: "src/lib.rs", suite: "cargo", tests: TESTS }]}
 			results={new Map<string, TestReport>()}
 			running={new Set<string>()}
 			collapsedGroups={new Set(collapsed ? ["src/lib.rs"] : [])}
