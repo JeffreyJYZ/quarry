@@ -16,7 +16,8 @@ import { problemFiles } from "@/lib/problems/model";
  * The two diagnostic sources, merged.
  *
  * The language server publishes per file and the build reports per run; a build's findings stay
- * until the next build, so a fixed file keeps its old error only until the compiler runs again.
+ * until the next build or until the text they describe is edited, and a restart of the server
+ * starts its own map from nothing.
  *
  * Lifetime events arrive from three places — a closed tab, a server that stopped, a file that moved
  * — and each is applied here through one pure decision, so nothing a diagnostic describes can
@@ -72,6 +73,15 @@ export function useDiagnosticsState(options: {
 		setBuild(groupDiagnostics(diagnostics));
 	}, []);
 
+	/**
+	 * A restart starts from nothing: the old session's rows describe a process that is gone, so
+	 * they go before the replacement publishes. This is an empty publish for every file at once;
+	 * build rows are not a server's findings, so they stay.
+	 */
+	const clearServer = useCallback(() => {
+		setServer(new Map());
+	}, []);
+
 	const reset = useCallback(() => {
 		setServer(new Map());
 		setBuild(new Map());
@@ -81,5 +91,14 @@ export function useDiagnosticsState(options: {
 	const counts = useMemo(() => countSeverities(diagnostics), [diagnostics]);
 	const files = useMemo(() => problemFiles(diagnostics), [diagnostics]);
 
-	return { diagnostics, counts, files, publish, setBuildReport, reset, applyEvent };
+	return {
+		diagnostics,
+		counts,
+		files,
+		publish,
+		setBuildReport,
+		clearServer,
+		reset,
+		applyEvent,
+	};
 }

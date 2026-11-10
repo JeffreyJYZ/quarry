@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { startupMark } from "@/lib/startupMarks";
 import { type FileEdit, type ProjectInfo, openProject, rememberRoot } from "@/lib/project/api";
-import { type FileBuffer, withBufferText } from "@/lib/project/buffer";
+import type { FileBuffer } from "@/lib/project/buffer";
 import { describeError } from "@/lib/project/errors";
 import { applyEditsWithNotice } from "@/ui/app/applyEdits";
 import { externalChangeHandler } from "@/ui/app/externalChanges";
 import type { DiagnosticsLifecycleEvent } from "@/lib/lsp/lifecycle";
 import { useTabClose } from "@/ui/app/useTabClose";
+import { useBufferText } from "@/ui/app/useBufferText";
 import { followExternalChanges } from "@/ui/app/recentsFollow";
 import { useFileOpening } from "@/ui/app/useFileOpening";
 import { useFileNavigation } from "@/ui/app/useFileNavigation";
@@ -15,7 +16,7 @@ export type WorkspaceOptions = {
 	onNotice: (message: string | null) => void;
 	onProjectOpened: () => void;
 	savePaths: (paths: string[]) => Promise<boolean>;
-	/** A tab closed or a file moved on disk, so anything keyed by that path has to follow. */
+	/** A tab closed, a file moved, or a buffer's text changed: anything keyed by that path follows. */
 	onDiagnosticsEvent?: (event: DiagnosticsLifecycleEvent) => void;
 	setRevealTarget: (target: Reveal | null) => void;
 	setRevealToken: (updater: (current: number) => number) => void;
@@ -101,17 +102,14 @@ export function useWorkspace(options: WorkspaceOptions) {
 		setQuickOpenOpen: options.setQuickOpenOpen,
 	});
 
-	// Typing replaces the one buffer it changed. The same text reported again — an external reload
-	// echoing back through the editor — leaves the array and every buffer in it untouched.
-	const handleChange = useCallback((value: string) => {
-		setBuffers((current) => withBufferText(current, activePathRef.current, value));
-	}, []);
-
-	// The split pane names its own file, so typing beside the active tab can never overwrite the
-	// active tab's text — the two writers share one helper and differ only in the path they pass.
-	const handleChangeFor = useCallback((path: string, value: string) => {
-		setBuffers((current) => withBufferText(current, path, value));
-	}, []);
+	// Typing replaces the one buffer it changed, and a real text change also drops that file's build
+	// rows; the same text reported again — an external reload echoing back — leaves both untouched.
+	const { handleChange, handleChangeFor } = useBufferText({
+		buffers: buffersRef,
+		activePath: activePathRef,
+		setBuffers,
+		onTextChanged: (path) => options.onDiagnosticsEvent?.({ type: "text", path }),
+	});
 
 	const handleApplyEdits = useCallback(
 		async (edits: FileEdit[]) =>
@@ -141,6 +139,7 @@ export function useWorkspace(options: WorkspaceOptions) {
 				follow.onMoved(from, to);
 				options.onDiagnosticsEvent?.({ type: "rename", from, to });
 			},
+			onReloaded: (path) => options.onDiagnosticsEvent?.({ type: "text", path }),
 		},
 	);
 

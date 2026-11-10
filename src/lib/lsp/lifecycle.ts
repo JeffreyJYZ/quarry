@@ -7,7 +7,12 @@
  * `useDiagnosticsState` only applies the result.
  */
 
-import { type DiagnosticMap, diagnosticKey, sortDiagnostics } from "@/lib/lsp/diagnostics";
+import {
+	type DiagnosticMap,
+	diagnosticKey,
+	sortDiagnostics,
+	withoutDiagnostics,
+} from "@/lib/lsp/diagnostics";
 import { type ServerKind, serverKindForPath } from "@/lib/lsp/served";
 
 /**
@@ -22,17 +27,12 @@ export type DiagnosticsOrigin = "server" | "build";
 export type DiagnosticsLifecycleEvent =
 	/** The document was closed: its squiggles and its problems row go with it. */
 	| { type: "close"; path: string }
+	/** The buffer's text changed, so a build report about it describes text that is gone. */
+	| { type: "text"; path: string }
 	/** The server that published them is gone; `null` means every server. */
 	| { type: "session-end"; kind: ServerKind | null }
 	/** The file moved; the old key must never stay behind. */
 	| { type: "rename"; from: string; to: string };
-
-function withoutPath(current: DiagnosticMap, path: string): DiagnosticMap {
-	if (!current.has(path)) return current;
-	const next = new Map(current);
-	next.delete(path);
-	return next;
-}
 
 function withoutServer(current: DiagnosticMap, kind: ServerKind | null): DiagnosticMap {
 	let changed = false;
@@ -71,7 +71,12 @@ export function applyDiagnosticsEvent(
 	origin: DiagnosticsOrigin = "server",
 ): DiagnosticMap {
 	if (event.type === "rename") return moved(current, event.from, event.to);
+	// A build report describes the text it was compiled from, so a changed buffer leaves a build
+	// finding describing text that is gone. The server follows the text live and keeps its rows.
+	if (event.type === "text") {
+		return origin === "build" ? withoutDiagnostics(current, event.path) : current;
+	}
 	if (origin === "build") return current;
-	if (event.type === "close") return withoutPath(current, event.path);
+	if (event.type === "close") return withoutDiagnostics(current, event.path);
 	return withoutServer(current, event.kind);
 }
