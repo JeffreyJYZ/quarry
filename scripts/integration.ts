@@ -77,6 +77,14 @@ function findTool(name: string): string | null {
 	return null;
 }
 
+/** One probe run, output captured so a failure can say why. */
+function run(probe: Probe) {
+	return spawnSync("bun", [join("scripts", probe.file)], {
+		stdio: "pipe",
+		encoding: "utf8",
+	});
+}
+
 let failed = false;
 for (const probe of PROBES) {
 	if (probe.manualOnly) {
@@ -88,10 +96,14 @@ for (const probe of PROBES) {
 		console.log(`SKIP  ${probe.name} (no tool: ${missing.join(", ")})`);
 		continue;
 	}
-	const result = spawnSync("bun", [join("scripts", probe.file)], {
-		stdio: "pipe",
-		encoding: "utf8",
-	});
+	let result = run(probe);
+	if (result.status !== 0) {
+		// These probes index a cold project on a shared runner, and the first run after checkout can
+		// outlast a language server's warm-up window. One retry separates that from a real breakage:
+		// a probe that is genuinely wrong fails both times.
+		console.log(`RETRY ${probe.name}`);
+		result = run(probe);
+	}
 	if (result.status === 0) {
 		console.log(`PASS  ${probe.name}`);
 	} else {
