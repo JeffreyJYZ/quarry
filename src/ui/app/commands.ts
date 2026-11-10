@@ -33,6 +33,7 @@ export type CommandContext = {
 	toggleSplit: () => void;
 	revealFile: () => void;
 	openQuick: () => void;
+	openStructure: () => void;
 	openShortcuts: () => void;
 	workspaceSymbol: () => void;
 	gotoImplementation: () => void;

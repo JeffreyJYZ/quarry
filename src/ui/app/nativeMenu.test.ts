@@ -42,6 +42,7 @@ const IDLE_CONTEXT: CommandContext = {
 	toggleSplit: noop,
 	revealFile: noop,
 	openQuick: noop,
+	openStructure: noop,
 	openShortcuts: noop,
 	refreshGit: noop,
 	toggleBlame: noop,

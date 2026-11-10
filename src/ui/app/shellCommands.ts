@@ -78,6 +78,7 @@ export function shellCommands(options: {
 		toggleSplit: () => split.toggle(),
 		revealFile: () => panels.setFileRevealToken((current) => current + 1),
 		openQuick: () => overlays.setQuickOpenOpen(true),
+		openStructure: () => overlays.setStructureOpen(true),
 		openShortcuts: () => overlays.setShortcutsOpen(true),
 		workspaceSymbol: lsp.workspaceSymbol,
 		gotoImplementation: lsp.gotoImplementation,

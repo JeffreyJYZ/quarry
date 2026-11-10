@@ -15,6 +15,7 @@ import { useSplitKey } from "@/ui/app/useSplitKey";
 import { useBookmarkNavKey } from "@/ui/app/useBookmarkNavKey";
 import { useTabKeys } from "@/ui/app/useTabKeys";
 import type { useWorkspace } from "@/ui/app/useWorkspace";
+import { useStructureKey } from "@/ui/structure/useStructureKey";
 
 type Cursor = { line: number; character: number } | null;
 
@@ -57,6 +58,7 @@ export function useShellKeymaps(options: {
 	useGotoLineKey({ activePath, open: () => overlays.setLineOpen(true) });
 	useSplitKey({ toggle: options.toggleSplit });
 	useBookmarkNavKey({ step: options.stepBookmark });
+	useStructureKey(overlays.setStructureOpen);
 
 	useKeybindings({
 		root,
