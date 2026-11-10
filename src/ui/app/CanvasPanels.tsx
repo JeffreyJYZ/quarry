@@ -128,6 +128,7 @@ export default function CanvasPanels({ model }: { model: ShellModel }) {
 			tests={model.tests}
 			runs={model.runs}
 			todo={model.todos}
+			bookmarks={model.bookmarks}
 		/>
 	);
 }

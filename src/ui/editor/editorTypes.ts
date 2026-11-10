@@ -18,6 +18,10 @@ export type EditorProps = {
 	testMarkers?: TestMarker[];
 	/** A click on a test marker, and whether that click asked for its group. */
 	onTestMarker?: (marker: TestMarker, group: boolean) => void;
+	/** 1-based lines carrying a bookmark, drawn as ribbons in their own gutter column. */
+	bookmarkLines?: number[];
+	/** Clicking the bookmark gutter reports a 1-based line; the caller owns the set. */
+	onToggleBookmark?: (line: number) => void;
 	/** Open project root; null disables all LSP requests. */
 	root?: string | null;
 	/** Navigate to a definition location. */

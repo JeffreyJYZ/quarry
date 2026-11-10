@@ -9,6 +9,7 @@ import type { RunConfiguration } from "@/lib/project/api";
 import { useTests } from "@/lib/tests/useTests";
 import { useTodos } from "@/lib/todo/useTodos";
 import { useBuild } from "@/ui/app/useBuild";
+import { useBookmarks } from "@/ui/app/useBookmarks";
 import type { EditorHandle } from "@/ui/editor/Editor";
 import { useEditorActions } from "@/ui/app/useEditorActions";
 import { useGitState } from "@/ui/app/useGitState";
@@ -18,6 +19,7 @@ import { useRunControls } from "@/ui/app/useRunControls";
 import { useSaveBuffers } from "@/ui/app/useSaveBuffers";
 import { useSettings } from "@/ui/app/useSettings";
 import { useShellSnapshot } from "@/ui/app/useShellSnapshot";
+import { shellStatus } from "@/ui/app/status";
 
 import { resetProjectState } from "@/ui/app/projectReset";
 import { useShellGlue } from "@/ui/app/useShellGlue";
@@ -126,13 +128,10 @@ export function useShell() {
 		},
 	});
 	const tests = useTests(root);
-	// The dock stays where the user put it: an error appearing is not a reason to move a panel they
-	// are not looking at. Only Run and the debugger open it, because those output to it.
+	const bookmarks = useBookmarks({ root, activePath, onNotice: setNotice });
+	// The dock stays where the user put it; only Run and the debugger open it.
 	const panelExpanded = panels.panelOpen ?? false;
-	const missingTools =
-		settings.report?.tools.filter((tool) => tool.source === "missing").length ?? 0;
-	/** Only a failed save earns a slot in the bar; a successful one is not news. */
-	const saveError = panels.saveStatus?.failed === true ? panels.saveStatus.text : null;
+	const { missingTools, saveError } = shellStatus(settings.report, panels.saveStatus);
 	// Everything that belonged to the previous project, cleared when a new one opens.
 	projectOpenedRef.current = () =>
 		resetProjectState({ git, panels, overlays, diagnostics, runs });
@@ -181,6 +180,7 @@ export function useShell() {
 		debug,
 		tests,
 		todos,
+		bookmarks,
 		lspStatuses,
 		restartLsp: lspRestart.restart,
 		notice,

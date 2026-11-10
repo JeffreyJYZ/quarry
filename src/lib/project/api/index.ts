@@ -5,6 +5,7 @@
  * touching every call site.
  */
 export * from "./backend";
+export * from "./bookmarks";
 export * from "./dap";
 export * from "./dap-types";
 export * from "./git";

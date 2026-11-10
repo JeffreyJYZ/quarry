@@ -1,4 +1,5 @@
 mod atomic_write;
+mod bookmarks;
 mod build_task;
 mod dap;
 mod extensions;
@@ -131,6 +132,9 @@ pub fn run() {
             test_task::run_test,
             settings::read_settings,
             settings::write_settings,
+            bookmarks::list_bookmarks,
+            bookmarks::toggle_bookmark,
+            bookmarks::clear_bookmarks,
             settings::remember_root,
             settings::read_project_settings,
             settings::write_project_settings,

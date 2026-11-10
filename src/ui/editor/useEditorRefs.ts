@@ -51,6 +51,14 @@ export function useEditorRefs(props: EditorProps) {
 		props.onTestMarker ?? null,
 	);
 	onTestMarkerRef.current = props.onTestMarker ?? null;
+	const bookmarkMarkersRef = useRef<{ view: EditorView | null; lines: number[] }>({
+		view: null,
+		lines: [],
+	});
+	const bookmarkToggleRef = useRef<((line: number) => void) | null>(
+		props.onToggleBookmark ?? null,
+	);
+	bookmarkToggleRef.current = props.onToggleBookmark ?? null;
 	const rootRef = useRef<string | null>(props.root ?? null);
 	rootRef.current = props.root ?? null;
 	const navigateRef = useRef<((path: string, line: number, character: number) => void) | null>(
@@ -89,6 +97,8 @@ export function useEditorRefs(props: EditorProps) {
 		latestRef,
 		toggleRef,
 		onTestMarkerRef,
+		bookmarkMarkersRef,
+		bookmarkToggleRef,
 		rootRef,
 		navigateRef,
 		referencesRef,

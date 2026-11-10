@@ -91,6 +91,8 @@ export default function EditorColumn({ model }: { model: ShellModel }) {
 				onCursor={overlays.setCursor}
 				onApplyEdits={workspace.handleApplyEdits}
 				onToggleBreakpoint={editorActions.handleToggleBreakpoint}
+				bookmarkLines={model.bookmarks.lines}
+				onToggleBookmark={model.bookmarks.toggle}
 				onNotice={model.setNotice}
 			/>
 			<CanvasPanels model={model} />

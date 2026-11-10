@@ -11,6 +11,7 @@ import ConsoleSection from "@/ui/debug/ConsoleSection";
 import MemoryPanes from "@/ui/debug/MemoryPanes";
 import DebugDockBody from "@/ui/debug/dock/DebugDockBody";
 import DebugMenu from "@/ui/debug/dock/DebugMenu";
+import BookmarksPanel from "@/ui/bookmarks/BookmarksPanel";
 import { activeFrame, memoryAddressOf } from "@/ui/debug/dock/addresses";
 import ProblemsPanel from "@/ui/problems/ProblemsPanel";
 import TestsPanel from "@/ui/tests/TestsPanel";
@@ -44,6 +45,7 @@ export type TestsDockProps = {
 	tests: TestsController;
 	runs: RunControls;
 	todo: TodoController;
+	bookmarks: import("@/ui/app/useBookmarks").BookmarksController;
 };
 
 /** The bottom dock: diagnostics, tests and the debug session's own views share one header. */
@@ -60,6 +62,7 @@ export default function TestsDock({
 	tests,
 	runs,
 	todo,
+	bookmarks,
 }: TestsDockProps) {
 	const dock = useDockFilters({ tests, tab, expanded });
 	const bodyClass =
@@ -81,6 +84,7 @@ export default function TestsDock({
 					failed={dock.failed}
 					problemsErrors={problems.errors}
 					todoCount={todo.count}
+					bookmarksCount={bookmarks.rows.length}
 					debugStatus={debug.status}
 					runStatus={runTabStatus({
 						running: runs.running !== null,
@@ -120,6 +124,13 @@ export default function TestsDock({
 							root={problems.root}
 							buffers={problems.buffers}
 							setBuffers={problems.setBuffers}
+						/>
+					) : tab === "bookmarks" ? (
+						<BookmarksPanel
+							groups={bookmarks.groups}
+							onJump={(path, line) => onNavigate(path, line - 1, 0)}
+							onRemove={bookmarks.remove}
+							onClear={() => void bookmarks.clear()}
 						/>
 					) : tab === "debugger" ? (
 						<DebugDockBody

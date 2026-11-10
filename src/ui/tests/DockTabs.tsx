@@ -4,6 +4,7 @@ import { DOCK_TABS, type DockTab } from "./parts";
 /** Every tab's label; the record is exhaustive, so a new tab cannot ship unnamed. */
 const LABELS: Record<DockTab, string> = {
 	problems: "Problems",
+	bookmarks: "Bookmarks",
 	tests: "Tests",
 	run: "Run",
 	debugger: "Debugger",
@@ -21,6 +22,7 @@ export function DockTabs({
 	failed,
 	problemsErrors,
 	todoCount,
+	bookmarksCount,
 	debugStatus,
 	runStatus,
 }: {
@@ -33,6 +35,8 @@ export function DockTabs({
 	problemsErrors: number;
 	/** How many markers the TODO scan is holding, so the tab says it while collapsed. */
 	todoCount: number;
+	/** How many bookmarks this project holds, so the tab says it while collapsed. */
+	bookmarksCount: number;
 	debugStatus: DebugStatus;
 	/** The run tab's suffix: `running`, the exit code, or nothing before the first run. */
 	runStatus: string | null;
@@ -60,6 +64,9 @@ export function DockTabs({
 		}
 		if (value === "todo") {
 			return <span className="dock-tab-count">{todoCount}</span>;
+		}
+		if (value === "bookmarks") {
+			return <span className="dock-tab-count">{bookmarksCount}</span>;
 		}
 		if (value === "debugger") {
 			return <span className={`dock-tab-status ${debugStatus}`}>{debugStatus}</span>;

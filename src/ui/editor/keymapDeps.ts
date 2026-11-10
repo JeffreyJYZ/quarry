@@ -27,6 +27,8 @@ export type KeymapDeps = {
 	stepRef: { current: (delta: number) => void };
 	/** Toggles a breakpoint on a 1-based line; null until the shell has a file to act on. */
 	toggleBreakpointRef: { current: ((line: number) => void) | null };
+	/** Toggles a bookmark on a 1-based line; null until the shell has a file to act on. */
+	toggleBookmarkRef: { current: ((line: number) => void) | null };
 	/** The open document's findings, which a quick-fix request must carry to get its action. */
 	diagnosticsRef: { current: Diagnostic[] };
 	applyInlay: (hints: InlayHint[] | null) => void;

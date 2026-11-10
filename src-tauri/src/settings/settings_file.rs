@@ -45,7 +45,9 @@ where
     match value.as_str() {
         // Exactly the DockTab union in src/ui/tests/parts.ts. "refs" used to be here and is not a tab
         // the UI can show any more, so a stored one now falls back rather than restoring nothing.
-        "problems" | "tests" | "run" | "debugger" | "console" | "memory" | "todo" => Ok(value),
+        "problems" | "bookmarks" | "tests" | "run" | "debugger" | "console" | "memory" | "todo" => {
+            Ok(value)
+        }
         _ => Ok(dock_tab_default()),
     }
 }
