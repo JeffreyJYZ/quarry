@@ -11,6 +11,7 @@ import { buildCommands } from "@/ui/app/commands";
 import { openDisassembly } from "@/lib/debug/disasm";
 import type { LspCommandHandlers } from "@/ui/app/lspCommandHandlers";
 import type { SplitEditor } from "@/ui/app/useSplit";
+import type { BookmarksController } from "@/ui/app/useBookmarks";
 
 /**
  * The command palette's rows.
@@ -34,12 +35,15 @@ export function shellCommands(options: {
 	debug: ReturnType<typeof useDebugSession>;
 	lsp: LspCommandHandlers;
 	split: SplitEditor;
+	bookmarks: BookmarksController;
+	/** Next or previous bookmark from the caret, wrapping at either end. */
+	stepBookmark: (direction: 1 | -1) => void;
 	run: () => void;
 	debugNow: () => void;
 	restartLsp: () => void;
 }): Command[] {
 	const { root, activePath, cursor, panelExpanded, workspace, overlays, panels } = options;
-	const { git, save, build, runs, debug, lsp, split } = options;
+	const { git, save, build, runs, debug, lsp, split, bookmarks, stepBookmark } = options;
 
 	return buildCommands({
 		root,
@@ -58,6 +62,9 @@ export function shellCommands(options: {
 		save: () => void save.saveActive(),
 		saveAll: () => void save.saveAll(),
 		format: () => void save.formatActive(),
+		nextBookmark: () => stepBookmark(1),
+		previousBookmark: () => stepBookmark(-1),
+		bookmarkCount: bookmarks.rows.length,
 		runToCursor: (path, line) => debug.runToCursor(path, line),
 		showDebugger: () => panels.showDebugger(),
 		showTodos: () => panels.showTodos(),

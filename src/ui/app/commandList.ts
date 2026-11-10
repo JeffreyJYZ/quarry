@@ -1,5 +1,6 @@
 import type { Command } from "@/ui/palette/CommandPalette";
 import type { CommandContext } from "./commands";
+import { bookmarkCommands } from "./bookmarkCommands";
 import { lspCommands } from "./lspPaletteCommand";
 import { navigationCommands } from "./navigationCommands";
 import { todoCommands } from "./todoCommands";
@@ -162,6 +163,7 @@ export function buildCommands(context: CommandContext): Command[] {
 			activePath,
 			cursor: cursor !== null,
 		}),
+		...bookmarkCommands(context, { root, count: context.bookmarkCount }),
 	];
 	// One cause covers most of the list: with no project open, every project action is unavailable for
 	// the same reason, so the palette can say it rather than only greying the row.

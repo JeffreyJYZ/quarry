@@ -10,6 +10,8 @@ import type { usePanels } from "@/ui/app/usePanels";
 import type { useRunControls } from "@/ui/app/useRunControls";
 import type { useSaveBuffers } from "@/ui/app/useSaveBuffers";
 import type { SplitEditor } from "@/ui/app/useSplit";
+import { useBookmarkStep } from "@/ui/app/useBookmarkStep";
+import type { BookmarksController } from "@/ui/app/useBookmarks";
 import type { useSettings } from "@/ui/app/useSettings";
 import type { useWorkspace } from "@/ui/app/useWorkspace";
 import { shellCommands } from "@/ui/app/shellCommands";
@@ -35,6 +37,7 @@ export type GlueOptions = {
 	diagnostics: ReturnType<typeof useDiagnosticsState>;
 	debug: ReturnType<typeof useDebugSession>;
 	tests: ReturnType<typeof import("@/lib/tests/useTests").useTests>;
+	bookmarks: BookmarksController;
 	split: SplitEditor;
 	root: string | null;
 	activePath: string | null;
@@ -68,6 +71,13 @@ export function useShellGlue(options: GlueOptions) {
 	const { debug, root, activePath, cursor, panelExpanded, snapshotRef, onNotice, restartLsp } =
 		options;
 	const { tests } = options;
+	const { bookmarks } = options;
+	const stepBookmark = useBookmarkStep({
+		groups: bookmarks.groups,
+		activePath,
+		cursor,
+		navigate: workspace.handleNavigate,
+	});
 
 	// Discovery follows the editor: asked for where a test can exist, refreshed when the file moves.
 	useTestRefresh(tests, {
@@ -119,6 +129,7 @@ export function useShellGlue(options: GlueOptions) {
 		lsp: lspCommands,
 		runDebug: { run: runDebug.run, debugNow: runDebug.debugNow, stop: runDebug.stop },
 		toggleSplit: split.toggle,
+		stepBookmark,
 		root,
 		activePath,
 		cursor,
@@ -144,6 +155,8 @@ export function useShellGlue(options: GlueOptions) {
 		debugNow: runDebug.debugNow,
 		restartLsp,
 		split,
+		bookmarks,
+		stepBookmark,
 	});
 
 	useSessionPersistence({

@@ -1,9 +1,8 @@
-import "@/test/dom";
-import { afterEach, describe, expect, mock, test } from "bun:test";
-import { act, cleanup, render } from "@testing-library/react";
+import { afterEach, describe, expect, test } from "bun:test";
+import { act, cleanup, render } from "@/test/render";
 import { PANEL_LIMITS } from "@/lib/consts/layout";
 import type { FileBuffer } from "@/lib/project/buffer";
-import { SPLIT_NEEDS_ANOTHER_FILE, type SplitEditor, useSplit } from "@/ui/app/useSplit";
+import { type SplitEditor, useSplit } from "@/ui/app/useSplit";
 
 function buffer(path: string): FileBuffer {
 	return { path, name: path.split("/").pop() ?? path, text: "", loaded: "" };
@@ -13,29 +12,23 @@ function buffer(path: string): FileBuffer {
 type Sink = { current: SplitEditor | null };
 
 /** A module-level probe, so re-rendering it is the same component with new props. */
-function Probe(props: {
-	buffers: FileBuffer[];
-	activePath: string | null;
-	onNotice: (message: string | null) => void;
-	sink: Sink;
-}) {
+function Probe(props: { buffers: FileBuffer[]; activePath: string | null; sink: Sink }) {
 	props.sink.current = useSplit(props);
 	return null;
 }
 
 function harness(options: { buffers: FileBuffer[]; activePath: string | null }) {
-	const onNotice = mock((_message: string | null) => {});
 	const sink: Sink = { current: null };
 
-	const view = render(<Probe {...options} onNotice={onNotice} sink={sink} />);
+	const view = render(<Probe {...options} sink={sink} />);
 	const api = (): SplitEditor => {
 		if (sink.current === null) throw new Error("the split probe did not render");
 		return sink.current;
 	};
 	const rerender = (next: { buffers: FileBuffer[]; activePath: string | null }) => {
-		view.rerender(<Probe {...next} onNotice={onNotice} sink={sink} />);
+		view.rerender(<Probe {...next} sink={sink} />);
 	};
-	return { onNotice, api, rerender };
+	return { api, rerender };
 }
 
 afterEach(() => {
@@ -49,6 +42,7 @@ describe("the split editor's state", () => {
 			activePath: "/p/a.rs",
 		});
 		act(() => h.api().toggle());
+		expect(h.api().open).toBe(true);
 		expect(h.api().path).toBe("/p/b.rs");
 	});
 
@@ -63,12 +57,34 @@ describe("the split editor's state", () => {
 		expect(h.api().path).toBe("/p/b.rs");
 	});
 
-	test("refuses with only one file open, and says what to do", () => {
+	test("opens with nothing on show when only one file is open, instead of refusing", () => {
 		const h = harness({ buffers: [buffer("/p/a.rs")], activePath: "/p/a.rs" });
 		act(() => h.api().toggle());
+		expect(h.api().open).toBe(true);
 		expect(h.api().path).toBeNull();
-		expect(h.onNotice).toHaveBeenCalledWith(SPLIT_NEEDS_ANOTHER_FILE);
-		expect(SPLIT_NEEDS_ANOTHER_FILE).toBe("Open another file to split the editor");
+	});
+
+	test("points at whatever the picker names, never the left pane's file", () => {
+		const h = harness({
+			buffers: [buffer("/p/a.rs"), buffer("/p/b.rs"), buffer("/p/c.rs")],
+			activePath: "/p/a.rs",
+		});
+		act(() => h.api().toggle());
+		expect(h.api().path).toBe("/p/c.rs");
+		act(() => h.api().setPath("/p/b.rs"));
+		expect(h.api().path).toBe("/p/b.rs");
+		act(() => h.api().setPath("/p/a.rs"));
+		expect(h.api().path).toBe("/p/b.rs");
+	});
+
+	test("hands the pane another file when the left pane opens its own", () => {
+		const a = buffer("/p/a.rs");
+		const b = buffer("/p/b.rs");
+		const h = harness({ buffers: [a, b], activePath: a.path });
+		act(() => h.api().toggle());
+		expect(h.api().path).toBe(b.path);
+		h.rerender({ buffers: [a, b], activePath: b.path });
+		expect(h.api().path).toBe(a.path);
 	});
 
 	test("closes again when it is already open", () => {
@@ -77,19 +93,23 @@ describe("the split editor's state", () => {
 			activePath: "/p/a.rs",
 		});
 		act(() => h.api().toggle());
-		expect(h.api().path).toBe("/p/b.rs");
 		act(() => h.api().toggle());
+		expect(h.api().open).toBe(false);
 		expect(h.api().path).toBeNull();
 	});
 
-	test("drops the pane when the buffer it shows is closed", () => {
+	test("empties instead of showing a buffer that was closed, then fills on the next file", () => {
 		const a = buffer("/p/a.rs");
 		const b = buffer("/p/b.rs");
+		const c = buffer("/p/c.rs");
 		const h = harness({ buffers: [a, b], activePath: a.path });
 		act(() => h.api().toggle());
-		expect(h.api().path).toBe("/p/b.rs");
+		expect(h.api().path).toBe(b.path);
 		h.rerender({ buffers: [a], activePath: a.path });
+		expect(h.api().open).toBe(true);
 		expect(h.api().path).toBeNull();
+		h.rerender({ buffers: [a, c], activePath: a.path });
+		expect(h.api().path).toBe(c.path);
 	});
 
 	test("keeps its width inside the published limits", () => {

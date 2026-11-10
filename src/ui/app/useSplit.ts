@@ -2,21 +2,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { DEFAULT_PANEL_SIZES, PANEL_LIMITS } from "@/lib/consts/layout";
 import type { FileBuffer } from "@/lib/project/buffer";
 
-/** What the split editor is, as the shell holds it: one path that is not the active tab, or none. */
+/** What the split editor is, as the shell holds it: a path that is not the active tab, or none. */
 export type SplitEditor = {
-	/** The buffer the right pane shows, or null while the split is closed. */
+	/** Whether the pane is on screen. It can be open with no path, when there is no other file. */
+	open: boolean;
+	/** The buffer the right pane shows, or null while nothing is on show. */
 	path: string | null;
 	/** Pane width in px, owned here so the handle and the pane cannot disagree. */
 	width: number;
-	setPath: (path: string | null) => void;
+	/** Points the pane at another open file; the left pane's own file is refused. */
+	setPath: (path: string) => void;
 	setWidth: (next: number) => void;
 	/** Open on the most recently read other buffer, or close when already open. */
 	toggle: () => void;
 	close: () => void;
 };
-
-/** Nothing to put beside the active file is the one refusal, and it is the user's to fix. */
-export const SPLIT_NEEDS_ANOTHER_FILE = "Open another file to split the editor";
 
 /**
  * The second code pane beside the active file.
@@ -24,14 +24,18 @@ export const SPLIT_NEEDS_ANOTHER_FILE = "Open another file to split the editor";
  * It holds a path, never a buffer: the workspace stays the single owner of text, so a keystroke in
  * either pane writes the one buffer it belongs to. The pane's path follows the file list — a closed
  * buffer takes the split with it — and a project reset clears it through `resetProjectState`.
+ *
+ * The pane itself opens even when there is only one file, so the header's picker can list what is
+ * open instead of a chord refusing with a notice. It never shows the left pane's own buffer: with
+ * nothing else open the body says so, and shows the nearest other file once one exists.
  */
 export function useSplit(options: {
 	buffers: FileBuffer[];
 	activePath: string | null;
-	onNotice: (message: string | null) => void;
 }): SplitEditor {
-	const { buffers, activePath, onNotice } = options;
-	const [path, setPath] = useState<string | null>(null);
+	const { buffers, activePath } = options;
+	const [open, setOpen] = useState(false);
+	const [path, setPathState] = useState<string | null>(null);
 	const [width, setWidth] = useState(DEFAULT_PANEL_SIZES.splitWidth);
 	/** Files the caret left, newest first: what `toggle` prefers over an arbitrary other tab. */
 	const history = useRef<string[]>([]);
@@ -46,38 +50,52 @@ export function useSplit(options: {
 		history.current = [previous, ...history.current.filter((entry) => entry !== previous)];
 	}, [activePath]);
 
-	// A closed buffer cannot stay on screen, and the left tab strip is the only navigator, so the
-	// split closes instead of showing a file nothing points at any more.
-	useEffect(() => {
-		if (path === null) return;
-		if (buffers.some((buffer) => buffer.path === path)) return;
-		setPath(null);
-	}, [buffers, path]);
+	/** The file the pane should show instead: the most recent other buffer, else the last other tab. */
+	const pickOther = useCallback((): string | null => {
+		const openPaths = new Set(buffers.map((buffer) => buffer.path));
+		const recent = history.current.find(
+			(entry) => entry !== activePath && openPaths.has(entry),
+		);
+		const others = buffers.filter((buffer) => buffer.path !== activePath);
+		return recent ?? others[others.length - 1]?.path ?? null;
+	}, [buffers, activePath]);
 
-	const close = useCallback(() => setPath(null), []);
+	// The pane must always show a file that is really open and is not the left pane's: a closed
+	// buffer, or one the user just activated on the left, hands the pane the nearest other file, and
+	// with none left it empties instead of showing the same buffer twice.
+	useEffect(() => {
+		if (!open) return;
+		const stillOpen = path !== null && buffers.some((buffer) => buffer.path === path);
+		if (stillOpen && path !== activePath) return;
+		setPathState(pickOther());
+	}, [open, path, activePath, buffers, pickOther]);
+
+	const close = useCallback(() => {
+		setOpen(false);
+		setPathState(null);
+	}, []);
+
+	const setPath = useCallback(
+		(next: string) => {
+			if (next === activePath) return;
+			setPathState(next);
+		},
+		[activePath],
+	);
 
 	const setWidth_ = useCallback((next: number) => {
 		const { min, max } = PANEL_LIMITS.splitWidth;
 		setWidth(Math.min(max, Math.max(min, Math.round(next))));
 	}, []);
 
-	/** The most recent file that is neither the active one nor closed, else the nearest other tab. */
 	const toggle = useCallback(() => {
-		if (path !== null) {
-			setPath(null);
+		if (open) {
+			close();
 			return;
 		}
-		const open = new Set(buffers.map((buffer) => buffer.path));
-		const recent = history.current.find((entry) => entry !== activePath && open.has(entry));
-		const others = buffers.filter((buffer) => buffer.path !== activePath);
-		const last = others[others.length - 1];
-		const next = recent ?? last?.path ?? null;
-		if (next === null) {
-			onNotice(SPLIT_NEEDS_ANOTHER_FILE);
-			return;
-		}
-		setPath(next);
-	}, [buffers, activePath, path, onNotice]);
+		setOpen(true);
+		setPathState(pickOther());
+	}, [open, close, pickOther]);
 
-	return { path, width, setPath, setWidth: setWidth_, toggle, close };
+	return { open, path, width, setPath, setWidth: setWidth_, toggle, close };
 }
