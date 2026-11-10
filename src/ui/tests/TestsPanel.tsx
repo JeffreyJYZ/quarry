@@ -15,6 +15,7 @@ export type TestsPanelProps = {
 	onToggleGroup: (binary: string) => void;
 	highlighted: number;
 	onRun: (name: string) => void;
+	onRunGroup: (names: string[]) => void;
 	textFilter?: string;
 	binaryFilter?: string | null;
 	resultFilter?: ResultFilter;
@@ -32,6 +33,7 @@ export default function TestsPanel({
 	onToggleGroup,
 	highlighted,
 	onRun,
+	onRunGroup,
 	textFilter = "",
 	binaryFilter = null,
 	resultFilter = "all",
@@ -65,6 +67,7 @@ export default function TestsPanel({
 					onToggleGroup={onToggleGroup}
 					highlighted={highlighted}
 					onRun={onRun}
+					onRunGroup={onRunGroup}
 					emptyMessage={emptyMessage}
 				/>
 			)}

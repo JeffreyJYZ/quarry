@@ -11,6 +11,7 @@ const DisasmPane = lazy(() => import("@/ui/debug/memory/DisasmPane"));
 import Splitter from "@/ui/layout/Splitter";
 import { PANEL_LIMITS } from "@/lib/consts/layout";
 import type { Location, ProjectInfo } from "@/lib/project/api";
+import type { TestMarker } from "@/lib/tests/gutter";
 import type { RefObject } from "react";
 import { type DisasmSplit, useEditorReveal } from "@/ui/app/useStableProps";
 
@@ -35,6 +36,8 @@ export type EditorStageProps = {
 	diagnostics: DiagnosticMap;
 	breakpointLines: number[];
 	unverifiedLines: number[];
+	/** Run buttons for the active file's tests, drawn in the editor's own gutter. */
+	testMarkers: TestMarker[];
 	blameOn: boolean;
 	blameByPath: Map<string, { line: number; label: string }[]>;
 	revealTarget: { line: number; character: number } | null;
@@ -51,6 +54,7 @@ export type EditorStageProps = {
 	onCursor: (position: { line: number; character: number }) => void;
 	onApplyEdits: (edits: import("@/lib/project/api").FileEdit[]) => void;
 	onToggleBreakpoint: (line: number) => void;
+	onTestMarker: (marker: TestMarker, group: boolean) => void;
 	onNotice: (message: string | null) => void;
 };
 
@@ -107,6 +111,8 @@ export default function EditorStage(props: EditorStageProps) {
 					breakpointLines={props.breakpointLines}
 					unverifiedLines={props.unverifiedLines}
 					onToggleBreakpoint={props.onToggleBreakpoint}
+					testMarkers={props.testMarkers}
+					onTestMarker={props.onTestMarker}
 					onNavigate={props.onNavigate}
 					onReferences={props.onReferences}
 					onCursor={props.onCursor}

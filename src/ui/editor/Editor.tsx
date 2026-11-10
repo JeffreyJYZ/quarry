@@ -33,6 +33,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		breakpointLines = NO_LINES,
 		unverifiedLines = NO_LINES,
 		onToggleBreakpoint,
+		testMarkers = [],
 		root = null,
 		onNavigate,
 		onReferences,
@@ -157,7 +158,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		},
 		diagnosticsRef,
 	});
-	useEditorMount({ refs, deps, behaviour, documentId });
+	useEditorMount({ refs, deps, behaviour, documentId, testMarkers });
 
 	useDocumentSync({ viewRef, value, emittedRef });
 	useBreakpointGutter({

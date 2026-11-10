@@ -2,6 +2,7 @@ import { useRef } from "react";
 import type { EditorView } from "@codemirror/view";
 import type { Compartment } from "@codemirror/state";
 import type { Diagnostic, FileEdit, Location } from "@/lib/project/api";
+import type { TestMarker } from "@/lib/tests/gutter";
 import type { EditorProps } from "@/ui/editor/editorTypes";
 
 type Cursor = { line: number; character: number };
@@ -13,6 +14,10 @@ export function useEditorRefs(props: EditorProps) {
 	const viewRef = useRef<EditorView | null>(null);
 	const languageRef = useRef<Compartment | null>(null);
 	const indentRef = useRef<Compartment | null>(null);
+	/** Holds the test column's gutter; empty while the file has no tests. */
+	const testGutterRef = useRef<Compartment | null>(null);
+	/** Signature of the markers already written into the view. */
+	const testMarkersRef = useRef("");
 	const tabSizeRef = useRef(props.tabSize ?? 4);
 	tabSizeRef.current = props.tabSize ?? 4;
 	const publishedRef = useRef<{ view: EditorView | null; signature: string }>({
@@ -42,6 +47,10 @@ export function useEditorRefs(props: EditorProps) {
 	};
 	const toggleRef = useRef<((line: number) => void) | null>(props.onToggleBreakpoint ?? null);
 	toggleRef.current = props.onToggleBreakpoint ?? null;
+	const onTestMarkerRef = useRef<((marker: TestMarker, group: boolean) => void) | null>(
+		props.onTestMarker ?? null,
+	);
+	onTestMarkerRef.current = props.onTestMarker ?? null;
 	const rootRef = useRef<string | null>(props.root ?? null);
 	rootRef.current = props.root ?? null;
 	const navigateRef = useRef<((path: string, line: number, character: number) => void) | null>(
@@ -71,12 +80,15 @@ export function useEditorRefs(props: EditorProps) {
 		viewRef,
 		languageRef,
 		indentRef,
+		testGutterRef,
+		testMarkersRef,
 		tabSizeRef,
 		publishedRef,
 		markersRef,
 		pathRef,
 		latestRef,
 		toggleRef,
+		onTestMarkerRef,
 		rootRef,
 		navigateRef,
 		referencesRef,

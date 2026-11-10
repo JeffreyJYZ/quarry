@@ -16,6 +16,7 @@ import { useShellKeymaps } from "@/ui/app/useShellKeymaps";
 import { makeLspCommandHandlers } from "@/ui/app/lspCommandHandlers";
 import { useRunDebug } from "@/ui/app/useRunDebug";
 import { useShellEffects } from "@/ui/app/useShellEffects";
+import { useTestRefresh } from "@/ui/app/useTestRefresh";
 import { useSessionPersistence } from "@/ui/app/useSessionPersistence";
 import { normalizePreferences } from "@/lib/settings/model";
 import { launchFailureLines } from "@/lib/run/failureLines";
@@ -63,6 +64,14 @@ export function useShellGlue(options: GlueOptions) {
 	} = options;
 	const { debug, root, activePath, cursor, panelExpanded, snapshotRef, onNotice, restartLsp } =
 		options;
+	const { tests } = options;
+
+	// Discovery follows the editor: asked for where a test can exist, refreshed when the file moves.
+	useTestRefresh(tests, {
+		projectKind: workspace.project?.kind ?? null,
+		activePath,
+		buffers: workspace.buffers,
+	});
 
 	const lspCommands = makeLspCommandHandlers({
 		workspace,

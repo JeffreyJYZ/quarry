@@ -1,10 +1,12 @@
 import { useEffect, type CSSProperties } from "react";
 import { setDisassemblyOpener } from "@/lib/debug/disasm";
+import type { TestMarker } from "@/lib/tests/gutter";
 import EditorStage from "@/ui/app/EditorStage";
 import { Palettes } from "@/ui/app/BottomDock";
 import CanvasPanels from "@/ui/app/CanvasPanels";
 import { SHORTCUT_GROUPS } from "@/ui/app/shellShortcuts";
 import { useDisasmSplit, useOpenPaths } from "@/ui/app/useStableProps";
+import { useTestMarkers } from "@/ui/tests/useTestMarkers";
 import type { ShellModel } from "@/ui/app/useShell";
 
 /** The editor column: the tabs and surfaces, then the bottom slot and the palettes over it. */
@@ -23,6 +25,19 @@ export default function EditorColumn({ model }: { model: ShellModel }) {
 	// Both keep their identity until the data behind them changes, so a keystroke does not hand the
 	// palettes a new path set or the split a new prop object.
 	const openPaths = useOpenPaths(workspace.buffers);
+	const testMarkers = useTestMarkers({
+		path: model.activePath,
+		text: model.active?.text ?? "",
+		items: model.tests.items,
+		results: model.tests.results,
+		running: model.tests.running,
+	});
+	/** A click runs the test; a right-click, or the module's own marker, runs the whole group. */
+	const runTestMarker = (marker: TestMarker, group: boolean) => {
+		if (group || marker.kind === "group") model.tests.runAll(marker.group);
+		else model.tests.runOne(marker.name);
+		model.panels.showTests();
+	};
 	const disasm = useDisasmSplit({
 		open: panels.disasmOpen,
 		width: panels.disasmWidth,
@@ -59,6 +74,8 @@ export default function EditorColumn({ model }: { model: ShellModel }) {
 				diagnostics={diagnostics.diagnostics}
 				breakpointLines={editorActions.breakpointLines}
 				unverifiedLines={editorActions.unverifiedLines}
+				testMarkers={testMarkers}
+				onTestMarker={runTestMarker}
 				blameOn={git.blameOn}
 				blameByPath={git.blameByPath}
 				revealTarget={overlays.revealTarget}

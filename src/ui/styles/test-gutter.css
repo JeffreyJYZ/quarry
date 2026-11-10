@@ -1,0 +1,43 @@
+/* The test column: a run button on each test line and on each module that holds one. */
+.cm-test-gutter {
+	width: 1.6em;
+	cursor: pointer;
+}
+
+.cm-test-gutter:hover {
+	background: var(--hover);
+}
+
+.cm-test-gutter .cm-gutterElement {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+}
+
+.cm-test-marker {
+	font-family: var(--mono);
+	font-size: 10px;
+	line-height: 1;
+	color: var(--muted);
+}
+
+.cm-test-marker:hover {
+	color: var(--text);
+}
+
+.cm-test-marker.group {
+	opacity: 0.75;
+}
+
+.cm-test-marker.running {
+	color: var(--accent);
+}
+
+.cm-test-marker.passed {
+	color: var(--good);
+}
+
+.cm-test-marker.failed {
+	color: var(--danger);
+}

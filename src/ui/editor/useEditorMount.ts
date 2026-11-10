@@ -2,7 +2,9 @@ import { useEffect } from "react";
 import { Compartment } from "@codemirror/state";
 import { documentCache, restoreDocument, saveDocument } from "@/lib/editor/documentCache";
 import { snapshotState } from "@/lib/editor/stateSnapshot";
+import type { TestMarker } from "@/lib/tests/gutter";
 import { createEditorView } from "@/ui/editor/createEditorView";
+import { useTestGutter } from "@/ui/editor/useTestGutter";
 import type { BehaviourDeps } from "@/ui/editor/extensionsBehaviour";
 import type { KeymapDeps } from "@/ui/editor/keymapDeps";
 import type { EditorRefs } from "@/ui/editor/useEditorRefs";
@@ -23,6 +25,7 @@ export function useEditorMount(options: {
 	deps: KeymapDeps;
 	behaviour: BehaviourDeps;
 	documentId: string | null;
+	testMarkers: readonly TestMarker[];
 }): void {
 	const { refs, deps, behaviour, documentId } = options;
 
@@ -34,6 +37,8 @@ export function useEditorMount(options: {
 		refs.languageRef.current = language;
 		const indentation = new Compartment();
 		refs.indentRef.current = indentation;
+		const testGutter = new Compartment();
+		refs.testGutterRef.current = testGutter;
 		const value = refs.latestRef.current.value;
 		const saved =
 			documentId === null ? null : restoreDocument(documentCache, documentId, value);
@@ -41,6 +46,7 @@ export function useEditorMount(options: {
 			host,
 			language,
 			indentation,
+			testGutter,
 			initialValue: value,
 			initialPath: refs.latestRef.current.path,
 			tabSize: refs.tabSizeRef.current,
@@ -56,6 +62,8 @@ export function useEditorMount(options: {
 		return () => {
 			refs.viewRef.current = null;
 			refs.languageRef.current = null;
+			refs.testGutterRef.current = null;
+			refs.testMarkersRef.current = "";
 			refs.markersRef.current = { view: null, lines: [], unverified: new Set() };
 			if (documentId !== null) {
 				saveDocument(documentCache, documentId, {
@@ -69,4 +77,7 @@ export function useEditorMount(options: {
 			view.destroy();
 		};
 	}, []);
+
+	// After the mount effect, so the first set of markers lands in a view that exists.
+	useTestGutter(refs, options.testMarkers);
 }

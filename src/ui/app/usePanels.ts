@@ -50,6 +50,12 @@ export function usePanels() {
 		setPanelOpen(true);
 	}, []);
 
+	/** Test markers run from the editor, so the result has to open the dock it lands in. */
+	const showTests = useCallback(() => {
+		setDockTab("tests");
+		setPanelOpen(true);
+	}, []);
+
 	return {
 		railCollapsed,
 		setRailCollapsed,
@@ -86,6 +92,7 @@ export function usePanels() {
 		showDebugger,
 		showRun,
 		showTodos,
+		showTests,
 	};
 }
 

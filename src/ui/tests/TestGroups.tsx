@@ -10,6 +10,7 @@ export function TestGroups({
 	onToggleGroup,
 	highlighted,
 	onRun,
+	onRunGroup,
 	emptyMessage,
 }: {
 	groups: TestGroup[];
@@ -19,6 +20,7 @@ export function TestGroups({
 	onToggleGroup: (binary: string) => void;
 	highlighted: number;
 	onRun: (name: string) => void;
+	onRunGroup: (names: string[]) => void;
 	emptyMessage: string;
 }) {
 	if (groups.length === 0) {
@@ -49,6 +51,14 @@ export function TestGroups({
 								</span>
 							</button>
 							<span className="tests-group-count">{group.tests.length}</span>
+							<button
+								type="button"
+								className="tests-group-run"
+								title={`run ${group.tests.length} tests in ${group.binary}`}
+								onClick={() => onRunGroup(group.tests.map((item) => item.name))}
+							>
+								run group
+							</button>
 						</div>
 						{collapsed ? null : (
 							<ul className="tests-list">
