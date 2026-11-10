@@ -1,5 +1,5 @@
 import type { ServerKind } from "@/lib/lsp/served";
-import type { MutableRefObject } from "react";
+import { type MutableRefObject, useEffect } from "react";
 
 import type { LspStatusMap } from "@/lib/lsp/session";
 import { useDiagnosticsState } from "@/ui/app/useDiagnosticsState";
@@ -44,5 +44,14 @@ export function useShellDiagnostics(options: ShellDiagnosticsOptions): {
 		onServerEnd: lsp.markEnded,
 		onError: options.onError,
 	});
+	// A restart reuses the same session identity, so nothing in the old map can be mistaken for the
+	// new server's answer. Clear before the replacement publishes, or rows the user already fixed
+	// linger until that server happens to republish the file.
+	const { clearServer } = diagnostics;
+	const { restartToken } = options;
+	useEffect(() => {
+		if (restartToken === 0) return;
+		clearServer();
+	}, [restartToken, clearServer]);
 	return { lspStatuses: lsp.statuses, diagnostics };
 }

@@ -2,6 +2,7 @@ import "@/test/dom";
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { act, cleanup, render } from "@testing-library/react";
 import type { FileBuffer } from "@/lib/project/buffer";
+import type { DiagnosticsLifecycleEvent } from "@/lib/lsp/lifecycle";
 import { useWorkspace } from "@/ui/app/useWorkspace";
 
 const noop = () => {};
@@ -11,11 +12,12 @@ function buffer(path: string, text: string): FileBuffer {
 }
 
 /** Inert shell options: nothing here reaches the backend, so only the writers are under test. */
-function options() {
+function options(events: DiagnosticsLifecycleEvent[] = []) {
 	return {
 		onNotice: mock((_message: string | null) => {}),
 		onProjectOpened: noop,
 		savePaths: async () => true,
+		onDiagnosticsEvent: (event: DiagnosticsLifecycleEvent) => events.push(event),
 		setRevealTarget: noop,
 		setRevealToken: noop,
 		setReferences: noop,
@@ -35,9 +37,9 @@ function Probe(props: { options: Options; sink: Sink }) {
 	return null;
 }
 
-function harness(): () => Workspace {
+function harness(events: DiagnosticsLifecycleEvent[] = []): () => Workspace {
 	const sink: Sink = { current: null };
-	render(<Probe options={options()} sink={sink} />);
+	render(<Probe options={options(events)} sink={sink} />);
 	return () => {
 		if (sink.current === null) throw new Error("the workspace probe did not render");
 		return sink.current;
@@ -79,5 +81,46 @@ describe("typing in the split pane", () => {
 			["/p/a.rs", "a2"],
 			["/p/b.rs", "b2"],
 		]);
+	});
+});
+
+describe("text a build no longer describes", () => {
+	test("a keystroke reports the buffer it changed", () => {
+		const events: DiagnosticsLifecycleEvent[] = [];
+		const api = harness(events);
+		act(() => {
+			api().setBuffers([buffer("/p/a.rs", "a")]);
+			api().setActivePath("/p/a.rs");
+		});
+
+		act(() => api().handleChange("a2"));
+
+		expect(events).toEqual([{ type: "text", path: "/p/a.rs" }]);
+	});
+
+	test("the same text reported again reports nothing, so a reload echo keeps its rows", () => {
+		const events: DiagnosticsLifecycleEvent[] = [];
+		const api = harness(events);
+		act(() => {
+			api().setBuffers([buffer("/p/a.rs", "a")]);
+			api().setActivePath("/p/a.rs");
+		});
+
+		act(() => api().handleChange("a"));
+
+		expect(events).toEqual([]);
+	});
+
+	test("the split pane reports its own file and leaves the active tab's rows alone", () => {
+		const events: DiagnosticsLifecycleEvent[] = [];
+		const api = harness(events);
+		act(() => {
+			api().setBuffers([buffer("/p/a.rs", "a"), buffer("/p/b.rs", "b")]);
+			api().setActivePath("/p/a.rs");
+		});
+
+		act(() => api().handleChangeFor("/p/b.rs", "b2"));
+
+		expect(events).toEqual([{ type: "text", path: "/p/b.rs" }]);
 	});
 });

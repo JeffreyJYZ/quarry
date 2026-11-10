@@ -55,6 +55,8 @@ export type ExternalChangeIo = {
 export type ExternalChangeActions = {
 	onClosed?: (path: string) => void;
 	onMoved?: (from: string, to: string) => void;
+	/** The disk text replaced the buffer's text, so anything describing that text is stale. */
+	onReloaded?: (path: string) => void;
 };
 
 /**
@@ -163,6 +165,13 @@ export function externalChangeHandler(
 		});
 		for (const buffer of plan.close) actions.onClosed?.(buffer.path);
 		for (const move of plan.moves) actions.onMoved?.(move.buffer.path, move.to);
+		// A reload that really replaced the text is reported once the array holds it, so the build
+		// findings compiled from the old text can be dropped by the store that keeps them.
+		for (const buffer of plan.reload) {
+			const file = files.get(buffer.path);
+			const applied = file === undefined ? null : reloaded(buffer, file);
+			if (applied !== null && applied.text !== buffer.text) actions.onReloaded?.(buffer.path);
+		}
 		afterBatch?.();
 	};
 }

@@ -17,6 +17,39 @@ function mapOf(entries: Array<[string, Diagnostic[]]>): DiagnosticMap {
 	return new Map(entries);
 }
 
+describe("text", () => {
+	test("a changed buffer drops its build rows and leaves another file's alone", () => {
+		const build = mapOf([
+			["/p/src/main.rs", [finding("/p/src/main.rs", "no matching function")]],
+			["/p/src/lib.rs", [finding("/p/src/lib.rs", "unused import")]],
+		]);
+		const next = applyDiagnosticsEvent(
+			build,
+			{ type: "text", path: "/p/src/main.rs" },
+			"build",
+		);
+		expect(next.has("/p/src/main.rs")).toBe(false);
+		expect(next.get("/p/src/lib.rs")).toEqual(build.get("/p/src/lib.rs"));
+	});
+
+	test("the server's own rows survive typing, because it follows the text live", () => {
+		const server = mapOf([["/p/src/main.rs", [finding("/p/src/main.rs", "mismatched types")]]]);
+		expect(applyDiagnosticsEvent(server, { type: "text", path: "/p/src/main.rs" })).toBe(
+			server,
+		);
+	});
+
+	test("a file a build never flagged costs no new map", () => {
+		const build = mapOf([["/p/src/lib.rs", [finding("/p/src/lib.rs", "unused import")]]]);
+		const next = applyDiagnosticsEvent(
+			build,
+			{ type: "text", path: "/p/src/main.rs" },
+			"build",
+		);
+		expect(next).toBe(build);
+	});
+});
+
 describe("close", () => {
 	test("drops exactly that file's diagnostics and leaves the others", () => {
 		const current = mapOf([

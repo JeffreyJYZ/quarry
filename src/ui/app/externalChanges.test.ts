@@ -32,6 +32,7 @@ function harness(
 	const notices: string[] = [];
 	const closed: string[] = [];
 	const moved: Array<[string, string]> = [];
+	const reloadedPaths: string[] = [];
 	const setBuffers: Dispatch<SetStateAction<FileBuffer[]>> = (next) => {
 		buffers = typeof next === "function" ? next(buffers) : next;
 	};
@@ -49,9 +50,13 @@ function harness(
 			},
 			exists: async (path) => there.has(path),
 		},
-		{ onClosed: (path) => closed.push(path), onMoved: (from, to) => moved.push([from, to]) },
+		{
+			onClosed: (path) => closed.push(path),
+			onMoved: (from, to) => moved.push([from, to]),
+			onReloaded: (path) => reloadedPaths.push(path),
+		},
 	);
-	return { handler, notices, closed, moved, current: () => buffers };
+	return { handler, notices, closed, moved, reloadedPaths, current: () => buffers };
 }
 
 describe("reloaded", () => {
@@ -155,13 +160,25 @@ describe("externalChangeHandler", () => {
 		expect(run.notices.join(" ")).toContain("unsaved changes kept");
 	});
 
-	test("a clean reload marks the buffer as a new document for the editor", async () => {
+	test("a clean reload marks the buffer as a new document and reports the text it replaced", async () => {
 		const clean = bufferAt("/project/src/main.rs", "old", "old");
-		const run = harness([clean], [clean.path], "new from disk");
+		const other = bufferAt("/project/src/lib.rs", "same", "same");
+		const run = harness([clean, other], [clean.path, other.path], "new from disk");
 		await run.handler([clean.path]);
 		const entry = run.current()[0];
 		expect(entry?.text).toBe("new from disk");
 		expect(entry?.loadId).toBe(1);
+		expect(run.reloadedPaths).toEqual([clean.path]);
+	});
+
+	test("text the reload keeps is not reported, so its findings stay", async () => {
+		const dirty = bufferAt("/project/src/main.rs", "same", "older");
+		const same = harness([dirty], [dirty.path], "same");
+		await same.handler([dirty.path]);
+		const conflict = bufferAt("/project/src/main.rs", "mine", "older");
+		const kept = harness([conflict], [conflict.path], "from disk");
+		await kept.handler([conflict.path]);
+		expect([...same.reloadedPaths, ...kept.reloadedPaths]).toEqual([]);
 	});
 
 	test("a keystroke landing while the disk is read wins over the reload", async () => {

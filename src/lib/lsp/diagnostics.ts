@@ -62,6 +62,19 @@ export function withServerDiagnostics(
 }
 
 /**
+ * Drop one file's entries; the same map comes back when it held none.
+ *
+ * A build report describes the text it was compiled from, so the file whose text just changed gives
+ * up its build rows, while every other file keeps theirs.
+ */
+export function withoutDiagnostics(current: DiagnosticMap, path: string): DiagnosticMap {
+	if (!current.has(path)) return current;
+	const next = new Map(current);
+	next.delete(path);
+	return next;
+}
+
+/**
  * Group a build report's diagnostics by file. A rebuild replaces the whole build map, which drops
  * every stale build entry while leaving the server's own entries untouched.
  */
