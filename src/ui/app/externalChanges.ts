@@ -9,7 +9,7 @@
  */
 
 import type { Dispatch, RefObject, SetStateAction } from "react";
-import { listDir, readTextFile } from "@/lib/project/api";
+import { listDir, readTextFile, type TextFile } from "@/lib/project/api";
 import { type FileBuffer, isDirty } from "@/lib/project/buffer";
 import { describeError } from "@/lib/project/errors";
 import { fileName, parentDir } from "@/lib/project/paths";
@@ -26,15 +26,27 @@ import { planWatchBatch } from "@/lib/project/watch";
  * - the buffer is clean: take the disk text and bump `loadId`, which is what tells the editor the
  *   document it holds is not the one its undo history describes.
  */
-export function reloaded(entry: FileBuffer, text: string): FileBuffer | null {
-	if (entry.text === text) return entry.loaded === text ? null : { ...entry, loaded: text };
+export function reloaded(entry: FileBuffer, file: TextFile): FileBuffer | null {
+	// An absent label already saves as UTF-8, so a UTF-8 read of an unlabelled buffer is no change.
+	const encoding = entry.encoding ?? "utf8";
+	if (entry.text === file.text) {
+		return entry.loaded === file.text && encoding === file.encoding
+			? null
+			: { ...entry, loaded: file.text, encoding: file.encoding };
+	}
 	if (isDirty(entry)) return null;
-	return { ...entry, text, loaded: text, loadId: (entry.loadId ?? 0) + 1 };
+	return {
+		...entry,
+		text: file.text,
+		loaded: file.text,
+		encoding: file.encoding,
+		loadId: (entry.loadId ?? 0) + 1,
+	};
 }
 
 /** The live tree the handler reads: injectable so the batch decision is testable without Tauri. */
 export type ExternalChangeIo = {
-	read: (path: string) => Promise<string>;
+	read: (path: string) => Promise<TextFile>;
 	/** Whether `path` is still a file. A probe that cannot answer says `true`, never `false`. */
 	exists: (path: string) => Promise<boolean>;
 };
@@ -105,11 +117,11 @@ export function externalChangeHandler(
 		// A conflict is read too: the disk text decides whether the edit is really still unsaved, so a
 		// file whose write landed is cleaned up instead of prompting on close.
 		const reloadSet = new Set(plan.reload.map((buffer) => buffer.path));
-		const texts = new Map<string, string>();
+		const files = new Map<string, TextFile>();
 		await Promise.all(
 			[...plan.reload, ...plan.conflicts].map(async (buffer) => {
 				try {
-					texts.set(buffer.path, await io.read(buffer.path));
+					files.set(buffer.path, await io.read(buffer.path));
 				} catch (error) {
 					// Only a buffer that was going to be replaced has lost a reload; a conflict that
 					// cannot be read simply stays dirty and keeps its row.
@@ -122,8 +134,8 @@ export function externalChangeHandler(
 		if (!refs.mounted.current) return;
 
 		const unsaved = plan.conflicts.filter((buffer) => {
-			const text = texts.get(buffer.path);
-			const next = text === undefined ? null : reloaded(buffer, text);
+			const file = files.get(buffer.path);
+			const next = file === undefined ? null : reloaded(buffer, file);
 			return next === null ? isDirty(buffer) : isDirty(next);
 		});
 		if (unsaved.length > 0) {
@@ -144,8 +156,8 @@ export function externalChangeHandler(
 				}
 				// `reloaded` runs against the live entry, not the one the batch was planned on, so an
 				// edit that landed after the read is still never thrown away.
-				const text = texts.get(entry.path);
-				next.push(text === undefined ? entry : (reloaded(entry, text) ?? entry));
+				const file = files.get(entry.path);
+				next.push(file === undefined ? entry : (reloaded(entry, file) ?? entry));
 			}
 			return next;
 		});

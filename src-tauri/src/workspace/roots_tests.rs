@@ -137,6 +137,7 @@ pub mod containment_tests {
         write_text_file(
             target.to_string_lossy().into_owned(),
             "inside\n".to_string(),
+            None,
         )
         .expect("a write inside an open project is allowed");
 

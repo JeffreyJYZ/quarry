@@ -85,7 +85,7 @@ pub mod tests_group_2 {
         let fixture = Fixture::new("write-directory");
         fixture.dir("nested");
 
-        let error = write_text_file(fixture.path("nested"), "text".to_string())
+        let error = write_text_file(fixture.path("nested"), "text".to_string(), None)
             .expect_err("directory must be refused");
 
         assert!(error.contains("nested"), "unexpected error: {error}");
@@ -97,7 +97,7 @@ pub mod tests_group_2 {
     pub fn a_missing_parent_is_rejected() {
         let fixture = Fixture::new("write-missing-parent");
 
-        let error = write_text_file(fixture.path("absent/file.txt"), "text".to_string())
+        let error = write_text_file(fixture.path("absent/file.txt"), "text".to_string(), None)
             .expect_err("missing parent must be refused");
 
         assert!(error.contains("absent"), "unexpected error: {error}");
@@ -109,7 +109,7 @@ pub mod tests_group_2 {
     pub fn a_relative_path_is_rejected() {
         let fixture = Fixture::new("write-relative");
 
-        let error = write_text_file("relative.txt".to_string(), "text".to_string())
+        let error = write_text_file("relative.txt".to_string(), "text".to_string(), None)
             .expect_err("relative path must be refused");
 
         assert!(error.contains("relative.txt"), "unexpected error: {error}");
@@ -121,7 +121,8 @@ pub mod tests_group_2 {
         let fixture = Fixture::new("write-oversized");
         let text = "x".repeat(MAX_TEXT_BYTES as usize + 1);
 
-        let error = write_text_file(fixture.path("big.txt"), text).expect_err("must be refused");
+        let error =
+            write_text_file(fixture.path("big.txt"), text, None).expect_err("must be refused");
 
         assert!(
             error.contains(&MAX_TEXT_BYTES.to_string()),
@@ -137,8 +138,12 @@ pub mod tests_group_2 {
         // A name past the filesystem's limit fails while creating the temporary file.
         let target = fixture.path.join("x".repeat(300));
 
-        let error = write_text_file(target.to_string_lossy().into_owned(), "text".to_string())
-            .expect_err("must fail");
+        let error = write_text_file(
+            target.to_string_lossy().into_owned(),
+            "text".to_string(),
+            None,
+        )
+        .expect_err("must fail");
 
         assert!(error.contains("xxxx"), "unexpected error: {error}");
         assert!(temp_siblings(&fixture.path).is_empty());

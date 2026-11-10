@@ -3,6 +3,7 @@ import type { RefObject } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { type FileEntry, readTextFile } from "@/lib/project/api";
 import type { FileBuffer } from "@/lib/project/buffer";
+import { encodingNotice } from "@/lib/project/buffer";
 import { describeError } from "@/lib/project/errors";
 
 /** The most a recents list keeps; the tail is noise nobody scrolls to. */
@@ -46,15 +47,24 @@ export function useFileOpening(input: {
 			if (reading.current.has(path)) return;
 			reading.current.add(path);
 			try {
-				const text = await readTextFile(path);
+				const file = await readTextFile(path);
 				if (!mountedRef.current) return;
 				setBuffers((current) =>
 					current.some((buffer) => buffer.path === path)
 						? current
-						: [...current, { path, name, text, loaded: text }],
+						: [
+								...current,
+								{
+									path,
+									name,
+									text: file.text,
+									loaded: file.text,
+									encoding: file.encoding,
+								},
+							],
 				);
 				setActivePath(path);
-				options.onNotice(null);
+				options.onNotice(encodingNotice(name, file.encoding));
 			} catch (error) {
 				if (mountedRef.current)
 					options.onNotice(`Could not open ${name}: ${describeError(error)}`);

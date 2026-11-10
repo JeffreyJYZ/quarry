@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import type { Dispatch, RefObject, SetStateAction } from "react";
-import { type FileBuffer, isDirty } from "@/lib/project/buffer";
+import type { TextFile } from "@/lib/project/api";
+import { type FileBuffer, type FileEncoding, isDirty } from "@/lib/project/buffer";
 import { externalChangeHandler, reloaded } from "@/ui/app/externalChanges";
+
+/** A disk read at an encoding; plain UTF-8 unless a test says otherwise. */
+function disk(text: string, encoding: FileEncoding = "utf8"): TextFile {
+	return { text, encoding };
+}
 
 function buffer(text = "same", loaded = text): FileBuffer {
 	return { path: "/project/src/main.rs", name: "main.rs", text, loaded };
@@ -18,6 +24,8 @@ function harness(
 	diskText = "from disk",
 	/** Runs while the disk read is in flight, which is where a keystroke can land. */
 	duringRead?: (buffers: FileBuffer[]) => FileBuffer[],
+	/** The encoding the file is read back in; a legacy file reports its own. */
+	diskEncoding: FileEncoding = "utf8",
 ) {
 	let buffers = [...initial];
 	const there = new Set(existing);
@@ -37,7 +45,7 @@ function harness(
 		{
 			read: async () => {
 				if (duringRead !== undefined) buffers = duringRead(buffers);
-				return diskText;
+				return disk(diskText, diskEncoding);
 			},
 			exists: async (path) => there.has(path),
 		},
@@ -48,34 +56,34 @@ function harness(
 
 describe("reloaded", () => {
 	test("a buffer that stayed clean takes the disk text", () => {
-		const next = reloaded(buffer("old", "old"), "new from disk");
+		const next = reloaded(buffer("old", "old"), disk("new from disk"));
 		expect(next?.text).toBe("new from disk");
 		expect(next?.loaded).toBe("new from disk");
 		expect(isDirty(next as FileBuffer)).toBe(false);
 	});
 
 	test("a reload is a new document, so the editor starts a fresh history", () => {
-		const next = reloaded(buffer("old", "old"), "new from disk");
+		const next = reloaded(buffer("old", "old"), disk("new from disk"));
 		expect(next?.loadId).toBe(1);
 	});
 
 	test("a dirty buffer whose disk text already matches stops being dirty", () => {
-		const next = reloaded(buffer("same", "old"), "same");
+		const next = reloaded(buffer("same", "old"), disk("same"));
 		expect(next?.text).toBe("same");
 		expect(next?.loaded).toBe("same");
 		expect(isDirty(next as FileBuffer)).toBe(false);
 	});
 
 	test("the same match keeps the document id, since the text never changed", () => {
-		expect(reloaded({ ...buffer("same", "old"), loadId: 2 }, "same")?.loadId).toBe(2);
+		expect(reloaded({ ...buffer("same", "old"), loadId: 2 }, disk("same"))?.loadId).toBe(2);
 	});
 
 	test("a buffer edited during the read is left alone", () => {
-		expect(reloaded(buffer("typed while reading", "old"), "new from disk")).toBeNull();
+		expect(reloaded(buffer("typed while reading", "old"), disk("new from disk"))).toBeNull();
 	});
 
 	test("unchanged disk text is not applied, so no render is wasted", () => {
-		expect(reloaded(buffer("same", "same"), "same")).toBeNull();
+		expect(reloaded(buffer("same", "same"), disk("same"))).toBeNull();
 	});
 });
 

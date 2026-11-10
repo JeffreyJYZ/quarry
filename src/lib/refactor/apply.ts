@@ -129,9 +129,11 @@ export async function applyFileEdits(
 			files += 1;
 		} else {
 			try {
-				const text = await readTextFile(fileEdit.path);
-				const nextText = applyEdits(text, fileEdit.edits);
-				await writeTextFile(fileEdit.path, nextText);
+				// A file that was not open is read and written in its own encoding: a workspace edit
+				// must not convert a legacy source to UTF-8 as a side effect.
+				const file = await readTextFile(fileEdit.path);
+				const nextText = applyEdits(file.text, fileEdit.edits);
+				await writeTextFile(fileEdit.path, nextText, file.encoding);
 				files += 1;
 			} catch {
 				failed.push(fileEdit.path);

@@ -44,6 +44,7 @@ export default function OverlaysMount({ model }: { model: ShellModel }) {
 					cursor === null ? null : { line: cursor.line + 1, column: cursor.character + 1 }
 				}
 				language={languageLabel(model.activePath)}
+				encoding={active?.encoding ?? null}
 				tabSize={settings.effective.editorTabSize}
 				status={status}
 				onOpenSettings={() => panels.setSettingsOpen(true)}

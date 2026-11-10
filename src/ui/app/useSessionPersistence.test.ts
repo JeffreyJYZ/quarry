@@ -16,7 +16,7 @@ mock.module("@/lib/project/api", () => ({
 	readSettings: async () => settings,
 	readTextFile: async (path: string) => {
 		if (path === "/p/too-big.rs") throw new Error("File is too large to open");
-		return `text of ${path}`;
+		return { text: `text of ${path}`, encoding: "utf8" as const };
 	},
 	settingsForWrite: (preserved: Record<string, unknown>, known: Settings) => ({
 		...preserved,
