@@ -1,4 +1,3 @@
-import type { ServerKind } from "@/lib/lsp/served";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	createHierarchy,
@@ -18,8 +17,9 @@ import {
 	type VisibleNode,
 } from "@/lib/lsp/typeHierarchy";
 import { describeError } from "@/lib/project/errors";
+import { symbolFailureNotice } from "@/lib/lsp/errors";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
-import { ALL_SERVER_KINDS } from "@/lib/consts/lsp";
+import { useRunningSessions } from "@/lib/lsp/useLspContext";
 
 type Hierarchies = Record<TypeHierarchyDirection, TypeHierarchy>;
 
@@ -34,16 +34,14 @@ export function useHierarchy({
 	cursor,
 	onNavigate,
 	onClose,
-	running,
 }: {
 	root: string;
 	path: string;
 	cursor: { line: number; character: number };
 	onNavigate: (path: string, line: number, character: number) => void;
 	onClose: () => void;
-	running?: ReadonlySet<ServerKind>;
 }) {
-	const runningSet = running ?? new Set(ALL_SERVER_KINDS);
+	const running = useRunningSessions();
 	const [direction, setDirection] = useState<TypeHierarchyDirection>("supertypes");
 	const [hierarchies, setHierarchies] = useState<Hierarchies>(freshHierarchies);
 	const [prepared, setPrepared] = useState<TypeHierarchyNode[] | null>(null);
@@ -55,7 +53,7 @@ export function useHierarchy({
 	/** Bumped per prepare, so a level fetched for an old symbol cannot land in the new tree. */
 	const generation = useRef(0);
 
-	const kind = servedByRunningServer(path, runningSet);
+	const kind = servedByRunningServer(path, running);
 	useEffect(() => {
 		if (kind === null) {
 			setLoading(false);
@@ -84,7 +82,7 @@ export function useHierarchy({
 			},
 			(reason: unknown) => {
 				if (cancelled || generation.current !== token) return;
-				setError(describeError(reason));
+				setError(symbolFailureNotice(reason));
 				setLoading(false);
 			},
 		);
@@ -156,7 +154,7 @@ export function useHierarchy({
 				},
 				(reason: unknown) => {
 					if (generation.current !== token) return;
-					setError(describeError(reason));
+					setError(symbolFailureNotice(reason));
 					setLoadingKey(null);
 				},
 			);
