@@ -19,6 +19,7 @@ import { useRunControls } from "@/ui/app/useRunControls";
 import { useSaveBuffers } from "@/ui/app/useSaveBuffers";
 import { useSettings } from "@/ui/app/useSettings";
 import { useShellSnapshot } from "@/ui/app/useShellSnapshot";
+import { useSplit } from "@/ui/app/useSplit";
 import { shellStatus } from "@/ui/app/status";
 
 import { resetProjectState } from "@/ui/app/projectReset";
@@ -53,6 +54,7 @@ export function useShell() {
 	});
 	const root = workspace.project?.root ?? null;
 	const activePath = workspace.activePath;
+	const split = useSplit({ buffers: workspace.buffers, activePath, onNotice: setNotice });
 	const todos = useTodos(root);
 	const git = useGitState({ root, activePath, onNotice: setNotice });
 	const runs = useRunControls({
@@ -134,15 +136,9 @@ export function useShell() {
 	const { missingTools, saveError } = shellStatus(settings.report, panels.saveStatus);
 	// Everything that belonged to the previous project, cleared when a new one opens.
 	projectOpenedRef.current = () =>
-		resetProjectState({ git, panels, overlays, diagnostics, runs });
+		resetProjectState({ git, panels, overlays, diagnostics, runs, split });
 
-	const snapshotRef = useShellSnapshot({
-		workspace,
-		panels,
-		activePath,
-		runs,
-		settings,
-	});
+	const snapshotRef = useShellSnapshot({ workspace, panels, activePath, runs, settings });
 
 	const { commands, runCommand, runDebug } = useShellGlue({
 		workspace,
@@ -157,6 +153,7 @@ export function useShell() {
 		diagnostics,
 		debug,
 		tests,
+		split,
 		root,
 		activePath,
 		cursor: overlays.cursor,
@@ -181,6 +178,7 @@ export function useShell() {
 		tests,
 		todos,
 		bookmarks,
+		split,
 		lspStatuses,
 		restartLsp: lspRestart.restart,
 		notice,
@@ -191,7 +189,7 @@ export function useShell() {
 		editorRef,
 		root,
 		activePath,
-		active: workspace.buffers.find((buffer) => buffer.path === activePath) ?? null,
+		active,
 		panelExpanded,
 		missingTools,
 		saveError,

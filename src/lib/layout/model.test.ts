@@ -54,6 +54,7 @@ describe("clampPanelSizes", () => {
 			terminalWidth: PANEL_LIMITS.terminalWidth.min,
 			outlineHeight: DEFAULT_PANEL_SIZES.outlineHeight,
 			disasmWidth: DEFAULT_PANEL_SIZES.disasmWidth,
+			splitWidth: DEFAULT_PANEL_SIZES.splitWidth,
 		});
 	});
 });

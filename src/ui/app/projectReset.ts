@@ -11,9 +11,9 @@ import { forgetClosed } from "@/lib/editor/closedTabs";
  * project's binary against the new tree.
  */
 export function resetProjectState(
-	shell: Pick<ShellModel, "git" | "panels" | "overlays" | "diagnostics" | "runs">,
+	shell: Pick<ShellModel, "git" | "panels" | "overlays" | "diagnostics" | "runs" | "split">,
 ): void {
-	const { git, panels, overlays, diagnostics, runs } = shell;
+	const { git, panels, overlays, diagnostics, runs, split } = shell;
 	git.setRefreshToken((current) => current + 1);
 	panels.setGitDiffPath(null);
 	panels.setGitCommitDiffHash(null);
@@ -23,6 +23,8 @@ export function resetProjectState(
 	overlays.setShortcutsOpen(false);
 	diagnostics.reset();
 	runs.replaceConfigurations([]);
+	// The split showed a file from the project that was just closed, so it goes with it.
+	split.close();
 	// Ctrl+Shift+T must not restore a buffer from the project that was just closed.
 	forgetClosed();
 }

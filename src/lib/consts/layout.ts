@@ -9,6 +9,8 @@ export const DEFAULT_PANEL_SIZES: PanelSizes = {
 	terminalWidth: 380,
 	outlineHeight: 200,
 	disasmWidth: 520,
+	/** Where the split editor opens on the right; its handle starts from here. */
+	splitWidth: 560,
 };
 
 /**
@@ -25,6 +27,7 @@ export const PANEL_LIMITS: Record<PanelName, { min: number; max: number }> = {
 	terminalWidth: { min: 240, max: 900 },
 	outlineHeight: { min: 80, max: 600 },
 	disasmWidth: { min: 240, max: 1200 },
+	splitWidth: { min: 280, max: 1200 },
 };
 
 /** Keyboard steps for a separator: a small nudge, and a page-sized jump with Shift. */

@@ -17,6 +17,8 @@ export type PanelSizes = {
 	outlineHeight: number;
 	/** Width of the assembly split beside the editor. */
 	disasmWidth: number;
+	/** Width of the split editor's second code pane. */
+	splitWidth: number;
 };
 
 export type PanelName = keyof PanelSizes;
@@ -51,6 +53,7 @@ export function clampPanelSizes(input: unknown): PanelSizes {
 		terminalWidth: read("terminalWidth"),
 		outlineHeight: read("outlineHeight"),
 		disasmWidth: read("disasmWidth"),
+		splitWidth: read("splitWidth"),
 	};
 }
 

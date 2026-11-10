@@ -25,6 +25,7 @@ export type CommandContext = {
 	toggleRail: () => void;
 	toggleDock: () => void;
 	toggleTerminal: () => void;
+	toggleSplit: () => void;
 	revealFile: () => void;
 	openQuick: () => void;
 	openShortcuts: () => void;

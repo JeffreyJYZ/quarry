@@ -11,6 +11,7 @@ import type { useRunControls } from "@/ui/app/useRunControls";
 import type { useSaveBuffers } from "@/ui/app/useSaveBuffers";
 import { useSelectionKeybindings } from "@/ui/app/useSelectionKeybindings";
 import type { useSettings } from "@/ui/app/useSettings";
+import { useSplitKey } from "@/ui/app/useSplitKey";
 import { useTabKeys } from "@/ui/app/useTabKeys";
 import type { useWorkspace } from "@/ui/app/useWorkspace";
 
@@ -39,6 +40,7 @@ export function useShellKeymaps(options: {
 		debugNow: () => void;
 		stop: () => void;
 	};
+	toggleSplit: () => void;
 	root: string | null;
 	activePath: string | null;
 	cursor: Cursor;
@@ -50,6 +52,7 @@ export function useShellKeymaps(options: {
 	const { runDebug, root, activePath, cursor, panelExpanded, restartLsp } = options;
 	const tabKeys = useTabKeys(workspace);
 	useGotoLineKey({ activePath, open: () => overlays.setLineOpen(true) });
+	useSplitKey({ toggle: options.toggleSplit });
 
 	useKeybindings({
 		root,

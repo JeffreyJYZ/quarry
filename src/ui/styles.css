@@ -52,6 +52,8 @@
 
 @import "./styles/editor-split.css";
 
+@import "./styles/split-editor.css";
+
 @import "./styles/welcome.css";
 
 @import "./styles/bookmarks.css";

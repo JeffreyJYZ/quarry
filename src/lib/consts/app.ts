@@ -144,6 +144,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
 			{ keys: ["Ctrl", "Tab"], action: "Next tab" },
 			{ keys: ["Ctrl", "Shift", "Tab"], action: "Previous tab" },
 			{ keys: ["Cmd", "J"], action: "Toggle bottom dock", menu: true },
+			{ keys: ["Cmd", "`"], action: "Split editor right" },
 			{ keys: ["Cmd", "6"], action: "Show TODO list" },
 			{ keys: ["Cmd", "Shift", "D"], action: "Show debugger" },
 			{ keys: ["Cmd", "Shift", "G"], action: "Toggle source control" },

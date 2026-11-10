@@ -107,3 +107,43 @@ describe("the open-file tab strip keyboard model", () => {
 		expect(onActivate).toHaveBeenLastCalledWith("/p/b.rs");
 	});
 });
+
+describe("the tab strip's split toggle", () => {
+	function row(splitOpen: boolean, onToggleSplit: () => void) {
+		return render(
+			<TabStrip
+				buffers={buffers}
+				activePath="/p/a.rs"
+				saving={new Set()}
+				confirmClose={null}
+				onActivate={() => {}}
+				onClose={() => {}}
+				onSaveClose={() => {}}
+				onDiscardClose={() => {}}
+				onCancelClose={() => {}}
+				splitOpen={splitOpen}
+				onToggleSplit={onToggleSplit}
+			/>,
+		);
+	}
+
+	test("is absent when the shell passes no handler, so the strip stays a plain tab list", () => {
+		expect(markup("/p/a.rs")).not.toContain("Split editor right");
+	});
+
+	test("reports whether the split is open and toggles it", () => {
+		const onToggleSplit = mock(() => {});
+		const view = row(true, onToggleSplit);
+		const button = view.getByRole("button", { name: "Split editor right" });
+		expect(button.getAttribute("aria-pressed")).toBe("true");
+		fireEvent.click(button);
+		expect(onToggleSplit).toHaveBeenCalled();
+	});
+
+	test("sits in the tab strip row, outside the tablist it would otherwise pollute", () => {
+		const view = row(false, () => {});
+		const button = view.getByRole("button", { name: "Split editor right" });
+		expect(button.getAttribute("aria-pressed")).toBe("false");
+		expect(button.closest('[role="tablist"]')).toBeNull();
+	});
+});

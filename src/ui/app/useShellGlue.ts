@@ -9,6 +9,7 @@ import type { useOverlays } from "@/ui/app/useOverlays";
 import type { usePanels } from "@/ui/app/usePanels";
 import type { useRunControls } from "@/ui/app/useRunControls";
 import type { useSaveBuffers } from "@/ui/app/useSaveBuffers";
+import type { SplitEditor } from "@/ui/app/useSplit";
 import type { useSettings } from "@/ui/app/useSettings";
 import type { useWorkspace } from "@/ui/app/useWorkspace";
 import { shellCommands } from "@/ui/app/shellCommands";
@@ -34,6 +35,7 @@ export type GlueOptions = {
 	diagnostics: ReturnType<typeof useDiagnosticsState>;
 	debug: ReturnType<typeof useDebugSession>;
 	tests: ReturnType<typeof import("@/lib/tests/useTests").useTests>;
+	split: SplitEditor;
 	root: string | null;
 	activePath: string | null;
 	cursor: { line: number; character: number } | null;
@@ -61,6 +63,7 @@ export function useShellGlue(options: GlueOptions) {
 		build,
 		editorActions,
 		diagnostics,
+		split,
 	} = options;
 	const { debug, root, activePath, cursor, panelExpanded, snapshotRef, onNotice, restartLsp } =
 		options;
@@ -115,6 +118,7 @@ export function useShellGlue(options: GlueOptions) {
 		editorActions,
 		lsp: lspCommands,
 		runDebug: { run: runDebug.run, debugNow: runDebug.debugNow, stop: runDebug.stop },
+		toggleSplit: split.toggle,
 		root,
 		activePath,
 		cursor,
@@ -139,6 +143,7 @@ export function useShellGlue(options: GlueOptions) {
 		run: runDebug.run,
 		debugNow: runDebug.debugNow,
 		restartLsp,
+		split,
 	});
 
 	useSessionPersistence({

@@ -3,6 +3,7 @@ import type { CommandContext } from "./commands";
 import { lspCommands } from "./lspPaletteCommand";
 import { navigationCommands } from "./navigationCommands";
 import { todoCommands } from "./todoCommands";
+import { viewCommands } from "./viewCommands";
 
 /**
  * The command palette's list.
@@ -102,32 +103,7 @@ export function buildCommands(context: CommandContext): Command[] {
 			disabled: root === null,
 			run: context.openSearch,
 		},
-		{
-			id: "toggle-rail",
-			label: "Toggle rail",
-			hint: "Cmd+B",
-			run: context.toggleRail,
-		},
-		{
-			id: "toggle-dock",
-			label: "Toggle dock",
-			hint: "Cmd+J",
-			run: context.toggleDock,
-		},
-		{
-			id: "toggle-terminal",
-			label: "Toggle terminal",
-			hint: "",
-			disabled: root === null,
-			run: context.toggleTerminal,
-		},
-		{
-			id: "reveal-active-file",
-			label: "Reveal active file in explorer",
-			hint: "Cmd+Shift+E",
-			disabled: root === null || activePath === null,
-			run: context.revealFile,
-		},
+		...viewCommands(context),
 		{
 			id: "quick-open",
 			label: "Quick open",

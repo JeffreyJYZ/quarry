@@ -107,6 +107,12 @@ export function useWorkspace(options: WorkspaceOptions) {
 		setBuffers((current) => withBufferText(current, activePathRef.current, value));
 	}, []);
 
+	// The split pane names its own file, so typing beside the active tab can never overwrite the
+	// active tab's text — the two writers share one helper and differ only in the path they pass.
+	const handleChangeFor = useCallback((path: string, value: string) => {
+		setBuffers((current) => withBufferText(current, path, value));
+	}, []);
+
 	const handleApplyEdits = useCallback(
 		async (edits: FileEdit[]) =>
 			applyEditsWithNotice(edits, buffersRef.current, setBuffers, options.onNotice),
@@ -176,6 +182,7 @@ export function useWorkspace(options: WorkspaceOptions) {
 		handleOpenQuick: navigation.openQuick,
 		handleNavigate: navigation.navigate,
 		handleChange,
+		handleChangeFor,
 		handleApplyEdits,
 		applyExternalChanges,
 		handleClose: tabs.close,
