@@ -28,49 +28,6 @@
 	cursor: pointer;
 }
 
-.dock-tabs {
-	display: flex;
-	align-items: center;
-	gap: 2px;
-	/* A tab's suffix (a count, a status word) changes width, never the row's height. */
-	height: 100%;
-}
-
-.dock-tab {
-	display: inline-flex;
-	align-items: baseline;
-	gap: 6px;
-	padding: 3px 8px;
-	border: 0;
-	border-radius: 3px;
-	background: transparent;
-	color: var(--muted);
-	font-family: var(--mono);
-	font-size: 10px;
-	letter-spacing: 0.14em;
-	text-transform: uppercase;
-	cursor: pointer;
-}
-
-.dock-tab:hover {
-	background: var(--hover);
-}
-
-.dock-tab.active {
-	color: var(--text);
-	background: var(--hover);
-}
-
-.dock-tab-count {
-	font-size: 10px;
-	letter-spacing: 0;
-	color: var(--muted);
-}
-
-.dock-tab-count.bad {
-	color: var(--danger);
-}
-
 .dock-tools {
 	display: flex;
 	align-items: center;

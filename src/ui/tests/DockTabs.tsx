@@ -1,17 +1,8 @@
 import type { DebugStatus } from "@/lib/debug/session";
+import { useDockOverflow } from "@/ui/app/useDockOverflow";
+import { DOCK_TAB_LABELS, DockTabSuffix, type DockTabCounts } from "./DockTabSuffix";
+import { DockOverflowMenu } from "./DockOverflowMenu";
 import { DOCK_TABS, type DockTab } from "./parts";
-
-/** Every tab's label; the record is exhaustive, so a new tab cannot ship unnamed. */
-const LABELS: Record<DockTab, string> = {
-	problems: "Problems",
-	bookmarks: "Bookmarks",
-	tests: "Tests",
-	run: "Run",
-	debugger: "Debugger",
-	console: "Console",
-	memory: "Memory",
-	todo: "TODO",
-};
 
 export function DockTabs({
 	expanded,
@@ -41,52 +32,20 @@ export function DockTabs({
 	/** The run tab's suffix: `running`, the exit code, or nothing before the first run. */
 	runStatus: string | null;
 }) {
-	/** The suffix each tab carries beside its name; console and memory have nothing to count. */
-	function suffix(value: DockTab) {
-		if (value === "tests") {
-			return (
-				<>
-					<span className={failed > 0 ? "dock-tab-count bad" : "dock-tab-count"}>
-						{testsCount}
-					</span>
-					{failed > 0 ? (
-						<span className="dock-tab-count bad">{failed} failed</span>
-					) : null}
-				</>
-			);
-		}
-		if (value === "problems") {
-			return (
-				<span className={problemsErrors > 0 ? "dock-tab-count bad" : "dock-tab-count"}>
-					{problemsErrors}
-				</span>
-			);
-		}
-		if (value === "todo") {
-			return <span className="dock-tab-count">{todoCount}</span>;
-		}
-		if (value === "bookmarks") {
-			return <span className="dock-tab-count">{bookmarksCount}</span>;
-		}
-		if (value === "debugger") {
-			return <span className={`dock-tab-status ${debugStatus}`}>{debugStatus}</span>;
-		}
-		if (value === "run") {
-			if (runStatus === null) {
-				return null;
-			}
-			return (
-				<span
-					className={
-						runStatus === "running" ? "dock-tab-status running" : "dock-tab-status"
-					}
-				>
-					{runStatus}
-				</span>
-			);
-		}
-		return null;
-	}
+	const counts: DockTabCounts = {
+		testsCount,
+		failed,
+		problemsErrors,
+		todoCount,
+		bookmarksCount,
+		debugStatus,
+		runStatus,
+	};
+	// Anything a tab's suffix reads is a width it can grow by, and the tab's own ResizeObserver
+	// reports that, so the strip never needs to guess which count moved.
+	const overflow = useDockOverflow({ tabs: DOCK_TABS, active: tab });
+	// The active tab is never fitted away, but a stale measurement must not park it either.
+	const parked = new Set(overflow.hidden.filter((value) => value !== tab));
 
 	return (
 		<>
@@ -102,20 +61,37 @@ export function DockTabs({
 					aria-hidden="true"
 				/>
 			</button>
-			<div className="dock-tabs">
-				{DOCK_TABS.map((value) => (
-					<button
-						key={value}
-						type="button"
-						id={`dock-tab-${value}`}
-						className={tab === value ? "dock-tab active" : "dock-tab"}
-						aria-pressed={tab === value}
-						onClick={() => onSelectTab(value)}
-					>
-						{LABELS[value]}
-						{suffix(value)}
-					</button>
-				))}
+			<div className="dock-tabs" ref={overflow.rowRef}>
+				{DOCK_TABS.map((value) => {
+					const away = parked.has(value);
+					const active = tab === value;
+					return (
+						<button
+							key={value}
+							type="button"
+							ref={(node) => overflow.register(value, node)}
+							id={`dock-tab-${value}`}
+							className={
+								away ? "dock-tab parked" : active ? "dock-tab active" : "dock-tab"
+							}
+							aria-pressed={active}
+							aria-hidden={away || undefined}
+							tabIndex={away ? -1 : undefined}
+							onClick={() => onSelectTab(value)}
+						>
+							{DOCK_TAB_LABELS[value]}
+							<DockTabSuffix tab={value} {...counts} />
+						</button>
+					);
+				})}
+				{overflow.overflow ? (
+					<DockOverflowMenu
+						hidden={overflow.hidden}
+						onSelectTab={onSelectTab}
+						triggerRef={overflow.moreRef}
+						{...counts}
+					/>
+				) : null}
 			</div>
 		</>
 	);

@@ -1,0 +1,128 @@
+/* The dock's tab strip: its tabs, the tabs it had to park, and the `»` menu that lists them. */
+
+.dock-tabs {
+	position: relative;
+	display: flex;
+	flex: 1 1 auto;
+	align-items: center;
+	gap: 2px;
+	/* A tab's suffix (a count, a status word) changes width, never the row's height. */
+	height: 100%;
+	/* The row takes the space the dock allows, so its width is a measurement, not a sum of tabs. */
+	min-width: 0;
+	white-space: nowrap;
+}
+
+.dock-tab {
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: baseline;
+	gap: 6px;
+	padding: 3px 8px;
+	border: 0;
+	border-radius: 3px;
+	background: transparent;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.dock-tab:hover {
+	background: var(--hover);
+}
+
+.dock-tab.active {
+	color: var(--text);
+	background: var(--hover);
+}
+
+/*
+ * A tab the row cannot fit: still laid out at its natural width so it can be measured, but out of
+ * the flow and off the strip, so a narrow dock never squeezes or half-clips it.
+ */
+.dock-tab.parked {
+	position: absolute;
+	top: 0;
+	left: -10000px;
+	visibility: hidden;
+	pointer-events: none;
+}
+
+.dock-tab-count {
+	font-size: 10px;
+	letter-spacing: 0;
+	color: var(--muted);
+}
+
+.dock-tab-count.bad {
+	color: var(--danger);
+}
+
+.dock-overflow {
+	position: relative;
+	flex: 0 0 auto;
+}
+
+.dock-tab-more {
+	display: inline-grid;
+	place-items: center;
+	padding: 3px 8px;
+	border: 0;
+	border-radius: 3px;
+	background: transparent;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.dock-tab-more:hover,
+.dock-tab-more[aria-expanded="true"] {
+	background: var(--hover);
+	color: var(--text);
+}
+
+.dock-overflow-menu {
+	position: absolute;
+	top: calc(100% + 4px);
+	right: 0;
+	z-index: 40;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 150px;
+	padding: 4px;
+	border: 1px solid var(--line);
+	border-radius: 4px;
+	background: var(--panel);
+	box-shadow: 0 10px 28px rgb(0 0 0 / 0.45);
+}
+
+.dock-overflow-item {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 6px;
+	padding: 4px 8px;
+	border: 0;
+	border-radius: 3px;
+	background: transparent;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: 0.14em;
+	text-align: left;
+	text-transform: uppercase;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.dock-overflow-item:hover,
+.dock-overflow-item:focus-visible {
+	background: var(--hover);
+	color: var(--text);
+}
