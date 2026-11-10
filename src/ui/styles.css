@@ -24,6 +24,8 @@
 
 @import "./styles/12-dock.css";
 
+@import "./styles/dock-tabs.css";
+
 @import "./styles/13-refs-row.css";
 
 @import "./styles/14-git-row.css";
