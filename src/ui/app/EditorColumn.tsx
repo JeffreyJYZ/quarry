@@ -45,6 +45,30 @@ export default function EditorColumn({ model }: { model: ShellModel }) {
 		onWidthChange: panels.setDisasmWidth,
 		setOpen: panels.setDisasmOpen,
 	});
+	// The right pane is resolved from the same buffer list as the tabs, so it always shows a file
+	// that is really open; its markers follow its own text, never the active tab's.
+	const splitPath = model.split.path;
+	const splitBuffer =
+		splitPath === null
+			? null
+			: (workspace.buffers.find((buffer) => buffer.path === splitPath) ?? null);
+	const splitMarkers = useTestMarkers({
+		path: splitBuffer?.path ?? null,
+		text: splitBuffer?.text ?? "",
+		items: model.tests.items,
+		results: model.tests.results,
+		running: model.tests.running,
+	});
+	const split =
+		splitBuffer === null
+			? null
+			: {
+					buffer: splitBuffer,
+					width: model.split.width,
+					testMarkers: splitMarkers,
+					onWidthChange: model.split.setWidth,
+					onClose: model.split.close,
+				};
 
 	return (
 		<main
@@ -58,6 +82,8 @@ export default function EditorColumn({ model }: { model: ShellModel }) {
 		>
 			<EditorStage
 				disasm={disasm}
+				split={split}
+				splitOpen={split !== null}
 				project={workspace.project}
 				root={model.root}
 				active={model.active}
@@ -86,6 +112,8 @@ export default function EditorColumn({ model }: { model: ShellModel }) {
 				onDiscardClose={workspace.handleDiscardClose}
 				onCancelClose={workspace.handleCancelClose}
 				onChange={workspace.handleChange}
+				onChangeFor={workspace.handleChangeFor}
+				onToggleSplit={model.split.toggle}
 				onNavigate={workspace.handleNavigate}
 				onReferences={editorActions.handleReferences}
 				onCursor={overlays.setCursor}

@@ -14,6 +14,10 @@ export type TabStripProps = {
 	onSaveClose: (path: string) => void;
 	onDiscardClose: (path: string) => void;
 	onCancelClose: () => void;
+	/** Open state of the split editor, for the toggle at the row's end. */
+	splitOpen?: boolean;
+	/** The toggle itself; omitted, the row renders no split button at all. */
+	onToggleSplit?: () => void;
 };
 
 export default function TabStrip({
@@ -26,6 +30,8 @@ export default function TabStrip({
 	onSaveClose,
 	onDiscardClose,
 	onCancelClose,
+	splitOpen = false,
+	onToggleSplit,
 }: TabStripProps) {
 	/** One tab owns the tab stop; the others are reachable with the arrow keys. */
 	const tabButtons = useRef<(HTMLButtonElement | null)[]>([]);
@@ -59,79 +65,93 @@ export default function TabStrip({
 	}, [confirmClose, onCancelClose]);
 
 	return (
-		<div className="tabstrip" role="tablist" aria-label="Open files">
-			{buffers.map((buffer, index) => {
-				const active = buffer.path === activePath;
-				const confirming = buffer.path === confirmClose;
-				const pending = saving.has(buffer.path);
-				const rowClass = ["tab", active ? "active" : "", confirming ? "confirming" : ""]
-					.filter((part) => part !== "")
-					.join(" ");
+		<div className="tabstrip-row">
+			<div className="tabstrip" role="tablist" aria-label="Open files">
+				{buffers.map((buffer, index) => {
+					const active = buffer.path === activePath;
+					const confirming = buffer.path === confirmClose;
+					const pending = saving.has(buffer.path);
+					const rowClass = ["tab", active ? "active" : "", confirming ? "confirming" : ""]
+						.filter((part) => part !== "")
+						.join(" ");
 
-				return (
-					<div key={buffer.path} className={rowClass} role="presentation">
-						{confirming ? (
-							<>
-								<span className="tab-name tab-confirm-name" title={buffer.path}>
-									{buffer.name}
-								</span>
-								<button
-									type="button"
-									className="tab-choice save"
-									disabled={pending}
-									onClick={() => onSaveClose(buffer.path)}
-								>
-									{pending ? "saving" : "Save"}
-								</button>
-								<button
-									type="button"
-									className="tab-choice discard"
-									disabled={pending}
-									onClick={() => onDiscardClose(buffer.path)}
-								>
-									Discard
-								</button>
-							</>
-						) : (
-							<>
-								<button
-									type="button"
-									ref={(node) => {
-										tabButtons.current[index] = node;
-									}}
-									className="tab-name"
-									title={buffer.path}
-									role="tab"
-									aria-selected={active}
-									tabIndex={index === selectedIndex ? 0 : -1}
-									onClick={() => onActivate(buffer.path)}
-									onKeyDown={onTabKeyDown}
-								>
-									{isDirty(buffer) ? (
-										<span className="dirty" title="unsaved changes">
-											•
-										</span>
-									) : null}
-									{pending ? (
-										<span className="tab-saving" title="saving">
-											·
-										</span>
-									) : null}
-									{buffer.name}
-								</button>
-								<button
-									type="button"
-									className="tab-close"
-									aria-label={`Close ${buffer.name}`}
-									onClick={() => onClose(buffer.path)}
-								>
-									×
-								</button>
-							</>
-						)}
-					</div>
-				);
-			})}
+					return (
+						<div key={buffer.path} className={rowClass} role="presentation">
+							{confirming ? (
+								<>
+									<span className="tab-name tab-confirm-name" title={buffer.path}>
+										{buffer.name}
+									</span>
+									<button
+										type="button"
+										className="tab-choice save"
+										disabled={pending}
+										onClick={() => onSaveClose(buffer.path)}
+									>
+										{pending ? "saving" : "Save"}
+									</button>
+									<button
+										type="button"
+										className="tab-choice discard"
+										disabled={pending}
+										onClick={() => onDiscardClose(buffer.path)}
+									>
+										Discard
+									</button>
+								</>
+							) : (
+								<>
+									<button
+										type="button"
+										ref={(node) => {
+											tabButtons.current[index] = node;
+										}}
+										className="tab-name"
+										title={buffer.path}
+										role="tab"
+										aria-selected={active}
+										tabIndex={index === selectedIndex ? 0 : -1}
+										onClick={() => onActivate(buffer.path)}
+										onKeyDown={onTabKeyDown}
+									>
+										{isDirty(buffer) ? (
+											<span className="dirty" title="unsaved changes">
+												•
+											</span>
+										) : null}
+										{pending ? (
+											<span className="tab-saving" title="saving">
+												·
+											</span>
+										) : null}
+										{buffer.name}
+									</button>
+									<button
+										type="button"
+										className="tab-close"
+										aria-label={`Close ${buffer.name}`}
+										onClick={() => onClose(buffer.path)}
+									>
+										×
+									</button>
+								</>
+							)}
+						</div>
+					);
+				})}
+			</div>
+			{onToggleSplit === undefined ? null : (
+				<button
+					type="button"
+					className="tabstrip-split"
+					aria-label="Split editor right"
+					aria-pressed={splitOpen}
+					title="Split editor right"
+					onClick={onToggleSplit}
+				>
+					◫
+				</button>
+			)}
 		</div>
 	);
 }

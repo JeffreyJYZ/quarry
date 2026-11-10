@@ -10,6 +10,7 @@ import type { Command } from "@/ui/palette/CommandPalette";
 import { buildCommands } from "@/ui/app/commands";
 import { openDisassembly } from "@/lib/debug/disasm";
 import type { LspCommandHandlers } from "@/ui/app/lspCommandHandlers";
+import type { SplitEditor } from "@/ui/app/useSplit";
 
 /**
  * The command palette's rows.
@@ -32,12 +33,13 @@ export function shellCommands(options: {
 	runs: ReturnType<typeof useRunControls>;
 	debug: ReturnType<typeof useDebugSession>;
 	lsp: LspCommandHandlers;
+	split: SplitEditor;
 	run: () => void;
 	debugNow: () => void;
 	restartLsp: () => void;
 }): Command[] {
 	const { root, activePath, cursor, panelExpanded, workspace, overlays, panels } = options;
-	const { git, save, build, runs, debug, lsp } = options;
+	const { git, save, build, runs, debug, lsp, split } = options;
 
 	return buildCommands({
 		root,
@@ -66,6 +68,7 @@ export function shellCommands(options: {
 		toggleDock: () => panels.setPanelOpen(!panelExpanded),
 		// Only the terminal toggles: opening the bottom panel here also revealed Problems.
 		toggleTerminal: () => panels.setTerminalOpen((current) => !current),
+		toggleSplit: () => split.toggle(),
 		revealFile: () => panels.setFileRevealToken((current) => current + 1),
 		openQuick: () => overlays.setQuickOpenOpen(true),
 		openShortcuts: () => overlays.setShortcutsOpen(true),

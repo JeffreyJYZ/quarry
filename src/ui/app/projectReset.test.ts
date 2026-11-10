@@ -20,6 +20,7 @@ function shellStub() {
 		overlays: { setSearchOpen: mock(() => {}), setShortcutsOpen: mock(() => {}) },
 		diagnostics: { reset: mock(() => {}) },
 		runs: { replaceConfigurations: mock(() => {}) },
+		split: { close: mock(() => {}) },
 	};
 }
 
@@ -47,5 +48,11 @@ describe("resetProjectState", () => {
 		expect(shell.panels.setPanelOpen).toHaveBeenCalledWith(null);
 		expect(shell.overlays.setSearchOpen).toHaveBeenCalledWith(false);
 		expect(shell.diagnostics.reset).toHaveBeenCalled();
+	});
+
+	test("closes the split editor, which was showing a file from the old project", () => {
+		const shell = shellStub();
+		resetProjectState(shell as never);
+		expect(shell.split.close).toHaveBeenCalled();
 	});
 });

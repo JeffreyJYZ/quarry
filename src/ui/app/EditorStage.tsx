@@ -6,10 +6,8 @@ import Breadcrumb from "@/ui/breadcrumb/Breadcrumb";
 import LazyEditor from "@/ui/editor/LazyEditor";
 import TabStrip from "@/ui/components/TabStrip";
 import Welcome from "@/ui/components/Welcome";
-import { Suspense, lazy } from "react";
-const DisasmPane = lazy(() => import("@/ui/debug/memory/DisasmPane"));
-import Splitter from "@/ui/layout/Splitter";
-import { PANEL_LIMITS } from "@/lib/consts/layout";
+import DisasmSplitPane from "@/ui/app/DisasmSplitPane";
+import SplitPane, { type SplitView } from "@/ui/app/SplitPane";
 import type { Location, ProjectInfo } from "@/lib/project/api";
 import type { TestMarker } from "@/lib/tests/gutter";
 import type { RefObject } from "react";
@@ -18,6 +16,10 @@ import { type DisasmSplit, useEditorReveal } from "@/ui/app/useStableProps";
 export type EditorStageProps = {
 	/** The assembly split, or null when it is closed. */
 	disasm: DisasmSplit;
+	/** The second code pane, or null when it is closed. */
+	split: SplitView | null;
+	/** True while that pane is on screen, so the tab-strip button can report its state. */
+	splitOpen: boolean;
 	project: ProjectInfo | null;
 	root: string | null;
 	active: FileBuffer | null;
@@ -50,6 +52,9 @@ export type EditorStageProps = {
 	onDiscardClose: (path: string) => void;
 	onCancelClose: () => void;
 	onChange: (text: string) => void;
+	/** Text from the split pane: it names its own file, never the active one. */
+	onChangeFor: (path: string, text: string) => void;
+	onToggleSplit: () => void;
 	onNavigate: (path: string, line: number, character: number) => void;
 	onReferences: (locations: Location[]) => void;
 	onCursor: (position: { line: number; character: number }) => void;
@@ -63,6 +68,9 @@ export type EditorStageProps = {
 /**
  * The editor column: tab strip, breadcrumb and the code surface, or the welcome screen when
  * nothing is open.
+ *
+ * The left pane owns the shell's editor handle and the reveal requests; the split pane beside it is
+ * a read-and-edit surface only, so save and format-on-save always act on the active tab.
  */
 export default function EditorStage(props: EditorStageProps) {
 	const reveal = useEditorReveal(props.revealTarget, props.revealToken);
@@ -89,6 +97,8 @@ export default function EditorStage(props: EditorStageProps) {
 				onSaveClose={props.onSaveClose}
 				onDiscardClose={props.onDiscardClose}
 				onCancelClose={props.onCancelClose}
+				splitOpen={props.splitOpen}
+				onToggleSplit={props.onToggleSplit}
 			/>
 			<Breadcrumb
 				root={props.root ?? ""}
@@ -127,46 +137,29 @@ export default function EditorStage(props: EditorStageProps) {
 					blame={props.blameOn ? (props.blameByPath.get(active.path) ?? null) : null}
 					reveal={reveal}
 				/>
-				{props.disasm === null ? null : (
-					<>
-						<Splitter
-							axis="x"
-							invert
-							value={props.disasm.width}
-							min={PANEL_LIMITS.disasmWidth.min}
-							max={PANEL_LIMITS.disasmWidth.max}
-							label="Resize disassembly"
-							onChange={props.disasm.onWidthChange}
-						/>
-						<aside
-							className="editor-split"
-							aria-label="Disassembly"
-							style={{ width: `${props.disasm.width}px` }}
-						>
-							<header className="editor-split-head">
-								<span className="editor-split-title">{active.name} (assembly)</span>
-								<button
-									type="button"
-									className="editor-split-close"
-									aria-label="Close disassembly"
-									title="Close disassembly"
-									onClick={props.disasm.onClose}
-								>
-									×
-								</button>
-							</header>
-							<div className="editor-split-body">
-								<Suspense fallback={null}>
-									<DisasmPane
-										session={props.disasm.session}
-										address={props.disasm.address}
-										frameId={props.disasm.frameId}
-									/>
-								</Suspense>
-							</div>
-						</aside>
-					</>
+				{props.split === null ? null : (
+					<SplitPane
+						split={props.split}
+						root={props.root}
+						tabSize={props.effective.editorTabSize}
+						fontSize={props.effective.editorFontSize}
+						fontFamily={props.effective.editorFontFamily}
+						diagnostics={props.diagnostics}
+						breakpointLines={props.breakpointLines}
+						unverifiedLines={props.unverifiedLines}
+						bookmarkLines={props.bookmarkLines}
+						onChange={props.onChangeFor}
+						onNavigate={props.onNavigate}
+						onReferences={props.onReferences}
+						onCursor={props.onCursor}
+						onApplyEdits={props.onApplyEdits}
+						onToggleBreakpoint={props.onToggleBreakpoint}
+						onTestMarker={props.onTestMarker}
+						onToggleBookmark={props.onToggleBookmark}
+						onNotice={props.onNotice}
+					/>
 				)}
+				<DisasmSplitPane split={props.disasm} fileName={active.name} />
 			</div>
 		</>
 	);

@@ -36,6 +36,7 @@ const IDLE_CONTEXT: CommandContext = {
 	toggleRail: noop,
 	toggleDock: noop,
 	toggleTerminal: noop,
+	toggleSplit: noop,
 	revealFile: noop,
 	openQuick: noop,
 	openShortcuts: noop,
@@ -96,6 +97,29 @@ describe("native menu contract", () => {
 		expect(extractShellIds(readSource(SHELL_GLUE)).filter((id) => !menuIds.has(id))).toEqual(
 			[],
 		);
+	});
+});
+
+describe("split editor", () => {
+	test("is a palette row that toggles the pane", () => {
+		let toggled = 0;
+		const command = buildCommands({
+			...IDLE_CONTEXT,
+			root: "/p",
+			toggleSplit: () => {
+				toggled += 1;
+			},
+		}).find((entry) => entry.id === "toggle-split");
+		expect(command?.label).toBe("Split editor right");
+		expect(command?.hint).toBe("Cmd+`");
+		expect(command?.disabled).toBe(false);
+		command?.run();
+		expect(toggled).toBe(1);
+	});
+
+	test("is unavailable with no project open", () => {
+		const command = buildCommands(IDLE_CONTEXT).find((entry) => entry.id === "toggle-split");
+		expect(command?.disabled).toBe(true);
 	});
 });
 
