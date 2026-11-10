@@ -25,6 +25,9 @@ interface Probe {
 	manualReason?: string;
 }
 
+/** How many trailing output lines a failed probe may print, so one probe cannot bury the run. */
+const TAIL_LINES = 20;
+
 const PROBES: Probe[] = [
 	{ name: "lsp-smoke", file: "lsp-smoke.ts", requires: ["rust-analyzer"] },
 	{ name: "lsp-ux-smoke", file: "lsp-ux-smoke.ts", requires: ["rust-analyzer"] },
@@ -93,7 +96,14 @@ for (const probe of PROBES) {
 		console.log(`PASS  ${probe.name}`);
 	} else {
 		console.log(`FAIL  ${probe.name}`);
-		if (result.stderr) console.log(result.stderr.split("\n").slice(0, 5).join("\n"));
+		// A probe that fails almost always explains itself on stdout, which was dropped here: CI
+		// then reported only "FAIL" and no reason. Keep the tail of both streams, bounded so one
+		// chatty probe cannot bury the rest of the run.
+		for (const stream of [result.stderr, result.stdout]) {
+			const lines = (stream ?? "").trim().split("\n").filter(Boolean);
+			if (lines.length === 0) continue;
+			console.log(lines.slice(-TAIL_LINES).join("\n"));
+		}
 		failed = true;
 	}
 }
