@@ -7,13 +7,41 @@ import { type ServerKind, servedByRunningServer, sessionId } from "@/lib/lsp/ser
  * shell — problem quick fixes, source actions — would otherwise need that pair drilled through
  * every component between.
  */
-let current: { root: string | null; running: ReadonlySet<ServerKind> } = {
+export type LspContext = { root: string | null; running: ReadonlySet<ServerKind> };
+
+let current: LspContext = {
 	root: null,
 	running: new Set(),
 };
 
+const listeners = new Set<() => void>();
+
+function sameKinds(a: ReadonlySet<ServerKind>, b: ReadonlySet<ServerKind>): boolean {
+	return a.size === b.size && [...a].every((kind) => b.has(kind));
+}
+
+/** A listener hears it only when the root or the running set's members really changed. */
+export function subscribeLspContext(listener: () => void): () => void {
+	listeners.add(listener);
+	return () => {
+		listeners.delete(listener);
+	};
+}
+
+/**
+ * The live pair, replaced only on a real change.
+ *
+ * The identity is what `useSyncExternalStore` compares, so a shell render that republishes the same
+ * servers must not swap the object: doing so would re-render every consumer on every render.
+ */
+export function lspContext(): LspContext {
+	return current;
+}
+
 export function setLspContext(root: string | null, running: ReadonlySet<ServerKind>): void {
+	if (root === current.root && sameKinds(current.running, running)) return;
 	current = { root, running };
+	for (const listener of [...listeners]) listener();
 }
 
 /** The session a path's requests belong to, or null when no running server serves it. */

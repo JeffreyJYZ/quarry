@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { type DocumentSymbol as LspSymbol, lspSymbols } from "@/lib/project/api";
-import { describeError } from "@/lib/project/errors";
-import { isInsideRoot, lspErrorMessage } from "@/lib/lsp/paths";
-import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
-import { ALL_SERVER_KINDS } from "@/lib/consts/lsp";
+import type { DocumentSymbol as LspSymbol } from "@/lib/project/api";
+import { useOutlineSymbols } from "@/lib/outline/useOutlineSymbols";
+import { useRunningSessions } from "@/lib/lsp/useLspContext";
 
 import { caretSymbolIndex } from "@/lib/outline/model";
 import { useOutlineRows } from "@/lib/outline/useOutlineRows";
@@ -20,11 +18,8 @@ export type OutlineProps = {
 };
 
 export default function Outline({ root, activePath, onNavigate, cursor }: OutlineProps) {
-	const [symbols, setSymbols] = useState<LspSymbol[]>([]);
-	const [loading, setLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [noServer, setNoServer] = useState(false);
-	const seqRef = useRef(0);
+	const running = useRunningSessions();
+	const { symbols, loading, error, noServer } = useOutlineSymbols(root, activePath, running);
 	const [filter, setFilter] = useState("");
 	const [kbIndex, setKbIndex] = useState(0);
 	const highlightRef = useRef<HTMLButtonElement | null>(null);
@@ -34,49 +29,6 @@ export default function Outline({ root, activePath, onNavigate, cursor }: Outlin
 		setFilter("");
 		setKbIndex(0);
 	}, [activePath]);
-
-	useEffect(() => {
-		if (activePath === null || !isInsideRoot(root, activePath)) {
-			// The server indexes one root; a tab from outside it would come back as an internal error.
-			setSymbols([]);
-			setError(null);
-			setNoServer(false);
-			setLoading(false);
-			return;
-		}
-		const seq = ++seqRef.current;
-		setLoading(true);
-		setError(null);
-		setNoServer(false);
-		const running = new Set(ALL_SERVER_KINDS);
-		const kind = servedByRunningServer(activePath, running);
-		if (kind === null) {
-			setSymbols([]);
-			setNoServer(true);
-			setLoading(false);
-			return;
-		}
-		setNoServer(false);
-		const sid = sessionId(kind, root);
-		const timer = window.setTimeout(() => {
-			void (async () => {
-				try {
-					const result = await lspSymbols(sid, activePath);
-					if (seqRef.current !== seq) return;
-					setSymbols(result);
-					setLoading(false);
-				} catch (err) {
-					if (seqRef.current !== seq) return;
-					setError(lspErrorMessage(describeError(err)));
-					setSymbols([]);
-					setLoading(false);
-				}
-			})();
-		}, 300);
-		return () => {
-			window.clearTimeout(timer);
-		};
-	}, [root, activePath]);
 
 	// The cap is on what is drawn, not only on what the "+N more" line counts: a C file with a few
 	// hundred symbols would otherwise render every row and shout about a limit it never applied.

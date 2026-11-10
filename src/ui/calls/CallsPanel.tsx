@@ -5,7 +5,8 @@ import {
 	lspCallHierarchyPrepare,
 } from "@/lib/project/api";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
-import { ALL_SERVER_KINDS } from "@/lib/consts/lsp";
+import { symbolFailureNotice } from "@/lib/lsp/errors";
+import { useRunningSessions } from "@/lib/lsp/useLspContext";
 import { fileName } from "@/lib/project/paths";
 export type CallsPanelProps = {
 	root: string;
@@ -20,6 +21,7 @@ const MAX_DEPTH = 5; // cap recursion to avoid loops in cyclic call graphs
 type Direction = "incoming" | "outgoing";
 
 export default function CallsPanel({ root, path, cursor, onNavigate, onClose }: CallsPanelProps) {
+	const running = useRunningSessions();
 	const [direction, setDirection] = useState<Direction>("incoming");
 	const [prepared, setPrepared] = useState<CallHierarchyNode[] | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -38,7 +40,6 @@ export default function CallsPanel({ root, path, cursor, onNavigate, onClose }: 
 		setChildren(new Map());
 		setExpanded(new Set());
 		setLoadingNodes(new Set());
-		const running = new Set(ALL_SERVER_KINDS);
 		const kind = servedByRunningServer(path, running);
 		if (kind === null) {
 			setPrepared(null);
@@ -56,13 +57,13 @@ export default function CallsPanel({ root, path, cursor, onNavigate, onClose }: 
 			})
 			.catch((err: unknown) => {
 				if (cancelled) return;
-				setError(err instanceof Error ? err.message : String(err));
+				setError(symbolFailureNotice(err));
 				setLoading(false);
 			});
 		return () => {
 			cancelled = true;
 		};
-	}, [root, path, cursor.line, cursor.character]);
+	}, [root, path, cursor.line, cursor.character, running]);
 
 	const toggleNode = useCallback(
 		(node: CallHierarchyNode, depth: number) => {
@@ -75,7 +76,6 @@ export default function CallsPanel({ root, path, cursor, onNavigate, onClose }: 
 				});
 				return;
 			}
-			const running = new Set(ALL_SERVER_KINDS);
 			const kind = servedByRunningServer(path, running);
 			if (kind === null) return;
 			const sid = sessionId(kind, root);
@@ -96,7 +96,7 @@ export default function CallsPanel({ root, path, cursor, onNavigate, onClose }: 
 					});
 				})
 				.catch((err: unknown) => {
-					setError(err instanceof Error ? err.message : String(err));
+					setError(symbolFailureNotice(err));
 					setLoadingNodes((current) => {
 						const next = new Set(current);
 						next.delete(node.itemId);
@@ -104,7 +104,7 @@ export default function CallsPanel({ root, path, cursor, onNavigate, onClose }: 
 					});
 				});
 		},
-		[root, path, direction, expanded, children, loadingNodes],
+		[root, path, running, direction, expanded, children, loadingNodes],
 	);
 
 	const renderNode = (node: CallHierarchyNode, depth: number): ReactElement => {

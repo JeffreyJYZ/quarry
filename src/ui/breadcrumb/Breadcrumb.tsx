@@ -1,10 +1,9 @@
 import { BREADCRUMB_TAIL, BREADCRUMB_VISIBLE } from "@/lib/consts/breadcrumb";
 import { useEffect, useRef, useState } from "react";
 import { type DocumentSymbol as LspSymbol, lspSymbols } from "@/lib/project/api";
-import { describeError } from "@/lib/project/errors";
-import { lspErrorMessage } from "@/lib/lsp/paths";
+import { symbolFailureNotice } from "@/lib/lsp/errors";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
-import { ALL_SERVER_KINDS } from "@/lib/consts/lsp";
+import { useRunningSessions } from "@/lib/lsp/useLspContext";
 
 import { qualifiedName } from "@/lib/breadcrumb/model";
 import { useBreadcrumbChain } from "@/lib/breadcrumb/useBreadcrumbChain";
@@ -23,6 +22,7 @@ export default function Breadcrumb({ root, activePath, cursor, onNavigate }: Bre
 	const [copyError, setCopyError] = useState<string | null>(null);
 	const cacheRef = useRef<Map<string, LspSymbol[]>>(new Map());
 	const seqRef = useRef(0);
+	const running = useRunningSessions();
 
 	const copyText = async (text: string) => {
 		try {
@@ -48,9 +48,10 @@ export default function Breadcrumb({ root, activePath, cursor, onNavigate }: Bre
 			return;
 		}
 		const seq = ++seqRef.current;
-		const running = new Set(ALL_SERVER_KINDS);
 		const kind = servedByRunningServer(activePath, running);
 		if (kind === null) {
+			// The restored tab can be active before its server answered. Quiet, not an error: the
+			// running set is a dependency, so the chain arrives when that server starts.
 			setSymbols([]);
 			setSymbolError(null);
 			return;
@@ -65,11 +66,13 @@ export default function Breadcrumb({ root, activePath, cursor, onNavigate }: Bre
 				setSymbolError(null);
 			} catch (error) {
 				if (seqRef.current !== seq) return;
+				// A failed attempt is never cached, and a session a restart just tore down is not a
+				// failure: both leave the breadcrumb quiet so the next running-set change retries.
 				setSymbols([]);
-				setSymbolError(`symbols unavailable: ${lspErrorMessage(describeError(error))}`);
+				setSymbolError(symbolFailureNotice(error, "symbols unavailable: "));
 			}
 		})();
-	}, [root, activePath]);
+	}, [root, activePath, running]);
 
 	const { chain } = useBreadcrumbChain(symbols, cursor);
 

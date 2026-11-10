@@ -1,10 +1,11 @@
 import { GOTO_RESULT_LIMIT } from "@/lib/consts/goto";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { lspSymbols, lspWorkspaceSymbols, type WorkspaceSymbol } from "@/lib/project/api";
-import { describeError } from "@/lib/project/errors";
+import { symbolFailureNotice } from "@/lib/lsp/errors";
 import { isInsideRoot } from "@/lib/lsp/paths";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
-import { ALL_SERVER_KINDS, RUST_ANALYZER } from "@/lib/consts/lsp";
+import { useRunningSessions } from "@/lib/lsp/useLspContext";
+import { RUST_ANALYZER } from "@/lib/consts/lsp";
 import { useDialogFocus } from "@/ui/app/useDialogFocus";
 import "@/ui/goto/goto.css";
 import GotoInput from "@/ui/goto/GotoInput";
@@ -24,6 +25,18 @@ export type GotoProps = {
 	onClose: () => void;
 	onNotice?: (message: string) => void;
 };
+
+/**
+ * Name a failed symbol read, unless a restart tore the session down mid-flight.
+ *
+ * The palette's effect re-runs when the running set changes, so a refusal that only means "the server
+ * was not quite up" is left unsaid and answered by that re-run. Module level on purpose: a listener
+ * defined in the component would change identity every render and re-trigger the effect.
+ */
+function reportSymbolFailure(error: unknown, onNotice?: (message: string) => void): void {
+	const notice = symbolFailureNotice(error, "symbols unavailable: ");
+	if (notice !== null) onNotice?.(notice);
+}
 /**
  * One palette for the three "go to" gestures.
  *
@@ -37,6 +50,7 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose, onNoti
 	const [loading, setLoading] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const listRef = useRef<HTMLUListElement>(null);
+	const running = useRunningSessions();
 	const { panelRef, onKeyDown } = useDialogFocus(true);
 	useEffect(() => {
 		inputRef.current?.focus();
@@ -62,11 +76,10 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose, onNoti
 				if (mode === "symbol") {
 					let symbols: Awaited<ReturnType<typeof lspSymbols>> = [];
 					if (path !== null && isInsideRoot(root, path)) {
-						const running = new Set(ALL_SERVER_KINDS);
 						const kind = servedByRunningServer(path, running);
 						if (kind !== null) {
 							symbols = await lspSymbols(sessionId(kind, root), path).catch((err) => {
-								onNotice?.(`symbols unavailable: ${describeError(err)}`);
+								reportSymbolFailure(err, onNotice);
 								return [];
 							});
 						}
@@ -83,17 +96,17 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose, onNoti
 						})),
 					);
 				} else {
-					// Workspace symbols come from the Rust server; the set above is "every server".
-					const kind = RUST_ANALYZER;
-					const symbols: WorkspaceSymbol[] =
-						kind === null
-							? []
-							: await lspWorkspaceSymbols(sessionId(kind, root), query).catch(
-									(err) => {
-										onNotice?.(`symbols unavailable: ${describeError(err)}`);
-										return [];
-									},
-								);
+					// Workspace symbols come from rust-analyzer alone, and only while it is up: a
+					// session id composed before it answered is the same premature request the panels
+					// had, so the running set is a dependency and its arrival retries this load.
+					const symbols: WorkspaceSymbol[] = running.has(RUST_ANALYZER)
+						? await lspWorkspaceSymbols(sessionId(RUST_ANALYZER, root), query).catch(
+								(err) => {
+									reportSymbolFailure(err, onNotice);
+									return [];
+								},
+							)
+						: [];
 					if (cancelled) return;
 					setRows(
 						symbols.map((symbol) => ({
@@ -115,7 +128,7 @@ export default function Goto({ mode, root, path, recent, onOpen, onClose, onNoti
 			cancelled = true;
 		};
 		// The class mode is the only one that re-queries as the query changes.
-	}, [mode, path, recent, root, query, onNotice]);
+	}, [mode, path, recent, root, query, onNotice, running]);
 	const visible = useMemo(
 		() => filterRows(rows, query).slice(0, GOTO_RESULT_LIMIT),
 		[query, rows],
