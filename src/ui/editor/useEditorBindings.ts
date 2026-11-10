@@ -78,6 +78,7 @@ export function useEditorBindings(options: {
 		closeSearchRef: search.closeSearchRef,
 		stepRef: search.stepRef,
 		toggleBreakpointRef: refs.toggleRef,
+		toggleBookmarkRef: refs.bookmarkToggleRef,
 		diagnosticsRef,
 		applyInlay: actions.applyInlay,
 		hideSig: actions.hideSig,

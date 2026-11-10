@@ -47,7 +47,7 @@ pub mod tests_group_1 {
         // Mirrors DockTab in src/ui/tests/parts.ts: a tab missing from the Rust allowlist is reset to
         // "problems" on every relaunch, so the user's dock forgets which panel they were using.
         for tab in [
-            "problems", "tests", "run", "debugger", "console", "memory", "todo",
+            "problems", "bookmarks", "tests", "run", "debugger", "console", "memory", "todo",
         ] {
             let parsed: Settings =
                 serde_json::from_str(&format!(r#"{{"dockTab":"{tab}"}}"#)).expect("parses");

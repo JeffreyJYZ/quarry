@@ -19,6 +19,7 @@ import {
 import { closeBrackets } from "@codemirror/autocomplete";
 import { history } from "@codemirror/commands";
 import { blameField } from "@/lib/editor/blame";
+import { bookmarkGutter } from "@/lib/bookmarks/gutter";
 import { breakpointGutter } from "@/lib/editor/breakpoints";
 import { cppEditing } from "@/lib/editor/cppEditing";
 import { inlayHintsField } from "@/lib/editor/inlayHints";
@@ -30,6 +31,7 @@ import { quarryHighlightStyle } from "@/lib/editor/themeSyntax";
 import { semanticTokens } from "@/lib/editor/semanticTokens";
 import { stateFromSnapshot } from "@/lib/editor/stateSnapshot";
 import { type BehaviourDeps, behaviourExtensions } from "@/ui/editor/extensionsBehaviour";
+import { bookmarkBindings } from "@/ui/editor/keymapBookmarks";
 import { completionBindings } from "@/ui/editor/keymapCompletion";
 import { debugBindings } from "@/ui/editor/keymapDebug";
 import { editingBindings } from "@/ui/editor/keymapEditing";
@@ -62,6 +64,7 @@ export function createEditorView(options: {
 }): EditorView {
 	const { host, language, indentation, initialValue, initialPath, tabSize } = options;
 	const extensions: Extension = [
+		bookmarkGutter,
 		breakpointGutter,
 		searchField,
 		searchDecorations,
@@ -87,6 +90,7 @@ export function createEditorView(options: {
 			...lspBindings(options.deps),
 			...editingBindings(options.deps),
 			...debugBindings(options.deps),
+			...bookmarkBindings(options.deps),
 		]),
 		language.of(languageForPath(initialPath)),
 		quarryTheme,

@@ -38,6 +38,7 @@ export type EditorStageProps = {
 	unverifiedLines: number[];
 	/** Run buttons for the active file's tests, drawn in the editor's own gutter. */
 	testMarkers: TestMarker[];
+	bookmarkLines: number[];
 	blameOn: boolean;
 	blameByPath: Map<string, { line: number; label: string }[]>;
 	revealTarget: { line: number; character: number } | null;
@@ -55,6 +56,7 @@ export type EditorStageProps = {
 	onApplyEdits: (edits: import("@/lib/project/api").FileEdit[]) => void;
 	onToggleBreakpoint: (line: number) => void;
 	onTestMarker: (marker: TestMarker, group: boolean) => void;
+	onToggleBookmark: (line: number) => void;
 	onNotice: (message: string | null) => void;
 };
 
@@ -113,6 +115,8 @@ export default function EditorStage(props: EditorStageProps) {
 					onToggleBreakpoint={props.onToggleBreakpoint}
 					testMarkers={props.testMarkers}
 					onTestMarker={props.onTestMarker}
+					bookmarkLines={props.bookmarkLines}
+					onToggleBookmark={props.onToggleBookmark}
 					onNavigate={props.onNavigate}
 					onReferences={props.onReferences}
 					onCursor={props.onCursor}

@@ -1,7 +1,7 @@
 import type { EditorSelection } from "@codemirror/state";
 import { forwardRef, type JSX, useRef } from "react";
 import "@/ui/editor/editor.css";
-import { useBreakpointGutter } from "@/ui/editor/useBreakpointGutter";
+import { useGutterMarkers } from "@/ui/editor/useGutterMarkers";
 import { useCodeActionMenu } from "@/ui/editor/useCodeActionMenu";
 import { useDiagnosticsPublish } from "@/ui/editor/useDiagnosticsPublish";
 import { useDocumentSync } from "@/ui/editor/useDocumentSync";
@@ -34,6 +34,8 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		unverifiedLines = NO_LINES,
 		onToggleBreakpoint,
 		testMarkers = [],
+		bookmarkLines = NO_LINES,
+		onToggleBookmark,
 		root = null,
 		onNavigate,
 		onReferences,
@@ -54,6 +56,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		value,
 		onChange,
 		onToggleBreakpoint,
+		onToggleBookmark,
 		root,
 		onNavigate,
 		onReferences,
@@ -66,7 +69,6 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 		hostRef,
 		viewRef,
 		publishedRef,
-		markersRef,
 		pathRef,
 		latestRef,
 		rootRef,
@@ -161,13 +163,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 	useEditorMount({ refs, deps, behaviour, documentId, testMarkers });
 
 	useDocumentSync({ viewRef, value, emittedRef });
-	useBreakpointGutter({
-		viewRef,
-		breakpointLines,
-		unverifiedLines,
-		markersRef,
-		toggleRef: refs.toggleRef,
-	});
+	useGutterMarkers(refs, { breakpointLines, unverifiedLines, bookmarkLines });
 	useDiagnosticsPublish({ viewRef, diagnostics, publishedRef });
 
 	useEditorEffects({

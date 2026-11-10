@@ -124,3 +124,35 @@ export const breakpointStyles = {
 		opacity: 0.65,
 	},
 } as const;
+
+/**
+ * The bookmark column and the tint under the caret.
+ *
+ * The ribbon is a clipped rectangle so it reads as a flag at 8px wide; the tint is translucent in
+ * both themes, which keeps a bookmarked line distinct from a selection without hiding its text.
+ */
+export const bookmarkStyles = {
+	".cm-bookmark-gutter": {
+		width: "1.4em",
+		cursor: "pointer",
+		"&:hover": {
+			backgroundColor: "var(--hover)",
+		},
+		"& .cm-gutterElement": {
+			display: "flex",
+			alignItems: "center",
+			justifyContent: "center",
+			padding: "0",
+		},
+	},
+	".cm-bookmark-dot": {
+		width: "8px",
+		height: "11px",
+		backgroundColor: "var(--accent, #8bb8f0)",
+		clipPath: "polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%)",
+		opacity: 0.9,
+	},
+	".cm-bookmark-line": {
+		backgroundColor: "rgba(139, 184, 240, 0.12)",
+	},
+} as const;

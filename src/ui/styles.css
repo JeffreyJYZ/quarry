@@ -52,6 +52,8 @@
 
 @import "./styles/welcome.css";
 
+@import "./styles/bookmarks.css";
+
 @import "./styles/breadcrumb.css";
 @import "./styles/calls.css";
 @import "./styles/test-gutter.css";
