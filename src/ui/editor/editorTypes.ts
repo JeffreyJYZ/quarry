@@ -1,4 +1,5 @@
 import type { Diagnostic, FileEdit, Location } from "@/lib/project/api";
+import type { TestMarker } from "@/lib/tests/gutter";
 
 export type EditorProps = {
 	/** Absolute path of the open file, or null for an empty buffer. */
@@ -13,6 +14,10 @@ export type EditorProps = {
 	unverifiedLines?: number[];
 	/** Clicking the breakpoint gutter reports a 1-based line; the caller owns the set. */
 	onToggleBreakpoint?: (line: number) => void;
+	/** Run buttons for the tests `list_tests` named in this file; empty draws no column. */
+	testMarkers?: TestMarker[];
+	/** A click on a test marker, and whether that click asked for its group. */
+	onTestMarker?: (marker: TestMarker, group: boolean) => void;
 	/** Open project root; null disables all LSP requests. */
 	root?: string | null;
 	/** Navigate to a definition location. */

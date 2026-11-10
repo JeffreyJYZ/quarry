@@ -105,6 +105,7 @@ export default function TestsDock({
 							onToggleGroup={dock.toggleGroup}
 							highlighted={dock.highlighted}
 							onRun={tests.runOne}
+							onRunGroup={tests.runAll}
 							textFilter={dock.filter}
 							binaryFilter={dock.binaryFilter}
 							resultFilter={dock.resultFilter}

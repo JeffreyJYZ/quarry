@@ -51,6 +51,8 @@ export function createEditorView(options: {
 	host: HTMLDivElement;
 	language: Compartment;
 	indentation: Compartment;
+	/** Holds the test column; empty until the file has markers to draw. */
+	testGutter: Compartment;
 	initialValue: string;
 	initialPath: string | null;
 	tabSize: number;
@@ -79,6 +81,7 @@ export function createEditorView(options: {
 		codeFolding(),
 		foldGutter(),
 		indentation.of([indentUnit.of(" ".repeat(tabSize)), EditorState.tabSize.of(tabSize)]),
+		options.testGutter.of([]),
 		keymap.of([
 			...completionBindings(options.deps),
 			...lspBindings(options.deps),

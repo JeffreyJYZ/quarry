@@ -43,6 +43,22 @@
 	color: var(--muted);
 }
 
+.tests-group-run {
+	padding: 1px 6px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	background: transparent;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10px;
+	cursor: pointer;
+}
+
+.tests-group-run:hover {
+	color: var(--text);
+	border-color: var(--muted);
+}
+
 .test-leaf {
 	padding-left: 14px;
 }

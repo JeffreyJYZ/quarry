@@ -23,6 +23,8 @@ export type TestsController = {
 	runAllProgress: { done: number; total: number } | null;
 	/** Loads the test list once per project; later calls are ignored. */
 	load: () => void;
+	/** Re-runs discovery for the current project, once it has been loaded at least once. */
+	reload: () => void;
 	/** Runs one test; a second call while it runs is ignored. */
 	runOne: (name: string) => void;
 	/** Runs the given names in order, stopping after the first failure. */
@@ -94,6 +96,13 @@ export function useTests(root: string | null): TestsController {
 			}
 		})();
 	}, [root]);
+
+	/* Discovery is expensive, so a reload only refreshes a list that was already asked for. */
+	const reload = useCallback(() => {
+		if (loadedFor.current === null) return;
+		loadedFor.current = null;
+		load();
+	}, [load]);
 
 	const runOne = useCallback(
 		async (name: string): Promise<TestReport | null> => {
@@ -175,6 +184,7 @@ export function useTests(root: string | null): TestsController {
 		summary,
 		runAllProgress,
 		load,
+		reload,
 		runOne: (name: string) => {
 			void runOne(name);
 		},
