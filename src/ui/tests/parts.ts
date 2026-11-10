@@ -2,14 +2,7 @@ import type { TestItem, TestReport } from "@/lib/project/api";
 import { signalName } from "@/lib/run/exitStatus";
 
 export type DockTab =
-	| "problems"
-	| "bookmarks"
-	| "tests"
-	| "run"
-	| "debugger"
-	| "console"
-	| "memory"
-	| "todo";
+	"problems" | "bookmarks" | "tests" | "run" | "debugger" | "console" | "memory" | "todo";
 
 import { DOCK_TABS, OUTPUT_LINE_CAP } from "@/lib/consts/tests";
 

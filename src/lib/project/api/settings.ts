@@ -9,14 +9,7 @@ export type Settings = {
 	railCollapsed?: boolean;
 	gitOpen?: boolean;
 	dockTab?:
-		| "problems"
-		| "bookmarks"
-		| "tests"
-		| "run"
-		| "debugger"
-		| "console"
-		| "memory"
-		| "todo";
+		"problems" | "bookmarks" | "tests" | "run" | "debugger" | "console" | "memory" | "todo";
 	dockExpanded?: boolean | null;
 	recentRoots?: string[];
 	recentFiles?: string[];
