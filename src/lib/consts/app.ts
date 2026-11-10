@@ -93,6 +93,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
 				menu: true,
 			},
 			{ keys: ["F12"], action: "Go to definition" },
+			{ keys: ["Cmd", "F12"], action: "Go to symbol in file" },
 			{
 				keys: ["Cmd", "Alt", "K"],
 				action: "Toggle a bookmark on the caret line",

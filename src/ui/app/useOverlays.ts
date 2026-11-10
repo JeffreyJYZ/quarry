@@ -32,6 +32,7 @@ export function useOverlays() {
 	const [gotoMode, setGotoMode] = useState<GotoMode | null>(null);
 	const [generateOpen, setGenerateOpen] = useState(false);
 	const [lineOpen, setLineOpen] = useState(false);
+	const [structureOpen, setStructureOpen] = useState(false);
 
 	return {
 		cursor,
@@ -70,6 +71,8 @@ export function useOverlays() {
 		setLineOpen,
 		generateOpen,
 		setGenerateOpen,
+		structureOpen,
+		setStructureOpen,
 	};
 }
 

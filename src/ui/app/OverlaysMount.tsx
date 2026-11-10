@@ -1,10 +1,12 @@
 import { generateItems } from "@/lib/generate/model";
+import { structureSession } from "@/lib/outline/structure";
 import { serverKindForPath } from "@/lib/lsp/served";
 import { DEFAULT_PROJECT_SETTINGS } from "@/lib/settings/model";
 import { languageLabel } from "@/lib/editor/languageLabel";
 import { Suspense, lazy } from "react";
 import { serverSurface, statusChip } from "@/lib/status/model";
 import AppOverlays from "@/ui/app/AppOverlays";
+import * as Lazy from "@/ui/app/lazyOverlays";
 const ReleaseNotes = lazy(() => import("@/ui/updates/ReleaseNotes"));
 import { useCurrentVersion } from "@/ui/updates/useCurrentVersion";
 import type { ShellModel } from "@/ui/app/useShell";
@@ -24,12 +26,24 @@ export default function OverlaysMount({ model }: { model: ShellModel }) {
 		building: build.building || model.runDebug.busy,
 		running: runs.running !== null,
 	});
+	const session = structureSession(model.root, model.activePath, model.lspStatuses);
 
 	return (
 		<>
 			{overlays.notesOpen && version !== null ? (
 				<Suspense fallback={null}>
 					<ReleaseNotes version={version} onClose={() => overlays.setNotesOpen(false)} />
+				</Suspense>
+			) : null}
+			{overlays.structureOpen ? (
+				<Suspense fallback={null}>
+					<Lazy.Structure
+						activePath={model.activePath}
+						session={session}
+						cursor={cursor}
+						onNavigate={workspace.handleNavigate}
+						onClose={() => overlays.setStructureOpen(false)}
+					/>
 				</Suspense>
 			) : null}
 			<AppOverlays

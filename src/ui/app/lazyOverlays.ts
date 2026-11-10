@@ -13,3 +13,4 @@ export const Generate = lazy(() => import("@/ui/generate/Generate"));
 export const NewProject = lazy(() => import("@/ui/projects/NewProject"));
 export const RefsPanel = lazy(() => import("@/ui/components/RefsPanel"));
 export const SettingsPage = lazy(() => import("@/ui/settings/SettingsPage"));
+export const Structure = lazy(() => import("@/ui/structure/StructurePalette"));

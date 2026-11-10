@@ -24,6 +24,7 @@
 			"includes": [
 				"src/ui/layout/Splitter.tsx",
 				"src/ui/goto/Goto.tsx",
+				"src/ui/structure/StructurePalette.tsx",
 				"src/ui/generate/Generate.tsx",
 				"src/ui/settings/SettingsPage.tsx",
 				"src/ui/projects/NewProject.tsx"

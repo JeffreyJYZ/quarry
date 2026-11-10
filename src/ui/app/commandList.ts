@@ -3,6 +3,7 @@ import type { CommandContext } from "./commands";
 import { bookmarkCommands } from "./bookmarkCommands";
 import { lspCommands } from "./lspPaletteCommand";
 import { navigationCommands } from "./navigationCommands";
+import { structureCommand } from "./structureCommand";
 import { todoCommands } from "./todoCommands";
 import { viewCommands } from "./viewCommands";
 
@@ -138,6 +139,7 @@ export function buildCommands(context: CommandContext): Command[] {
 			run: context.refreshGit,
 		},
 		...lspCommands(context),
+		structureCommand({ activePath, open: context.openStructure }),
 		{
 			id: "toggle-blame",
 			label: "Toggle blame annotations",
