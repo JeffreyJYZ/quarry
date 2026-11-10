@@ -1,11 +1,11 @@
 import type { ServerKind } from "@/lib/lsp/served";
 import { autocompletion } from "@codemirror/autocomplete";
 import { EditorView, hoverTooltip, tooltips } from "@codemirror/view";
-import { kindToType } from "@/lib/editor/completion";
+import { createCompletionSource } from "@/lib/editor/completionSource";
 import { toLspPosition } from "@/lib/editor/positions";
 import { renderMarkdown } from "@/lib/editor/markdown";
 import { tooltipSpace } from "@/lib/editor/tooltipSpace";
-import { type Location, lspCompletion, lspDefinition, lspHover } from "@/lib/project/api";
+import { type Location, lspDefinition, lspHover } from "@/lib/project/api";
 import { servedByRunningServer, sessionId } from "@/lib/lsp/served";
 
 import type { KeymapDeps } from "@/ui/editor/keymapDeps";
@@ -122,44 +122,7 @@ export function behaviourExtensions(deps: BehaviourDeps) {
 		}),
 		autocompletion({
 			defaultKeymap: false,
-			override: [
-				async (context) => {
-					const currentRoot = deps.rootRef.current;
-					const currentPath = deps.latestRef.current.path;
-					if (currentRoot === null || currentPath === null) return null;
-					const kind = servedByRunningServer(currentPath, deps.runningRef.current);
-					if (kind === null) return null;
-					if (!context.explicit && context.matchBefore(/[\w:.]+/) === null) {
-						return null;
-					}
-					const mySeq = ++deps.completionSeq;
-					const completionView = context.view;
-					if (completionView === undefined) return null;
-					const { line, character } = toLspPosition(completionView, context.pos);
-					let result: Awaited<ReturnType<typeof lspCompletion>>;
-					try {
-						result = await lspCompletion(
-							sessionId(kind, currentRoot),
-							currentPath,
-							line,
-							character,
-						);
-					} catch {
-						return null;
-					}
-					if (mySeq !== deps.completionSeq) return null;
-					if (result === null) return null;
-					const word = context.matchBefore(/\w*/);
-					const from = word === null ? context.pos : word.from;
-					const options = result.items.map((item) => ({
-						label: item.label,
-						detail: item.detail ?? undefined,
-						type: kindToType(item.kind),
-						apply: item.insertText ?? item.label,
-					}));
-					return { from, options };
-				},
-			],
+			override: [createCompletionSource(deps)],
 		}),
 		hoverTooltip(async (view, pos) => {
 			const currentRoot = deps.rootRef.current;
