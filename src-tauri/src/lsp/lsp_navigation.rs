@@ -22,6 +22,7 @@ async fn request_locations(
     method: &str,
 ) -> Result<Vec<Location>, String> {
     let session = session_for(&state, &root)?;
+    ensure_open_for(&session, &path)?;
     let result = send_request(
         &session,
         method,

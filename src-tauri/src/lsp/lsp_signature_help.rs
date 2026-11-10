@@ -31,6 +31,7 @@ pub async fn lsp_signature_help(
     character: u32,
 ) -> Result<Option<SignatureHelp>, String> {
     let session = session_for(&state, &root)?;
+    ensure_open_for(&session, &path)?;
     let result = send_request(
         &session,
         "textDocument/signatureHelp",
@@ -88,12 +89,13 @@ pub async fn lsp_inlay_hints(
     path: String,
 ) -> Result<Vec<InlayHint>, String> {
     let session = session_for(&state, &root)?;
+    ensure_open_for(&session, &path)?;
     let end = {
         let guard = lock(&session);
-        match guard.document_ends.get(&path).copied() {
-            Some(end) => end,
-            None => return Ok(Vec::new()),
-        }
+        guard.document_ends.get(&path).copied().unwrap_or(Position {
+            line: 0,
+            character: 0,
+        })
     };
     let result = send_request(
         &session,

@@ -81,6 +81,7 @@ pub async fn lsp_semantic_tokens(
     path: String,
 ) -> Result<Vec<SemanticToken>, String> {
     let session = session_for(&state, &root)?;
+    ensure_open_for(&session, &path)?;
     let (types, modifiers) = {
         let guard = lock(&session);
         (

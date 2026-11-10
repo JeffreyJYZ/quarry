@@ -79,6 +79,7 @@ pub async fn lsp_hover(
     character: u32,
 ) -> Result<Option<HoverInfo>, String> {
     let session = session_for(&state, &root)?;
+    ensure_open_for(&session, &path)?;
     let result = send_request(
         &session,
         "textDocument/hover",
@@ -97,6 +98,7 @@ pub async fn lsp_definition(
     character: u32,
 ) -> Result<Vec<Location>, String> {
     let session = session_for(&state, &root)?;
+    ensure_open_for(&session, &path)?;
     let result = send_request(
         &session,
         "textDocument/definition",
@@ -115,6 +117,7 @@ pub async fn lsp_references(
     character: u32,
 ) -> Result<Vec<Location>, String> {
     let session = session_for(&state, &root)?;
+    ensure_open_for(&session, &path)?;
     let result = send_request(
         &session,
         "textDocument/references",
@@ -133,6 +136,7 @@ pub async fn lsp_completion(
     character: u32,
 ) -> Result<CompletionList, String> {
     let session = session_for(&state, &root)?;
+    ensure_open_for(&session, &path)?;
     let result = send_request(
         &session,
         "textDocument/completion",
@@ -150,6 +154,7 @@ pub async fn lsp_symbols(
     path: String,
 ) -> Result<Vec<Symbol>, String> {
     let session = session_for(&state, &root)?;
+    ensure_open_for(&session, &path)?;
     let result = send_request(
         &session,
         "textDocument/documentSymbol",
