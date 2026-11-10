@@ -1,9 +1,9 @@
 #![allow(unused_imports)]
 
 pub(crate) use crate::project;
-pub(crate) use crate::types::{ProjectKind, TestItem, TestReport};
+pub(crate) use crate::types::{ProjectInfo, ProjectKind, TestItem, TestReport};
 pub use std::io::{BufRead, BufReader, Read};
-pub use std::process::{ExitStatus, Stdio};
+pub use std::process::{Command, ExitStatus, Stdio};
 pub use std::sync::{Arc, Mutex};
 pub use std::thread;
 pub use std::time::{Duration, Instant};
@@ -41,26 +41,14 @@ pub const OUTPUT_LINE_LIMIT: usize = 200;
 /// A failing command's detail line is one line, and a cargo error block can be a paragraph.
 pub const ERROR_LINE_LIMIT: usize = 300;
 
+/// Suite label for a Cargo test, shown next to the binary group in the dock.
+pub const CARGO_SUITE: &str = "cargo";
+
 /// Suffix cargo prints for an ordinary test in `--format terse`.
 pub const TEST_SUFFIX: &str = ": test";
 
-#[tauri::command]
-pub async fn list_tests(root: String) -> Result<Vec<TestItem>, String> {
-    tauri::async_runtime::spawn_blocking(move || list(&root))
-        .await
-        .map_err(|error| format!("test discovery task failed: {error}"))?
-}
-
-#[tauri::command]
-pub async fn run_test(root: String, name: String) -> Result<TestReport, String> {
-    tauri::async_runtime::spawn_blocking(move || run(&root, &name))
-        .await
-        .map_err(|error| format!("test run task failed: {error}"))?
-}
-
-/// Detection and the cargo run both touch the filesystem, so both run off the async runtime.
-pub fn list(root: &str) -> Result<Vec<TestItem>, String> {
-    let info = project::inspect(root)?;
+/// Discovery for a Cargo project: one `--list` run, no build ahead of it.
+pub fn list(info: &ProjectInfo) -> Result<Vec<TestItem>, String> {
     require_cargo(info.kind)?;
 
     let captured = capture(
@@ -82,8 +70,7 @@ pub fn list(root: &str) -> Result<Vec<TestItem>, String> {
 }
 
 /// A failing test is a report with `passed: false`; only a spawn failure or a timeout is `Err`.
-pub fn run(root: &str, name: &str) -> Result<TestReport, String> {
-    let info = project::inspect(root)?;
+pub fn run_for(info: &ProjectInfo, name: &str) -> Result<TestReport, String> {
     require_cargo(info.kind)?;
 
     let started = Instant::now();

@@ -3,7 +3,7 @@
 pub(crate) use crate::project;
 pub(crate) use crate::types::{ProjectKind, TestItem, TestReport};
 pub use std::io::{BufRead, BufReader, Read};
-pub use std::process::{ExitStatus, Stdio};
+pub use std::process::{Command, ExitStatus, Stdio};
 pub use std::sync::{Arc, Mutex};
 pub use std::thread;
 pub use std::time::{Duration, Instant};
@@ -15,6 +15,7 @@ use super::*;
 /// The two pipes are drained by threads of their own, so a large log never fills a pipe buffer and
 /// stalls the child, and the relative order of the streams is preserved closely enough to attribute
 /// a `Running …` header to the tests that follow it.
+#[derive(Debug)]
 pub struct Captured {
     pub(crate) status: ExitStatus,
     pub(crate) lines: Vec<Line>,
@@ -27,16 +28,29 @@ pub fn capture(
     timeout: Duration,
 ) -> Result<Captured, String> {
     let program = cargo_program();
-    let mut child = crate::resolve::command(&program)?
-        .current_dir(build_root)
+    capture_program(operation, build_root, &program, args, timeout)
+}
+
+/// Runs one program in `cwd` with the given arguments and kills it once `timeout` elapses.
+///
+/// The program is a path for a test binary and a bare tool name for cargo, so a name without a
+/// separator goes through the shared resolver (a GUI launch has no usable `PATH`) while a path is
+/// spawned as written.
+pub fn capture_program(
+    operation: &str,
+    cwd: &str,
+    program: &str,
+    args: &[&str],
+    timeout: Duration,
+) -> Result<Captured, String> {
+    let mut child = program_command(program)?
+        .current_dir(cwd)
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|error| {
-            format!("cannot {operation} in {build_root}: cannot start {program}: {error}")
-        })?;
+        .map_err(|error| format!("cannot {operation} in {cwd}: cannot start {program}: {error}"))?;
 
     let sink: Arc<Mutex<Vec<Line>>> = Arc::new(Mutex::new(Vec::new()));
     let stdout = child
@@ -57,7 +71,7 @@ pub fn capture(
                 let _ = child.kill();
                 let _ = child.wait();
                 return Err(format!(
-                    "cannot {operation} in {build_root}: waiting for {program} failed: {error}"
+                    "cannot {operation} in {cwd}: waiting for {program} failed: {error}"
                 ));
             }
         }
@@ -74,13 +88,24 @@ pub fn capture(
     }
 
     let Some(status) = status else {
-        return Err(timeout_error(operation, timeout));
+        return Err(timeout_error(operation, timeout, program));
     };
     let lines = sink
         .lock()
         .unwrap_or_else(|error| error.into_inner())
         .clone();
     Ok(Captured { status, lines })
+}
+
+/// A command for a test binary path, or for a tool name found through the shared resolver.
+///
+/// A program carrying a separator is a path the project configured, so it is spawned as written;
+/// a bare name is a tool (`cargo`), which a GUI launch can only find through the resolver.
+pub fn program_command(program: &str) -> Result<Command, String> {
+    if program.contains('/') || program.contains('\\') {
+        return Ok(Command::new(program));
+    }
+    crate::resolve::command(program)
 }
 
 /// Drains one pipe into the shared sink until the child closes it.

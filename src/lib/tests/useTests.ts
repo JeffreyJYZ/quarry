@@ -1,37 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listTests, runTest, type TestItem, type TestReport } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
+import { NO_RESULTS, NO_RUNNING, type TestsController } from "@/lib/tests/controller";
 import { runAllSummary, runAllTests } from "@/lib/tests/runAll";
 
-const NO_RESULTS: ReadonlyMap<string, TestReport> = new Map();
-const NO_RUNNING: ReadonlySet<string> = new Set();
-
-export type TestsController = {
-	/** Tests the backend knows about, for the current project only. */
-	items: TestItem[];
-	/** True while `listTests` is in flight. */
-	loading: boolean;
-	/** One line describing a failed `listTests` call. */
-	loadError: string | null;
-	/** Last report per test name, kept for the session. */
-	results: ReadonlyMap<string, TestReport>;
-	/** Names with a run in flight. */
-	running: ReadonlySet<string>;
-	/** One line summarising the last `Run all`. */
-	summary: string | null;
-	/** Progress of an in-flight `Run all`, or null. */
-	runAllProgress: { done: number; total: number } | null;
-	/** Loads the test list once per project; later calls are ignored. */
-	load: () => void;
-	/** Re-runs discovery for the current project, once it has been loaded at least once. */
-	reload: () => void;
-	/** Runs one test; a second call while it runs is ignored. */
-	runOne: (name: string) => void;
-	/** Runs the given names in order, stopping after the first failure. */
-	runAll: (names: string[]) => void;
-	/** Empties the results map without touching the list. */
-	clearResults: () => void;
-};
+export type { TestsController };
 
 /**
  * Owns the test list and the run results for one project.
@@ -42,6 +15,8 @@ export type TestsController = {
 export function useTests(root: string | null): TestsController {
 	const [items, setItems] = useState<TestItem[]>([]);
 	const [itemsFor, setItemsFor] = useState<string | null>(null);
+	const [program, setProgram] = useState<string | null>(null);
+	const [notes, setNotes] = useState<string[]>([]);
 	const [results, setResults] = useState<Map<string, TestReport>>(new Map());
 	const [resultsFor, setResultsFor] = useState<string | null>(null);
 	const [running, setRunning] = useState<ReadonlySet<string>>(new Set());
@@ -62,6 +37,8 @@ export function useTests(root: string | null): TestsController {
 	useEffect(() => {
 		setItems([]);
 		setItemsFor(root);
+		setProgram(null);
+		setNotes([]);
 		setResults(new Map());
 		setResultsFor(null);
 		setRunning(new Set());
@@ -86,7 +63,9 @@ export function useTests(root: string | null): TestsController {
 			try {
 				const found = await listTests(target);
 				loadedFor.current = target;
-				setItems(found);
+				setItems(found.items);
+				setProgram(found.program);
+				setNotes(found.notes);
 				setItemsFor(target);
 			} catch (error) {
 				setLoadError(describeError(error));
@@ -179,6 +158,8 @@ export function useTests(root: string | null): TestsController {
 		items: visibleItems,
 		loading,
 		loadError,
+		program: itemsFor === root ? program : null,
+		notes: itemsFor === root ? notes : [],
 		results: visibleResults,
 		running: running.size > 0 ? running : NO_RUNNING,
 		summary,

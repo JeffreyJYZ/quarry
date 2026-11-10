@@ -1,0 +1,33 @@
+/* Which suite a test group belongs to, and what discovery was asked. */
+
+.tests-suite {
+	padding: 0 5px;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 9px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.tests-suite[data-suite="gtest"] {
+	color: var(--accent);
+	border-color: var(--accent);
+}
+
+.tests-source {
+	padding: 4px 8px 0;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 10px;
+	overflow-wrap: anywhere;
+}
+
+.tests-note {
+	padding: 6px 8px;
+	color: var(--muted);
+	font-family: var(--mono);
+	font-size: 11px;
+	overflow-wrap: anywhere;
+}

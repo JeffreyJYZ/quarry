@@ -34,10 +34,24 @@ pub struct LaunchFile {
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TestItem {
-    /// Fully qualified test name, e.g. `protocol_pipe::tests::roundtrip`.
+    /// Fully qualified test name: `protocol_pipe::tests::roundtrip` for Cargo, `MySuite.Case` for
+    /// GoogleTest.
     pub name: String,
-    /// Test binary the name belongs to.
+    /// Test binary the name belongs to: the cargo source path, or the gtest program.
     pub binary: String,
+    /// Which suite owns the name, `cargo` or `gtest`, so the dock can label the group.
+    pub suite: String,
+}
+
+/// Everything one discovery pass found, plus the sentences that explain an empty one.
+#[derive(Serialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TestDiscovery {
+    pub items: Vec<TestItem>,
+    /// The gtest program that was asked, when one was asked; the dock names it.
+    pub program: Option<String>,
+    /// One plain sentence per source that could not be listed, or that listed nothing.
+    pub notes: Vec<String>,
 }
 
 /// Result of running a single test.

@@ -36,6 +36,8 @@ export function runTabStatus(input: {
 
 export type TestGroup = {
 	binary: string;
+	/** `cargo` or `gtest`, shown as the group's suite label. */
+	suite: string;
 	tests: TestItem[];
 };
 
@@ -48,7 +50,7 @@ export function groupByBinary(items: TestItem[]): TestGroup[] {
 			existing.tests.push(item);
 			continue;
 		}
-		const group: TestGroup = { binary: item.binary, tests: [item] };
+		const group: TestGroup = { binary: item.binary, suite: item.suite, tests: [item] };
 		index.set(item.binary, group);
 		groups.push(group);
 	}
@@ -57,10 +59,15 @@ export function groupByBinary(items: TestItem[]): TestGroup[] {
 
 export function splitName(name: string): { module: string; leaf: string } {
 	const cut = name.lastIndexOf("::");
-	if (cut <= 0) {
-		return { module: "", leaf: name };
+	if (cut > 0) {
+		return { module: name.slice(0, cut + 2), leaf: name.slice(cut + 2) };
 	}
-	return { module: name.slice(0, cut + 2), leaf: name.slice(cut + 2) };
+	// A gtest name is `Suite.Case`; the suite reads as the module a row dims.
+	const dot = name.indexOf(".");
+	if (dot > 0) {
+		return { module: name.slice(0, dot + 1), leaf: name.slice(dot + 1) };
+	}
+	return { module: "", leaf: name };
 }
 
 export function capOutput(output: string): { text: string; truncated: boolean } {

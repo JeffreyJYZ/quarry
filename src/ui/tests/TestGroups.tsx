@@ -46,6 +46,9 @@ export function TestGroups({
 									className={collapsed ? "tests-caret" : "tests-caret open"}
 									aria-hidden="true"
 								/>
+								<span className="tests-suite" data-suite={group.suite}>
+									{group.suite}
+								</span>
 								<span className="tests-binary" title={group.binary}>
 									{group.binary}
 								</span>

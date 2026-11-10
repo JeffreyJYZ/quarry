@@ -1,18 +1,23 @@
 /**
  * Where the test gutter draws its markers, and what each one runs.
  *
- * The list is the backend's: `list_tests` names every test and the source file it was compiled
+ * The list is the backend's: `list_tests` names every test and the source file or program it came
  * from. This module only maps those names onto the open file's lines, so the editor never decides
- * what a test is — it matches each name's `fn` leaf inside the `mod` chain the name spells, and
- * reports the module that encloses it as the group a right-click runs.
+ * what a test is — it matches each Rust name's `fn` leaf inside the `mod` chain the name spells, and
+ * for C++ it matches each gtest name against the file's `TEST`-family macro lines. A right-click
+ * runs the module that encloses a Rust test, or the single C++ case behind its macro.
  */
 
-import { isRustPath } from "@/lib/consts/extensions";
+import { isCppPath, isRustPath } from "@/lib/consts/extensions";
 import type { TestItem, TestReport } from "@/lib/project/api";
+import { cppPlacements } from "@/lib/tests/gutterCpp";
+import { groupState, type MarkerState, stateOf } from "@/lib/tests/markerState";
 import { scanTestFile } from "@/lib/tests/scan";
 
+export { groupState, stateOf };
+export type { MarkerState };
+
 export type MarkerKind = "test" | "group";
-export type MarkerState = "idle" | "running" | "passed" | "failed";
 
 export type TestMarker = {
 	/** 1-based line the marker sits on. */
@@ -36,12 +41,22 @@ export type MarkerInput = {
 
 /** Markers for one file, ascending by line: one per known test, one per enclosing module. */
 export function testMarkers(input: MarkerInput): TestMarker[] {
+	const { path, text } = input;
+	if (path === null || text === "") return [];
+	if (isCppPath(path)) return cppMarkers(input);
+	if (!isRustPath(path)) return [];
+	return rustMarkers(input);
+}
+
+/** A Rust file: one marker per `fn`, one group per `mod` that encloses a known test. */
+function rustMarkers(input: MarkerInput): TestMarker[] {
 	const { path, text, items, results, running } = input;
-	if (path === null || !isRustPath(path) || text === "") return [];
+	if (path === null) return [];
 	const { fns, mods } = scanTestFile(text);
 
 	const placed: { marker: TestMarker; mods: string[] }[] = [];
 	for (const item of items) {
+		if (item.suite !== "cargo") continue;
 		if (!belongsToFile(item.binary, path)) continue;
 		const segments = item.name.split("::");
 		const leaf = segments[segments.length - 1] ?? "";
@@ -93,30 +108,16 @@ export function testMarkers(input: MarkerInput): TestMarker[] {
 	return [...byLine.values()].sort((left, right) => left.line - right.line);
 }
 
-/** The marker state the dock's results already describe. */
-export function stateOf(
-	name: string,
-	results: ReadonlyMap<string, TestReport>,
-	running: ReadonlySet<string>,
-): MarkerState {
-	if (running.has(name)) return "running";
-	const report = results.get(name);
-	if (report === undefined) return "idle";
-	return report.passed ? "passed" : "failed";
-}
-
-/** A group runs as one: any live child is running, any failed child fails the group. */
-export function groupState(
-	names: readonly string[],
-	results: ReadonlyMap<string, TestReport>,
-	running: ReadonlySet<string>,
-): MarkerState {
-	if (names.some((name) => running.has(name))) return "running";
-	const reports = names.map((name) => results.get(name));
-	if (reports.some((report) => report?.passed === false)) return "failed";
-	return reports.length > 0 && reports.every((report) => report?.passed === true)
-		? "passed"
-		: "idle";
+/** A C++ file: one marker per gtest case whose macro line this file holds. */
+function cppMarkers(input: MarkerInput): TestMarker[] {
+	const { text, items, results, running } = input;
+	return cppPlacements(items, text).map((placement) => ({
+		line: placement.line,
+		kind: "test",
+		name: placement.name,
+		group: [placement.name],
+		state: stateOf(placement.name, results, running),
+	}));
 }
 
 /** Whether a test compiled from `binary` sits in the file at `path`. */

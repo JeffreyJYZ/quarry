@@ -11,7 +11,7 @@ import {
 	truncateFailureOutput,
 } from "@/lib/tests/filterTests";
 
-const item = (name: string, binary: string): TestItem => ({ name, binary });
+const item = (name: string, binary: string): TestItem => ({ name, binary, suite: "cargo" });
 const report = (passed: boolean): TestReport => ({
 	name: "x",
 	passed,
@@ -108,10 +108,10 @@ describe("resultLabel", () => {
 
 describe("matchesTestFilter", () => {
 	test("matches case-insensitively against name and path", () => {
-		const item = { name: "Foo::Bar", binary: "src/Lib.rs" };
-		expect(matchesTestFilter(item, "foo")).toBe(true);
-		expect(matchesTestFilter(item, "LIB.RS")).toBe(true);
-		expect(matchesTestFilter(item, "nope")).toBe(false);
+		const named = item("Foo::Bar", "src/Lib.rs");
+		expect(matchesTestFilter(named, "foo")).toBe(true);
+		expect(matchesTestFilter(named, "LIB.RS")).toBe(true);
+		expect(matchesTestFilter(named, "nope")).toBe(false);
 	});
 });
 

@@ -35,6 +35,7 @@ pub fn parse_tests(merged: &str, crate_name: &str) -> Vec<TestItem> {
         items.push(TestItem {
             name,
             binary: binary.clone(),
+            suite: CARGO_SUITE.to_string(),
         });
     }
 
@@ -88,10 +89,10 @@ pub fn failure_error(operation: &str, build_root: &str, lines: &[Line]) -> Strin
     format!("cannot {operation} in {build_root}: {detail}")
 }
 
-pub fn timeout_error(operation: &str, timeout: Duration) -> String {
+pub fn timeout_error(operation: &str, timeout: Duration, program: &str) -> String {
     format!(
-        "{operation} timed out after {} s: cargo was killed",
-        timeout.as_secs()
+        "{operation} timed out after {} s: {program} was killed",
+        timeout.as_secs_f64()
     )
 }
 
