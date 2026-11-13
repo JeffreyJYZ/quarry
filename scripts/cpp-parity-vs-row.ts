@@ -17,6 +17,7 @@ import {
 	NO_CLANGD,
 	NO_TOOLSET,
 	errorLines,
+	configProbe,
 	VS_BUILD_DIR,
 	VS_EXE,
 	VS_HALVES,
@@ -43,6 +44,16 @@ function shown(root: string, path: string): string {
 	const base = `${normalised(root)}/`;
 	const full = normalised(path);
 	return full.startsWith(base) ? full.slice(base.length) : path;
+}
+
+/** The Win32 verbatim marker, which no build tool accepts as an argument. */
+function hasVerbatim(argument: string): boolean {
+	return argument.includes("\\\\?\\");
+}
+
+/** Every argument carrying that marker, for a finding that names them. */
+function verbatimArguments(argv: string[]): string[] {
+	return argv.filter(hasVerbatim);
 }
 
 /** Every database entry for `source`, by file name, whichever configuration wrote it. */
@@ -151,20 +162,18 @@ export async function judgeVisualStudio(
 
 	let passed = true;
 	let named = true;
-	let last: Plan | null = null;
+	let analysed: Verdict = "n/a";
 	for (const half of VS_HALVES) {
 		const judged = await judgeHalf(root, harness, row, half, findings);
 		if (judged.broken) {
 			broken = true;
 			break;
 		}
-		last = judged.plan;
 		passed = passed && judged.ok;
 		named = named && judged.named;
+		analysed = worst(analysed, judged.analysis);
 		if (judged.plan === null) break;
 	}
-
-	if (last !== null) await judgeAnalysis(fixture, root, harness, row, findings, last);
 
 	if (harness.isFile(join(root, "CMakeCache.txt"))) {
 		row.tree = "FAIL";
@@ -174,7 +183,18 @@ export async function judgeVisualStudio(
 	}
 	row.build = passed ? "PASS" : "FAIL";
 	row.targets = named ? "PASS" : "FAIL";
+	row.analysis = analysed;
 	return { row, findings, broken };
+}
+
+/**
+ * The worse of two column verdicts: one failing configuration fails the column, and a skip only
+ * stands when nothing measured.
+ */
+function worst(current: Verdict, next: Verdict): Verdict {
+	if (current === "FAIL" || next === "FAIL") return "FAIL";
+	if (next === "PASS") return "PASS";
+	return current === "n/a" ? next : current;
 }
 
 /** One configuration: the plan's argv, the synthesised database, and the artefact it names. */
@@ -184,7 +204,7 @@ async function judgeHalf(
 	row: Row,
 	half: VsHalf,
 	findings: string[],
-): Promise<{ ok: boolean; named: boolean; plan: Plan | null; broken: boolean }> {
+): Promise<{ ok: boolean; named: boolean; plan: Plan | null; broken: boolean; analysis: Verdict }> {
 	const directory = basename(root);
 	let plan: Plan;
 	try {
@@ -197,7 +217,7 @@ async function judgeHalf(
 		findings.push(
 			`${directory}: \`cd ${directory} && quarry-plan . --profile ${half.profile}\` answers: ${message}`,
 		);
-		return { ok: false, named: false, plan: null, broken: false };
+		return { ok: false, named: false, plan: null, broken: false, analysis: "n/a" };
 	}
 	row.commands.push({
 		line: `cd ${directory} && quarry-plan . --profile ${half.profile}`,
@@ -209,7 +229,7 @@ async function judgeHalf(
 		findings.push(
 			`${directory}: \`cd ${directory} && quarry-plan . --profile ${half.profile}\` reports no CMake plan for a CMake project, so nothing can be built or analysed.`,
 		);
-		return { ok: false, named: false, plan: null, broken: false };
+		return { ok: false, named: false, plan: null, broken: false, analysis: "n/a" };
 	}
 
 	// 1. The configuration belongs on the build line, never as a CMAKE_BUILD_TYPE this tree ignores.
@@ -226,24 +246,33 @@ async function judgeHalf(
 		);
 	}
 
-	// 2. The database: the generator wrote none, so the hand-off had to synthesise one, and it must
-	//    describe this configuration's own compiles.
-	const database = join(section.buildRoot, "compile_commands.json");
-	const entry = harness.compileArguments(database, "main.cpp");
-	const perConfiguration = entriesFor(database, "main.cpp").some((candidate) =>
-		normalised(candidate.directory).endsWith(`/${half.configuration}`),
-	);
-	const synthesised = entry !== null && perConfiguration;
-	const seen = entriesFor(database, "main.cpp").map((candidate) =>
-		normalised(candidate.directory),
-	);
+	// 2. No argument may carry the Win32 verbatim marker: MSBuild and CL reject `\\?\C:\…` where the
+	//    same build given `C:\…` succeeds, and that is what made every Windows build fail once.
+	const verbatim = verbatimArguments([...section.configure, ...section.build]);
 	row.details.push(
-		`database     ${synthesised ? "PASS" : "FAIL"}  ${half.profile}: ${harness.isFile(database) ? shown(root, database) : "no database"} ${synthesised ? `holds main.cpp for ${half.configuration}` : `has no main.cpp entry for ${half.configuration} (entries: ${JSON.stringify(seen)})`}`,
+		`paths        ${verbatim.length === 0 ? "PASS" : "FAIL"}  ${verbatim.length === 0 ? "no argument carries the Win32 verbatim marker" : `the argv carries ${JSON.stringify(verbatim)}`}`,
+	);
+	if (verbatim.length > 0) {
+		ok = false;
+		findings.push(
+			`${directory}: the ${half.profile} argv carries the Win32 verbatim marker, which MSBuild and CL reject — ${JSON.stringify(verbatim)}. \`cd ${directory} && quarry-plan . --profile ${half.profile}\` must name the plain drive path.`,
+		);
+	}
+
+	// 3. The database: the generator wrote none, so the hand-off had to synthesise one, and since
+	//    #189 it holds one entry per source for the configuration this build uses. A file with an
+	//    entry per configuration is the shape that made clangd read another configuration's flags.
+	const database = join(section.buildRoot, "compile_commands.json");
+	const entries = entriesFor(database, "main.cpp");
+	const entry = harness.compileArguments(database, "main.cpp");
+	const synthesised = entry !== null && entries.length === 1;
+	row.details.push(
+		`database     ${synthesised ? "PASS" : "FAIL"}  ${half.profile}: ${harness.isFile(database) ? shown(root, database) : "no database"} holds ${entries.length} main.cpp entr${entries.length === 1 ? "y" : "ies"}${entry === null ? "" : ` (${JSON.stringify(entry.slice(0, 8))})`}`,
 	);
 	ok = ok && synthesised;
 	if (!synthesised) {
 		findings.push(
-			`${directory}: the ${half.profile} session must analyse a database synthesised from the file API, but \`cd ${directory} && quarry-plan . --profile ${half.profile}\` names ${harness.isFile(database) ? shown(root, database) : "no database"} whose main.cpp entry for ${half.configuration} is ${entry === null ? "absent" : "present but in another configuration"}.`,
+			`${directory}: the ${half.profile} session must analyse a database synthesised from the file API holding one entry per source for ${half.configuration}, but \`cd ${directory} && quarry-plan . --profile ${half.profile}\` names ${harness.isFile(database) ? shown(root, database) : "no database"} with ${entries.length} main.cpp entr${entries.length === 1 ? "y" : "ies"}${entry === null ? " and no readable command" : ""}. \`cd ${directory} && rg -- '"file": ".*/main.cpp"' ${shown(root, database)}\`.`,
 		);
 	}
 
@@ -260,7 +289,7 @@ async function judgeHalf(
 		findings.push(
 			`${directory}: the ${half.profile} build fails — \`cd ${directory} && ${harness.commandLine(section.configure)}\` exits ${configure.code}.`,
 		);
-		return { ok: false, named: false, plan, broken: false };
+		return { ok: false, named: false, plan, broken: false, analysis: "n/a" };
 	}
 	const built = await harness.run(program, section.build.slice(1), section.cwd);
 	row.commands.push({
@@ -273,7 +302,7 @@ async function judgeHalf(
 		findings.push(
 			`${directory}: the ${half.profile} build fails — \`cd ${directory} && ${harness.commandLine(section.build)}\` exits ${built.code}.`,
 		);
-		return { ok: false, named: false, plan, broken: false };
+		return { ok: false, named: false, plan, broken: false, analysis: "n/a" };
 	}
 
 	const artifact = plan.targets[0]?.program ?? null;
@@ -303,7 +332,13 @@ async function judgeHalf(
 			`${directory}: the ${half.profile} artefact ${shown(root, expected)} ${written ? `printed ${JSON.stringify(executed?.stdout.trim() ?? "")} (exit ${executed?.code ?? "none"})` : "was not written"} — \`cd ${directory} && ${harness.commandLine(section.build)}\`.`,
 		);
 	}
-	return { ok: ok && written && prints, named, plan, broken: false };
+	// 4. Analysis of *this* configuration: the plan's own clangd arguments, and the define this
+	//    configuration compiles with. A database holding another configuration's command answers the
+	//    other number, which is exactly the failure #189 fixed.
+	const analysis = await judgeAnalysis(fixture, root, harness, row, findings, plan, [
+		configProbe(half),
+	]);
+	return { ok: ok && written && prints, named, plan, broken: false, analysis };
 }
 
 /** The analysis both rows share: the product's clangd arguments, and the probes they must answer. */
@@ -314,20 +349,22 @@ async function judgeAnalysis(
 	row: Row,
 	findings: string[],
 	plan: Plan,
+	/** Probes a caller adds for its own configuration, judged with the same clangd session. */
+	extra: Fixture["probes"] = [],
 ): Promise<Verdict> {
 	const directory = basename(root);
 	if (harness.clangd === null) {
-		row.analysis = "SKIP";
 		row.details.push(`analysis     SKIP  ${NO_CLANGD}`);
 		return "SKIP";
 	}
+	const probes = [...fixture.probes, ...extra];
 	const args = plan.handoff?.args ?? [];
 	const product = harness.commandLine(["clangd", ...args]);
 	const line = row.commands.length;
 	row.commands.push({ line: `cd ${directory} && ${product}`, verdict: "PASS" });
-	const measured = await harness.analyse(fixture.probes, args);
+	const measured = await harness.analyse(probes, args);
 	let analysed = true;
-	fixture.probes.forEach((probe, index) => {
+	probes.forEach((probe, index) => {
 		const hover = measured[index]?.hover ?? null;
 		const diagnostics = measured[index]?.diagnostics ?? [];
 		const ok = hover?.includes(probe.expect) ?? false;
@@ -341,9 +378,9 @@ async function judgeAnalysis(
 			);
 		}
 	});
-	row.analysis = analysed ? "PASS" : "FAIL";
-	row.commands[line].verdict = row.analysis;
-	return row.analysis;
+	const verdict: Verdict = analysed ? "PASS" : "FAIL";
+	row.commands[line].verdict = verdict;
+	return verdict;
 }
 
 /**
@@ -421,6 +458,18 @@ export async function judgeMsvcToolchain(
 		);
 	}
 
+	// 2. No argument may carry the Win32 verbatim marker; `cmake --build \\?\C:\…` is a build that
+	//    exits non-zero for a path, not for the project.
+	const verbatim = verbatimArguments([...section.configure, ...section.build]);
+	row.details.push(
+		`paths        ${verbatim.length === 0 ? "PASS" : "FAIL"}  ${verbatim.length === 0 ? "no argument carries the Win32 verbatim marker" : `the argv carries ${JSON.stringify(verbatim)}`}`,
+	);
+	if (verbatim.length > 0) {
+		findings.push(
+			`${directory}: the plan's argv carries the Win32 verbatim marker, which MSBuild and CL reject — ${JSON.stringify(verbatim)}.`,
+		);
+	}
+
 	// 2. The build the plan reports, run as reported: the artefact must be the plan's own.
 	const program = section.program ?? "cmake";
 	const configure = await harness.run(program, section.configure.slice(1), section.cwd);
@@ -494,7 +543,7 @@ export async function judgeMsvcToolchain(
 			? "control      PASS  without --query-driver the same clangd cannot read MSVC's headers"
 			: "control      note  clangd answered without --query-driver here, so this row proves the hand-off names cl.exe but not that the name was needed on this machine",
 	);
-	row.build = namesCl && includeAt >= 0 && prints ? "PASS" : "FAIL";
+	row.build = namesCl && includeAt >= 0 && verbatim.length === 0 && prints ? "PASS" : "FAIL";
 	row.analysis = named && analysed === "PASS" ? "PASS" : analysed === "SKIP" ? "SKIP" : "FAIL";
 	if (harness.isFile(join(root, "CMakeCache.txt"))) {
 		row.tree = "FAIL";

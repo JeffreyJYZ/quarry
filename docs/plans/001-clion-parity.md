@@ -137,11 +137,14 @@ row that cannot run there says why instead of passing.
 
 Not verified here, and therefore not claimed: Linux toolchains, cross-compilers other than the one
 toolchain file above, and diagnostics parity beyond clangd's own output. On Windows what stays
-unproven is narrower and named: no debugger or test-runner row runs there, a `compile_commands.json`
-holds one entry per file per configuration while clangd reads the first, so a multi-config analysis
-is always the Debug command, and the MSVC control run is reported as evidence rather than required
-— when clangd answers without `--query-driver`, the row says so. A row that skips (no GCC on the
-machine, no Visual Studio toolset) is a skip, never a pass.
+unproven is narrower and named: no debugger or test-runner row runs there, and the MSVC control run
+is reported as evidence rather than required — when clangd answers without `--query-driver`, the row
+says so. A row that skips (no GCC on the machine, no Visual Studio toolset) is a skip, never a pass.
+
+Both Windows rows analyse the configuration they built: the synthesised database holds one entry per
+source for that configuration, and the rows hover the define each configuration compiles with, so a
+database holding another configuration's command fails the row instead of passing on a plausible
+header.
 
 The generator version is discovered, never assumed: `cmake --help` names what that cmake supports,
 and a runner image can list a generator whose Visual Studio instance is absent, so the probe

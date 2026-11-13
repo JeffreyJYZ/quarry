@@ -18,6 +18,8 @@ pub use std::path::{Path, PathBuf};
 
 use super::*;
 
+use crate::build_task::{external, external_str};
+
 /// What one synthesis wrote — or found already written — for the note a build reports.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlainSynthesis {
@@ -104,13 +106,13 @@ fn entries(root: &Path, flags: &PlainFlags, sources: &[PathBuf]) -> Vec<CompileE
     sources
         .iter()
         .map(|source| {
-            let file = root.join(source).display().to_string();
+            let file = external(&root.join(source));
             let mut arguments = vec![flags.compiler_for(source).to_string()];
             arguments.extend(flags.command_flags_for(source));
             arguments.push("-c".to_string());
             arguments.push(file.clone());
             CompileEntry {
-                directory: root.display().to_string(),
+                directory: external(root),
                 file,
                 arguments,
             }

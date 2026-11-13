@@ -7,6 +7,8 @@ pub(crate) use crate::types::{ProjectInfo, ProjectKind};
 
 use super::*;
 
+use crate::build_task::{external, external_str};
+
 /// The server this hand-off belongs to; rust-analyzer has a manifest and needs none of it.
 pub const CLANGD: &str = "clangd";
 
@@ -63,14 +65,15 @@ pub fn clangd_args(user: &[String], database: Option<&Path>) -> Vec<String> {
         return args;
     };
     if !carries_flag(user, COMPILE_COMMANDS_DIR) {
-        args.push(format!("{COMPILE_COMMANDS_DIR}={}", database.display()));
+        args.push(format!("{COMPILE_COMMANDS_DIR}={}", external(database)));
     }
     if !carries_flag(user, QUERY_DRIVER) {
         // The tree's own record of what it was configured with, then its cache, then the database
         // it wrote; none of them is emitted when it names a launcher rather than a compiler.
         let drivers = tree_drivers(database);
         if !drivers.is_empty() {
-            args.push(format!("{QUERY_DRIVER}={}", drivers.join(",")));
+            let listed: Vec<String> = drivers.iter().map(|path| external_str(path)).collect();
+            args.push(format!("{QUERY_DRIVER}={}", listed.join(",")));
         }
     }
     args

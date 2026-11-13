@@ -91,6 +91,9 @@ pub use tests_model_inputs::*;
 mod tests_multiconfig;
 pub use tests_multiconfig::*;
 
+mod tests_verbatim;
+pub use tests_verbatim::*;
+
 mod tests_stale_fixture;
 pub use tests_stale_fixture::*;
 

@@ -112,10 +112,7 @@ fn best_reported(output: &str, build_root: &Path, started_at: SystemTime) -> Opt
         .collect();
     prefer_written(&mut resolved, started_at);
 
-    resolved
-        .into_iter()
-        .next()
-        .map(|(path, _)| path.to_string_lossy().into_owned())
+    resolved.into_iter().next().map(|(path, _)| external(&path))
 }
 
 /// Where CMake writes a target, before any walk for a nested directory.

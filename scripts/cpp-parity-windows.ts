@@ -242,9 +242,11 @@ int main() {
 			},
 			{
 				file: "app/main.cpp",
+				// The position is the start of `values`, so the hover is the variable's declared
+				// type — which is what says the standard header resolved at all.
 				needle: "values.size()",
 				needs: "<vector> resolved through the compiler this project was built with",
-				expect: "size()",
+				expect: "std::vector<int>",
 			},
 		],
 	};
@@ -255,12 +257,35 @@ export interface VsHalf {
 	profile: string;
 	configuration: string;
 	printed: string;
+	/** The `PARITY_VS_CONFIG` this configuration defines, which its analysis must read. */
+	level: number;
 }
 
 export const VS_HALVES: VsHalf[] = [
-	{ profile: "debug", configuration: "Debug", printed: "config=1" },
-	{ profile: "release", configuration: "Release", printed: "config=2" },
+	{ profile: "debug", configuration: "Debug", printed: "config=1", level: 1 },
+	{ profile: "release", configuration: "Release", printed: "config=2", level: 2 },
 ];
+
+/**
+ * The position that proves analysis read *this* configuration's command.
+ *
+ * The fixture defines `PARITY_VS_CONFIG` per configuration through a generator expression, so the
+ * macro's value is the configuration itself; a database holding another configuration's entries
+ * answers the other number. This is the same signal the multi-config row uses for `PARITY_LEVEL`.
+ */
+export function configProbe(half: VsHalf): {
+	file: string;
+	needle: string;
+	needs: string;
+	expect: string;
+} {
+	return {
+		file: "app/main.cpp",
+		needle: "PARITY_VS_CONFIG",
+		needs: `the ${half.configuration} compile command, which defines PARITY_VS_CONFIG=${half.level}`,
+		expect: `Value = \`${half.level}\``,
+	};
+}
 
 /**
  * Whether a failed configure names an environment gap rather than a product defect.

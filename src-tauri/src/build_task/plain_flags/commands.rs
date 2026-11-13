@@ -15,6 +15,8 @@ pub use std::path::{Path, PathBuf};
 
 use super::*;
 
+use crate::build_task::{external, external_str};
+
 /// The driver that links a project with a C++ translation unit.
 pub const CXX_LINK_DRIVER: &str = "clang++";
 
@@ -74,9 +76,9 @@ pub fn plain_build_commands(
             argv.extend(flags.plain.command_flags_for(source));
             argv.extend(FIXED_FLAGS.iter().map(|flag| flag.to_string()));
             argv.push("-c".to_string());
-            argv.push(source.display().to_string());
+            argv.push(external(source));
             argv.push("-o".to_string());
-            argv.push(object.display().to_string());
+            argv.push(external(object));
             PlainCommand {
                 program: argv[0].clone(),
                 argv,
@@ -86,8 +88,8 @@ pub fn plain_build_commands(
     let mut link = vec![CXX_LINK_DRIVER.to_string()];
     link.extend(FIXED_FLAGS.iter().map(|flag| flag.to_string()));
     link.push("-o".to_string());
-    link.push(build_dir.join(name).display().to_string());
-    link.extend(objects.iter().map(|object| object.display().to_string()));
+    link.push(external(&build_dir.join(name)));
+    link.extend(objects.iter().map(|object| external(object)));
     commands.push(PlainCommand {
         program: link[0].clone(),
         argv: link,

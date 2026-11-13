@@ -117,7 +117,7 @@ pub fn run_plain_clang_build(
         // A failed compile leaves whatever the previous build wrote at this path, so naming it
         // would report a program this build never produced; `run_cmake_build` gates the same way.
         artifact: if success {
-            Some(build_dir.join(name).display().to_string())
+            Some(external(&build_dir.join(name)))
         } else {
             None
         },

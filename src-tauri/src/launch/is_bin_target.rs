@@ -10,6 +10,8 @@ pub use std::process::Command;
 
 use super::*;
 
+use crate::build_task::{external, external_str};
+
 /// Names of the package's targets whose `kind` includes `bin`, in manifest order.
 pub fn bin_names(package: &Value) -> Vec<&str> {
     package["targets"]
@@ -87,6 +89,7 @@ pub fn first_line(text: &str) -> String {
         .to_string()
 }
 
+/// A path as a launch configuration carries it, for the program another process will start.
 pub fn display(path: &Path) -> String {
-    path.to_string_lossy().into_owned()
+    crate::build_task::external(path)
 }
