@@ -33,6 +33,10 @@
  * The fixtures are left in place on purpose: every finding quotes `cd <fixture> && …` against the
  * printed root, so a reader can rerun it by hand.
  *
+ * The last row is a second toolchain: the same measurements against a project configured with
+ * Homebrew GCC, whose standard headers clangd can only find because the hand-off's
+ * `--query-driver` names that compiler. It is skipped by name on a machine that has no GCC.
+ *
  * Usage: bun scripts/cpp-parity-probe.ts
  */
 
@@ -52,6 +56,7 @@ import { basename, dirname, join } from "node:path";
 import {
 	type AnalysisProbe,
 	type Fixture,
+	gccToolchainFixture,
 	generatorFixture,
 	mixedLanguagesFixture,
 	multiConfigFixture,
@@ -64,6 +69,8 @@ import {
 	toolchainFixture,
 	twoTargetsFixture,
 } from "./cpp-parity-fixtures";
+import { findGcc, NO_GCC, type GccHarness } from "./cpp-parity-gcc";
+import { judgeGccToolchain } from "./cpp-parity-gcc-row";
 import { fileUri, LspClient } from "./lsp-client";
 
 const SOURCE = join(import.meta.dir, "..", "src-tauri", "src");
@@ -77,7 +84,7 @@ const CMAKE_TIMEOUT = 180_000;
 const CARGO_TIMEOUT = 900_000;
 
 /** What `quarry-plan` prints: the product's own answer, one section per consumer. */
-interface Plan {
+export interface Plan {
 	kind: string;
 	root: string;
 	name: string;
@@ -113,7 +120,7 @@ function plainCommands(section: PlainSection): PlainCommand[] {
 	return [{ program: section.program ?? null, argv: section.argv, cwd: section.cwd ?? "." }];
 }
 
-interface CmakeSection {
+export interface CmakeSection {
 	program: string | null;
 	options: { preset: string; buildDir: string; toolchainFile: string };
 	/** The profile the plan was asked for, in the spelling the settings file uses. */
@@ -145,15 +152,15 @@ interface Handoff {
 }
 
 /** One probe's answer from one clangd session. */
-interface Measurement {
+export interface Measurement {
 	hover: string | null;
 	diagnostics: string[];
 }
 
 /** `PASS`/`FAIL` are measured; `n/a` is a consumer the row does not exercise. */
-type Verdict = "PASS" | "FAIL" | "n/a";
+type Verdict = "PASS" | "FAIL" | "SKIP" | "n/a";
 
-interface Row {
+export interface Row {
 	capability: string;
 	build: Verdict;
 	analysis: Verdict;
@@ -165,7 +172,7 @@ interface Row {
 	commands: { line: string; verdict: Verdict }[];
 }
 
-interface RunResult {
+export interface RunResult {
 	code: number | null;
 	stdout: string;
 	stderr: string;
@@ -1569,6 +1576,8 @@ async function main() {
 	const clangd = findTool("clangd");
 	if (!cmake) throw new Error("cmake is not installed");
 	if (!clangd) throw new Error("clangd is not installed");
+	// The second toolchain is optional: a machine without one gets this row skipped by name.
+	const gcc = findGcc();
 
 	const generators = (await run(cmake, ["--help"], process.cwd())).stdout;
 	const fixtures: Fixture[] = [presetsFixture(), toolchainFixture(), multiTargetFixture()];
@@ -1595,6 +1604,7 @@ async function main() {
 	console.log(`  planner   ${plannerBin}`);
 	console.log(`  cmake     ${firstLine((await run(cmake, ["--version"], tempRoot)).stdout)}`);
 	console.log(`  clangd    ${firstLine((await run(clangd, ["--version"], tempRoot)).stdout)}`);
+	console.log(`  gcc       ${gcc === null ? NO_GCC : gcc.version}`);
 	for (const fact of seamFacts()) {
 		console.log(`  drift     ${fact}`);
 		broken = true;
@@ -1639,6 +1649,43 @@ async function main() {
 		mkdirSync(root, { recursive: true });
 		process.stdout.write(`running ${extra.fixture.name} … `);
 		const result = await extra.judged(extra.fixture, root, plannerBin, cmake, clangd);
+		rows.push(result.row);
+		findings.push(...result.findings);
+		broken = broken || result.broken;
+		console.log(
+			`build ${result.row.build} · analysis ${result.row.analysis} · targets ${result.row.targets} · tree ${result.row.tree}`,
+		);
+	}
+
+	// The second toolchain, last: a compiler clangd does not recognise, so either this machine has
+	// one or the row says why it could not run.
+	if (gcc === null) {
+		console.log(`skipping toolchain: gcc … ${NO_GCC}`);
+		rows.push({
+			capability: "toolchain: gcc",
+			build: "SKIP",
+			analysis: "SKIP",
+			targets: "SKIP",
+			tree: "SKIP",
+			details: [`skipped      ${NO_GCC}`],
+			commands: [],
+		});
+	} else {
+		const fixture = gccToolchainFixture(gcc);
+		const root = join(tempRoot, "toolchain-gcc");
+		mkdirSync(root, { recursive: true });
+		const harness: GccHarness = {
+			ask: (flags) => askPlan(plannerBin, root, flags),
+			run,
+			analyse: (probes, args) => analyse(clangd, root, probes, args),
+			compileArguments,
+			commandLine: (argv) => commandLine(root, argv),
+			firstError,
+			isFile,
+			writeFixture: () => writeFixture(root, fixture),
+		};
+		process.stdout.write(`running toolchain: gcc … `);
+		const result = await judgeGccToolchain(fixture, root, gcc, harness);
 		rows.push(result.row);
 		findings.push(...result.findings);
 		broken = broken || result.broken;
