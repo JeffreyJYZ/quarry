@@ -14,16 +14,34 @@ use super::*;
 /// discovery, no configure, and no path written into their tree. A CMake project is answered by its
 /// own configure model — the directory its presets, its toolchain and its configured trees name — so
 /// a preset building into `out/debug` is analysed against `out/debug` rather than a guessed `build/`.
-/// Plain clang and a project detected by its own database keep the search they always had.
+/// Any other C/C++ project keeps the database it already has; one that has none gets the plain
+/// build's own flags written where that build writes, so the analysis it is about to run matches the
+/// compile it would run.
 pub fn database_for(info: &ProjectInfo, user: &[String]) -> Option<PathBuf> {
     if carries_flag(user, COMPILE_COMMANDS_DIR) {
         return None;
     }
     let root = Path::new(&info.root);
-    if info.kind != ProjectKind::Cmake {
-        return crate::project::locate_database(root, Path::new(&info.build_root));
+    if info.kind == ProjectKind::Cmake {
+        return cmake_database(root);
     }
-    cmake_database(root)
+    // A project's own database always wins: it is what its own build reads.
+    if let Some(found) = crate::project::locate_database(root, Path::new(&info.build_root)) {
+        return Some(found);
+    }
+    plain_database(root)
+}
+
+/// The directory holding the database synthesised for a C/C++ project with no build system.
+///
+/// The flags are the plain build's own, so this is the same directory that build writes into — the
+/// mirror of the CMake lane, where the tree that builds is the tree clangd reads. A project that
+/// states its own flags (`compile_flags.txt`, `.clangd`), names no source, or cannot be written to
+/// answers `None`, and the session starts exactly as it did before.
+fn plain_database(root: &Path) -> Option<PathBuf> {
+    let sources = crate::build_task::collect_plain_clang_sources(root).ok()?;
+    let written = crate::build_task::synthesize_plain_database(root, &sources).ok()??;
+    written.path.parent().map(Path::to_path_buf)
 }
 
 /// Where a CMake project's database belongs: the tree the plan names, and one configure through it.

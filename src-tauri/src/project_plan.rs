@@ -4,17 +4,19 @@
 //! the product's own build and starting clangd with the product's own arguments. A probe that
 //! re-derived those decisions in TypeScript would measure the probe, so this module asks the three
 //! questions of the functions that already decide them — [`cmake_plan`] for the build tree and both
-//! argv, [`server_args`] for the clangd hand-off, [`list_targets`]/[`resolve_target`] for the run
-//! dropdown — and `src/bin/quarry-plan.rs` prints the answers as JSON.
+//! argv, [`plain_build_plan`] for a project with no build system, [`server_args`] for the clangd
+//! hand-off, [`list_targets`]/[`resolve_target`] for the run dropdown — and
+//! `src/bin/quarry-plan.rs` prints the answers as JSON.
 //!
 //! Reading it is not free of side effects, because the product is not: the hand-off configures a
-//! CMake project that has no compiler database, exactly as opening that project does.
+//! CMake project that has no compiler database, and writes one for a plain C/C++ project, exactly as
+//! opening that project does.
 
 use std::path::Path;
 
 use serde::Serialize;
 
-use crate::build_task::{CMAKE_PROGRAM, CmakeOptions, cmake_plan};
+use crate::build_task::{CMAKE_PROGRAM, CmakeOptions, PlainPlan, cmake_plan, plain_build_plan};
 use crate::launch::{list_targets, resolve_target};
 use crate::project::inspect;
 use crate::types::ProjectKind;
@@ -29,6 +31,8 @@ pub struct Plan {
     /// The build root the project model reports, before CMake detection refines it.
     pub build_root: String,
     pub cmake: Option<CmakeSection>,
+    /// The build a project with no build system runs, which quarry compiles itself.
+    pub plain: Option<PlainPlan>,
     pub targets: Vec<Target>,
     pub handoff: Option<Handoff>,
 }
@@ -110,6 +114,14 @@ pub fn project_plan(root: &str, release: bool) -> Result<Plan, String> {
         _ => None,
     };
 
+    // The plain build exists for the kinds quarry compiles itself; Cargo and CMake have their own.
+    let plain = match info.kind {
+        ProjectKind::Cargo | ProjectKind::Cmake => None,
+        ProjectKind::CompileCommands | ProjectKind::Unknown => {
+            plain_build_plan(&info.root, &info.name).ok()
+        }
+    };
+
     let targets = list_targets(&info.root)
         .unwrap_or_default()
         .into_iter()
@@ -128,7 +140,7 @@ pub fn project_plan(root: &str, release: bool) -> Result<Plan, String> {
 
     // rust-analyzer has a manifest and needs no database, so only the C/C++ kinds are handed one.
     let handoff = match info.kind {
-        ProjectKind::Cmake | ProjectKind::CompileCommands => {
+        ProjectKind::Cmake | ProjectKind::CompileCommands | ProjectKind::Unknown => {
             let (args, database) = crate::lsp::server_args("clangd", &info, &[]);
             Some(Handoff {
                 server: "clangd".to_string(),
@@ -145,6 +157,7 @@ pub fn project_plan(root: &str, release: bool) -> Result<Plan, String> {
         name: info.name.clone(),
         build_root: info.build_root.clone(),
         cmake,
+        plain,
         targets,
         handoff,
     })

@@ -6,7 +6,8 @@
  * Each fixture is a project a CLion user actually has — presets with their own binary dir, a
  * toolchain file, a library plus an app that includes it by a build-system-only path, a project
  * configured into `cmake-build-debug/`, a generator that writes no compiler database, standard
- * headers through the compiler CMake chose. For each one the probe asks the product what it would
+ * headers through the compiler CMake chose, and a plain C++ project with no build system at all,
+ * which quarry compiles itself. For each one the probe asks the product what it would
  * do, then does exactly that, and reports the consumers separately:
  *
  *   build     the argv `src-tauri/examples/quarry-plan.rs` reports, spawned in the working directory
@@ -53,6 +54,7 @@ import {
 	type Fixture,
 	generatorFixture,
 	multiTargetFixture,
+	plainFixture,
 	positionOf,
 	presetsFixture,
 	systemHeaderFixture,
@@ -77,8 +79,17 @@ interface Plan {
 	name: string;
 	buildRoot: string;
 	cmake: CmakeSection | null;
+	plain: PlainSection | null;
 	targets: Target[];
 	handoff: Handoff | null;
+}
+
+/** The build quarry runs itself for a project with no build system. */
+interface PlainSection {
+	program: string | null;
+	cwd: string;
+	argv: string[];
+	note: string | null;
 }
 
 interface CmakeSection {
@@ -431,6 +442,16 @@ function seamFacts(): string[] {
 	if (!database.includes("ensure_database(root, &plan)")) {
 		facts.push("the hand-off no longer takes its database directory from the plan");
 	}
+	if (!database.includes("plain_database(root)")) {
+		facts.push("the hand-off no longer synthesises a database for a plain project");
+	}
+	const plain = read("build_task/run_plain_clang.rs");
+	if (!plain.includes("let flags = build_flags(root_path, &sources);")) {
+		facts.push("the plain build no longer derives its flags from the project");
+	}
+	if (!plain.includes("synthesize_plain_database(root_path, &sources)")) {
+		facts.push("the plain build no longer writes the database it analyses with");
+	}
 	const session = read("lsp/start_session.rs");
 	if (!session.includes("server_args(server, &info, &overrides.args)")) {
 		facts.push("start_session no longer composes the server arguments with server_args");
@@ -471,29 +492,48 @@ async function judge(
 	const findings: string[] = [];
 	let broken = false;
 
-	// 1. The build a CLion user's project already has: the fixture's own proof of life.
-	writeQuery(root, dirname(fixture.userDb));
-	for (const args of fixture.userBuild) {
-		const result = await run(cmake, args, root);
-		row.commands.push({
-			line: `cd ${directory} && cmake ${args.join(" ")}`,
-			verdict: result.code === 0 ? "PASS" : "FAIL",
-		});
-		if (result.code !== 0) {
-			broken = true;
-			row.details.push(`fixture FAIL  cmake ${args.join(" ")}: ${firstError(result.stderr)}`);
+	// 1. The build the project already has: the fixture's own proof of life. A plain project has none
+	//    to borrow, so its own compile is written down and run as the standard its analysis is judged
+	//    against.
+	const plain = fixture.kind === "plain";
+	if (plain) {
+		for (const argv of fixture.plainBuild ?? []) {
+			const result = await run(argv[0], argv.slice(1), root);
+			row.commands.push({
+				line: `cd ${directory} && ${argv.join(" ")}`,
+				verdict: result.code === 0 ? "PASS" : "FAIL",
+			});
+			if (result.code !== 0) {
+				broken = true;
+				row.details.push(`fixture FAIL  ${argv.join(" ")}: ${firstError(result.stderr)}`);
+			}
+		}
+	} else {
+		writeQuery(root, dirname(fixture.userDb ?? "compile_commands.json"));
+		for (const args of fixture.userBuild ?? []) {
+			const result = await run(cmake, args, root);
+			row.commands.push({
+				line: `cd ${directory} && cmake ${args.join(" ")}`,
+				verdict: result.code === 0 ? "PASS" : "FAIL",
+			});
+			if (result.code !== 0) {
+				broken = true;
+				row.details.push(
+					`fixture FAIL  cmake ${args.join(" ")}: ${firstError(result.stderr)}`,
+				);
+			}
 		}
 	}
-	const userDb = join(root, fixture.userDb);
-	const userDbExists = existsSync(userDb);
-	if (!userDbExists && !fixture.dbOptional) {
+	const userDb = fixture.userDb === undefined ? null : join(root, fixture.userDb);
+	const userDbExists = userDb !== null && existsSync(userDb);
+	if (userDb !== null && !userDbExists && !fixture.dbOptional) {
 		broken = true;
 		row.details.push(`fixture FAIL  no ${fixture.userDb} after the CLion-shaped build`);
 	}
 
 	// 2. The expectations are the fixture's own truth, so cross-check them against the database its
 	//    build wrote before judging the product's answer by them.
-	if (userDbExists) {
+	if (userDb !== null && userDbExists) {
 		const reference = await analyse(clangd, root, fixture.probes, [
 			`--compile-commands-dir=${dirname(userDb)}`,
 		]);
@@ -511,17 +551,19 @@ async function judge(
 	// 3. The plan as the project is opened: the target rows and the hand-off the session would make.
 	//    A tree already configured by CLion must be found as it stands, so its cache timestamp is the
 	//    witness that opening did not reconfigure it.
-	const fixtureCache = join(dirname(userDb), "CMakeCache.txt");
-	const cacheBefore = isFile(fixtureCache) ? statSync(fixtureCache).mtimeMs : null;
+	const fixtureCache = userDb === null ? null : join(dirname(userDb), "CMakeCache.txt");
+	const cacheBefore =
+		fixtureCache !== null && isFile(fixtureCache) ? statSync(fixtureCache).mtimeMs : null;
 	const madeBuildTreeBefore = isFile(join(root, "build", "CMakeCache.txt"));
 	const opened = await askPlan(plannerBin, root);
 	row.commands.push({
 		line: `cd ${directory} && quarry-plan .`,
-		verdict: opened.cmake ? "PASS" : "FAIL",
+		verdict: opened.cmake || opened.plain ? "PASS" : "FAIL",
 	});
 	const openedTarget = opened.targets[0] ?? null;
-	const cacheAfter = isFile(fixtureCache) ? statSync(fixtureCache).mtimeMs : null;
-	if (cacheBefore !== null && cacheAfter !== cacheBefore) {
+	const cacheAfter =
+		fixtureCache !== null && isFile(fixtureCache) ? statSync(fixtureCache).mtimeMs : null;
+	if (cacheBefore !== null && cacheAfter !== cacheBefore && fixtureCache !== null) {
 		row.details.push("handoff      FAIL  opening re-configured the project's own tree");
 		findings.push(
 			`${directory}: opening the project re-configured ${relative(dirname(userDb))}, though its compile_commands.json was current — \`cd ${directory} && ls -l --time-style=full-iso ${relative(fixtureCache)}\` changes across \`quarry-plan .\`.`,
@@ -548,9 +590,9 @@ async function judge(
 		if (!ok && !broken) {
 			const evidence = measured[index]?.diagnostics ?? [];
 			const database = opened.handoff?.databaseDir ?? null;
-			const namedFixtureDb = database !== null && database === dirname(userDb);
+			const namedFixtureDb = userDb !== null && database === dirname(userDb);
 			const elsewhere =
-				userDbExists && !namedFixtureDb
+				userDb !== null && userDbExists && !namedFixtureDb
 					? `, though ${fixture.userDb} exists and records the flags the build used`
 					: "";
 			findings.push(
@@ -571,7 +613,38 @@ async function judge(
 	// 5. The build: a fresh plan, because the product recomputes it when Build is pressed.
 	const buildPlan = await askPlan(plannerBin, root);
 	const section = buildPlan.cmake;
-	if (!section) {
+	const plainSection = buildPlan.plain;
+	if (plain) {
+		if (!plainSection) {
+			row.details.push("build        FAIL  the product reports no build for this project");
+			findings.push(`${directory}: the product reports no build, so nothing would run.`);
+		} else {
+			const built = await run(
+				plainSection.program ?? "clang++",
+				plainSection.argv.slice(1),
+				plainSection.cwd,
+				CMAKE_TIMEOUT,
+			);
+			const command = commandLine(root, plainSection.argv);
+			row.commands.push({
+				line: `cd ${directory} && ${command}`,
+				verdict: built.code === 0 ? "PASS" : "FAIL",
+			});
+			row.build = built.code === 0 ? "PASS" : "FAIL";
+			if (row.build === "FAIL") {
+				const reason = firstError(built.stderr);
+				row.details.push(`build        FAIL  ${command} exited ${built.code}: ${reason}`);
+				findings.push(
+					`${directory}: the plain build fails — \`cd ${directory} && ${command}\` exits ${built.code}: "${reason}"${plainSection.note ? ` (it noted: ${plainSection.note})` : ""}.`,
+				);
+			} else {
+				row.details.push(
+					`build        PASS  ${command} in ${plainSection.cwd === root ? "." : relative(plainSection.cwd)}`,
+				);
+			}
+			if (plainSection.note) row.details.push(`note         ${plainSection.note}`);
+		}
+	} else if (!section) {
 		row.details.push("build        FAIL  the product reports no CMake plan for this project");
 		findings.push(`${directory}: the product reports no CMake plan, so no build can run.`);
 	} else {
@@ -629,7 +702,7 @@ async function judge(
 	if (exists && target) {
 		row.details.push(`targets      PASS  ${target.id} -> ${relative(program as string)}`);
 	} else {
-		const name = target?.target ?? section?.buildRoot.split("/").pop() ?? "";
+		const name = target?.target ?? section?.buildRoot.split("/").pop() ?? after.name;
 		const written = findExecutables(root, name).map(relative);
 		row.details.push(
 			`targets      FAIL  ${target?.id ?? "no target"} -> ${program === null ? "no program" : relative(program)} does not exist; builds wrote ${JSON.stringify(written)}`,
@@ -695,6 +768,8 @@ async function main() {
 		fixtures.push(generatorFixture("generator: Ninja Multi-Config", "Ninja Multi-Config"));
 	}
 	fixtures.push(systemHeaderFixture());
+	// Last, so the table shows the one project with no build system to borrow a database from.
+	fixtures.push(plainFixture());
 
 	// Canonical, because the product reports canonical paths (`/private/var` over `/var`) and every
 	// relative path in this report is measured against this root.

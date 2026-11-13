@@ -4,13 +4,17 @@
 //! becomes `Diagnostic`s. CMake projects configure with `cmake -S … -B …` — only when their model
 //! inputs changed since the last configure, never because a build was merely asked for — then build
 //! with `cmake --build`; their diagnostics are parsed from the compiler's plain-text output. A
-//! project whose only marker is `compile_commands.json` builds with clang directly, using the
-//! include paths and defines its database records.
+//! project with no build system builds with clang directly, using the include paths and defines its
+//! database records, or the ones [`plain_flags`] derives from its own layout and settings.
 //!
 //! A CMake configure also asks CMake's file API for the project model, and the reply becomes a
 //! compiler database where the generator writes none (Xcode, Visual Studio, Ninja Multi-Config).
 //! That configure is skipped when nothing it reads has changed since the last one, so a quiet build
 //! costs no configure and a changed manifest is reloaded before the compiler runs.
+//!
+//! A project with no build system gets a database the same way, from its own flags: the plain build
+//! writes one where it writes its binary, so the clangd session started for that project analyses
+//! the code with the flags this compiler used instead of with none at all.
 //!
 //! A failing build is a result, not a command error: only a missing tool or a spawn failure is
 //! `Err`. The build never runs the program and never writes into the source tree.
@@ -44,6 +48,9 @@ pub use cmakeoutcome::*;
 
 mod collect_plain_clang_sources;
 pub use collect_plain_clang_sources::*;
+
+mod plain_flags;
+pub use plain_flags::*;
 
 mod run_plain_clang;
 pub use run_plain_clang::*;
@@ -89,6 +96,15 @@ pub use tests_plain_clang_sources::*;
 
 mod tests_plain_clang_flags;
 pub use tests_plain_clang_flags::*;
+
+mod tests_plain_flags_db;
+pub use tests_plain_flags_db::*;
+
+mod tests_plain_database;
+pub use tests_plain_database::*;
+
+mod tests_plain_flags_build;
+pub use tests_plain_flags_build::*;
 
 mod tests_cmake_artifact;
 pub use tests_cmake_artifact::*;

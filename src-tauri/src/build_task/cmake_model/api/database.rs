@@ -79,15 +79,24 @@ pub fn synthesize_database(build_root: &Path) -> Result<Option<Synthesis>, Strin
     }))
 }
 
+/// The exact text a database file holds for `entries`.
+///
+/// A caller that rewrites a database clangd is watching compares against this first, so an unchanged
+/// file is not rewritten; the encoding stays here so both write the same bytes.
+pub fn encode_database(entries: &[CompileEntry]) -> Result<String, String> {
+    serde_json::to_string_pretty(entries)
+        .map(|text| format!("{text}\n"))
+        .map_err(|error| format!("cannot encode the compiler database: {error}"))
+}
+
 /// Write the entries as the array `compile_commands.json` is, replacing the file atomically.
 ///
 /// clangd may be reading the directory while a build runs, so a half-written database is never
 /// visible: the array goes to a sibling temporary file and is renamed over the destination.
 pub fn write_database(path: &Path, entries: &[CompileEntry]) -> Result<(), String> {
-    let text = serde_json::to_string_pretty(entries)
-        .map_err(|error| format!("cannot encode {}: {error}", path.display()))?;
+    let text = encode_database(entries)?;
     let temporary = path.with_extension("json.tmp");
-    fs::write(&temporary, format!("{text}\n"))
+    fs::write(&temporary, text)
         .map_err(|error| format!("cannot write {}: {error}", temporary.display()))?;
     fs::rename(&temporary, path).map_err(|error| {
         let _ = fs::remove_file(&temporary);
