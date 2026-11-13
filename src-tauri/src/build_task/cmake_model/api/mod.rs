@@ -93,6 +93,9 @@ pub use tests_reply::*;
 mod tests_compile;
 pub use tests_compile::*;
 
+mod tests_msvc;
+pub use tests_msvc::*;
+
 mod tests_targets;
 pub use tests_targets::*;
 

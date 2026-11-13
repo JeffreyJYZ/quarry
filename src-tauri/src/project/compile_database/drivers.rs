@@ -43,21 +43,26 @@ fn compiler_token(argv: &[String]) -> Option<&str> {
 }
 
 /// Whether a program name is a C/C++ compiler rather than a launcher or a build tool.
+///
+/// `cl.exe` is MSVC's driver and names no family below, so a Visual Studio tree's record was
+/// filtered out and clangd was never told to query the compiler that tree was built with. The
+/// `.exe` suffix is not part of the name: the same driver is `cl` under a POSIX launcher.
 pub fn is_compiler(program: &str) -> bool {
     let name = Path::new(program)
         .file_name()
         .map(|name| name.to_string_lossy().to_ascii_lowercase())
         .unwrap_or_default();
-    if name.is_empty() {
+    let stem = name.strip_suffix(".exe").unwrap_or(name.as_str());
+    if stem.is_empty() {
         return false;
     }
     let families = ["clang", "gcc", "g++", "icx", "icpx"];
-    if families.iter().any(|family| name.contains(family)) {
+    if families.iter().any(|family| stem.contains(family)) {
         return true;
     }
     matches!(
-        name.as_str(),
-        "cc" | "c++" | "c89" | "c99" | "gcc" | "g++" | "zig"
+        stem,
+        "cc" | "c++" | "c89" | "c99" | "gcc" | "g++" | "zig" | "cl"
     )
 }
 

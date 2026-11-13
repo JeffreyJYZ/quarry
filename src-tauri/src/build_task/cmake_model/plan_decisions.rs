@@ -39,12 +39,13 @@ pub fn configuration(
 pub fn build_type(
     preset: &ResolvedConfigure,
     configuration: &str,
+    build_root: &Path,
     notes: &mut Vec<String>,
 ) -> Option<String> {
     if preset.cache.contains_key("CMAKE_BUILD_TYPE") {
         return None;
     }
-    if is_multi_config(preset.generator.as_deref()) {
+    if tree_multi_config(build_root, preset.generator.as_deref()) {
         // A multi-config generator takes its configuration at build time; nothing to force here.
         return None;
     }
@@ -56,16 +57,22 @@ pub fn build_type(
 }
 
 /// Whether a compiler database will be written, honouring a value the project set itself.
-pub fn compile_database(preset: &ResolvedConfigure, notes: &mut Vec<String>) -> bool {
+pub fn compile_database(
+    preset: &ResolvedConfigure,
+    build_root: &Path,
+    notes: &mut Vec<String>,
+) -> bool {
+    let generator = preset.generator.as_deref();
+    let writes = !tree_multi_config(build_root, generator);
     match preset.cache.get("CMAKE_EXPORT_COMPILE_COMMANDS") {
-        Some(value) if is_cache_on(value) => writes_compile_database(preset.generator.as_deref()),
+        Some(value) if is_cache_on(value) => writes,
         Some(value) => {
             notes.push(format!(
                 "preset sets CMAKE_EXPORT_COMPILE_COMMANDS={value}, so no compiler database is written"
             ));
             false
         }
-        None => writes_compile_database(preset.generator.as_deref()),
+        None => writes,
     }
 }
 

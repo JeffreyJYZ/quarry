@@ -85,9 +85,9 @@ pub fn cmake_plan_target(
         let build_root = super::build_root::resolve(source_root, options, None);
         let dir = build_root.display().to_string();
         // A multi-config generator takes its configuration at build time, so it never gets one
-        // here; a tree already configured records the generator in its cache and nothing else does.
-        let typed = !super::generator::generator_at(&build_root)
-            .is_some_and(|name| is_multi_config(Some(&name)));
+        // here; a tree already configured records the generator in its cache and its reply, and a
+        // fresh one states it only in a preset this branch does not have.
+        let typed = !tree_multi_config(&build_root, None);
         let mut configure = if typed {
             cmake_configure_argv(&source, &dir, profile)
         } else {
@@ -115,8 +115,8 @@ pub fn cmake_plan_target(
     let build_root = super::build_root::resolve(source_root, options, Some(&binary));
     let dir = build_root.display().to_string();
     let configuration = configuration(&presets, &preset, profile);
-    let build_type = build_type(&preset, &configuration, &mut notes);
-    let database = compile_database(&preset, &mut notes);
+    let build_type = build_type(&preset, &configuration, &build_root, &mut notes);
+    let database = compile_database(&preset, &build_root, &mut notes);
     let settings_toolchain = options
         .toolchain()
         .map(|value| absolute(source_root, value));

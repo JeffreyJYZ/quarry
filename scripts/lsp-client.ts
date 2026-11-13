@@ -11,8 +11,11 @@ import { type ChildProcess, spawn } from "node:child_process";
 
 /** A local path as an LSP `file://` URI: everything outside the unreserved set is percent-encoded. */
 export function fileUri(path: string): string {
+	// A Windows path needs the third slash before its drive letter, and the server expects forward
+	// slashes; on every other platform the path is already the URI's path.
+	const source = process.platform === "win32" ? `/${path.replaceAll("\\", "/")}` : path;
 	let uri = "file://";
-	for (const byte of Buffer.from(path, "utf8")) {
+	for (const byte of Buffer.from(source, "utf8")) {
 		if (
 			(byte >= 0x41 && byte <= 0x5a) ||
 			(byte >= 0x61 && byte <= 0x7a) ||

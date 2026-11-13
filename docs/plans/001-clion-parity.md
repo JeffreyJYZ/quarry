@@ -125,9 +125,23 @@ Verified on macOS with Apple clang 21, Homebrew GCC 16, CMake 4.4/4.5:
 | toolchain: gcc                   | a compiler clangd cannot recognise is queried for its include paths                           |
 | toolchain: gcc behind a launcher | the same, with the compiler behind a `ccache`-shaped wrapper                                  |
 
-Not verified here, and therefore not claimed: MSVC and the Visual Studio generator, Windows or Linux
-toolchains, cross-compilers other than the one toolchain file above, and diagnostics parity beyond
-clangd's own output. A row that skips (no GCC on the machine) is a skip, never a pass.
+The Windows rows are the same probe, run with `--windows` by the `windows` CI job on
+`windows-latest`. A macOS run skips them by name, so nothing on the development machine proves them;
+the job's own output — the table, the details and one line per command — is the measurement, and a
+row that cannot run there says why instead of passing.
+
+| capability               | what it proves                                                                                                                                                                                                                                           |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| generator: Visual Studio | the generator writes no `compile_commands.json`, the file-API synthesis produces one, `--config` carries `Debug`/`Release`, and the artefact the plan names is `build/<Config>/<target>.exe`                                                             |
+| toolchain: MSVC          | the database's command runs `cl.exe` with `/I…`, the hand-off's `--query-driver` names `cl.exe`, and analysis resolves a project header, MSVC's `_MSC_VER` overload and `<vector>`; a control run records whether clangd needs the query on that machine |
+
+Not verified here, and therefore not claimed: Linux toolchains, cross-compilers other than the one
+toolchain file above, and diagnostics parity beyond clangd's own output. On Windows what stays
+unproven is narrower and named: no debugger or test-runner row runs there, a `compile_commands.json`
+holds one entry per file per configuration while clangd reads the first, so a multi-config analysis
+is always the Debug command, and the MSVC control run is reported as evidence rather than required
+— when clangd answers without `--query-driver`, the row says so. A row that skips (no GCC on the
+machine, no Visual Studio toolset) is a skip, never a pass.
 
 ## 5. Slices
 

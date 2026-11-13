@@ -29,6 +29,26 @@ pub fn generator_at(build_root: &Path) -> Option<String> {
     cache_value(build_root, GENERATOR_VARIABLE)
 }
 
+/// Whether the tree's own last reply says its generator is multi-config.
+///
+/// A tree configured by a helper whose preset names no generator still records the answer here —
+/// the index states `cmake.generator.multiConfig` — so a preset silent on the generator no longer
+/// makes the plan force a `CMAKE_BUILD_TYPE` the generator ignores.
+pub fn reply_multi_config(build_root: &Path) -> bool {
+    read_reply(build_root).is_ok_and(|reply| reply.multi_config)
+}
+
+/// Whether this configure targets a multi-config generator, as the preset, the cache or the reply
+/// states it. A preset that names a generator is authoritative; one that is silent leaves the
+/// answer to the tree it describes.
+pub fn tree_multi_config(build_root: &Path, preset_generator: Option<&str>) -> bool {
+    if let Some(name) = preset_generator {
+        return is_multi_config(Some(name));
+    }
+    generator_at(build_root).is_some_and(|name| is_multi_config(Some(&name)))
+        || reply_multi_config(build_root)
+}
+
 /// Only a single-config Makefiles or Ninja generator implements `CMAKE_EXPORT_COMPILE_COMMANDS`.
 ///
 /// Ninja Multi-Config is multi-config but takes its `--config` at build time; measured on cmake

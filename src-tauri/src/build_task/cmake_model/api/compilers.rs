@@ -69,9 +69,42 @@ impl Compilers {
         }
     }
 
+    /// The flag spelling the driver for `language` takes.
+    pub fn style(&self, language: Option<&str>) -> DriverStyle {
+        driver_style(&self.driver(language))
+    }
+
     /// Whether the reply named a compiler for `language`.
     #[allow(dead_code)] // read by the test that proves the driver fallback is never the empty string
     pub fn has(&self, language: &str) -> bool {
         self.paths.contains_key(language)
+    }
+}
+
+/// The two flag spellings a compiler family takes in a synthesised command line.
+///
+/// A `compile_commands.json` written by CMake uses the generator's own spelling; a synthesised one
+/// has to choose, because CMake's compile groups carry paths and defines rather than a command.
+/// MSVC's `cl.exe` is the only family here that spells its flags with `/`, and an entry that gave it
+/// `-I` described a compiler this tree was not built with.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DriverStyle {
+    /// clang, gcc and every driver of that shape: `-I`, `-isystem`, `-D`, `-c`.
+    Gnu,
+    /// MSVC's `cl.exe` and the clang that speaks its dialect: `/I`, `/external:I`, `/D`, `/c`.
+    Msvc,
+}
+
+/// The spelling a driver's command line takes.
+pub fn driver_style(driver: &str) -> DriverStyle {
+    let name = Path::new(driver)
+        .file_name()
+        .map(|name| name.to_string_lossy().to_ascii_lowercase())
+        .unwrap_or_default();
+    let stem = name.strip_suffix(".exe").unwrap_or(name.as_str());
+    if stem == "cl" || stem == "clang-cl" {
+        DriverStyle::Msvc
+    } else {
+        DriverStyle::Gnu
     }
 }
