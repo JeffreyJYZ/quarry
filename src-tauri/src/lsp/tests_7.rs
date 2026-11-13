@@ -117,6 +117,7 @@ pub mod tests_group_7 {
         Arc::new(Mutex::new(Session {
             server: "cat".to_string(),
             database: None,
+            profile: BuildProfile::default(),
             pipe,
             documents: HashMap::new(),
             document_ends: HashMap::new(),

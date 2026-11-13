@@ -33,6 +33,8 @@ pub use std::time::{Duration, Instant};
 pub use tauri::{AppHandle, State};
 pub use tokio::sync::oneshot;
 
+pub use crate::build_task::BuildProfile;
+
 mod handshake_timeout;
 pub use handshake_timeout::*;
 

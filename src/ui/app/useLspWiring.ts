@@ -13,6 +13,8 @@ export type LspWiringOptions = {
 	activeText: string;
 	report: (message: string) => void;
 	overrides: Partial<Record<ServerKind, { path?: string; args?: string[] }>>;
+	/** The build profile in effect; a profile switch restarts the session so analysis follows it. */
+	profile: string;
 	/** Bumped by the restart command: every server for this root stops and starts again. */
 	restartToken: number;
 	/** Kept in a ref so the editor guards read the live set without re-rendering. */
@@ -43,6 +45,7 @@ export function useLspWiring(options: LspWiringOptions): {
 		signals,
 		options.report,
 		options.overrides,
+		options.profile,
 		options.restartToken,
 	);
 	const running = useMemo(() => new Set(kindsIn(statuses, "ready")), [statuses]);

@@ -48,6 +48,7 @@ function setup(token: number) {
 				activeText: "",
 				report: () => {},
 				overrides: {},
+				profile: "debug",
 				runningRef,
 				restartToken: props.token,
 				onRestarted: () => {},

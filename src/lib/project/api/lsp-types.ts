@@ -29,6 +29,11 @@ export type LspStatus = {
 	root: string;
 	server: string;
 	version: string | null;
+	/**
+	 * Why the start had to configure the project's tree, when it did — a profile change is a genuine
+	 * reconfigure of the user's build directory, so the window says so once.
+	 */
+	note?: string | null;
 };
 
 export type Location = { path: string; range: Range };

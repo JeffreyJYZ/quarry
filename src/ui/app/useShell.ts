@@ -102,6 +102,7 @@ export function useShell() {
 		activeText: active?.text ?? "",
 		report: reportNotice,
 		overrides: lspOverrides,
+		profile: effective.buildProfile,
 		onRestarted: lspRestart.settled,
 		runningRef: lspRunningRef,
 		restartToken: lspRestart.token,

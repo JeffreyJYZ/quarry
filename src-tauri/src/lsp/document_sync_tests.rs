@@ -96,6 +96,7 @@ pub mod tests_document_sync {
         Arc::new(Mutex::new(Session {
             server: "cat".to_string(),
             database: None,
+            profile: BuildProfile::default(),
             pipe,
             documents: HashMap::new(),
             document_ends: HashMap::new(),

@@ -26,6 +26,8 @@ function useOneServer(
 	report: (message: string) => void,
 	path: string,
 	args: string[],
+	/** The build profile in effect, so a CMake hand-off configures the tree the build would. */
+	profile: string,
 	restartToken: number,
 ): { state: ServerState; end: () => void } {
 	const [state, setState] = useState<ServerState>(ABSENT);
@@ -41,9 +43,13 @@ function useOneServer(
 		setState(STARTING);
 		const sessionId = makeSessionId(kind, root);
 		let live = true;
-		startLsp(sessionId, path, args).then(
+		startLsp(sessionId, path, args, profile).then(
 			(next) => {
-				if (live) setState({ phase: "ready", status: next });
+				if (!live) return;
+				// A start that reconfigured the project's tree says so once: the note is the only
+				// moment the user can learn the build type the tree had was replaced by this one.
+				if (next.note) reportRef.current(`${kind}: ${next.note}`);
+				setState({ phase: "ready", status: next });
 			},
 			(error) => {
 				if (!live) return;
@@ -61,7 +67,7 @@ function useOneServer(
 				reportRef.current(`${kind} stop: ${describeError(error)}`);
 			});
 		};
-	}, [root, kind, enabled, path, args.join(" "), restartToken]);
+	}, [root, kind, enabled, path, args.join(" "), profile, restartToken]);
 
 	/** The server's reader thread finished: its last answer describes a process that is gone. */
 	const end = useCallback(() => {
@@ -76,6 +82,7 @@ export function useLspServers(
 	signals: RootSignals | null,
 	report: (message: string) => void,
 	overrides: Partial<Record<ServerKind, { path?: string; args?: string[] }>> = {},
+	profile = "debug",
 	restartToken = 0,
 ): { statuses: LspStatusMap; markEnded: (kind: ServerKind) => void } {
 	const kinds = signals === null ? [] : serversForRoot(signals);
@@ -86,6 +93,7 @@ export function useLspServers(
 		report,
 		overrides["rust-analyzer"]?.path ?? "",
 		overrides["rust-analyzer"]?.args ?? [],
+		profile,
 		restartToken,
 	);
 	const clang = useOneServer(
@@ -95,6 +103,7 @@ export function useLspServers(
 		report,
 		overrides.clangd?.path ?? "",
 		overrides.clangd?.args ?? [],
+		profile,
 		restartToken,
 	);
 	// A stable map: `useDocumentSync` keys its open/close effect on it, so a fresh object each render

@@ -57,6 +57,9 @@ pub struct Session {
     /// The compile-database directory this session was started with, when there is one. A marker
     /// edit reconfigures this exact tree; `None` means the user named their own or there is none.
     pub(crate) database: Option<std::path::PathBuf>,
+    /// The build profile the session was started for, so a marker edit reconfigures the tree as the
+    /// user is building it instead of falling back to a Debug default.
+    pub(crate) profile: BuildProfile,
     pub(crate) pipe: ProcessPipe,
     /// Open document path to the version last sent, so `didChange` speaks the same version the
     /// server last heard.

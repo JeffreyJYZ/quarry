@@ -31,15 +31,21 @@ pub async fn start_lsp(
     server_path: Option<String>,
     // Extra arguments, already split by the caller.
     server_args: Option<Vec<String>>,
-) -> Result<LspStatus, String> {
+    // The build profile the window has in effect; absent leaves the Debug default.
+    profile: Option<String>,
+) -> Result<StartReply, String> {
     let overrides = StartOverrides {
         path: server_path.unwrap_or_default(),
         args: server_args.unwrap_or_default(),
+        profile: match profile.as_deref() {
+            Some(value) => BuildProfile::from_wire(value)?,
+            None => BuildProfile::default(),
+        },
     };
     match start_lsp_session(app, state.inner(), &root, &overrides).await {
-        Ok(status) => {
+        Ok(reply) => {
             lock(&state.in_flight).remove(&root);
-            Ok(status)
+            Ok(reply)
         }
         Err(error) => {
             // A failed start must leave nothing behind: a half-registered session would make
@@ -51,6 +57,25 @@ pub async fn start_lsp(
     }
 }
 
+/// What a start answers: the status the window already had, plus one line worth showing.
+///
+/// The note rides on the reply rather than a second event: a start that reconfigured the user's
+/// tree has exactly one moment to say so, and that is this answer.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartReply {
+    #[serde(flatten)]
+    pub status: LspStatus,
+    /// Why the start had to configure the tree, when it did.
+    pub note: Option<String>,
+}
+
+impl From<LspStatus> for StartReply {
+    fn from(status: LspStatus) -> Self {
+        Self { status, note: None }
+    }
+}
+
 /// What the settings page may override when a server is started.
 #[derive(Clone, Debug, Default)]
 pub struct StartOverrides {
@@ -59,6 +84,8 @@ pub struct StartOverrides {
     pub(crate) path: String,
     /// Extra arguments handed to the server as its own arguments.
     pub(crate) args: Vec<String>,
+    /// The build profile the window has in effect, which the CMake hand-off configures for.
+    pub(crate) profile: BuildProfile,
 }
 
 pub async fn start_lsp_session(
@@ -66,17 +93,17 @@ pub async fn start_lsp_session(
     state: &LspState,
     root: &str,
     overrides: &StartOverrides,
-) -> Result<LspStatus, String> {
+) -> Result<StartReply, String> {
     let root = root.to_string();
     // Atomic check-and-reserve: a concurrent start for the same root waits instead of spawning a
     // second server (which would leak the first child/pipe).
     if let Some(existing) = claim_start(state, &root).await {
         let server = lock(&existing).server.clone();
-        return Ok(LspStatus {
+        return Ok(StartReply::from(LspStatus {
             root,
             server,
             version: None,
-        });
+        }));
     }
 
     // The `root` argument is a session id of the form `{server}::{path}`. Strip the prefix to get
@@ -95,6 +122,7 @@ pub async fn start_lsp_session(
         let overrides = StartOverrides {
             path: overrides.path.clone(),
             args: overrides.args.clone(),
+            profile: overrides.profile,
         };
         tauri::async_runtime::spawn_blocking(move || launch(&name, &actual_root, &overrides))
             .await
@@ -106,11 +134,13 @@ pub async fn start_lsp_session(
         mut pipe,
         legend,
         database,
+        note,
     } = started;
     let frames = pipe.take_frames();
     let session = Arc::new(Mutex::new(Session {
         server: server.to_string(),
         database,
+        profile: overrides.profile,
         pipe,
         documents: HashMap::new(),
         document_ends: HashMap::new(),
@@ -138,9 +168,12 @@ pub async fn start_lsp_session(
 
     lock(&state.sessions).insert(root.clone(), session);
 
-    Ok(LspStatus {
-        root,
-        server: server.to_string(),
-        version: None,
+    Ok(StartReply {
+        status: LspStatus {
+            root,
+            server: server.to_string(),
+            version: None,
+        },
+        note,
     })
 }

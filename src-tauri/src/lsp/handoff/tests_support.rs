@@ -112,4 +112,12 @@ pub mod support {
     pub fn cmake_available() -> bool {
         crate::resolve::resolve(crate::build_task::CMAKE_PROGRAM).is_some()
     }
+
+    /// The hand-off for one project, asked for the profile every fixture here builds as.
+    ///
+    /// The profile is pinned here so a test that is about flags, directories or the cache reads the
+    /// same answer whatever the product's default becomes.
+    pub fn handoff_for(server: &str, info: &ProjectInfo, user: &[String]) -> Handoff {
+        crate::lsp::server_args(server, info, user, crate::build_task::BuildProfile::Debug)
+    }
 }

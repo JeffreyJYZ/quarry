@@ -8,6 +8,10 @@
 //! sequence now lives in `build_task::cmake_model::configure`, which the build runs too, so the two
 //! consumers cannot describe a tree differently.
 //!
+//! The profile is the build's own. CLion analyses the configuration being built, so a session for a
+//! `RelWithDebInfo` project configures and reads `RelWithDebInfo` flags, and a tree configured for
+//! another profile is reconfigured once — which the session reports, because the user's tree changed.
+//!
 //! What stays here is what only a language-server start needs: the deadline, so a broken toolchain
 //! cannot hold the session open, and the process-wide slot, so two change batches cannot configure
 //! one tree at once.
@@ -20,11 +24,12 @@ pub use std::process::{Command, Stdio};
 pub use std::thread;
 pub use std::time::{Duration, Instant};
 
+pub use crate::build_task::BuildProfile;
 pub(crate) use crate::types::{ProjectInfo, ProjectKind};
 
 use crate::build_task::{
-    CMAKE_CACHE, CMAKE_PROGRAM, CmakeOptions, CmakePlan, ConfigureIntent, ConfigureRequest,
-    ConfigureRun, DATABASE_FILE, cmake_plan, configure_need, configure_tree, synthesize_database,
+    CMAKE_PROGRAM, CmakeOptions, CmakePlan, ConfigureNeed, ConfigureRequest, ConfigureRun,
+    DATABASE_FILE, cmake_plan, configure_need, configure_tree, synthesize_database,
 };
 
 use super::*;
@@ -33,22 +38,31 @@ use super::*;
 /// toolchain cannot hold a language-server start open.
 pub const CONFIGURE_TIMEOUT: Duration = Duration::from_secs(60);
 
-/// The plan's build type flag, which a tree that already has one must not be reconfigured with.
-pub const BUILD_TYPE_FLAG: &str = "-DCMAKE_BUILD_TYPE=";
+/// What a start may report: whether the tree holds a database now, and why it configured.
+pub struct Ensured {
+    /// True when the plan's tree holds a readable compiler database afterwards.
+    pub current: bool,
+    /// One line saying the tree was reconfigured, when it was and the configure succeeded.
+    pub note: Option<String>,
+}
 
 /// Make the plan's own tree hold a compiler database, and say whether one is readable afterwards.
 ///
 /// The model decides whether a configure is needed at all: a tree whose last configure read every
-/// input unchanged is current, and it is not configured again merely because a session started. A
-/// generator that writes `compile_commands.json` itself leaves its own file authoritative; one that
-/// writes none gets the database synthesised from the file API, in the tree the plan names, so
+/// input unchanged is current, and it is not configured again merely because a session started. It
+/// also decides the profile: a tree configured for another build type is stale, so a profile change
+/// in settings is followed once rather than analysed against the old flags.
+///
+/// A generator that writes `compile_commands.json` itself leaves its own file authoritative; one
+/// that writes none gets the database synthesised from the file API, in the tree the plan names, so
 /// `--compile-commands-dir` points at that tree and nowhere else. A failed configure is not an
 /// error to the session: the previous database stays in place where there is one, and the session
 /// starts either way.
-pub fn ensure_database(root: &Path, plan: &CmakePlan) -> bool {
+pub fn ensure_database(root: &Path, plan: &CmakePlan) -> Ensured {
     let _guard = configure_lock();
     let database = plan.build_root.join(DATABASE_FILE);
-    if configure_need(root, &plan.build_root, &handoff_intent(plan)).is_some() {
+    let mut note = None;
+    if let Some(need) = configure_need(root, &plan.build_root, &handoff_intent(plan)) {
         let argv = configure_argv(plan);
         let request = ConfigureRequest {
             build_root: &plan.build_root,
@@ -56,52 +70,39 @@ pub fn ensure_database(root: &Path, plan: &CmakePlan) -> bool {
             // A tree that already holds a database keeps it when this configure fails.
             had_previous: database.is_file(),
         };
-        // The reason is the session's to ignore: it starts against whatever is on disk.
-        let _ = configure_tree(request, |argv| bounded_configure(root, argv));
+        // The reason is worth one line when the configure succeeds, and nothing when it fails: the
+        // session starts against whatever is on disk either way.
+        let outcome = configure_tree(request, |argv| bounded_configure(root, argv));
+        if let (Ok(configured), ConfigureNeed::Changed(reason)) = (outcome, need)
+            && configured.success
+        {
+            note = Some(reason);
+        }
     } else if !database.is_file() {
         // The reply is current, so only the derived file is missing: synthesise from the model
         // rather than pay for a configure that would produce the same reply.
         let _ = synthesize_database(&plan.build_root);
     }
-    database.is_file()
+    Ensured {
+        current: database.is_file(),
+        note,
+    }
 }
 
 /// Reconfigure when the session's database no longer describes the tree.
 ///
-/// Called for a watched manifest edit. True when the database is current afterwards, so the caller
-/// reports the regenerated file to clangd; a tree the plan no longer names is left alone rather
-/// than reconfigured through a recipe it never chose.
-pub fn refresh(root: &Path, database_dir: &Path) -> bool {
-    let Ok(plan) = cmake_plan(root, false, &CmakeOptions::for_root(root)) else {
+/// Called for a watched manifest edit, with the profile the session was started for: the tree keeps
+/// the configuration the user is building. True when the database is current afterwards, so the
+/// caller reports the regenerated file to clangd; a tree the plan no longer names is left alone
+/// rather than reconfigured through a recipe it never chose.
+pub fn refresh(root: &Path, database_dir: &Path, profile: BuildProfile) -> bool {
+    let Ok(plan) = cmake_plan(root, profile, &CmakeOptions::for_root(root)) else {
         return false;
     };
     if plan.build_root != database_dir {
         return false;
     }
-    ensure_database(root, &plan)
-}
-
-/// What the hand-off asks a configure to carry: the plan's toolchain, and no build type.
-///
-/// Reconfiguring an existing Release tree to export a database must not flip it to Debug, so the
-/// build type a build would force is left out of the comparison as well as the command line.
-fn handoff_intent(plan: &CmakePlan) -> ConfigureIntent {
-    ConfigureIntent {
-        toolchain: plan.intent.toolchain.clone(),
-        build_type: None,
-    }
-}
-
-/// The plan's configure, minus a build type for a directory that already has one.
-pub fn configure_argv(plan: &CmakePlan) -> Vec<String> {
-    if !plan.build_root.join(CMAKE_CACHE).is_file() {
-        return plan.configure.clone();
-    }
-    plan.configure
-        .iter()
-        .filter(|arg| !arg.starts_with(BUILD_TYPE_FLAG))
-        .cloned()
-        .collect()
+    ensure_database(root, &plan).current
 }
 
 /// Run the plan's configure under the deadline, capturing stderr only.

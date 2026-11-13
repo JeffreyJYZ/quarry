@@ -3,10 +3,23 @@
 pub use std::fs;
 pub use std::path::{Path, PathBuf};
 
-use crate::build_task::{CmakeOptions, cmake_plan};
+pub use crate::build_task::{BuildProfile, CmakeOptions, cmake_plan};
 pub(crate) use crate::types::{ProjectInfo, ProjectKind};
 
 use super::*;
+
+/// What discovery found: the directory clangd should read, and why a start had to configure.
+pub struct Database {
+    pub dir: Option<PathBuf>,
+    /// One line a session start reports when the tree had to be reconfigured for the profile.
+    pub note: Option<String>,
+}
+
+impl Database {
+    fn at(dir: Option<PathBuf>) -> Self {
+        Self { dir, note: None }
+    }
+}
 
 /// The directory whose `compile_commands.json` this clangd session should read.
 ///
@@ -17,19 +30,22 @@ use super::*;
 /// Any other C/C++ project keeps the database it already has; one that has none gets the plain
 /// build's own flags written where that build writes, so the analysis it is about to run matches the
 /// compile it would run.
-pub fn database_for(info: &ProjectInfo, user: &[String]) -> Option<PathBuf> {
+///
+/// `profile` is the one the build was asked for, so the tree that is configured and the database
+/// that is read carry the flags the user compiled with rather than a Debug default.
+pub fn database_for(info: &ProjectInfo, user: &[String], profile: BuildProfile) -> Database {
     if carries_flag(user, COMPILE_COMMANDS_DIR) {
-        return None;
+        return Database::at(None);
     }
     let root = Path::new(&info.root);
     if info.kind == ProjectKind::Cmake {
-        return cmake_database(root);
+        return cmake_database(root, profile);
     }
     // A project's own database always wins: it is what its own build reads.
     if let Some(found) = crate::project::locate_database(root, Path::new(&info.build_root)) {
-        return Some(found);
+        return Database::at(Some(found));
     }
-    plain_database(root)
+    Database::at(plain_database(root))
 }
 
 /// The directory holding the database synthesised for a C/C++ project with no build system.
@@ -51,12 +67,16 @@ fn plain_database(root: &Path) -> Option<PathBuf> {
 /// configure the build runs also synthesises the database from the CMake file API where the
 /// generator writes none, so that tree holds one either way; there is no second tree configured only
 /// to have a database to read.
-fn cmake_database(root: &Path) -> Option<PathBuf> {
+fn cmake_database(root: &Path, profile: BuildProfile) -> Database {
     let options = CmakeOptions::for_root(root);
-    let Ok(plan) = cmake_plan(root, false, &options) else {
+    let Ok(plan) = cmake_plan(root, profile, &options) else {
         // A model the project's own files cannot produce must not keep the session from starting.
-        return crate::project::locate_database(root, root);
+        return Database::at(crate::project::locate_database(root, root));
     };
     // A failed configure leaves the old database in place, which is still better than none.
-    ensure_database(root, &plan).then_some(plan.build_root)
+    let ensured = ensure_database(root, &plan);
+    Database {
+        dir: ensured.current.then_some(plan.build_root),
+        note: ensured.note,
+    }
 }

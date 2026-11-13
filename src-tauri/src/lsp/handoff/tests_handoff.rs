@@ -9,6 +9,7 @@ use super::*;
 
 #[cfg(test)]
 pub mod tests {
+    use super::support::handoff_for;
     use super::*;
     use std::env;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -70,8 +71,11 @@ pub mod tests {
         let fixture = Fixture::new("rust");
         fixture.write("build/compile_commands.json", "[]");
         let user = args(&["--log-file=/tmp/ra.log"]);
-        let (computed, database) =
-            server_args("rust-analyzer", &fixture.info(ProjectKind::Cargo), &user);
+        let Handoff {
+            args: computed,
+            database,
+            ..
+        } = handoff_for("rust-analyzer", &fixture.info(ProjectKind::Cargo), &user);
         assert_eq!(computed, user);
         assert_eq!(database, None);
     }
@@ -81,7 +85,11 @@ pub mod tests {
     #[test]
     fn a_directory_with_no_source_gains_no_flag() {
         let fixture = Fixture::new("plain");
-        let (computed, database) = server_args(
+        let Handoff {
+            args: computed,
+            database,
+            ..
+        } = handoff_for(
             "clangd",
             &fixture.info(ProjectKind::Unknown),
             &args(&["--log=error"]),
@@ -95,7 +103,11 @@ pub mod tests {
         let fixture = Fixture::new("cmake");
         fixture.write("CMakeLists.txt", "project(demo)\n");
         fixture.write("build/compile_commands.json", "[]");
-        let (computed, database) = server_args("clangd", &fixture.info(ProjectKind::Cmake), &[]);
+        let Handoff {
+            args: computed,
+            database,
+            ..
+        } = handoff_for("clangd", &fixture.info(ProjectKind::Cmake), &[]);
         let expected = format!(
             "{COMPILE_COMMANDS_DIR}={}",
             fixture.root().join("build").display()
@@ -110,7 +122,11 @@ pub mod tests {
         fixture.write("CMakeLists.txt", "project(demo)\n");
         fixture.write("build/compile_commands.json", "[]");
         let user = args(&["--compile-commands-dir=/custom/db"]);
-        let (computed, database) = server_args("clangd", &fixture.info(ProjectKind::Cmake), &user);
+        let Handoff {
+            args: computed,
+            database,
+            ..
+        } = handoff_for("clangd", &fixture.info(ProjectKind::Cmake), &user);
         assert_eq!(computed, user, "no second flag may shadow the user's");
         assert_eq!(
             database, None,
