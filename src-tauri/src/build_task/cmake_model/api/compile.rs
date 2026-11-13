@@ -46,19 +46,25 @@ pub fn compile_entry(
     source: &Path,
     compilers: &Compilers,
 ) -> CompileEntry {
-    let mut arguments = vec![compilers.driver(group.language.as_deref())];
+    let driver = compilers.driver(group.language.as_deref());
+    let (include, system, define, compile_only) = match compilers.style(group.language.as_deref()) {
+        // cl.exe spells every switch its own way; handing it `-I` describes a compiler this tree
+        // was not built with, which is what a Visual Studio database used to record.
+        DriverStyle::Msvc => ("/I", "/external:I", "/D", "/c"),
+        DriverStyle::Gnu => ("-I", "-isystem", "-D", "-c"),
+    };
+    let mut arguments = vec![driver];
     for fragment in &group.fragments {
         arguments.extend(fragment_tokens(fragment));
     }
-    for include in &group.includes {
-        let flag = if include.system { "-isystem" } else { "-I" };
-        arguments.push(flag.to_string());
-        arguments.push(include.path.display().to_string());
+    for path in &group.includes {
+        arguments.push(if path.system { system } else { include }.to_string());
+        arguments.push(path.path.display().to_string());
     }
-    for define in &group.defines {
-        arguments.push(format!("-D{define}"));
+    for name in &group.defines {
+        arguments.push(format!("{define}{name}"));
     }
-    arguments.push("-c".to_string());
+    arguments.push(compile_only.to_string());
     arguments.push(source.display().to_string());
 
     CompileEntry {

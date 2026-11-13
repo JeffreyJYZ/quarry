@@ -52,6 +52,9 @@ pub use tests_cache::*;
 mod tests_compiler;
 pub use tests_compiler::*;
 
+mod tests_msvc;
+pub use tests_msvc::*;
+
 mod tests_profile;
 pub use tests_profile::*;
 

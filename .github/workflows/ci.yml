@@ -47,6 +47,53 @@ jobs:
             - name: Build
               run: bun run build
 
+    # Windows exists for one thing: the compiler half of the matrix is measured against Apple clang
+    # and Homebrew GCC, and a CLion user on Windows builds with MSVC through the Visual Studio
+    # generator. The probe's Windows subset configures that generator, runs the plan the product
+    # reports, and starts clangd on the database quarry synthesises from CMake's file API — the two
+    # rows nothing on macOS can measure. A row this runner cannot measure says so by name.
+    windows:
+        name: windows
+        runs-on: windows-latest
+        timeout-minutes: 30
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v7
+
+            - name: Setup Bun
+              uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: "1"
+
+            - name: Setup Rust
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Cache Rust
+              uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: src-tauri
+
+            - name: Install dependencies
+              run: bun install --frozen-lockfile
+
+            # Built here rather than by the probe so a compile error is one named step, and so the
+            # probe measures the planner this job reports on instead of rebuilding it.
+            - name: Build quarry-plan
+              run: cargo build --example quarry-plan --manifest-path src-tauri/Cargo.toml
+
+            - name: Detect tools
+              run: |
+                  cmake --version
+                  if (Get-Command clangd -ErrorAction SilentlyContinue) { clangd --version } else { "clangd: missing; the analysis half of each row will skip by name" }
+                  cmake --help | Select-String -Pattern "Visual Studio 17 2022"
+
+            # The probe prints its own table, details and findings; a failing row names the command
+            # that produced it, so the first run of this job is itself the measurement.
+            - name: C/C++ parity probe (Windows subset)
+              env:
+                  QUARRY_PLAN_BIN: src-tauri\target\debug\examples\quarry-plan.exe
+              run: bun scripts/cpp-parity-probe.ts --windows
+
     # The LSP and debugger probes are a separate job: they need toolchains the gate does not, and
     # a hung language server should not hold the gate job hostage. `bun scripts/integration.ts`
     # exits non-zero only when a probe that ran fails; probes whose tool is missing are SKIPPED and

@@ -34,6 +34,9 @@ pub use cmake_targets::*;
 mod find_with_xcrun;
 pub use find_with_xcrun::*;
 
+mod program_file;
+pub use program_file::*;
+
 mod is_bin_target;
 pub use is_bin_target::*;
 

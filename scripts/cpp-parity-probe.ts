@@ -54,7 +54,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { basename, delimiter, dirname, join } from "node:path";
 import {
 	type AnalysisProbe,
 	type Fixture,
@@ -74,6 +74,14 @@ import {
 } from "./cpp-parity-fixtures";
 import { findGcc, NO_GCC, type GccHarness } from "./cpp-parity-gcc";
 import { judgeGccToolchain } from "./cpp-parity-gcc-row";
+import { judgeMsvcToolchain, judgeVisualStudio } from "./cpp-parity-vs-row";
+import {
+	NO_VS,
+	NO_CLANGD,
+	VS_GENERATOR,
+	type WindowsHarness,
+	vsFixture,
+} from "./cpp-parity-windows";
 import { fileUri, LspClient } from "./lsp-client";
 
 const SOURCE = join(import.meta.dir, "..", "src-tauri", "src");
@@ -161,7 +169,7 @@ export interface Measurement {
 }
 
 /** `PASS`/`FAIL` are measured; `n/a` is a consumer the row does not exercise. */
-type Verdict = "PASS" | "FAIL" | "SKIP" | "n/a";
+export type Verdict = "PASS" | "FAIL" | "SKIP" | "n/a";
 
 export interface Row {
 	capability: string;
@@ -210,17 +218,21 @@ function run(bin: string, args: string[], cwd: string, timeout = 120_000): Promi
 
 /** A tool the way quarry's `resolve` finds one: PATH first, then the install dirs a GUI launch lacks. */
 function findTool(name: string): string | null {
+	const windows = process.platform === "win32";
+	const files = windows ? [name, `${name}.exe`] : [name];
 	const dirs = [
-		...(process.env.PATH ?? "").split(":").filter(Boolean),
-		"/opt/homebrew/bin",
-		"/usr/local/bin",
+		...(process.env.PATH ?? "").split(delimiter).filter(Boolean),
+		...(windows ? [] : ["/opt/homebrew/bin", "/usr/local/bin"]),
 		`${process.env.HOME}/.cargo/bin`,
 	];
 	for (const dir of dirs) {
-		const candidate = join(dir, name);
-		if (existsSync(candidate)) return candidate;
+		for (const file of files) {
+			const candidate = join(dir, file);
+			if (existsSync(candidate)) return candidate;
+		}
 	}
-	if (name === "clangd" || name === "cargo") {
+	// `xcrun` is Apple's; asking for it on another platform is a wasted spawn, not a fallback.
+	if (!windows && (name === "clangd" || name === "cargo")) {
 		const xcrun = Bun.spawnSync(["xcrun", "--find", name]);
 		const found = xcrun.stdout.toString().trim();
 		if (found && existsSync(found)) return found;
@@ -229,9 +241,10 @@ function findTool(name: string): string | null {
 }
 
 function serverPath(binary: string): string {
-	const dirs = [dirname(binary), "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"];
-	const inherited = (process.env.PATH ?? "").split(":").filter(Boolean);
-	return [...dirs, ...inherited].join(":");
+	const inherited = (process.env.PATH ?? "").split(delimiter).filter(Boolean);
+	const apple =
+		process.platform === "win32" ? [] : ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"];
+	return [dirname(binary), ...apple, ...inherited].join(delimiter);
 }
 
 function isFile(path: string): boolean {
@@ -780,7 +793,7 @@ async function judgeProfile(
 		if (args === null) {
 			broken = true;
 			row.details.push(
-				`fixture FAIL  ${half.profile}: the build wrote no compile command for main.cpp in ${relative(root, database)}`,
+				`fixture FAIL  ${half.profile}: the build wrote no compile command for main.cpp in ${relativeTo(root, database)}`,
 			);
 			break;
 		}
@@ -791,7 +804,7 @@ async function judgeProfile(
 		if (!carries) {
 			passed = false;
 			findings.push(
-				`${directory}: ${half.configuration} must compile with ${half.optimisation} and ${half.debugInfo ? "with" : "without"} -g, but the compile command carries ${describeFlags(args)} — \`cd ${directory} && rg -- ${half.optimisation} ${relative(root, database)}\`.`,
+				`${directory}: ${half.configuration} must compile with ${half.optimisation} and ${half.debugInfo ? "with" : "without"} -g, but the compile command carries ${describeFlags(args)} — \`cd ${directory} && rg -- ${half.optimisation} ${relativeTo(root, database)}\`.`,
 			);
 		}
 
@@ -814,12 +827,12 @@ async function judgeProfile(
 			verdict: followed ? "PASS" : "FAIL",
 		});
 		row.details.push(
-			`analysis     ${followed ? "PASS" : "FAIL"}  ${half.profile}: the hand-off names ${tree === null ? "no database" : relative(root, tree)} configured for ${configured ?? "nothing"} and carries ${describeFlags(openArgs)}`,
+			`analysis     ${followed ? "PASS" : "FAIL"}  ${half.profile}: the hand-off names ${tree === null ? "no database" : relativeTo(root, tree)} configured for ${configured ?? "nothing"} and carries ${describeFlags(openArgs)}`,
 		);
 		if (!followed) {
 			analysed = false;
 			findings.push(
-				`${directory}: a ${half.profile} session must analyse the tree the ${half.configuration} build wrote, but \`cd ${directory} && quarry-plan . --profile ${half.profile}\` names ${tree === null ? "no compile database" : relative(root, tree)}, whose CMAKE_BUILD_TYPE is ${configured ?? "unset"} and whose main.cpp entry carries ${describeFlags(openArgs)}.`,
+				`${directory}: a ${half.profile} session must analyse the tree the ${half.configuration} build wrote, but \`cd ${directory} && quarry-plan . --profile ${half.profile}\` names ${tree === null ? "no compile database" : relativeTo(root, tree)}, whose CMAKE_BUILD_TYPE is ${configured ?? "unset"} and whose main.cpp entry carries ${describeFlags(openArgs)}.`,
 			);
 		}
 	}
@@ -855,7 +868,7 @@ async function judgeProfile(
 		if (!followed) {
 			analysed = false;
 			findings.push(
-				`${directory}: switching the profile to relwithdebinfo must reconfigure the tree it analyses and report that once, but \`cd ${directory} && quarry-plan . --profile relwithdebinfo\` leaves ${relative(root, cache)} at ${switchedType ?? "unset"}, names a database carrying ${describeFlags(switchedArgs)}, and ${switched.handoff?.note ? "noted it" : "said nothing"}.`,
+				`${directory}: switching the profile to relwithdebinfo must reconfigure the tree it analyses and report that once, but \`cd ${directory} && quarry-plan . --profile relwithdebinfo\` leaves ${relativeTo(root, cache)} at ${switchedType ?? "unset"}, names a database carrying ${describeFlags(switchedArgs)}, and ${switched.handoff?.note ? "noted it" : "said nothing"}.`,
 			);
 		}
 
@@ -868,7 +881,7 @@ async function judgeProfile(
 		if (!quiet) {
 			analysed = false;
 			findings.push(
-				`${directory}: a second start with the profile unchanged must not configure again, but ${relative(root, cache)} changed or the start reported a reconfigure.`,
+				`${directory}: a second start with the profile unchanged must not configure again, but ${relativeTo(root, cache)} changed or the start reported a reconfigure.`,
 			);
 		}
 	}
@@ -1057,12 +1070,12 @@ async function judgeMixedLanguages(
 		cxxEntry !== null && cxxEntry.some((arg) => arg === "-std=c++20" || arg === "-std=gnu++20");
 	const languages = cDriver === "clang" && cStandard && noCxxFlag && cxxDriver === "clang++";
 	row.details.push(
-		`language     ${languages && cxxStandard ? "PASS" : "FAIL"}  ${database === null ? "no database" : relative(root, file as string)}: mix.c is ${JSON.stringify(describeArguments(cEntry))}, main.cpp is ${JSON.stringify(describeArguments(cxxEntry))}`,
+		`language     ${languages && cxxStandard ? "PASS" : "FAIL"}  ${database === null ? "no database" : relativeTo(root, file as string)}: mix.c is ${JSON.stringify(describeArguments(cEntry))}, main.cpp is ${JSON.stringify(describeArguments(cxxEntry))}`,
 	);
 	if (!(languages && cxxStandard)) {
 		row.build = "FAIL";
 		findings.push(
-			`${directory}: \`cd ${directory} && quarry-plan .\` names ${database === null ? "no compile database" : relative(root, file as string)}, whose mix.c entry is ${JSON.stringify(describeArguments(cEntry))} and whose main.cpp entry is ${JSON.stringify(describeArguments(cxxEntry))}. A C translation unit must be compiled as C and a C++ one as C++, so the .c entry needs the C driver and the C standard, never a C++ one.`,
+			`${directory}: \`cd ${directory} && quarry-plan .\` names ${database === null ? "no compile database" : relativeTo(root, file as string)}, whose mix.c entry is ${JSON.stringify(describeArguments(cEntry))} and whose main.cpp entry is ${JSON.stringify(describeArguments(cxxEntry))}. A C translation unit must be compiled as C and a C++ one as C++, so the .c entry needs the C driver and the C standard, never a C++ one.`,
 		);
 	}
 
@@ -1079,16 +1092,16 @@ async function judgeMixedLanguages(
 	const executed = artifact === null ? null : await run(artifact, [], root);
 	const prints = executed !== null && executed.code === 0 && executed.stdout.includes("mix=21");
 	row.commands.push({
-		line: `cd ${directory} && ${artifact === null ? "(no artifact)" : relative(root, artifact)}`,
+		line: `cd ${directory} && ${artifact === null ? "(no artifact)" : relativeTo(root, artifact)}`,
 		verdict: prints ? "PASS" : "FAIL",
 	});
 	row.targets = prints ? "PASS" : "FAIL";
 	row.details.push(
-		`targets      ${prints ? "PASS" : "FAIL"}  ${artifact === null ? "no target" : relative(root, artifact)} printed ${executed === null ? "nothing" : JSON.stringify(executed.stdout.trim())} (wants "mix=21")`,
+		`targets      ${prints ? "PASS" : "FAIL"}  ${artifact === null ? "no target" : relativeTo(root, artifact)} printed ${executed === null ? "nothing" : JSON.stringify(executed.stdout.trim())} (wants "mix=21")`,
 	);
 	if (!prints) {
 		findings.push(
-			`${directory}: the built program ${artifact === null ? "is unset" : relative(root, artifact)} printed ${executed === null ? "nothing" : JSON.stringify(executed.stdout.trim())} (exit ${executed?.code ?? "none"}), so the value the C function returns does not cross the extern "C" boundary — \`cd ${directory} && ls -l ${artifact === null ? "." : relative(root, artifact)}\`.`,
+			`${directory}: the built program ${artifact === null ? "is unset" : relativeTo(root, artifact)} printed ${executed === null ? "nothing" : JSON.stringify(executed.stdout.trim())} (exit ${executed?.code ?? "none"}), so the value the C function returns does not cross the extern "C" boundary — \`cd ${directory} && ls -l ${artifact === null ? "." : relativeTo(root, artifact)}\`.`,
 		);
 	}
 	row.build = languages && cxxStandard && ran.ok && prints ? "PASS" : "FAIL";
@@ -1113,7 +1126,7 @@ async function judgeMixedLanguages(
 		if (!ok) {
 			analysed = false;
 			findings.push(
-				`${directory}: the analysis cannot answer at ${probe.file}:${position.line + 1}:${position.character + 1} as ${probe.file.endsWith(".c") ? "C" : "C++"}, which needs ${probe.needs}. \`cd ${directory} && ${clangdCommand}\` answers ${describe(hover)}${diagnostics.length > 0 ? `, with "${diagnostics[0]}"` : ""}${database === null ? "" : `; the plan named ${relative(root, file as string)}`}.`,
+				`${directory}: the analysis cannot answer at ${probe.file}:${position.line + 1}:${position.character + 1} as ${probe.file.endsWith(".c") ? "C" : "C++"}, which needs ${probe.needs}. \`cd ${directory} && ${clangdCommand}\` answers ${describe(hover)}${diagnostics.length > 0 ? `, with "${diagnostics[0]}"` : ""}${database === null ? "" : `; the plan named ${relativeTo(root, file as string)}`}.`,
 			);
 		}
 	});
@@ -1212,12 +1225,12 @@ async function judgeMultiConfig(
 			target === null ? null : join(section.buildRoot, half.configuration, target.target);
 		const names = program !== null && program === artifact;
 		row.details.push(
-			`target       ${names ? "PASS" : "FAIL"}  ${half.profile}: the plan names ${program === null ? "no program" : relative(root, program)} (wants ${artifact === null ? "a target" : relative(root, artifact)})`,
+			`target       ${names ? "PASS" : "FAIL"}  ${half.profile}: the plan names ${program === null ? "no program" : relativeTo(root, program)} (wants ${artifact === null ? "a target" : relativeTo(root, artifact)})`,
 		);
 		if (!names) {
 			named = false;
 			findings.push(
-				`${directory}: \`cd ${directory} && quarry-plan . --profile ${half.profile}\` names ${program === null ? "no program" : relative(root, program)} for its first target, but a ${half.configuration} build writes ${artifact === null ? "no artefact" : relative(root, artifact)}. The configuration asked for decides the artefact, not the Debug one.`,
+				`${directory}: \`cd ${directory} && quarry-plan . --profile ${half.profile}\` names ${program === null ? "no program" : relativeTo(root, program)} for its first target, but a ${half.configuration} build writes ${artifact === null ? "no artefact" : relativeTo(root, artifact)}. The configuration asked for decides the artefact, not the Debug one.`,
 			);
 		}
 
@@ -1229,18 +1242,18 @@ async function judgeMultiConfig(
 		}
 		const written = artifact !== null && isFile(artifact);
 		row.details.push(
-			`build        ${written ? "PASS" : "FAIL"}  ${half.profile}: ${artifact === null ? "no artefact named" : relative(root, artifact)} ${written ? "written" : "missing"}`,
+			`build        ${written ? "PASS" : "FAIL"}  ${half.profile}: ${artifact === null ? "no artefact named" : relativeTo(root, artifact)} ${written ? "written" : "missing"}`,
 		);
 		if (!written) {
 			passed = false;
 			findings.push(
-				`${directory}: the ${half.profile} build wrote no ${artifact === null ? "artefact" : relative(root, artifact)} — \`cd ${directory} && ${commandLine(root, section.build)}\`.`,
+				`${directory}: the ${half.profile} build wrote no ${artifact === null ? "artefact" : relativeTo(root, artifact)} — \`cd ${directory} && ${commandLine(root, section.build)}\`.`,
 			);
 		} else {
 			const executed = await run(artifact as string, [], root);
 			const prints = executed.code === 0 && executed.stdout.includes("variant=7");
 			row.commands.push({
-				line: `cd ${directory} && ${relative(root, artifact as string)}`,
+				line: `cd ${directory} && ${relativeTo(root, artifact as string)}`,
 				verdict: prints ? "PASS" : "FAIL",
 			});
 			row.details.push(
@@ -1249,7 +1262,7 @@ async function judgeMultiConfig(
 			if (!prints) {
 				passed = false;
 				findings.push(
-					`${directory}: the ${half.profile} artefact printed ${JSON.stringify(executed.stdout.trim())} (exit ${executed.code}) — \`cd ${directory} && ${relative(root, artifact as string)}\`.`,
+					`${directory}: the ${half.profile} artefact printed ${JSON.stringify(executed.stdout.trim())} (exit ${executed.code}) — \`cd ${directory} && ${relativeTo(root, artifact as string)}\`.`,
 				);
 			}
 		}
@@ -1264,7 +1277,7 @@ async function judgeMultiConfig(
 			if (objects.length !== 1) {
 				broken = true;
 				row.details.push(
-					`fixture FAIL  ${half.profile}: ${objects.length} main.cpp.o under ${relative(root, buildRoot)} for ${half.configuration}`,
+					`fixture FAIL  ${half.profile}: ${objects.length} main.cpp.o under ${relativeTo(root, buildRoot)} for ${half.configuration}`,
 				);
 				continue;
 			}
@@ -1272,16 +1285,16 @@ async function judgeMultiConfig(
 			const otool = await run("/usr/bin/otool", ["-l", object], root);
 			const dwarf = otool.stdout.includes("__DWARF");
 			row.commands.push({
-				line: `cd ${directory} && otool -l ${relative(root, object)} | rg __DWARF`,
+				line: `cd ${directory} && otool -l ${relativeTo(root, object)} | rg __DWARF`,
 				verdict: dwarf === half.debugInfo ? "PASS" : "FAIL",
 			});
 			row.details.push(
-				`debug info   ${dwarf === half.debugInfo ? "PASS" : "FAIL"}  ${half.profile}: ${relative(root, object)} ${dwarf ? "carries" : "carries no"} __DWARF`,
+				`debug info   ${dwarf === half.debugInfo ? "PASS" : "FAIL"}  ${half.profile}: ${relativeTo(root, object)} ${dwarf ? "carries" : "carries no"} __DWARF`,
 			);
 			if (dwarf !== half.debugInfo) {
 				passed = false;
 				findings.push(
-					`${directory}: ${half.configuration} must compile ${half.debugInfo ? "with" : "without"} debug info, but \`cd ${directory} && otool -l ${relative(root, object)}\` ${dwarf ? "shows a __DWARF segment" : "shows no __DWARF segment"}.`,
+					`${directory}: ${half.configuration} must compile ${half.debugInfo ? "with" : "without"} debug info, but \`cd ${directory} && otool -l ${relativeTo(root, object)}\` ${dwarf ? "shows a __DWARF segment" : "shows no __DWARF segment"}.`,
 				);
 			}
 		}
@@ -1299,8 +1312,11 @@ async function judgeMultiConfig(
 }
 
 /** A path with the fixture root written as `.`, for a detail line. */
-function relative(root: string, path: string): string {
-	return path.startsWith(`${root}/`) ? path.slice(root.length + 1) : path;
+function relativeTo(root: string, path: string): string {
+	const norm = (value: string) => value.replaceAll("\\", "/");
+	const base = `${norm(root)}/`;
+	const full = norm(path);
+	return full.startsWith(base) ? full.slice(base.length) : path;
 }
 
 async function judge(
@@ -1311,8 +1327,7 @@ async function judge(
 	clangd: string,
 ): Promise<{ row: Row; findings: string[]; broken: boolean }> {
 	const directory = basename(root);
-	const relative = (path: string) =>
-		path.startsWith(`${root}/`) ? path.slice(root.length + 1) : path;
+	const relative = (path: string) => relativeTo(root, path);
 	writeFixture(root, fixture);
 	const row: Row = {
 		capability: fixture.name,
@@ -1577,14 +1592,48 @@ async function judge(
 
 async function main() {
 	const started = Date.now();
+	const windowsOnly = process.argv.includes("--windows");
 	const cmake = findTool("cmake");
 	const clangd = findTool("clangd");
 	if (!cmake) throw new Error("cmake is not installed");
-	if (!clangd) throw new Error("clangd is not installed");
 	// The second toolchain is optional: a machine without one gets this row skipped by name.
-	const gcc = findGcc();
+	const gcc = windowsOnly ? null : findGcc();
 
 	const generators = (await run(cmake, ["--help"], process.cwd())).stdout;
+
+	// Canonical, because the product reports canonical paths (`/private/var` over `/var`) and every
+	// relative path in this report is measured against this root.
+	const tempRoot = realpathSync(mkdtempSync(join(tmpdir(), "quarry-cpp-parity-")));
+
+	const plannerBin = await planner();
+	console.log("C/C++ parity probe — quarry");
+	console.log(`  fixtures  ${tempRoot}`);
+	console.log(`  planner   ${plannerBin}`);
+	console.log(`  cmake     ${firstLine((await run(cmake, ["--version"], tempRoot)).stdout)}`);
+	if (clangd === null) console.log(`  clangd    ${NO_CLANGD}`);
+	else
+		console.log(
+			`  clangd    ${firstLine((await run(clangd, ["--version"], tempRoot)).stdout)}`,
+		);
+	console.log(`  gcc       ${gcc === null ? NO_GCC : gcc.version}`);
+	let broken = false;
+	for (const fact of seamFacts()) {
+		console.log(`  drift     ${fact}`);
+		broken = true;
+	}
+
+	// The Windows subset is the two rows a Visual Studio generator and MSVC can measure. It is the
+	// whole run there: the other rows are macOS toolchains and would only say "no clang++" eight
+	// times over.
+	if (windowsOnly) {
+		const measured = await windowsRows(tempRoot, plannerBin, clangd, generators);
+		return report(measured.rows, measured.findings, measured.broken || broken, started);
+	}
+	if (clangd === null) throw new Error("clangd is not installed");
+
+	const rows: Row[] = [];
+	const findings: string[] = [];
+
 	const fixtures: Fixture[] = [presetsFixture(), toolchainFixture(), multiTargetFixture()];
 	if (generators.includes("Xcode")) {
 		fixtures.push(generatorFixture("generator: Xcode", "Xcode"));
@@ -1595,25 +1644,6 @@ async function main() {
 	fixtures.push(systemHeaderFixture());
 	// Last, so the table shows the one project with no build system to borrow a database from.
 	fixtures.push(plainFixture());
-
-	// Canonical, because the product reports canonical paths (`/private/var` over `/var`) and every
-	// relative path in this report is measured against this root.
-	const tempRoot = realpathSync(mkdtempSync(join(tmpdir(), "quarry-cpp-parity-")));
-	const rows: Row[] = [];
-	const findings: string[] = [];
-	let broken = false;
-
-	const plannerBin = await planner();
-	console.log("C/C++ parity probe — quarry");
-	console.log(`  fixtures  ${tempRoot}`);
-	console.log(`  planner   ${plannerBin}`);
-	console.log(`  cmake     ${firstLine((await run(cmake, ["--version"], tempRoot)).stdout)}`);
-	console.log(`  clangd    ${firstLine((await run(clangd, ["--version"], tempRoot)).stdout)}`);
-	console.log(`  gcc       ${gcc === null ? NO_GCC : gcc.version}`);
-	for (const fact of seamFacts()) {
-		console.log(`  drift     ${fact}`);
-		broken = true;
-	}
 
 	for (const fixture of fixtures) {
 		const root = join(tempRoot, fixture.name.replace(/[/: ]+/g, "-"));
@@ -1704,6 +1734,114 @@ async function main() {
 		}
 	}
 
+	// The Windows rows run everywhere they can: on a machine without the generator each says so by
+	// name, which is the whole point of a row that cannot pass by being absent.
+	const vs = generators.includes(VS_GENERATOR);
+	if (vs) {
+		const measured = await windowsRows(tempRoot, plannerBin, clangd, generators);
+		rows.push(...measured.rows);
+		findings.push(...measured.findings);
+		broken = broken || measured.broken;
+	} else {
+		for (const capability of ["generator: Visual Studio", "toolchain: MSVC"]) {
+			console.log(`skipping ${capability} … ${NO_VS}`);
+			rows.push({
+				capability,
+				build: "SKIP",
+				analysis: "SKIP",
+				targets: "SKIP",
+				tree: "SKIP",
+				details: [`skipped      ${NO_VS}`],
+				commands: [],
+			});
+		}
+	}
+
+	report(rows, findings, broken, started);
+}
+
+/** The probe's own machinery, as the Windows rows ask the product and start clangd with it. */
+function windowsHarness(
+	fixture: Fixture,
+	root: string,
+	plannerBin: string,
+	clangd: string | null,
+): WindowsHarness {
+	return {
+		clangd,
+		ask: (flags) => askPlan(plannerBin, root, flags),
+		run: (bin, args, cwd) => run(bin, args, cwd, CMAKE_TIMEOUT),
+		analyse: (probes, args) =>
+			clangd === null ? Promise.resolve([]) : analyse(clangd, root, probes, args),
+		compileArguments,
+		commandLine: (argv) => commandLine(root, argv),
+		firstError,
+		isFile,
+		writeFixture: () => writeFixture(root, fixture),
+		writeQuery: (directory) => writeQuery(root, directory),
+	};
+}
+
+/**
+ * The two Windows rows, run through the same machinery every other row uses.
+ *
+ * A machine whose cmake lists no Visual Studio generator says so once per row; one that lists it
+ * without the toolset behind it says that instead, from the fixture's own configure.
+ */
+async function windowsRows(
+	tempRoot: string,
+	plannerBin: string,
+	clangd: string | null,
+	generators: string,
+): Promise<{ rows: Row[]; findings: string[]; broken: boolean }> {
+	if (!generators.includes(VS_GENERATOR)) {
+		const rows: Row[] = [];
+		for (const capability of ["generator: Visual Studio", "toolchain: MSVC"]) {
+			console.log(`skipping ${capability} … ${NO_VS}`);
+			rows.push({
+				capability,
+				build: "SKIP",
+				analysis: "SKIP",
+				targets: "SKIP",
+				tree: "SKIP",
+				details: [`skipped      ${NO_VS}`],
+				commands: [],
+			});
+		}
+		return { rows, findings: [], broken: false };
+	}
+	const judges: {
+		fixture: Fixture;
+		judged: (
+			fixture: Fixture,
+			root: string,
+			harness: WindowsHarness,
+		) => Promise<{ row: Row; findings: string[]; broken: boolean }>;
+	}[] = [
+		{ fixture: vsFixture("generator: Visual Studio"), judged: judgeVisualStudio },
+		{ fixture: vsFixture("toolchain: MSVC"), judged: judgeMsvcToolchain },
+	];
+	const rows: Row[] = [];
+	const findings: string[] = [];
+	let broken = false;
+	for (const entry of judges) {
+		const root = join(tempRoot, entry.fixture.name.replace(/[/: ]+/g, "-"));
+		mkdirSync(root, { recursive: true });
+		process.stdout.write(`running ${entry.fixture.name} … `);
+		const harness = windowsHarness(entry.fixture, root, plannerBin, clangd);
+		const judged = await entry.judged(entry.fixture, root, harness);
+		rows.push(judged.row);
+		findings.push(...judged.findings);
+		broken = broken || judged.broken;
+		console.log(
+			`build ${judged.row.build} · analysis ${judged.row.analysis} · targets ${judged.row.targets} · tree ${judged.row.tree}`,
+		);
+	}
+	return { rows, findings, broken };
+}
+
+/** Print the table, the findings and every command, then exit with the probe's own code. */
+function report(rows: Row[], findings: string[], broken: boolean, started: number): void {
 	const columns = ["capability", "build", "analysis", "targets", "tree"];
 	const width = Math.max(...rows.map((row) => row.capability.length), columns[0].length);
 	const line = (cells: string[]) =>

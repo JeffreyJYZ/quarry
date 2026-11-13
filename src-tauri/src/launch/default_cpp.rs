@@ -135,34 +135,35 @@ pub fn cpp_build_root(root: &Path) -> PathBuf {
 
 /// The conventional locations one name may occupy, by project kind.
 pub fn paths_for_name(root: &Path, name: &str, kind: ProjectKind) -> Vec<PathBuf> {
+    let file = program_file(name);
     match kind {
         ProjectKind::Cmake => {
             let detected = cpp_build_root(root);
             let mut paths = Vec::new();
-            push_candidate(&mut paths, &detected, name);
+            push_candidate(&mut paths, &detected, &file);
             for config in MULTI_CONFIG_DIRS {
-                push_path(&mut paths, detected.join(config).join(name));
+                push_path(&mut paths, detected.join(config).join(&file));
             }
-            push_candidate(&mut paths, root, name);
+            push_candidate(&mut paths, root, &file);
             for config in MULTI_CONFIG_DIRS {
-                push_path(&mut paths, root.join(config).join(name));
+                push_path(&mut paths, root.join(config).join(&file));
             }
-            push_candidate(&mut paths, &root.join(CMAKE_BUILD_DIR), name);
+            push_candidate(&mut paths, &root.join(CMAKE_BUILD_DIR), &file);
             for config in MULTI_CONFIG_DIRS {
                 push_path(
                     &mut paths,
-                    root.join(CMAKE_BUILD_DIR).join(config).join(name),
+                    root.join(CMAKE_BUILD_DIR).join(config).join(&file),
                 );
             }
             for directory in CLION_BUILD_DIRS {
-                push_candidate(&mut paths, &root.join(directory), name);
+                push_candidate(&mut paths, &root.join(directory), &file);
             }
             paths
         }
         _ => vec![
-            root.join(QUARRY_BUILD_DIR).join(name),
-            root.join(CMAKE_BUILD_DIR).join(name),
-            root.join(name),
+            root.join(QUARRY_BUILD_DIR).join(&file),
+            root.join(CMAKE_BUILD_DIR).join(&file),
+            root.join(&file),
         ],
     }
 }
@@ -188,8 +189,9 @@ pub fn first_existing(candidates: &[PathBuf]) -> Option<PathBuf> {
 /// the other kinds get quarry's own build output, which is the only executable quarry itself knows
 /// how to produce for them.
 pub fn fallback_program(root: &Path, name: &str, kind: ProjectKind) -> PathBuf {
+    let file = program_file(name);
     match kind {
-        ProjectKind::Cmake => cpp_build_root(root).join(name),
-        _ => root.join(QUARRY_BUILD_DIR).join(name),
+        ProjectKind::Cmake => cpp_build_root(root).join(file),
+        _ => root.join(QUARRY_BUILD_DIR).join(file),
     }
 }
