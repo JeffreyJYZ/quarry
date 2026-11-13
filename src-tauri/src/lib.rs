@@ -14,6 +14,8 @@ mod menu;
 mod new_project;
 mod processes;
 mod project;
+/// The plan a project would run, printed by `src/bin/quarry-plan.rs` for the parity probe.
+pub mod project_plan;
 mod protocol_pipe;
 mod pty;
 mod resolve;

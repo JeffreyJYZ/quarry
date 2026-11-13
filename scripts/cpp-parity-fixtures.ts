@@ -20,6 +20,11 @@ export interface AnalysisProbe {
 	needle: string;
 	/** What the position needs from the compile command, for the findings. */
 	needs: string;
+	/**
+	 * Text a correct hover must contain. This is the standard the analysis is judged against: the
+	 * fixture's own build guarantees it, so a hover that lacks it is analysing other flags.
+	 */
+	expect: string;
 }
 
 export interface Fixture {
@@ -108,6 +113,7 @@ int main() {
 				file: "main.cpp",
 				needle: "parity_preset_value()",
 				needs: "the preset's binary dir, which holds the only compile_commands.json",
+				expect: "int parity_preset_value()",
 			},
 		],
 	};
@@ -178,6 +184,7 @@ int main() {
 				file: "main.cpp",
 				needle: "toolchain_marker(1)",
 				needs: "PARITY_TOOLCHAIN from the toolchain file, which picks the int overload",
+				expect: "int toolchain_marker(int value)",
 			},
 		],
 	};
@@ -240,11 +247,13 @@ int main() {
 				file: "app/main.cpp",
 				needle: "parity_bump()",
 				needs: "the library include path from target_include_directories",
+				expect: "int parity_bump()",
 			},
 			{
 				file: "app/main.cpp",
 				needle: "parity_counter",
 				needs: "the library include path, so the extern declaration is visible",
+				expect: "extern int parity_counter",
 			},
 		],
 	};
@@ -313,11 +322,13 @@ int main() {
 				file: "main.cpp",
 				needle: "format(",
 				needs: "CMAKE_CXX_STANDARD 20 recorded in the compile command: <format> is C++20 only",
+				expect: "basic_string<char>",
 			},
 			{
 				file: "main.cpp",
 				needle: "parity_c_api(1)",
 				needs: 'the extern "C" declaration from the library header',
+				expect: "int parity_c_api(int value)",
 			},
 		],
 	};
@@ -326,10 +337,12 @@ int main() {
 /**
  * A project configured with one generator and no `-std` guess, used per generator CMake offers.
  *
- * `directory` is where that generator writes its tree; the analysis position is the C++20 one, so a
- * generator that writes no `compile_commands.json` leaves clangd with nothing to answer from.
+ * The generator is picked the way a CLion CMake profile picks one, and the tree is CLion's own
+ * `cmake-build-debug`; the analysis position is the C++20 one, so a generator that writes no
+ * `compile_commands.json` leaves clangd with nothing to answer from unless the product makes one.
  */
-export function generatorFixture(label: string, generator: string, directory: string): Fixture {
+export function generatorFixture(label: string, generator: string): Fixture {
+	const directory = "cmake-build-debug";
 	return {
 		name: label,
 		files: {
@@ -367,6 +380,7 @@ int main() {
 				file: "main.cpp",
 				needle: "format(",
 				needs: "the C++ standard from the compile command this generator writes, if it writes one",
+				expect: "basic_string<char>",
 			},
 		],
 	};
