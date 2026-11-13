@@ -31,6 +31,9 @@ pub struct Started {
     pub(crate) root: String,
     pub(crate) pipe: ProcessPipe,
     pub(crate) legend: SemanticLegend,
+    /// The compile-database directory this session was pointed at, so a marker edit can reconfigure
+    /// exactly that tree instead of rediscovering one mid-session.
+    pub(crate) database: Option<std::path::PathBuf>,
 }
 
 /// Wait until this root is either served or reserved by this call.
@@ -88,10 +91,15 @@ pub(crate) fn launch(
     };
     let root_uri = path_to_uri(&info.root);
 
+    // clangd is handed the project's compile database (and the compiler to query) because it cannot
+    // find a database that lives in a build directory on its own; rust-analyzer keeps the user's
+    // arguments verbatim.
+    let (args, database) = server_args(server, &info, &overrides.args);
+
     let mut command = Command::new(&binary);
     command.current_dir(&info.root);
     command.env("PATH", server_path(&binary));
-    command.args(&overrides.args);
+    command.args(&args);
     let (mut pipe, stderr) = ProcessPipe::spawn_with_stderr(&mut command).map_err(|error| {
         format_start_failure(server, &format!("cannot start ({binary}): {error}"), "")
     })?;
@@ -112,5 +120,6 @@ pub(crate) fn launch(
         root: info.root,
         pipe,
         legend,
+        database,
     })
 }

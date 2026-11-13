@@ -36,6 +36,9 @@ pub use tokio::sync::oneshot;
 mod handshake_timeout;
 pub use handshake_timeout::*;
 
+mod handoff;
+pub use handoff::*;
+
 mod start_lsp;
 pub use start_lsp::*;
 

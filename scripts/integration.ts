@@ -32,6 +32,7 @@ const PROBES: Probe[] = [
 	{ name: "lsp-smoke", file: "lsp-smoke.ts", requires: ["rust-analyzer"] },
 	{ name: "lsp-ux-smoke", file: "lsp-ux-smoke.ts", requires: ["rust-analyzer"] },
 	{ name: "cxx-smoke", file: "cxx-smoke.ts", requires: ["clang++"] },
+	{ name: "lsp-cmake-probe", file: "lsp-cmake-probe.ts", requires: ["clangd", "cmake"] },
 	{
 		name: "dap-cpp-probe",
 		file: "dap-cpp-probe.ts",

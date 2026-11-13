@@ -91,6 +91,7 @@ pub mod tests_group_7 {
         let pipe = ProcessPipe::spawn(&mut command).expect("starts cat");
         Arc::new(Mutex::new(Session {
             server: "cat".to_string(),
+            database: None,
             pipe,
             documents: HashMap::new(),
             document_ends: HashMap::new(),

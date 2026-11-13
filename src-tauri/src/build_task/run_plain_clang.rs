@@ -42,7 +42,15 @@ pub fn run_plain_clang_build(
     std::fs::create_dir_all(&build_dir)
         .map_err(|error| format!("cannot create {}: {error}", build_dir.display()))?;
 
-    let argv = plain_clang_argv(root, name, &sources);
+    // A project whose only build description is a compile database keeps that database's include
+    // paths and defines: without them its sources do not compile even though its own build does.
+    let database = crate::project::locate_database(root_path, root_path)
+        .map(|dir| dir.join(crate::project::DATABASE_FILE));
+    let flags = database.map_or_else(Vec::new, |database| {
+        crate::project::database_flags(&database, compiler != "clang")
+    });
+
+    let argv = plain_clang_argv_with(root, name, &sources, &flags);
 
     let started = Instant::now();
     let mut command = Command::new(&resolved.path);
