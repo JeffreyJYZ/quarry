@@ -8,15 +8,23 @@
  */
 
 import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import type { Fixture } from "./cpp-parity-fixtures";
 import type { Measurement, Plan, RunResult } from "./cpp-parity-probe";
 
+/** How this platform installs a second toolchain, so a skip names a command that works there. */
+const INSTALL =
+	process.platform === "darwin"
+		? "brew install gcc"
+		: process.platform === "win32"
+			? "install GCC, for instance through MSYS2"
+			: "apt install g++";
+
 /** Why a machine without a second toolchain is skipped, in the words that fix it. */
-export const NO_GCC = "no GCC compiler found (install one with `brew install gcc`)";
+export const NO_GCC = `no GCC compiler found (install one with \`${INSTALL}\`)`;
 
 /** The PATH of the machine the probe was started on, before the install dirs below. */
-const PATH = (process.env.PATH ?? "").split(":").filter(Boolean);
+const PATH = (process.env.PATH ?? "").split(delimiter).filter(Boolean);
 
 /** The compiler pair a second toolchain is made of, and the version it reported. */
 export interface GccToolchain {
@@ -35,6 +43,14 @@ export interface GccHarness {
 	firstError(text: string): string;
 	isFile(path: string): boolean;
 	writeFixture(): void;
+	/**
+	 * Whether the row's control must discriminate: the same clangd with no `--query-driver` failing
+	 * to read GCC's standard header. That holds where clang and GCC keep different C++ standard
+	 * libraries (macOS: libc++ against libstdc++). On a platform where both use libstdc++, clangd
+	 * finds those headers by itself, so the control is evidence instead of a requirement — the same
+	 * way the MSVC row reports its control.
+	 */
+	requiresDriverControl: boolean;
 }
 
 /** Where a Homebrew GCC lives, before PATH: a GUI launch does not search these. */

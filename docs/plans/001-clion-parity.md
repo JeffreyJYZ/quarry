@@ -135,16 +135,51 @@ row that cannot run there says why instead of passing.
 | generator: Visual Studio | the generator writes no `compile_commands.json`, the file-API synthesis produces one, `--config` carries `Debug`/`Release`, and the artefact the plan names is `build/<Config>/<target>.exe`                                                             |
 | toolchain: MSVC          | the database's command runs `cl.exe` with `/I…`, the hand-off's `--query-driver` names `cl.exe`, and analysis resolves a project header, MSVC's `_MSC_VER` overload and `<vector>`; a control run records whether clangd needs the query on that machine |
 
-Not verified here, and therefore not claimed: Linux toolchains, cross-compilers other than the one
-toolchain file above, and diagnostics parity beyond clangd's own output. On Windows what stays
-unproven is narrower and named: no debugger or test-runner row runs there, and the MSVC control run
-is reported as evidence rather than required — when clangd answers without `--query-driver`, the row
-says so. A row that skips (no GCC on the machine, no Visual Studio toolset) is a skip, never a pass.
+Not verified here, and therefore not claimed: cross-compilers other than the one toolchain file above,
+and diagnostics parity beyond clangd's own output. On Windows what stays unproven is narrower and
+named: no debugger or test-runner row runs there, and the MSVC control run is reported as evidence
+rather than required — when clangd answers without `--query-driver`, the row says so. A row that
+skips (no GCC on the machine, no Visual Studio toolset) is a skip, never a pass.
 
 Both Windows rows analyse the configuration they built: the synthesised database holds one entry per
 source for that configuration, and the rows hover the define each configuration compiles with, so a
 database holding another configuration's command fails the row instead of passing on a plausible
 header.
+
+Linux is the same probe run with `--linux` by the `linux` CI job on `ubuntu-latest`, where CLion's
+own default toolchain is GCC rather than Apple clang and every artefact is an ELF file with no
+`.app`/`.exe` beside it:
+
+| capability                       | what it proves on Linux                                                                                      |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| presets                          | configure goes through `--preset` into the preset's `binaryDir`, with `-DCMAKE_BUILD_TYPE` from the profile  |
+| toolchain file                   | `CMAKE_TOOLCHAIN_FILE` reaches the configure and its define reaches the compiler                             |
+| multi-target                     | a library header and an `extern` resolve from `target_include_directories`, listed from CMake's model        |
+| generator: Ninja Multi-Config    | the generator writes no database, the file API synthesis makes one in the plan's tree                        |
+| system-headers                   | `std::format` and a C API resolve through `/usr/bin/c++`, which only `--query-driver` teaches clangd to read |
+| plain                            | a project with no CMake analyses from flags its own build derives                                            |
+| mixed-languages                  | the `.c` unit is compiled and analysed as C, the `.cpp` as C++, and the link crosses `extern "C"`            |
+| profile                          | `RelWithDebInfo`/`MinSizeRel` reach the compiler, and the session follows the tree the profile built         |
+| two-targets                      | `--target parity_one` writes one binary, no target writes both                                               |
+| multi-config                     | each configuration writes its own artefact under `build/<Config>/`, and debug info is read with `readelf -S` |
+| toolchain: gcc                   | a compiler clangd cannot recognise is queried for its include paths                                          |
+| toolchain: gcc behind a launcher | the same, with the compiler behind a `ccache`-shaped wrapper                                                 |
+
+Three things on that list are Linux-only or Linux-different, and each is named rather than assumed:
+`readelf -S` replaces `otool -l` as the DWARF reader (`scripts/cpp-parity-debug-info.ts`), because ELF
+keeps `.debug_info` where Mach-O keeps `__DWARF` — the row used to spawn `/usr/bin/otool`, which on
+Linux prints nothing and fails the `RelWithDebInfo` half it never read; `generator: Xcode` skips by
+name, since no Linux cmake can write that layout; and the GCC row's control run is reported as
+evidence instead of a hard requirement, because clang and GCC there share libstdc++, so an unqueried
+clangd still finds the headers and the control cannot discriminate. The Visual Studio and MSVC rows
+are skipped by the same line a machine without the generator prints everywhere.
+
+The table is the job's own measurement, not a claim transferred from macOS: the first run on
+`ubuntu-latest` is what proves it, the same way the Windows rows are proved by theirs.
+
+On Linux what stays unproven is narrower still: no debugger or test-runner row runs, the plain and
+mixed-language rows compile with clang (the product's plain build names `clang`/`clang++`), so a Linux
+box without clang is not covered, and no cross-toolchain beyond the one toolchain file is measured.
 
 The generator version is discovered, never assumed: `cmake --help` names what that cmake supports,
 and a runner image can list a generator whose Visual Studio instance is absent, so the probe

@@ -153,10 +153,17 @@ export async function judgeGccToolchain(
 		row.details.push(
 			"control      PASS  without --query-driver the same clangd cannot read GCC's standard header",
 		);
-	} else {
+	} else if (harness.requiresDriverControl) {
 		broken = true;
 		row.details.push(
 			"control      FAIL  the same clangd answers without --query-driver, so this fixture cannot tell a queried driver from an unqueried one",
+		);
+	} else {
+		// Both compilers read the same C++ standard library here, so clangd finds its headers with
+		// no query at all: the row still measures the product's arguments, but this machine cannot
+		// prove the query is what made the analysis work. Named, never passed off as a check.
+		row.details.push(
+			"control      note  the same clangd answers without --query-driver, because this platform's clang and GCC share one C++ standard library, so the control cannot discriminate here",
 		);
 	}
 
