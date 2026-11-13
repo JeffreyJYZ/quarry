@@ -37,29 +37,38 @@ pub mod tests_group_5 {
         );
     }
 
+    /// The frame is only published after this many full polls have already expired empty, so the
+    /// loop having kept waiting is a fact rather than a bet on a sleeping sender's schedule.
+    pub const EMPTY_POLLS_BEFORE_THE_FRAME: u32 = 2;
+
     #[test]
     pub fn a_live_adapter_keeps_waiting_through_empty_polls() {
         let (sender, frames) = channel::<Result<Value, FrameError>>();
-        thread::spawn(move || {
-            thread::sleep(Duration::from_millis(60));
-            let _ = sender.send(Ok(event("stopped")));
-        });
 
+        // The liveness callback runs only after a whole poll window expired with nothing to read,
+        // so publishing from inside it makes "polled twice while silent" a happens-before edge: the
+        // frame cannot be in the channel before the loop has already waited out two empty polls.
+        let pending = Mutex::new(Some(sender));
         let polls = Arc::new(AtomicU32::new(0));
         let counted = Arc::clone(&polls);
         let next = wait_frame(
             &frames,
             move || {
-                counted.fetch_add(1, Ordering::SeqCst);
+                let seen = counted.fetch_add(1, Ordering::SeqCst) + 1;
+                if seen == EMPTY_POLLS_BEFORE_THE_FRAME
+                    && let Some(sender) = lock(&pending).take()
+                {
+                    let _ = sender.send(Ok(event("stopped")));
+                }
                 true
             },
             TEST_POLL,
         )
-        .expect("the frame that arrives at 60ms");
+        .expect("the frame published after the loop had already polled empty");
 
         assert_eq!(next.get("event").and_then(Value::as_str), Some("stopped"));
         assert!(
-            polls.load(Ordering::SeqCst) >= 2,
+            polls.load(Ordering::SeqCst) >= EMPTY_POLLS_BEFORE_THE_FRAME,
             "silence must not end a live session; polls: {}",
             polls.load(Ordering::SeqCst)
         );
