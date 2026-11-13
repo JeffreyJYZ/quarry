@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-	type EnvVar,
-	onRunExited,
-	onRunOutput,
-	runProgram,
-	sendRunStdin,
-	stopProgram,
-} from "@/lib/project/api";
+import { useCallback, useRef, useState } from "react";
+import { type EnvVar, runProgram, sendRunStdin, stopProgram } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
 import type { RunLine, RunExit } from "@/lib/run/runOutput";
-import { appendNotice, appendOutput, bufferedFor, type PendingEvent } from "@/lib/run/runOutput";
+import {
+	appendNotice,
+	appendOutput,
+	bufferedFor,
+	type OutputEvent,
+	type PendingEvent,
+} from "@/lib/run/runOutput";
+import { useRunEvents } from "@/lib/run/useRunEvents";
 
 export type { RunExit } from "@/lib/run/runOutput";
 
@@ -36,7 +36,7 @@ export function useRunProcess(onNotice: (message: string) => void): {
 	clear: () => void;
 	/** One line to the live program's stdin; a refusal is written into the console. */
 	sendStdin: (text: string) => Promise<void>;
-	/** Write lines the process never printed, such as why it could not be started. */
+	/** Write lines the process never printed: with no run live, a fresh console for that attempt. */
 	append: (lines: string[]) => void;
 } {
 	const [running, setRunning] = useState<string | null>(null);
@@ -85,42 +85,27 @@ export function useRunProcess(onNotice: (message: string) => void): {
 		[finish],
 	);
 
-	useEffect(() => {
-		let unOutput: (() => void) | undefined;
-		let unExited: (() => void) | undefined;
-		let cancelled = false;
-		void (async () => {
-			try {
-				unOutput = await onRunOutput((event) => {
-					if (event.runId === runningRef.current) {
-						setLines((current) => appendOutput(current, event));
-						return;
-					}
-					// A program that prints and exits at once beats the command's answer back; keeping
-					// that output is what stops a quick run from showing a blank console.
-					if (startingRef.current) pendingRef.current.push({ kind: "output", event });
-				});
-				unExited = await onRunExited((event) => {
-					if (event.runId === runningRef.current) {
-						finish(event);
-						return;
-					}
-					if (startingRef.current) pendingRef.current.push({ kind: "exited", event });
-				});
-			} catch {
-				/* a listener that never registered leaves the log to the next run */
-			}
-			if (cancelled) {
-				unOutput?.();
-				unExited?.();
-			}
-		})();
-		return () => {
-			cancelled = true;
-			unOutput?.();
-			unExited?.();
-		};
-	}, [finish]);
+	/** A new attempt owns the console: no rows, no exit, none of an older run's held tail. */
+	const beginAttempt = useCallback(() => {
+		pendingRef.current = [];
+		stopRequestedRef.current = null;
+		setStopping(false);
+		setLines([]);
+		setExited(null);
+	}, []);
+
+	/** One chunk of the run the console owns. */
+	const appendOne = useCallback((event: OutputEvent) => {
+		setLines((current) => appendOutput(current, event));
+	}, []);
+
+	useRunEvents({
+		runningRef,
+		startingRef,
+		pendingRef,
+		onOutput: appendOne,
+		onExited: finish,
+	});
 
 	const start = useCallback(
 		async (program: string, args: string[], cwd: string, env: EnvVar[]): Promise<boolean> => {
@@ -129,11 +114,7 @@ export function useRunProcess(onNotice: (message: string) => void): {
 			// that arrives while a run is live is not a failure, so the caller must not report one.
 			if (runningRef.current !== null || startingRef.current) return true;
 			startingRef.current = true;
-			pendingRef.current = [];
-			stopRequestedRef.current = null;
-			setStopping(false);
-			setLines([]);
-			setExited(null);
+			beginAttempt();
 			try {
 				const id = await runProgram(program, args, cwd, env.length === 0 ? undefined : env);
 				runningRef.current = id;
@@ -153,14 +134,28 @@ export function useRunProcess(onNotice: (message: string) => void): {
 				if (runningRef.current === null) pendingRef.current = [];
 			}
 		},
-		[flush],
+		[beginAttempt, flush],
 	);
 
-	/** Lines the process never printed: a build that stopped the launch, and why. */
-	const append = useCallback((messages: string[]) => {
-		if (messages.length === 0) return;
-		setLines((current) => appendNotice(current, messages));
-	}, []);
+	/**
+	 * Lines the process never printed: a build that stopped the launch, and why.
+	 *
+	 * A failed build is an attempt with no process, so it owns the console as `start` does and the
+	 * previous run's output cannot sit above it. A live run keeps its log: that attempt was refused,
+	 * and the reason belongs under the output the user is watching.
+	 */
+	const append = useCallback(
+		(messages: string[]) => {
+			if (messages.length === 0) return;
+			if (runningRef.current !== null || startingRef.current) {
+				setLines((current) => appendNotice(current, messages));
+				return;
+			}
+			beginAttempt();
+			setLines(appendNotice([], messages));
+		},
+		[beginAttempt],
+	);
 
 	const stop = useCallback(async () => {
 		const id = runningRef.current;
