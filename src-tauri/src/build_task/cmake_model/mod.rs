@@ -40,8 +40,17 @@ pub use preset_resolve::*;
 mod argv;
 pub use argv::*;
 
+mod generator;
+pub use generator::*;
+
 mod plan;
 pub use plan::*;
+
+mod model_inputs;
+pub use model_inputs::*;
+
+mod staleness;
+pub use staleness::*;
 
 mod api;
 pub use api::*;
@@ -66,3 +75,12 @@ pub use tests_argv_select::*;
 
 mod tests_fixture;
 pub use tests_fixture::*;
+
+mod tests_staleness;
+pub use tests_staleness::*;
+
+mod tests_stale_fixture;
+pub use tests_stale_fixture::*;
+
+mod tests_stale_preset;
+pub use tests_stale_preset::*;

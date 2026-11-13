@@ -88,6 +88,10 @@ pub fn truncate(text: &str, limit: usize) -> String {
 /// Builds a CMake project the way the project's own configuration says: pick the tree, configure
 /// through its preset when it has one, then build that tree.
 ///
+/// Configure only when the tree is stale — a manifest, a preset or a toolchain file the last
+/// configure read has changed, or the tree has never been configured — so a build with nothing to
+/// reload goes straight to the compiler and one note says a reload happened.
+///
 /// A failing configure or build is a result, not an error: only a missing `cmake` or a failed
 /// spawn is `Err`.
 pub fn run_cmake_build(
@@ -103,28 +107,57 @@ pub fn run_cmake_build(
     // which must stay the compiler's own verdict, so every note precedes the output it describes.
     let mut notes: Vec<String> = plan.note.iter().cloned().collect();
 
-    // The query has to exist before the configure that answers it: CMake writes only the objects a
-    // client asked for, and it reads the query once, as the configure starts.
-    if let Err(error) = write_query(&plan.build_root) {
-        notes.push(error);
+    // A configure is what turns the manifest into build rules and a model, so it runs when that
+    // input changed and not merely because a build was asked for: an unchanged tree goes straight
+    // to the compiler. The note has to precede the output it explains, hence the collection above.
+    let need = configure_need(source, &plan.build_root, &plan.intent);
+    let reconfigured = matches!(need, Some(ConfigureNeed::Changed(_)));
+    if let Some(ConfigureNeed::Changed(note)) = &need {
+        notes.push(note.clone());
     }
 
-    // Both steps run from the project root: `--preset` is looked up against the working directory,
-    // while an absolute `--build <path>` does not care where it starts.
-    let configure = run_cmake(state, &plan.configure, source_root)?;
-    let mut body = configure.text;
-    let mut success = configure.success;
-    let mut stopped = configure.stopped;
+    let mut body = String::new();
+    let mut success = true;
+    let mut stopped = false;
+    let mut configured = false;
 
-    // Read only after a configure that succeeded: a failed one can leave a reply half written, and a
-    // database built from half a project is worse than the previous one still on disk.
+    if need.is_some() {
+        // The query has to exist before the configure that answers it: CMake writes only the
+        // objects a client asked for, and it reads the query once, as the configure starts.
+        if let Err(error) = write_query(&plan.build_root) {
+            notes.push(error);
+        }
+
+        // Both steps run from the project root: `--preset` is looked up against the working
+        // directory, while an absolute `--build <path>` does not care where it starts.
+        let configure = run_cmake(state, &plan.configure, source_root)?;
+        body.push_str(&configure.text);
+        success = configure.success;
+        stopped = configure.stopped;
+        configured = true;
+
+        // The reply and the model on disk are the last configure that succeeded, so a failure here
+        // says so instead of letting the old targets pass for current ones. The database is left
+        // alone: a half-built model, or none, is worse for analysis than the previous one.
+        if !success && !stopped && reconfigured {
+            notes.push(format!(
+                "the configure failed, so {} still holds the model of its last successful configure",
+                plan.build_root.display()
+            ));
+        }
+    }
+
     if success && !stopped {
-        match synthesize_database(&plan.build_root) {
-            Ok(Some(written)) => notes.push(written.note()),
-            Ok(None) => {}
-            Err(why) => notes.push(format!(
-                "no compiler database from the CMake file API: {why}"
-            )),
+        // Read only after a configure that succeeded: a failed one can leave a reply half written,
+        // and a database built from half a project is worse than the previous one still on disk.
+        if configured {
+            match synthesize_database(&plan.build_root) {
+                Ok(Some(written)) => notes.push(written.note()),
+                Ok(None) => {}
+                Err(why) => notes.push(format!(
+                    "no compiler database from the CMake file API: {why}"
+                )),
+            }
         }
         let outcome = run_cmake(state, &plan.build, source_root)?;
         body.push_str(&outcome.text);

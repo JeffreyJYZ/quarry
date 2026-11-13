@@ -1,13 +1,16 @@
 //! Build runner and compiler diagnostics.
 //!
 //! Cargo projects build with `cargo build --message-format=json`; the machine-readable stream
-//! becomes `Diagnostic`s. CMake projects configure with `cmake -S … -B …` when their build root
-//! holds no generator file, then build with `cmake --build`; their diagnostics are parsed from
-//! the compiler's plain-text output. A project whose only marker is `compile_commands.json` builds
-//! with clang directly, using the include paths and defines its database records.
+//! becomes `Diagnostic`s. CMake projects configure with `cmake -S … -B …` — only when their model
+//! inputs changed since the last configure, never because a build was merely asked for — then build
+//! with `cmake --build`; their diagnostics are parsed from the compiler's plain-text output. A
+//! project whose only marker is `compile_commands.json` builds with clang directly, using the
+//! include paths and defines its database records.
 //!
 //! A CMake configure also asks CMake's file API for the project model, and the reply becomes a
 //! compiler database where the generator writes none (Xcode, Visual Studio, Ninja Multi-Config).
+//! That configure is skipped when nothing it reads has changed since the last one, so a quiet build
+//! costs no configure and a changed manifest is reloaded before the compiler runs.
 //!
 //! A failing build is a result, not a command error: only a missing tool or a spawn failure is
 //! `Err`. The build never runs the program and never writes into the source tree.

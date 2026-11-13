@@ -26,6 +26,8 @@ pub struct CmakePlan {
     pub build_root: PathBuf,
     pub configure: Vec<String>,
     pub build: Vec<String>,
+    /// What this configure must carry, so a tree configured with other values reads as stale.
+    pub intent: ConfigureIntent,
     /// One line naming a choice the user might not expect, or `None` when everything was obvious.
     pub note: Option<String>,
 }
@@ -65,13 +67,20 @@ pub fn cmake_plan(
         let build_root = super::build_root::resolve(source_root, options, None);
         let dir = build_root.display().to_string();
         let mut configure = cmake_configure_argv(&source, &dir, release);
-        if let Some(toolchain) = options.toolchain() {
-            configure.push(format!("-DCMAKE_TOOLCHAIN_FILE={toolchain}"));
+        let toolchain = options
+            .toolchain()
+            .map(|value| absolute(source_root, value));
+        if let Some(toolchain) = &toolchain {
+            configure.push(format!("-DCMAKE_TOOLCHAIN_FILE={}", toolchain.display()));
         }
         return Ok(CmakePlan {
             build_root,
             configure,
             build: cmake_build_argv(&dir, release),
+            intent: ConfigureIntent {
+                toolchain,
+                build_type: Some(cmake_config(release).to_string()),
+            },
             note: join(notes),
         });
     };
@@ -82,6 +91,15 @@ pub fn cmake_plan(
     let configuration = configuration(&presets, &preset, release);
     let build_type = build_type(&preset, &configuration, &mut notes);
     let database = compile_database(&preset, &mut notes);
+    let settings_toolchain = options
+        .toolchain()
+        .map(|value| absolute(source_root, value));
+    let toolchain = settings_toolchain
+        .clone()
+        .or_else(|| preset_toolchain(&preset, source_root));
+    // Only the settings value goes on the command line: a preset's own cache variable is applied by
+    // `--preset`, and repeating it here would resolve a relative path differently than CMake does.
+    let toolchain_arg = settings_toolchain.map(|path| path.display().to_string());
 
     let configure = preset_configure_argv(
         &preset.name,
@@ -89,7 +107,7 @@ pub fn cmake_plan(
         &dir,
         build_type.as_deref(),
         database,
-        options.toolchain(),
+        toolchain_arg.as_deref(),
     );
     let build = match build_preset(&presets, &preset.name) {
         Some(named) if build_root == binary => preset_build_argv(&named.name, &configuration),
@@ -106,8 +124,21 @@ pub fn cmake_plan(
         build_root,
         configure,
         build,
+        intent: ConfigureIntent {
+            toolchain,
+            build_type,
+        },
         note: join(notes),
     })
+}
+
+/// The toolchain file a preset configures with, expanded against the tree it describes.
+fn preset_toolchain(preset: &ResolvedConfigure, root: &Path) -> Option<PathBuf> {
+    let value = preset.cache.get(TOOLCHAIN_VARIABLE)?;
+    Some(absolute(
+        root,
+        &super::preset_resolve::expand(value, root, &preset.name),
+    ))
 }
 
 /// The configuration this build uses: the build preset's, then the configure preset's, then the profile.
@@ -143,7 +174,7 @@ fn build_type(
 /// Whether a compiler database will be written, honouring a value the project set itself.
 fn compile_database(preset: &ResolvedConfigure, notes: &mut Vec<String>) -> bool {
     match preset.cache.get("CMAKE_EXPORT_COMPILE_COMMANDS") {
-        Some(value) if is_on(value) => writes_compile_database(preset.generator.as_deref()),
+        Some(value) if is_cache_on(value) => writes_compile_database(preset.generator.as_deref()),
         Some(value) => {
             notes.push(format!(
                 "preset sets CMAKE_EXPORT_COMPILE_COMMANDS={value}, so no compiler database is written"
@@ -152,31 +183,6 @@ fn compile_database(preset: &ResolvedConfigure, notes: &mut Vec<String>) -> bool
         }
         None => writes_compile_database(preset.generator.as_deref()),
     }
-}
-
-/// Xcode and Visual Studio are multi-config: they take `--config` at build time.
-pub fn is_multi_config(generator: Option<&str>) -> bool {
-    generator.is_some_and(|name| {
-        name.starts_with("Xcode")
-            || name.starts_with("Visual Studio")
-            || name == "Ninja Multi-Config"
-    })
-}
-
-/// Only a single-config Makefiles or Ninja generator implements `CMAKE_EXPORT_COMPILE_COMMANDS`.
-///
-/// Ninja Multi-Config is multi-config but takes its `--config` at build time; measured on cmake
-/// 4.4.5 it writes no database even with the variable on, which is why analysis falls back to the
-/// file API for it rather than to a file nobody writes.
-pub fn writes_compile_database(generator: Option<&str>) -> bool {
-    !is_multi_config(generator)
-}
-
-fn is_on(value: &str) -> bool {
-    matches!(
-        value.trim().to_ascii_uppercase().as_str(),
-        "ON" | "TRUE" | "YES" | "Y" | "1"
-    )
 }
 
 fn join(notes: Vec<String>) -> Option<String> {

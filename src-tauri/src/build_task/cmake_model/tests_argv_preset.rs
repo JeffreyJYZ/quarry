@@ -147,4 +147,35 @@ pub mod tests_cmake_argv_preset {
             "a later -D overrides the preset's cache entry"
         );
     }
+
+    #[test]
+    fn a_presets_toolchain_is_watched_even_though_the_command_line_leaves_it_to_the_preset() {
+        let (_directory, root) = root("cmake-argv-toolchain-watched");
+        write(
+            &root,
+            r#"{ "version": 3, "configurePresets": [ {
+                "name": "dev", "binaryDir": "${sourceDir}/out/dev",
+                "cacheVariables": {
+                    "CMAKE_BUILD_TYPE": "Debug",
+                    "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/arm.cmake"
+                }
+            } ] }"#,
+        );
+
+        let plan = plan_for(&root, false, &CmakeOptions::default());
+
+        assert!(
+            !plan
+                .configure
+                .iter()
+                .any(|arg| arg.contains("CMAKE_TOOLCHAIN_FILE")),
+            "the preset applies its own cache variable: {:?}",
+            plan.configure
+        );
+        assert_eq!(
+            plan.intent.toolchain,
+            Some(root.join("cmake").join("arm.cmake")),
+            "the file a change has to be noticed in is still known"
+        );
+    }
 }
