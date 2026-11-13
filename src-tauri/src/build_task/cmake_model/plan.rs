@@ -23,6 +23,8 @@ pub use crate::build_task::{BuildProfile, CMAKE_PROGRAM, cmake_config};
 
 use super::*;
 
+use crate::build_task::{external, external_str};
+
 /// Everything one build runs, decided before the first child starts.
 #[derive(Debug)]
 pub struct CmakePlan {
@@ -103,7 +105,7 @@ pub fn cmake_plan_target(
             .toolchain()
             .map(|value| absolute(source_root, value));
         if let Some(toolchain) = &toolchain {
-            configure.push(format!("-DCMAKE_TOOLCHAIN_FILE={}", toolchain.display()));
+            configure.push(format!("-DCMAKE_TOOLCHAIN_FILE={}", external(toolchain)));
         }
         return Ok(CmakePlan {
             build_root,
@@ -132,7 +134,7 @@ pub fn cmake_plan_target(
         .or_else(|| preset_toolchain(&preset, source_root));
     // Only the settings value goes on the command line: a preset's own cache variable is applied by
     // `--preset`, and repeating it here would resolve a relative path differently than CMake does.
-    let toolchain_arg = settings_toolchain.map(|path| path.display().to_string());
+    let toolchain_arg = settings_toolchain.map(|path| external(&path));
 
     let configure = preset_configure_argv(
         &preset.name,

@@ -10,6 +10,8 @@ pub use std::time::Instant;
 
 use super::*;
 
+use crate::build_task::{external, external_str};
+
 pub fn collect_plain_clang_sources(root: &Path) -> Result<Vec<std::path::PathBuf>, String> {
     let mut sources: Vec<std::path::PathBuf> = Vec::new();
     collect_into(root, Path::new(""), 0, &mut sources)?;
@@ -92,10 +94,7 @@ pub fn plain_clang_argv_with<P: AsRef<Path>>(
     });
     let compiler = if c_only { "clang" } else { "clang++" };
     let std_flag = if c_only { "-std=c17" } else { "-std=c++20" };
-    let output = plain_clang_build_dir(Path::new(root))
-        .join(name)
-        .display()
-        .to_string();
+    let output = external(&plain_clang_build_dir(Path::new(root)).join(name));
 
     let mut argv = vec![compiler.to_string()];
     if !extra.iter().any(|flag| flag.starts_with("-std=")) {
@@ -108,7 +107,7 @@ pub fn plain_clang_argv_with<P: AsRef<Path>>(
     argv.push("-o".to_string());
     argv.push(output);
     for source in sources {
-        argv.push(source.as_ref().to_string_lossy().into_owned());
+        argv.push(external(source.as_ref()));
     }
     argv
 }

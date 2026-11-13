@@ -269,14 +269,15 @@ function firstLine(text: string): string {
 
 /**
  * A failure's own words: CMake puts "CMake Error at CMakeLists.txt:7 (message):" on one line and the
- * message on the next, so the first non-empty line alone names the site and hides the reason.
+ * message on the next, so the first line alone names the site and hides the reason. Six lines with
+ * their own spacing collapsed: the report clips a wall of text, and a wrapped message is often four.
  */
 function firstError(text: string): string {
 	const lines = text
 		.split("\n")
 		.map((line) => line.trim())
 		.filter((line) => line !== "");
-	return lines.slice(0, 2).join(" ").slice(0, 300);
+	return lines.slice(0, 6).join(" ").slice(0, 400);
 }
 
 /** A hover as a report token: `null`, or the quoted first 140 characters of it. */

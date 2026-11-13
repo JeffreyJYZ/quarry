@@ -17,7 +17,7 @@ use std::path::Path;
 use serde::Serialize;
 
 use crate::build_task::{
-    CMAKE_PROGRAM, CmakeOptions, PlainPlan, cmake_plan_target, plain_build_plan,
+    CMAKE_PROGRAM, CmakeOptions, PlainPlan, cmake_plan_target, external, plain_build_plan,
 };
 use crate::launch::{cmake_build_target, list_targets, resolve_target_in};
 use crate::project::inspect;
@@ -117,8 +117,7 @@ pub fn project_plan(root: &str, request: &PlanRequest) -> Result<Plan, String> {
             let options = CmakeOptions::for_root(source);
             let plan = cmake_plan_target(source, request.profile, &options, target.as_deref())?;
             Some(CmakeSection {
-                program: crate::resolve::resolve(CMAKE_PROGRAM)
-                    .map(|found| found.path.display().to_string()),
+                program: crate::resolve::resolve(CMAKE_PROGRAM).map(|found| external(&found.path)),
                 options: Options {
                     preset: options.preset.clone(),
                     build_dir: options.build_dir.clone(),
@@ -126,8 +125,8 @@ pub fn project_plan(root: &str, request: &PlanRequest) -> Result<Plan, String> {
                 },
                 profile: request.profile.wire().to_string(),
                 target,
-                build_root: plan.build_root.display().to_string(),
-                cwd: info.root.clone(),
+                build_root: external(&plan.build_root),
+                cwd: external(source),
                 configure: plan.configure,
                 build: plan.build,
                 note: plan.note,
@@ -176,7 +175,7 @@ pub fn project_plan(root: &str, request: &PlanRequest) -> Result<Plan, String> {
             Some(Handoff {
                 server: "clangd".to_string(),
                 args: handoff.args,
-                database_dir: handoff.database.map(|dir| dir.display().to_string()),
+                database_dir: handoff.database.map(|dir| external(&dir)),
                 note: handoff.note,
             })
         }
@@ -185,9 +184,9 @@ pub fn project_plan(root: &str, request: &PlanRequest) -> Result<Plan, String> {
 
     Ok(Plan {
         kind: format!("{:?}", info.kind),
-        root: info.root.clone(),
+        root: external(source),
         name: info.name.clone(),
-        build_root: info.build_root.clone(),
+        build_root: external(Path::new(&info.build_root)),
         cmake,
         plain,
         targets,

@@ -12,6 +12,8 @@ pub use crate::build_task::{BuildProfile, CMAKE_PROGRAM, cmake_config};
 
 use super::*;
 
+use crate::build_task::{external, external_str};
+
 /// Configure the way a project without a preset always has.
 ///
 /// The build type is not optional: a single-config generator ignores `--config` at build time and
@@ -36,9 +38,9 @@ pub fn cmake_configure_argv_with(
     let mut argv = vec![
         CMAKE_PROGRAM.to_string(),
         "-S".to_string(),
-        source_root.to_string(),
+        external_str(source_root),
         "-B".to_string(),
-        build_root.to_string(),
+        external_str(build_root),
     ];
     if let Some(build_type) = build_type {
         argv.push(format!("-DCMAKE_BUILD_TYPE={build_type}"));
@@ -60,7 +62,7 @@ pub fn cmake_build_argv(
     let mut argv = vec![
         CMAKE_PROGRAM.to_string(),
         "--build".to_string(),
-        build_root.to_string(),
+        external_str(build_root),
         "--config".to_string(),
         cmake_config(profile).to_string(),
     ];
@@ -85,9 +87,9 @@ pub fn preset_configure_argv(
         "--preset".to_string(),
         name.to_string(),
         "-S".to_string(),
-        source_root.to_string(),
+        external_str(source_root),
         "-B".to_string(),
-        build_root.to_string(),
+        external_str(build_root),
     ];
     if let Some(build_type) = build_type {
         argv.push(format!("-DCMAKE_BUILD_TYPE={build_type}"));
@@ -96,7 +98,10 @@ pub fn preset_configure_argv(
         argv.push("-DCMAKE_EXPORT_COMPILE_COMMANDS=ON".to_string());
     }
     if let Some(toolchain) = toolchain {
-        argv.push(format!("-DCMAKE_TOOLCHAIN_FILE={toolchain}"));
+        argv.push(format!(
+            "-DCMAKE_TOOLCHAIN_FILE={}",
+            external_str(toolchain)
+        ));
     }
     argv
 }

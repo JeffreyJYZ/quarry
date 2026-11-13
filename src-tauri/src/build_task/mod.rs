@@ -43,6 +43,9 @@ pub use parsedbuild::*;
 mod absolute_path;
 pub use absolute_path::*;
 
+mod external_path;
+pub use external_path::*;
+
 mod profile;
 pub use profile::*;
 
@@ -78,6 +81,9 @@ pub use cmake_model::*;
 
 mod tests_1;
 pub use tests_1::*;
+
+mod tests_external;
+pub use tests_external::*;
 
 mod tests_2;
 pub use tests_2::*;

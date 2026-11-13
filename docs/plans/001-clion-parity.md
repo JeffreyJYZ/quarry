@@ -136,12 +136,15 @@ row that cannot run there says why instead of passing.
 | toolchain: MSVC          | the database's command runs `cl.exe` with `/I…`, the hand-off's `--query-driver` names `cl.exe`, and analysis resolves a project header, MSVC's `_MSC_VER` overload and `<vector>`; a control run records whether clangd needs the query on that machine |
 
 Not verified here, and therefore not claimed: cross-compilers other than the one toolchain file above,
-and diagnostics parity beyond clangd's own output. On Windows what stays
-unproven is narrower and named: no debugger or test-runner row runs there, a `compile_commands.json`
-holds one entry per file per configuration while clangd reads the first, so a multi-config analysis
-is always the Debug command, and the MSVC control run is reported as evidence rather than required
-— when clangd answers without `--query-driver`, the row says so. A row that skips (no GCC on the
-machine, no Visual Studio toolset) is a skip, never a pass.
+and diagnostics parity beyond clangd's own output. On Windows what stays unproven is narrower and
+named: no debugger or test-runner row runs there, and the MSVC control run is reported as evidence
+rather than required — when clangd answers without `--query-driver`, the row says so. A row that
+skips (no GCC on the machine, no Visual Studio toolset) is a skip, never a pass.
+
+Both Windows rows analyse the configuration they built: the synthesised database holds one entry per
+source for that configuration, and the rows hover the define each configuration compiles with, so a
+database holding another configuration's command fails the row instead of passing on a plausible
+header.
 
 Linux is the same probe run with `--linux` by the `linux` CI job on `ubuntu-latest`, where CLion's
 own default toolchain is GCC rather than Apple clang and every artefact is an ELF file with no

@@ -17,6 +17,8 @@ pub use serde::{Deserialize, Serialize};
 
 use super::*;
 
+use crate::build_task::{external, external_str};
+
 /// One `compile_commands.json` entry: the directory the command ran in, the file, and its argv.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CompileEntry {
@@ -65,17 +67,19 @@ pub fn compile_entry(
     }
     for path in &group.includes {
         arguments.push(if path.system { system } else { include }.to_string());
-        arguments.push(path.path.display().to_string());
+        arguments.push(external(&path.path));
     }
     for name in &group.defines {
         arguments.push(format!("{define}{name}"));
     }
     arguments.push(compile_only.to_string());
-    arguments.push(source.display().to_string());
+    arguments.push(external(source));
 
     CompileEntry {
-        directory: target.build_dir.display().to_string(),
-        file: source.display().to_string(),
+        // Both fields are read by clangd, which chdirs to the first and resolves the agreement of
+        // the second against it: neither may carry the verbatim marker.
+        directory: external(&target.build_dir),
+        file: external(source),
         arguments,
     }
 }

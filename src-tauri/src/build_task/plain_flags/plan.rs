@@ -16,6 +16,8 @@ pub use serde::Serialize;
 
 use super::*;
 
+use crate::build_task::{external, external_str};
+
 /// One command a plain C/C++ build runs, with the program the product resolved for it.
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -55,10 +57,9 @@ pub fn plain_build_plan(root: &str, name: &str) -> Result<PlainPlan, String> {
     let steps = commands
         .into_iter()
         .map(|command| PlainStep {
-            program: crate::resolve::resolve(&command.program)
-                .map(|found| found.path.display().to_string()),
+            program: crate::resolve::resolve(&command.program).map(|found| external(&found.path)),
             argv: command.argv,
-            cwd: root.to_string(),
+            cwd: external(path),
         })
         .collect();
     let note = synthesize_plain_database(path, &sources)
