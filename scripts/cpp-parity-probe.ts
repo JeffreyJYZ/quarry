@@ -33,15 +33,17 @@
  * The fixtures are left in place on purpose: every finding quotes `cd <fixture> && …` against the
  * printed root, so a reader can rerun it by hand.
  *
- * The last row is a second toolchain: the same measurements against a project configured with
+ * The last rows are a second toolchain: the same measurements against a project configured with
  * Homebrew GCC, whose standard headers clangd can only find because the hand-off's
- * `--query-driver` names that compiler. It is skipped by name on a machine that has no GCC.
+ * `--query-driver` names that compiler — once bare, once behind a launcher that `exec`s it. They
+ * are skipped by name on a machine that has no GCC.
  *
  * Usage: bun scripts/cpp-parity-probe.ts
  */
 
 import { spawn } from "node:child_process";
 import {
+	chmodSync,
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
@@ -56,6 +58,7 @@ import { basename, dirname, join } from "node:path";
 import {
 	type AnalysisProbe,
 	type Fixture,
+	gccLauncherFixture,
 	gccToolchainFixture,
 	generatorFixture,
 	mixedLanguagesFixture,
@@ -431,6 +434,8 @@ function writeFixture(root: string, fixture: Fixture) {
 		mkdirSync(dirname(target), { recursive: true });
 		writeFileSync(target, text);
 	}
+	// A launcher has to be runnable for CMake to use it as the compiler.
+	for (const path of fixture.executables ?? []) chmodSync(join(root, path), 0o755);
 }
 
 /**
@@ -1658,40 +1663,45 @@ async function main() {
 	}
 
 	// The second toolchain, last: a compiler clangd does not recognise, so either this machine has
-	// one or the row says why it could not run.
+	// one or the row says why it could not run. The second row puts that compiler behind a launcher,
+	// which is the shape a `ccache` tree has and the one a hand-off can mistake for the driver.
+	const gccFixtures = gcc === null ? [] : [gccToolchainFixture(gcc), gccLauncherFixture(gcc)];
 	if (gcc === null) {
-		console.log(`skipping toolchain: gcc … ${NO_GCC}`);
-		rows.push({
-			capability: "toolchain: gcc",
-			build: "SKIP",
-			analysis: "SKIP",
-			targets: "SKIP",
-			tree: "SKIP",
-			details: [`skipped      ${NO_GCC}`],
-			commands: [],
-		});
+		for (const capability of ["toolchain: gcc", "toolchain: gcc behind a launcher"]) {
+			console.log(`skipping ${capability} … ${NO_GCC}`);
+			rows.push({
+				capability,
+				build: "SKIP",
+				analysis: "SKIP",
+				targets: "SKIP",
+				tree: "SKIP",
+				details: [`skipped      ${NO_GCC}`],
+				commands: [],
+			});
+		}
 	} else {
-		const fixture = gccToolchainFixture(gcc);
-		const root = join(tempRoot, "toolchain-gcc");
-		mkdirSync(root, { recursive: true });
-		const harness: GccHarness = {
-			ask: (flags) => askPlan(plannerBin, root, flags),
-			run,
-			analyse: (probes, args) => analyse(clangd, root, probes, args),
-			compileArguments,
-			commandLine: (argv) => commandLine(root, argv),
-			firstError,
-			isFile,
-			writeFixture: () => writeFixture(root, fixture),
-		};
-		process.stdout.write(`running toolchain: gcc … `);
-		const result = await judgeGccToolchain(fixture, root, gcc, harness);
-		rows.push(result.row);
-		findings.push(...result.findings);
-		broken = broken || result.broken;
-		console.log(
-			`build ${result.row.build} · analysis ${result.row.analysis} · targets ${result.row.targets} · tree ${result.row.tree}`,
-		);
+		for (const fixture of gccFixtures) {
+			const root = join(tempRoot, fixture.name.replace(/[/: ]+/g, "-"));
+			mkdirSync(root, { recursive: true });
+			const harness: GccHarness = {
+				ask: (flags) => askPlan(plannerBin, root, flags),
+				run,
+				analyse: (probes, args) => analyse(clangd, root, probes, args),
+				compileArguments,
+				commandLine: (argv) => commandLine(root, argv),
+				firstError,
+				isFile,
+				writeFixture: () => writeFixture(root, fixture),
+			};
+			process.stdout.write(`running ${fixture.name} … `);
+			const result = await judgeGccToolchain(fixture, root, gcc, harness);
+			rows.push(result.row);
+			findings.push(...result.findings);
+			broken = broken || result.broken;
+			console.log(
+				`build ${result.row.build} · analysis ${result.row.analysis} · targets ${result.row.targets} · tree ${result.row.tree}`,
+			);
+		}
 	}
 
 	const columns = ["capability", "build", "analysis", "targets", "tree"];

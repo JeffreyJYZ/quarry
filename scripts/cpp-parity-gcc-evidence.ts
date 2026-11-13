@@ -67,15 +67,23 @@ export interface Evidence {
  * The compiler the tree means, and whether it is the toolchain the fixture wrote into it.
  *
  * The tree is CMake's own record, not the database: a database entry may be a launcher, while the
- * compiler CMake configured with is the one whose headers the analysis must be taught to find.
+ * compiler CMake configured with is the one whose headers the analysis must be taught to find. A
+ * fixture configured behind a launcher records the launcher, which is what `launcher` says here.
  */
-export function treeEvidence(tree: string, gcc: GccToolchain, root: string): Evidence {
+export function treeEvidence(
+	tree: string,
+	gcc: GccToolchain,
+	root: string,
+	launcher: string | null = null,
+): Evidence {
 	const directory = basename(root);
 	const shown = tree.replace(`${root}/`, "");
 	const cxx = recordedCompiler(tree, "CXX");
 	const cc = recordedCompiler(tree, "C");
+	const wantedCxx = launcher ?? gcc.cxx;
+	const wantedCc = launcher ?? gcc.cc;
 	const ok =
-		cxx !== null && cc !== null && samePath(cxx.path, gcc.cxx) && samePath(cc.path, gcc.cc);
+		cxx !== null && cc !== null && samePath(cxx.path, wantedCxx) && samePath(cc.path, wantedCc);
 	const record =
 		cxx === null
 			? "no compiler recorded"
@@ -86,7 +94,7 @@ export function treeEvidence(tree: string, gcc: GccToolchain, root: string): Evi
 		findings: ok
 			? []
 			: [
-					`${directory}: the configure must use ${gcc.cxx} and ${gcc.cc}, but the tree at ${shown} records ${cxx?.path ?? "no C++ compiler"} and ${cc?.path ?? "no C compiler"} — \`cd ${directory} && rg CMAKE_CXX_COMPILER ${shown}/CMakeFiles\`.`,
+					`${directory}: the configure must use ${wantedCxx} and ${wantedCc}, but the tree at ${shown} records ${cxx?.path ?? "no C++ compiler"} and ${cc?.path ?? "no C compiler"} — \`cd ${directory} && rg CMAKE_CXX_COMPILER ${shown}/CMakeFiles\`.`,
 				],
 	};
 }
@@ -97,18 +105,23 @@ export function databaseEvidence(
 	gcc: GccToolchain,
 	root: string,
 	read: (database: string, source: string) => string[] | null,
+	launcher: string | null = null,
 ): Evidence {
 	const directory = basename(root);
 	const shown = tree.replace(`${root}/`, "");
 	const database = join(tree, "compile_commands.json");
 	const cxx = read(database, "main.cpp");
 	const c = read(database, "value.c");
-	const okCxx = cxx !== null && samePath(cxx[0] ?? "", gcc.cxx);
-	const okC = c !== null && samePath(c[0] ?? "", gcc.cc);
+	const okCxx = compilesWith(cxx, gcc.cxx, launcher);
+	const okC = compilesWith(c, gcc.cc, launcher);
 	const spilled = [...(cxx ?? []), ...(c ?? [])].some((arg) => basename(arg).startsWith("clang"));
 	const ok = okCxx && okC && !spilled;
 	const cxxDriver = basename(cxx?.[0] ?? "");
 	const cDriver = basename(c[0] ?? "");
+	const wording =
+		launcher === null
+			? `the compile database must name GCC's own drivers, but main.cpp is compiled by ${cxxDriver} and value.c by ${cDriver}`
+			: `the compile database must run ${basename(launcher)} in front of GCC's own drivers, but main.cpp is compiled by ${[cxxDriver, basename(cxx?.[1] ?? "")].join(" ")}, value.c by ${[cDriver, basename(c?.[1] ?? "")].join(" ")}`;
 	return {
 		ok,
 		details: [
@@ -117,9 +130,20 @@ export function databaseEvidence(
 		findings: ok
 			? []
 			: [
-					`${directory}: the compile database must name GCC's own drivers, but main.cpp is compiled by ${cxxDriver} and value.c by ${cDriver} — \`cd ${directory} && rg -o '"command": "[^ ]*' ${shown}/compile_commands.json\`.`,
+					`${directory}: ${wording} — \`cd ${directory} && rg -o '"command": "[^ ]*' ${shown}/compile_commands.json\`.`,
 				],
 	};
+}
+
+/** Whether one command names `compiler`, behind `launcher` when the tree has one. */
+function compilesWith(
+	command: string[] | null,
+	compiler: string,
+	launcher: string | null,
+): boolean {
+	if (command === null) return false;
+	if (launcher === null) return samePath(command[0] ?? "", compiler);
+	return samePath(command[0] ?? "", launcher) && samePath(command[1] ?? "", compiler);
 }
 
 /** Whether the hand-off tells clangd to query the drivers it cannot recognise, and the tree it wrote. */

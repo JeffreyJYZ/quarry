@@ -52,20 +52,24 @@ pub mod tests {
     fn driver_paths_are_absolute_and_only_real_compilers_are_named() {
         let fixture = Fixture::new("drivers");
         fixture.write("bin/my-clang++", "");
+        fixture.write("bin/ccache-standin", "");
         let driver = fixture.root().join("bin/my-clang++");
+        let launcher = fixture.root().join("bin/ccache-standin");
         fixture.write(
             "compile_commands.json",
             &format!(
                 r#"[{{"directory": "{root}", "arguments": ["{driver}", "-c", "a.cpp"]}},
-                   {{"directory": "{root}", "arguments": ["ccache", "clang++", "-c", "b.cpp"]}}]"#,
+                   {{"directory": "{root}", "arguments": ["{launcher}", "{driver}", "-c", "b.cpp"]}}]"#,
                 root = fixture.root().display(),
-                driver = driver.display()
+                driver = driver.display(),
+                launcher = launcher.display()
             ),
         );
         assert_eq!(
             compiler_drivers(&fixture.root().join(DATABASE_FILE)),
             vec![driver.display().to_string()],
-            "a launcher in front of the compiler is not the driver clangd can query"
+            "a launcher in front of the compiler is not the driver clangd can query, and the \
+             compiler behind it is the same driver the first entry already named"
         );
     }
 

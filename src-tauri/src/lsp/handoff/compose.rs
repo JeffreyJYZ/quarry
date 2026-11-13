@@ -66,13 +66,9 @@ pub fn clangd_args(user: &[String], database: Option<&Path>) -> Vec<String> {
         args.push(format!("{COMPILE_COMMANDS_DIR}={}", database.display()));
     }
     if !carries_flag(user, QUERY_DRIVER) {
-        // The configured tree's own compiler is the sharper answer; the database is asked when the
-        // tree has no cache to name one, which is the case for a vendor tree somebody else wrote.
-        let mut drivers = cache_drivers(database);
-        if drivers.is_empty() {
-            drivers =
-                crate::project::compiler_drivers(&database.join(crate::project::DATABASE_FILE));
-        }
+        // The tree's own record of what it was configured with, then its cache, then the database
+        // it wrote; none of them is emitted when it names a launcher rather than a compiler.
+        let drivers = tree_drivers(database);
         if !drivers.is_empty() {
             args.push(format!("{QUERY_DRIVER}={}", drivers.join(",")));
         }

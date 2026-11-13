@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 /**
- * The `toolchain: gcc` parity row: a project built by a compiler clangd does not recognise.
+ * The `toolchain: gcc` parity rows: a project built by a compiler clangd does not recognise, and the
+ * same project with that compiler behind a launcher.
  *
  * Every other row uses the platform's clang, whose headers clangd finds by itself. A CLion user's
  * second toolchain is Homebrew GCC, named by the toolchain file the preset selects, and clangd
@@ -102,10 +103,14 @@ export async function judgeGccToolchain(
 
 	// 3. What the tree, the database and the hand-off say: GCC, and clangd told to query it. The
 	//    first two are the build's own facts; the third is the analysis's, so each fails its column.
+	//    A fixture configured behind a launcher names that launcher first in both records, which is
+	//    the shape the hand-off has to see through.
 	const tree = section.buildRoot;
+	const launcherFile = fixture.executables?.[0];
+	const launcher = launcherFile === undefined ? null : join(root, launcherFile);
 	const facts = [
-		treeEvidence(tree, gcc, root),
-		databaseEvidence(tree, gcc, root, harness.compileArguments),
+		treeEvidence(tree, gcc, root, launcher),
+		databaseEvidence(tree, gcc, root, harness.compileArguments, launcher),
 	];
 	const handoff = handoffEvidence(tree, gcc, plan, root);
 	for (const part of [...facts, handoff]) {
