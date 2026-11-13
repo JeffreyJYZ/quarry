@@ -1295,7 +1295,6 @@ async function judgeMultiConfig(
 				passed = false;
 				findings.push(
 					`${directory}: the ${half.profile} artefact printed ${JSON.stringify(executed.stdout.trim())} (exit ${executed.code}), so it was not compiled with this configuration's defines — \`cd ${directory} && ${relativeTo(root, artifact as string)}\`.`,
-
 				);
 			}
 		}
