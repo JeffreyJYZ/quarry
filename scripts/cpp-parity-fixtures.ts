@@ -617,6 +617,126 @@ int main() {
 	};
 }
 
+/** The compiler pair a second toolchain is made of, as the fixture's toolchain file names it. */
+export interface ToolchainPaths {
+	cc: string;
+	cxx: string;
+}
+
+/** What the fixture program prints when every one of its three values arrived: 1 + 16 + 16. */
+export const GCC_STDOUT = "gcc=33";
+
+/**
+ * A C and C++ project built by a second toolchain, the one CLion users keep beside Apple clang.
+ *
+ * The preset names a toolchain file, and the toolchain file names both compilers — the shape a
+ * CMake project carries when its user picked a compiler CMake does not find on its own. That is
+ * also the shape clangd cannot analyse unaided: it recognises clang by name, so a project built by
+ * GCC needs `--query-driver` or the analysis reads the platform's libc++ headers instead.
+ *
+ * The header makes that difference visible in a hover rather than in a diagnostic. libstdc++
+ * defines `__GLIBCXX__` and libc++ does not, so the same call resolves to the `int` overload only
+ * when the analysis is reading the headers of the compiler this project was built with. The
+ * `<bits/stdc++.h>` include is the standard header only GCC ships: with the wrong headers it does
+ * not resolve at all.
+ */
+export function gccToolchainFixture(gcc: ToolchainPaths): Fixture {
+	return {
+		name: "toolchain: gcc",
+		files: {
+			"CMakeLists.txt": `cmake_minimum_required(VERSION 3.20)
+project(parity_gcc C CXX)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+add_executable(parity_gcc main.cpp library.cpp standard.cpp value.c)
+target_include_directories(parity_gcc PRIVATE \${CMAKE_CURRENT_SOURCE_DIR}/include)
+`,
+			"CMakePresets.json": `{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "generator": "Ninja",
+      "binaryDir": "\${sourceDir}/out/debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "\${sourceDir}/toolchains/gcc.cmake"
+      }
+    }
+  ],
+  "buildPresets": [{ "name": "debug", "configurePreset": "debug" }]
+}
+`,
+			"toolchains/gcc.cmake": `# The second toolchain: naming the compilers here is what makes this tree a GCC one.
+set(CMAKE_C_COMPILER ${gcc.cc})
+set(CMAKE_CXX_COMPILER ${gcc.cxx})
+`,
+			"include/parity/gcc.h": `#pragma once
+
+#include <string>
+
+// libstdc++ defines __GLIBCXX__ and libc++ does not, so only the analysis reading the headers of
+// the compiler this project builds with declares the int overload.
+#ifdef __GLIBCXX__
+int gcc_standard(int value);
+#else
+int gcc_standard(double value);
+#endif
+
+int gcc_project();
+`,
+			"standard.cpp": `#include <parity/gcc.h>
+
+int gcc_standard(int value) {
+\treturn value;
+}
+
+int gcc_standard(double value) {
+\treturn static_cast<int>(value);
+}
+`,
+			"library.cpp": `#include <parity/gcc.h>
+
+int gcc_project() {
+\treturn 16;
+}
+`,
+			"value.c": `int c_value(void) {
+\treturn 16;
+}
+`,
+			"main.cpp": `#include <parity/gcc.h>
+
+#include <bits/stdc++.h>
+
+extern "C" int c_value(void);
+
+int main() {
+\tstd::cout << "gcc=" << gcc_standard(1) + gcc_project() + c_value() << "\\n";
+\treturn 0;
+}
+`,
+		},
+		probes: [
+			{
+				file: "main.cpp",
+				needle: "gcc_standard(1)",
+				needs: "the int overload, which only libstdc++'s __GLIBCXX__ declares",
+				expect: "int gcc_standard(int value)",
+			},
+			{
+				file: "main.cpp",
+				needle: "gcc_project()",
+				needs: "the project header, through the include path this build records",
+				expect: "int gcc_project()",
+			},
+		],
+	};
+}
+
 /** The character offset of `needle` as an LSP position. */ export function positionOf(
 	text: string,
 	needle: string,

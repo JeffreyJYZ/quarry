@@ -85,5 +85,11 @@ jobs:
             - name: Detect tools
               run: bun scripts/detect-tools.ts
 
+            # The parity probe's `toolchain: gcc` row measures a second toolchain: a compiler clangd
+            # does not recognise, whose libstdc++ headers it can only find through --query-driver.
+            # Without GCC that row skips itself by name, so this step is what keeps the coverage.
+            - name: Install GCC
+              run: brew install gcc
+
             - name: Integration probes
               run: bun scripts/integration.ts
