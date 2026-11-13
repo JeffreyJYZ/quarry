@@ -13,26 +13,18 @@ pub const CMAKE_CACHE: &str = "CMakeCache.txt";
 /// The cache variables that name a compiler, the C++ one first because it is the sharper answer.
 pub const CACHE_COMPILERS: [&str; 2] = ["CMAKE_CXX_COMPILER", "CMAKE_C_COMPILER"];
 
-/// The compilers the configured tree names in its own cache, when those files exist.
+/// The compiler each cache variable names, in [`CACHE_COMPILERS`] order, when that file exists.
 ///
-/// This is the tree's own answer rather than the database's: a preset or toolchain that selects a
-/// compiler records it here, while a database entry may be a launcher (`ccache`, `sccache`) that
-/// answers `--version` for itself and teaches clangd nothing.
-pub fn cache_drivers(build_root: &Path) -> Vec<String> {
+/// Only the values are read here: whether one names a real compiler is [`tree_drivers`]'s question,
+/// because a cache may name a launcher (`ccache` as `CMAKE_CXX_COMPILER`) just as a database may.
+pub fn cache_values(build_root: &Path) -> Vec<Option<String>> {
     let Ok(text) = fs::read_to_string(build_root.join(CMAKE_CACHE)) else {
-        return Vec::new();
+        return vec![None; CACHE_COMPILERS.len()];
     };
-    let mut drivers: Vec<String> = Vec::new();
-    for key in CACHE_COMPILERS {
-        let Some(value) = cache_value(&text, key) else {
-            continue;
-        };
-        if !Path::new(&value).is_file() || drivers.iter().any(|seen| seen == &value) {
-            continue;
-        }
-        drivers.push(value);
-    }
-    drivers
+    CACHE_COMPILERS
+        .iter()
+        .map(|key| cache_value(&text, key))
+        .collect()
 }
 
 /// One variable's value in a `CMakeCache.txt` file, whose lines read `KEY:TYPE=value`.

@@ -22,6 +22,9 @@ use super::*;
 mod cache;
 pub use cache::*;
 
+mod compiler;
+pub use compiler::*;
+
 mod compose;
 pub use compose::*;
 
@@ -45,6 +48,9 @@ pub use tests_plain::*;
 
 mod tests_cache;
 pub use tests_cache::*;
+
+mod tests_compiler;
+pub use tests_compiler::*;
 
 mod tests_profile;
 pub use tests_profile::*;

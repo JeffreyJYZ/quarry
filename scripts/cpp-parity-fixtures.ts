@@ -48,6 +48,8 @@ export interface Fixture {
 	dbOptional?: boolean;
 	/** A plain project's own build, argv arrays run in order: its proof that its sources compile. */
 	plainBuild?: string[][];
+	/** Files that must be executable, relative to the fixture root: a launcher script, for one. */
+	executables?: string[];
 	/** Positions the analysis is judged at. */
 	probes: AnalysisProbe[];
 }
@@ -627,24 +629,17 @@ export interface ToolchainPaths {
 export const GCC_STDOUT = "gcc=33";
 
 /**
- * A C and C++ project built by a second toolchain, the one CLion users keep beside Apple clang.
+ * The one CMake project both GCC fixtures are: a library, an app and a C file through one header.
  *
- * The preset names a toolchain file, and the toolchain file names both compilers — the shape a
- * CMake project carries when its user picked a compiler CMake does not find on its own. That is
- * also the shape clangd cannot analyse unaided: it recognises clang by name, so a project built by
- * GCC needs `--query-driver` or the analysis reads the platform's libc++ headers instead.
- *
- * The header makes that difference visible in a hover rather than in a diagnostic. libstdc++
- * defines `__GLIBCXX__` and libc++ does not, so the same call resolves to the `int` overload only
- * when the analysis is reading the headers of the compiler this project was built with. The
+ * The header makes the toolchain visible in a hover rather than in a diagnostic. libstdc++ defines
+ * `__GLIBCXX__` and libc++ does not, so the same call resolves to the `int` overload only when the
+ * analysis is reading the headers of the compiler this project was built with. The
  * `<bits/stdc++.h>` include is the standard header only GCC ships: with the wrong headers it does
  * not resolve at all.
  */
-export function gccToolchainFixture(gcc: ToolchainPaths): Fixture {
+function gccFiles(gcc: ToolchainPaths): Record<string, string> {
 	return {
-		name: "toolchain: gcc",
-		files: {
-			"CMakeLists.txt": `cmake_minimum_required(VERSION 3.20)
+		"CMakeLists.txt": `cmake_minimum_required(VERSION 3.20)
 project(parity_gcc C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -652,7 +647,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(parity_gcc main.cpp library.cpp standard.cpp value.c)
 target_include_directories(parity_gcc PRIVATE \${CMAKE_CURRENT_SOURCE_DIR}/include)
 `,
-			"CMakePresets.json": `{
+		"CMakePresets.json": `{
   "version": 6,
   "configurePresets": [
     {
@@ -670,11 +665,11 @@ target_include_directories(parity_gcc PRIVATE \${CMAKE_CURRENT_SOURCE_DIR}/inclu
   "buildPresets": [{ "name": "debug", "configurePreset": "debug" }]
 }
 `,
-			"toolchains/gcc.cmake": `# The second toolchain: naming the compilers here is what makes this tree a GCC one.
+		"toolchains/gcc.cmake": `# The second toolchain: naming the compilers here is what makes this tree a GCC one.
 set(CMAKE_C_COMPILER ${gcc.cc})
 set(CMAKE_CXX_COMPILER ${gcc.cxx})
 `,
-			"include/parity/gcc.h": `#pragma once
+		"include/parity/gcc.h": `#pragma once
 
 #include <string>
 
@@ -688,7 +683,7 @@ int gcc_standard(double value);
 
 int gcc_project();
 `,
-			"standard.cpp": `#include <parity/gcc.h>
+		"standard.cpp": `#include <parity/gcc.h>
 
 int gcc_standard(int value) {
 \treturn value;
@@ -698,17 +693,17 @@ int gcc_standard(double value) {
 \treturn static_cast<int>(value);
 }
 `,
-			"library.cpp": `#include <parity/gcc.h>
+		"library.cpp": `#include <parity/gcc.h>
 
 int gcc_project() {
 \treturn 16;
 }
 `,
-			"value.c": `int c_value(void) {
+		"value.c": `int c_value(void) {
 \treturn 16;
 }
 `,
-			"main.cpp": `#include <parity/gcc.h>
+		"main.cpp": `#include <parity/gcc.h>
 
 #include <bits/stdc++.h>
 
@@ -719,21 +714,69 @@ int main() {
 \treturn 0;
 }
 `,
+	};
+}
+
+/** The positions both GCC fixtures are judged at: the overload and the project's own header. */
+function gccProbes(): AnalysisProbe[] {
+	return [
+		{
+			file: "main.cpp",
+			needle: "gcc_standard(1)",
+			needs: "the int overload, which only libstdc++'s __GLIBCXX__ declares",
+			expect: "int gcc_standard(int value)",
 		},
-		probes: [
-			{
-				file: "main.cpp",
-				needle: "gcc_standard(1)",
-				needs: "the int overload, which only libstdc++'s __GLIBCXX__ declares",
-				expect: "int gcc_standard(int value)",
-			},
-			{
-				file: "main.cpp",
-				needle: "gcc_project()",
-				needs: "the project header, through the include path this build records",
-				expect: "int gcc_project()",
-			},
-		],
+		{
+			file: "main.cpp",
+			needle: "gcc_project()",
+			needs: "the project header, through the include path this build records",
+			expect: "int gcc_project()",
+		},
+	];
+}
+
+/**
+ * A C and C++ project built by a second toolchain, the one CLion users keep beside Apple clang.
+ *
+ * The preset names a toolchain file, and the toolchain file names both compilers — the shape a
+ * CMake project carries when its user picked a compiler CMake does not find on its own. That is
+ * also the shape clangd cannot analyse unaided: it recognises clang by name, so a project built by
+ * GCC needs `--query-driver` or the analysis reads the platform's libc++ headers instead.
+ */
+export function gccToolchainFixture(gcc: ToolchainPaths): Fixture {
+	return { name: "toolchain: gcc", files: gccFiles(gcc), probes: gccProbes() };
+}
+
+/**
+ * The same project with the compiler behind a launcher, the shape a `ccache`-wrapped tree has.
+ *
+ * A shell script that `exec`s its arguments stands in for `ccache`, which is not installed on every
+ * machine; it is named `ccache` because that is a wrapper clangd itself knows to look through, and
+ * an arbitrary name would leave the analysis unable to use the command at all — measuring the name
+ * rather than the hand-off. The toolchain file names the launcher as the compiler and the real
+ * compiler as its first argument, which is how such a tree is configured; CMake then records the
+ * launcher in its compiler record, and every command in the database starts with the launcher and
+ * names the compiler second. A hand-off that stops at the first word has nothing to give clangd, so
+ * this fixture is the one that tells a launcher from the driver behind it.
+ */
+export function gccLauncherFixture(gcc: ToolchainPaths): Fixture {
+	const files = gccFiles(gcc);
+	files["toolchains/gcc.cmake"] =
+		`# A launcher in front of the compiler, as ccache would be: the real compiler is its first word.
+set(CMAKE_C_COMPILER \${CMAKE_CURRENT_LIST_DIR}/../ccache)
+set(CMAKE_C_COMPILER_ARG1 ${gcc.cc})
+set(CMAKE_CXX_COMPILER \${CMAKE_CURRENT_LIST_DIR}/../ccache)
+set(CMAKE_CXX_COMPILER_ARG1 ${gcc.cxx})
+`;
+	files["ccache"] = `#!/bin/sh
+# Stands in for ccache: a launcher that runs the compiler it is handed.
+exec "$@"
+`;
+	return {
+		name: "toolchain: gcc behind a launcher",
+		files,
+		executables: ["ccache"],
+		probes: gccProbes(),
 	};
 }
 

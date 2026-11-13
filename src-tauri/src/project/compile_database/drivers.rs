@@ -10,17 +10,15 @@ use super::*;
 /// clangd trusts a driver whose name looks like clang; a CMake project configured with Apple's `cc`,
 /// Homebrew's g++, or a cross toolchain records a driver it will not query, and without the query it
 /// cannot find libc++'s or the sysroot's headers. Only real compilers are named: a launcher such as
-/// `ccache` in front of the command answers `--version` for itself, which teaches clangd nothing.
+/// `ccache` in front of the command answers `--version` for itself, which teaches clangd nothing, so
+/// the driver behind it is taken instead.
 pub fn compiler_drivers(database: &Path) -> Vec<String> {
     let mut seen: HashSet<String> = HashSet::new();
     let mut drivers: Vec<String> = Vec::new();
     for entry in read_entries(database) {
-        let Some(program) = entry.argv.first() else {
+        let Some(program) = compiler_token(&entry.argv) else {
             continue;
         };
-        if !is_compiler(program) {
-            continue;
-        }
         let Some(path) = executable(&entry, program) else {
             continue;
         };
@@ -30,6 +28,18 @@ pub fn compiler_drivers(database: &Path) -> Vec<String> {
         }
     }
     drivers
+}
+
+/// The first word of a command that is a compiler rather than the launcher in front of it.
+///
+/// A tree compiled through `ccache` or a wrapper script records the launcher first, so the driver
+/// clangd can query is the next word after it. An option ends the command's own words, so a source
+/// or header named after a compiler is never mistaken for the driver.
+fn compiler_token(argv: &[String]) -> Option<&str> {
+    argv.iter()
+        .take_while(|token| !token.starts_with('-'))
+        .find(|token| is_compiler(token))
+        .map(String::as_str)
 }
 
 /// Whether a program name is a C/C++ compiler rather than a launcher or a build tool.
