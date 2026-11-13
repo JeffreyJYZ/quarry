@@ -81,11 +81,15 @@ jobs:
             - name: Build quarry-plan
               run: cargo build --example quarry-plan --manifest-path src-tauri/Cargo.toml
 
+            # A missing toolchain should name itself, in one line per tool. The generator list is
+            # printed in full because it is what the probe selects from: the rows used to hardcode
+            # "Visual Studio 17 2022" and failed on a runner that lists a newer one only.
             - name: Detect tools
               run: |
                   cmake --version
                   if (Get-Command clangd -ErrorAction SilentlyContinue) { clangd --version } else { "clangd: missing; the analysis half of each row will skip by name" }
-                  cmake --help | Select-String -Pattern "Visual Studio 17 2022"
+                  "--- cmake generators ---"
+                  cmake --help
 
             # The probe prints its own table, details and findings; a failing row names the command
             # that produced it, so the first run of this job is itself the measurement.

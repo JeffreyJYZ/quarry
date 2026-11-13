@@ -54,7 +54,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, delimiter, dirname, join } from "node:path";
+import { basename, delimiter, dirname, join, resolve as resolvePath } from "node:path";
 import {
 	type AnalysisProbe,
 	type Fixture,
@@ -78,9 +78,11 @@ import { judgeMsvcToolchain, judgeVisualStudio } from "./cpp-parity-vs-row";
 import {
 	NO_VS,
 	NO_CLANGD,
-	VS_GENERATOR,
-	type WindowsHarness,
+	detectVsGenerator,
 	vsFixture,
+	vsGenerators,
+	type VsDetection,
+	type WindowsHarness,
 } from "./cpp-parity-windows";
 import { fileUri, LspClient } from "./lsp-client";
 
@@ -456,12 +458,17 @@ function writeFixture(root: string, fixture: Fixture) {
  *
  * `QUARRY_PLAN_BIN` skips the build so a caller can measure a planner built from another commit —
  * that is how the before/after in this task's report was taken, without editing the probe.
+ *
+ * The override is resolved against the probe's own working directory: an environment variable
+ * arrives repo-relative, while every ask spawns the planner with a fixture as its cwd, so passing it
+ * through unresolved answered `ENOENT` on Windows and left both Windows rows unmeasurable.
  */
 async function planner(): Promise<string> {
 	const override = process.env.QUARRY_PLAN_BIN;
 	if (override !== undefined && override !== "") {
-		if (!isFile(override)) throw new Error(`QUARRY_PLAN_BIN is not a file: ${override}`);
-		return override;
+		const resolved = resolvePath(override);
+		if (!isFile(resolved)) throw new Error(`QUARRY_PLAN_BIN is not a file: ${resolved}`);
+		return resolved;
 	}
 	const result = await run(
 		"cargo",
@@ -1622,11 +1629,17 @@ async function main() {
 		broken = true;
 	}
 
+	// Which Visual Studio generator this machine has is discovered, never assumed: `cmake --help`
+	// lists what this cmake supports, and an image can list a generator whose instance is absent.
+	const vs = await visualStudio(cmake, generators, tempRoot);
+	for (const line of vs.attempts) console.log(`  vs        ${line}`);
+	if (vs.candidates.length > 0 && vs.generator === null) console.log(`  vs        ${NO_VS}`);
+
 	// The Windows subset is the two rows a Visual Studio generator and MSVC can measure. It is the
 	// whole run there: the other rows are macOS toolchains and would only say "no clang++" eight
 	// times over.
 	if (windowsOnly) {
-		const measured = await windowsRows(tempRoot, plannerBin, clangd, generators);
+		const measured = await windowsRows(tempRoot, plannerBin, clangd, vs);
 		return report(measured.rows, measured.findings, measured.broken || broken, started);
 	}
 	if (clangd === null) throw new Error("clangd is not installed");
@@ -1736,28 +1749,34 @@ async function main() {
 
 	// The Windows rows run everywhere they can: on a machine without the generator each says so by
 	// name, which is the whole point of a row that cannot pass by being absent.
-	const vs = generators.includes(VS_GENERATOR);
-	if (vs) {
-		const measured = await windowsRows(tempRoot, plannerBin, clangd, generators);
-		rows.push(...measured.rows);
-		findings.push(...measured.findings);
-		broken = broken || measured.broken;
-	} else {
-		for (const capability of ["generator: Visual Studio", "toolchain: MSVC"]) {
-			console.log(`skipping ${capability} … ${NO_VS}`);
-			rows.push({
-				capability,
-				build: "SKIP",
-				analysis: "SKIP",
-				targets: "SKIP",
-				tree: "SKIP",
-				details: [`skipped      ${NO_VS}`],
-				commands: [],
-			});
-		}
-	}
+	const measured = await windowsRows(tempRoot, plannerBin, clangd, vs);
+	rows.push(...measured.rows);
+	findings.push(...measured.findings);
+	broken = broken || measured.broken;
 
 	report(rows, findings, broken, started);
+}
+
+/** The Visual Studio generator search: the candidates `cmake --help` listed, and how each answered. */
+interface VsStatus extends VsDetection {
+	candidates: string[];
+}
+
+/**
+ * The Visual Studio generator this machine can configure with, and one line per candidate tried.
+ *
+ * `cmake --help` is a candidate list, not a fact: it names the generators this cmake supports, and a
+ * runner image can list one whose Visual Studio instance is not installed. Each candidate is
+ * therefore configured on a scratch project with the same `-A x64` argv the fixtures use, and the
+ * first success wins — a run with none names every failure instead of skipping quietly.
+ */
+async function visualStudio(cmake: string, help: string, tempRoot: string): Promise<VsStatus> {
+	const candidates = vsGenerators(help);
+	if (candidates.length === 0) return { candidates, generator: null, attempts: [] };
+	const scratch = join(tempRoot, "vs-generator");
+	mkdirSync(scratch, { recursive: true });
+	const detected = await detectVsGenerator(candidates, scratch, cmake, run);
+	return { candidates, ...detected };
 }
 
 /** The probe's own machinery, as the Windows rows ask the product and start clangd with it. */
@@ -1785,26 +1804,27 @@ function windowsHarness(
 /**
  * The two Windows rows, run through the same machinery every other row uses.
  *
- * A machine whose cmake lists no Visual Studio generator says so once per row; one that lists it
- * without the toolset behind it says that instead, from the fixture's own configure.
+ * A machine with no Visual Studio generator at all says so once per row, naming every candidate
+ * that was tried; the rows only skip when none of them configured.
  */
 async function windowsRows(
 	tempRoot: string,
 	plannerBin: string,
 	clangd: string | null,
-	generators: string,
+	vs: VsStatus,
 ): Promise<{ rows: Row[]; findings: string[]; broken: boolean }> {
-	if (!generators.includes(VS_GENERATOR)) {
+	if (vs.generator === null) {
+		const why = `${NO_VS}${vs.attempts.length > 0 ? ` — ${vs.attempts.join("; ")}` : ""}`;
 		const rows: Row[] = [];
 		for (const capability of ["generator: Visual Studio", "toolchain: MSVC"]) {
-			console.log(`skipping ${capability} … ${NO_VS}`);
+			console.log(`skipping ${capability} … ${why}`);
 			rows.push({
 				capability,
 				build: "SKIP",
 				analysis: "SKIP",
 				targets: "SKIP",
 				tree: "SKIP",
-				details: [`skipped      ${NO_VS}`],
+				details: [`skipped      ${why}`],
 				commands: [],
 			});
 		}
@@ -1818,8 +1838,8 @@ async function windowsRows(
 			harness: WindowsHarness,
 		) => Promise<{ row: Row; findings: string[]; broken: boolean }>;
 	}[] = [
-		{ fixture: vsFixture("generator: Visual Studio"), judged: judgeVisualStudio },
-		{ fixture: vsFixture("toolchain: MSVC"), judged: judgeMsvcToolchain },
+		{ fixture: vsFixture("generator: Visual Studio", vs.generator), judged: judgeVisualStudio },
+		{ fixture: vsFixture("toolchain: MSVC", vs.generator), judged: judgeMsvcToolchain },
 	];
 	const rows: Row[] = [];
 	const findings: string[] = [];

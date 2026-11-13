@@ -16,9 +16,9 @@ import type { Plan, Row, Verdict } from "./cpp-parity-probe";
 import {
 	NO_CLANGD,
 	NO_TOOLSET,
+	errorLines,
 	VS_BUILD_DIR,
 	VS_EXE,
-	VS_GENERATOR,
 	VS_HALVES,
 	type VsHalf,
 	type WindowsHarness,
@@ -93,7 +93,7 @@ async function fixtureBuild(
 	root: string,
 	harness: WindowsHarness,
 	row: Row,
-): Promise<{ ok: boolean; reason: string }> {
+): Promise<{ ok: boolean; stderr: string }> {
 	harness.writeQuery(VS_BUILD_DIR);
 	for (const args of fixture.userBuild ?? []) {
 		const result = await harness.run("cmake", args, root);
@@ -101,11 +101,9 @@ async function fixtureBuild(
 			line: `cd ${basename(root)} && cmake ${args.join(" ")}`,
 			verdict: result.code === 0 ? "PASS" : "FAIL",
 		});
-		if (result.code !== 0) {
-			return { ok: false, reason: harness.firstError(result.stderr) };
-		}
+		if (result.code !== 0) return { ok: false, stderr: result.stderr };
 	}
-	return { ok: true, reason: "" };
+	return { ok: true, stderr: "" };
 }
 
 /**
@@ -118,6 +116,7 @@ export async function judgeVisualStudio(
 	harness: WindowsHarness,
 ): Promise<{ row: Row; findings: string[]; broken: boolean }> {
 	const directory = basename(root);
+	const generator = fixture.generator ?? "the Visual Studio generator";
 	harness.writeFixture();
 	const row = blankRow(fixture.name);
 	const findings: string[] = [];
@@ -125,10 +124,17 @@ export async function judgeVisualStudio(
 
 	const own = await fixtureBuild(fixture, root, harness, row);
 	if (!own.ok) {
-		if (toolsetMissing(own.reason))
-			return skippedRow(fixture.name, `${NO_TOOLSET}: ${own.reason}`, findings);
+		// The whole stderr, line by line: CMake wraps this message over four lines, and the first two
+		// were all the row used to keep — which cut the cause off after the word "Generator".
+		const lines = errorLines(own.stderr);
+		row.details.push(
+			`fixture FAIL  the fixture's own build failed (${lines.length} line(s) of stderr)`,
+		);
+		for (const line of lines) row.details.push(`stderr       ${line}`);
+		if (toolsetMissing(own.stderr)) {
+			return skippedRow(fixture.name, `${NO_TOOLSET} — ${lines[0] ?? "no stderr"}`, findings);
+		}
 		broken = true;
-		row.details.push(`fixture FAIL  the fixture's own build failed: ${own.reason}`);
 		return { row, findings, broken };
 	}
 
@@ -137,11 +143,11 @@ export async function judgeVisualStudio(
 	if (harness.isFile(join(root, VS_BUILD_DIR, "compile_commands.json"))) {
 		broken = true;
 		row.details.push(
-			`fixture FAIL  ${VS_GENERATOR} wrote a compile_commands.json, so this row cannot measure the synthesis`,
+			`fixture FAIL  ${generator} wrote a compile_commands.json, so this row cannot measure the synthesis`,
 		);
 		return { row, findings, broken };
 	}
-	row.details.push(`generator    PASS  ${VS_GENERATOR} wrote no compile_commands.json`);
+	row.details.push(`generator    PASS  ${generator} wrote no compile_commands.json`);
 
 	let passed = true;
 	let named = true;
@@ -249,12 +255,10 @@ async function judgeHalf(
 		verdict: configure.code === 0 ? "PASS" : "FAIL",
 	});
 	if (configure.code !== 0) {
-		const reason = harness.firstError(configure.stderr);
-		row.details.push(
-			`build        FAIL  ${half.profile}: configure exited ${configure.code}: ${reason}`,
-		);
+		row.details.push(`build        FAIL  ${half.profile}: configure exited ${configure.code}`);
+		for (const line of errorLines(configure.stderr)) row.details.push(`stderr       ${line}`);
 		findings.push(
-			`${directory}: the ${half.profile} build fails — \`cd ${directory} && ${harness.commandLine(section.configure)}\` exits ${configure.code}: "${reason}".`,
+			`${directory}: the ${half.profile} build fails — \`cd ${directory} && ${harness.commandLine(section.configure)}\` exits ${configure.code}.`,
 		);
 		return { ok: false, named: false, plan, broken: false };
 	}
@@ -264,12 +268,10 @@ async function judgeHalf(
 		verdict: built.code === 0 ? "PASS" : "FAIL",
 	});
 	if (built.code !== 0) {
-		const reason = harness.firstError(built.stderr);
-		row.details.push(
-			`build        FAIL  ${half.profile}: build exited ${built.code}: ${reason}`,
-		);
+		row.details.push(`build        FAIL  ${half.profile}: build exited ${built.code}`);
+		for (const line of errorLines(built.stderr)) row.details.push(`stderr       ${line}`);
 		findings.push(
-			`${directory}: the ${half.profile} build fails — \`cd ${directory} && ${harness.commandLine(section.build)}\` exits ${built.code}: "${reason}".`,
+			`${directory}: the ${half.profile} build fails — \`cd ${directory} && ${harness.commandLine(section.build)}\` exits ${built.code}.`,
 		);
 		return { ok: false, named: false, plan, broken: false };
 	}
@@ -363,13 +365,30 @@ export async function judgeMsvcToolchain(
 	const findings: string[] = [];
 	const broken = false;
 
+	// The tree first, exactly as the generator row builds it: a CLion profile on Windows always has a
+	// configured tree, and a fresh one would be configured by whatever CMake defaults to rather than
+	// by the generator this row was chosen for.
+	const own = await fixtureBuild(fixture, root, harness, row);
+	if (!own.ok) {
+		const lines = errorLines(own.stderr);
+		row.details.push(
+			`fixture FAIL  the fixture's own build failed (${lines.length} line(s) of stderr)`,
+		);
+		for (const line of lines) row.details.push(`stderr       ${line}`);
+		if (toolsetMissing(own.stderr)) {
+			return skippedRow(fixture.name, `${NO_TOOLSET} — ${lines[0] ?? "no stderr"}`, findings);
+		}
+		return { row, findings, broken: true };
+	}
+
 	let plan: Plan;
 	try {
 		plan = await harness.ask();
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		row.details.push(`fixture FAIL  the product cannot be asked: ${message}`);
-		return skippedRow(fixture.name, `${NO_TOOLSET}: ${message}`, findings);
+		row.details.push(`plan         FAIL  the product cannot be asked: ${message}`);
+		findings.push(`${directory}: \`cd ${directory} && quarry-plan .\` answers: ${message}`);
+		return { row, findings, broken: false };
 	}
 	row.commands.push({ line: `cd ${directory} && quarry-plan .`, verdict: "PASS" });
 	const section = plan.cmake;
@@ -422,10 +441,11 @@ export async function judgeMsvcToolchain(
 	if (configure.code !== 0 || built?.code !== 0) {
 		const failed = configure.code === 0 ? built : configure;
 		const line = harness.commandLine(configure.code === 0 ? section.build : section.configure);
-		const reason = harness.firstError(failed?.stderr ?? "");
-		row.details.push(`build        FAIL  ${line} exited ${failed?.code}: ${reason}`);
+		row.details.push(`build        FAIL  ${line} exited ${failed?.code}`);
+		for (const excerpt of errorLines(failed?.stderr ?? ""))
+			row.details.push(`stderr       ${excerpt}`);
 		findings.push(
-			`${directory}: the MSVC build fails — \`cd ${directory} && ${line}\` exits ${failed?.code}: "${reason}".`,
+			`${directory}: the MSVC build fails — \`cd ${directory} && ${line}\` exits ${failed?.code}.`,
 		);
 		return { row, findings, broken: false };
 	}
@@ -436,7 +456,7 @@ export async function judgeMsvcToolchain(
 	const artifact = after.targets[0]?.program ?? null;
 	const written = artifact !== null && harness.isFile(artifact);
 	const executed = written && artifact !== null ? await harness.run(artifact, [], root) : null;
-	const prints = executed !== null && executed.stdout.includes("config=1");
+	const prints = executed?.stdout.includes("config=1") === true;
 	row.details.push(
 		`build        ${written && prints ? "PASS" : "FAIL"}  the plan's target ${artifact === null ? "is unset" : shown(root, artifact)} ${written ? "exists" : "does not exist"}${executed === null ? "" : ` and printed ${JSON.stringify(executed.stdout.trim())}`}`,
 	);

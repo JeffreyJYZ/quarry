@@ -16,11 +16,10 @@
  * so by name rather than pass quietly.
  */
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Fixture } from "./cpp-parity-fixtures";
 import type { Measurement, Plan, RunResult } from "./cpp-parity-probe";
-
-/** The generator a Visual Studio 2022 CLion profile names. */
-export const VS_GENERATOR = "Visual Studio 17 2022";
 
 /** The tree the fixture's own build writes, which is CLion's shape on Windows. */
 export const VS_BUILD_DIR = "build";
@@ -31,8 +30,95 @@ export const VS_TARGET = "parity_vs";
 /** The file the build writes for that target, named the way a link on Windows names it. */
 export const VS_EXE = `${VS_TARGET}.exe`;
 
-/** Why a machine without the generator skips both rows, in words that name the fix. */
-export const NO_VS = `cmake lists no "${VS_GENERATOR}" generator (install Visual Studio 2022 with the C++ workload)`;
+/**
+ * Why a machine without a Visual Studio generator skips both rows, in words that name the fix.
+ *
+ * The version is deliberately absent: `windows-latest` images move, and a hardcoded "Visual Studio
+ * 17 2022" failed on one that lists only a newer generator. Which one exists is discovered.
+ */
+export const NO_VS =
+	"cmake lists no Visual Studio generator (install Visual Studio with the C++ workload)";
+
+/** Why a machine whose Visual Studio generators all failed to configure skips both rows. */
+export const NO_TOOLSET =
+	"every Visual Studio generator cmake lists failed to configure: the C++ toolset is not installed";
+
+/** How a Visual Studio generator is spelled in `cmake --help`: `Visual Studio <version> <year>`. */
+const VS_GENERATOR_LINE = /^\s*\*?\s*(Visual Studio (\d+) \d{4})\s*=/;
+
+/**
+ * Every Visual Studio generator `cmake --help` lists, newest first.
+ *
+ * The list is what this cmake *supports*, not what the machine has installed, so each one is still
+ * tried before it is trusted: an image can list a generator whose instance is absent.
+ */
+export function vsGenerators(help: string): string[] {
+	const found: { name: string; version: number }[] = [];
+	for (const line of help.split(/\r?\n/)) {
+		const match = VS_GENERATOR_LINE.exec(line);
+		if (match === null || match[1] === undefined) continue;
+		found.push({ name: match[1], version: Number(match[2] ?? 0) });
+	}
+	found.sort((one, other) => other.version - one.version);
+	return found.map((entry) => entry.name);
+}
+
+/** What a generator search found, and one line per candidate saying how it answered. */
+export interface VsDetection {
+	generator: string | null;
+	attempts: string[];
+}
+
+/** The project each candidate generator is asked to configure, small enough to cost one second. */
+const DETECT_MANIFEST = "cmake_minimum_required(VERSION 3.20)\nproject(quarry_vs_probe CXX)\n";
+const DETECT_SOURCE = "int main() { return 0; }\n";
+
+/**
+ * The first Visual Studio generator this machine can actually configure with, newest first.
+ *
+ * `cmake --help` is a claim, not a fact, and this row branch was wrong once for trusting it: the
+ * scratch project is configured with the exact argv the fixtures use, so the generator that wins
+ * is the one that accepts `-A x64` here. Every candidate's failure is kept, so a runner with none
+ * says why instead of skipping silently.
+ */
+export async function detectVsGenerator(
+	candidates: string[],
+	scratch: string,
+	cmake: string,
+	run: (bin: string, args: string[], cwd: string) => Promise<RunResult>,
+): Promise<VsDetection> {
+	const attempts: string[] = [];
+	for (const name of candidates) {
+		const root = join(scratch, name.replace(/[^A-Za-z0-9]+/g, "-"));
+		mkdirSync(root, { recursive: true });
+		writeFileSync(join(root, "CMakeLists.txt"), DETECT_MANIFEST);
+		writeFileSync(join(root, "main.cpp"), DETECT_SOURCE);
+		const args = ["-S", root, "-B", join(root, "build"), "-G", name, "-A", "x64"];
+		const result = await run(cmake, args, root);
+		if (result.code === 0) {
+			attempts.push(`${name}: configured for x64`);
+			return { generator: name, attempts };
+		}
+		attempts.push(`${name}: ${errorLines(result.stderr)[0] ?? `exited ${result.code}`}`);
+	}
+	return { generator: null, attempts };
+}
+
+/**
+ * The first lines of a failing command's stderr, each short enough for a report.
+ *
+ * A CMake failure wraps its message over several lines — the rows used to print the first two, which
+ * cut "Generator Visual Studio 17 2022 could not find any instance of Visual Studio" off after the
+ * word "Generator", so the cause never appeared anywhere.
+ */
+export function errorLines(text: string, limit = 6): string[] {
+	return text
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter((line) => line !== "")
+		.slice(0, limit)
+		.map((line) => (line.length > 220 ? `${line.slice(0, 220)}…` : line));
+}
 
 /** Why a machine without clangd skips the analysis half. */
 export const NO_CLANGD = "clangd is not on PATH";
@@ -55,22 +141,19 @@ export interface WindowsHarness {
 }
 
 /**
- * How many `compile_commands.json` entries a synthesised database holds for the fixture.
- *
- * One per source per configuration: the reply names every configuration the generator supports, so
- * four configurations and two compilable sources make eight.
- */
-export const VS_ENTRIES = 8;
-
-/**
  * One project, configured and built the way a CLion profile on Windows builds it.
+ *
+ * `generator` is the Visual Studio generator this machine can actually configure with, discovered by
+ * [`detectVsGenerator`]; nothing here assumes a version, because the Windows images move and a
+ * hardcoded one failed on an image that lists a newer generator only.
  *
  * `userBuild` is the fixture's own proof: the generator configures without a build type, builds
  * `Debug` through `--config`, and never writes a database — which is the premise both rows rest on.
  */
-export function vsFixture(name: string): Fixture {
+export function vsFixture(name: string, generator: string): Fixture {
 	return {
 		name,
+		generator,
 		files: {
 			"CMakeLists.txt": `cmake_minimum_required(VERSION 3.20)
 project(parity_vs CXX)
@@ -135,7 +218,7 @@ int main() {
 				"-B",
 				VS_BUILD_DIR,
 				"-G",
-				VS_GENERATOR,
+				generator,
 				"-A",
 				"x64",
 				"-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
@@ -191,7 +274,3 @@ export function toolsetMissing(stderr: string): boolean {
 		stderr,
 	);
 }
-
-/** Why a machine with no Visual Studio toolset skips both rows. */
-export const NO_TOOLSET =
-	"the Visual Studio generator needs the MSVC C++ toolset and this machine has none";
