@@ -6,7 +6,14 @@ import { clampPanelSizes } from "@/lib/layout/model";
 import type { BuildProfile, Preferences, ProjectSettings, TabSize } from "@/lib/settings/model";
 
 export const TAB_SIZES: TabSize[] = [2, 4, 8];
-export const BUILD_PROFILES: BuildProfile[] = ["debug", "release"];
+/** CLion's four profiles; each names a CMake configuration of the same spelling. */
+export const BUILD_PROFILES: BuildProfile[] = ["debug", "release", "relwithdebinfo", "minsizerel"];
+export const BUILD_PROFILE_LABELS: Record<BuildProfile, string> = {
+	debug: "Debug",
+	release: "Release",
+	relwithdebinfo: "RelWithDebInfo",
+	minsizerel: "MinSizeRel",
+};
 export const FONT_SIZE_RANGE = { min: 9, max: 24 } as const;
 
 export const DEFAULT_PREFERENCES: Preferences = {

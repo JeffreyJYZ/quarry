@@ -1,9 +1,18 @@
 import { type BuildReport, buildProject } from "@/lib/project/api";
+import type { BuildProfile } from "@/lib/settings/model";
 
-/** How a build is asked for; the toolbar and a launch both hand it this signature. */
-export type BuildCall = (root: string, profile: "debug" | "release") => Promise<BuildReport>;
+/**
+ * How a build is asked for; the toolbar and a launch both hand it this signature.
+ *
+ * `target` is a run-target id or a bare CMake target name, and `null` builds the whole tree.
+ */
+export type BuildCall = (
+	root: string,
+	profile: BuildProfile,
+	target?: string | null,
+) => Promise<BuildReport>;
 
-/** Builds already running, keyed by the tree and profile they describe. */
+/** Builds already running, keyed by the tree, profile and target they describe. */
 const running = new Map<string, Promise<BuildReport>>();
 
 /**
@@ -17,14 +26,15 @@ const running = new Map<string, Promise<BuildReport>>();
  */
 export async function buildOnce(
 	root: string,
-	profile: "debug" | "release",
+	profile: BuildProfile,
+	target: string | null = null,
 	build: BuildCall = buildProject,
 ): Promise<BuildReport> {
-	const key = `${root}\u0000${profile}`;
+	const key = `${root}\u0000${profile}\u0000${target ?? ""}`;
 	const started = running.get(key);
 	if (started !== undefined) return started;
 
-	const pending = build(root, profile).finally(() => {
+	const pending = build(root, profile, target).finally(() => {
 		if (running.get(key) === pending) running.delete(key);
 	});
 	running.set(key, pending);

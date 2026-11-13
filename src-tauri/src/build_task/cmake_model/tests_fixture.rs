@@ -33,8 +33,13 @@ pub mod tests_cmake_fixture {
     }
 
     fn build(root: &Path) -> BuildReport {
-        run_cmake_build(&BuildState::default(), &root.display().to_string(), false)
-            .expect("cmake must be runnable")
+        run_cmake_build(
+            &BuildState::default(),
+            &root.display().to_string(),
+            false,
+            None,
+        )
+        .expect("cmake must be runnable")
     }
 
     #[test]

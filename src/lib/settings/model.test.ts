@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { DEFAULT_PANEL_SIZES, PANEL_LIMITS } from "@/lib/layout/model";
 import { DEFAULT_THEME_ID } from "@/lib/themes/model";
 import {
+	BUILD_PROFILE_LABELS,
+	BUILD_PROFILES,
 	clampFontSize,
 	DEFAULT_PREFERENCES,
 	DEFAULT_PROJECT_SETTINGS,
@@ -68,6 +70,15 @@ describe("normalizePreferences", () => {
 		expect(preferences.editorTabSize).toBe(DEFAULT_PREFERENCES.editorTabSize);
 		expect(preferences.buildProfile).toBe(DEFAULT_PREFERENCES.buildProfile);
 		expect(preferences.formatOnSave).toBe(DEFAULT_PREFERENCES.formatOnSave);
+	});
+
+	test("keeps every profile CLion offers, not just debug and release", () => {
+		for (const profile of BUILD_PROFILES) {
+			expect(normalizePreferences({ buildProfile: profile }).buildProfile).toBe(profile);
+			expect(normalizeProjectSettings({ buildProfile: profile }).buildProfile).toBe(profile);
+		}
+		expect(BUILD_PROFILE_LABELS.relwithdebinfo).toBe("RelWithDebInfo");
+		expect(BUILD_PROFILE_LABELS.minsizerel).toBe("MinSizeRel");
 	});
 
 	test("clamps panel sizes through the layout model", () => {

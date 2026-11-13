@@ -11,12 +11,11 @@ pub use std::time::Instant;
 use super::*;
 
 /// The CMake configuration name for a profile.
-pub fn cmake_config(release: bool) -> &'static str {
-    if release {
-        CMAKE_CONFIG_RELEASE
-    } else {
-        CMAKE_CONFIG_DEBUG
-    }
+///
+/// A boolean is still accepted so the language-server hand-off, which always configures Debug, needs
+/// no profile of its own.
+pub fn cmake_config(profile: impl Into<BuildProfile>) -> &'static str {
+    profile.into().cmake_config()
 }
 /// Output of one cmake invocation: the exit verdict and the merged output text.
 pub struct CmakeOutcome {

@@ -128,13 +128,19 @@ pub mod tests_group_2 {
     }
 
     #[test]
-    pub fn profile_accepts_only_debug_and_release() {
-        assert_eq!(release_for("debug"), Ok(false));
-        assert_eq!(release_for("release"), Ok(true));
+    pub fn profile_accepts_clions_four_and_cargo_sees_two() {
+        assert!(!BuildProfile::Debug.cargo_release());
+        assert!(BuildProfile::Release.cargo_release());
+        assert!(BuildProfile::RelWithDebInfo.cargo_release());
+        assert!(BuildProfile::MinSizeRel.cargo_release());
 
-        let error = release_for("bench").expect_err("bench is not a profile");
+        let error = BuildProfile::from_wire("bench").expect_err("bench is not a profile");
         assert!(error.contains("\"debug\""), "unexpected error: {error}");
         assert!(error.contains("\"release\""), "unexpected error: {error}");
+        assert!(
+            error.contains("\"relwithdebinfo\""),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]

@@ -97,10 +97,12 @@ pub fn truncate(text: &str, limit: usize) -> String {
 pub fn run_cmake_build(
     state: &BuildState,
     source_root: &str,
-    release: bool,
+    profile: impl Into<BuildProfile>,
+    target: Option<&str>,
 ) -> Result<BuildReport, String> {
     let source = Path::new(source_root);
-    let plan = cmake_plan(source, release, &CmakeOptions::for_root(source))?;
+    let profile = profile.into();
+    let plan = cmake_plan_target(source, profile, &CmakeOptions::for_root(source), target)?;
     let started = Instant::now();
     let started_at = SystemTime::now();
     // Notes are collected rather than appended as they happen: the status bar reports the last line,

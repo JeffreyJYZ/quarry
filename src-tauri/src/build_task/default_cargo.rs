@@ -42,44 +42,47 @@ pub const CMAKE_CONFIG_RELEASE: &str = "Release";
 /// Status-bar summary for a CMake build that printed nothing at all.
 pub const DEFAULT_CPP_SUMMARY: &str = "cmake build finished";
 
-/// `profile` is `debug` or `release`; anything else is an error naming the accepted values.
+/// `profile` is one of [`BUILD_PROFILES`]; `target` names one CMake target, and `None` builds
+/// everything. A run-target id (`cpp:<name>`) is accepted too, because that is what the run
+/// dropdown hands over.
 #[tauri::command]
 pub async fn build_project(
     state: State<'_, BuildState>,
     root: String,
     profile: String,
+    target: Option<String>,
 ) -> Result<BuildReport, String> {
-    let release = release_for(&profile)?;
+    let profile = BuildProfile::from_wire(&profile)?;
+    let target = target
+        .as_deref()
+        .and_then(crate::launch::cmake_build_target);
     // The managed copy and the blocking task share one slot, so a stop and the exit path can reach
     // the child while this call waits for the report.
     let state = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || build(&state, &root, release))
+    tauri::async_runtime::spawn_blocking(move || build(&state, &root, profile, target.as_deref()))
         .await
         .map_err(|error| format!("build task failed: {error}"))?
 }
 
 /// Detection and the build both touch the filesystem, so both run off the async runtime.
-pub fn build(state: &BuildState, root: &str, release: bool) -> Result<BuildReport, String> {
+///
+/// The target names one CMake target; Cargo and the plain-clang build compile the units their own
+/// manifests describe, so they ignore it rather than guessing a second way to select.
+pub fn build(
+    state: &BuildState,
+    root: &str,
+    profile: BuildProfile,
+    target: Option<&str>,
+) -> Result<BuildReport, String> {
     let info = project::inspect(root)?;
     match info.kind {
         ProjectKind::Cargo => {
             require_cargo(info.kind)?;
-            run_build(state, &info.build_root, release)
+            run_build(state, &info.build_root, profile.cargo_release())
         }
-        ProjectKind::Cmake => run_cmake_build(state, &info.root, release),
+        ProjectKind::Cmake => run_cmake_build(state, &info.root, profile, target),
         ProjectKind::CompileCommands => run_plain_clang_build(state, &info.root, &info.name),
         ProjectKind::Unknown => run_plain_clang_build(state, &info.root, &info.name),
-    }
-}
-
-/// Maps the wire profile onto cargo's `--release` flag.
-pub fn release_for(profile: &str) -> Result<bool, String> {
-    match profile {
-        "debug" => Ok(false),
-        "release" => Ok(true),
-        other => Err(format!(
-            "unsupported build profile {other:?}: expected \"debug\" or \"release\""
-        )),
     }
 }
 

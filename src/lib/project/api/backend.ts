@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { FileEncoding } from "@/lib/project/buffer";
 import type { StopReport } from "@/lib/project/api/run";
+import type { BuildProfile } from "@/lib/settings/model";
 
 export type ToolSource = "path" | "xcrun" | "missing";
 
@@ -110,8 +111,12 @@ export function formatterFor(path: string): Promise<string> {
 	return invoke<string>("formatter_for", { path });
 }
 
-export function buildProject(root: string, profile: "debug" | "release"): Promise<BuildReport> {
-	return invoke<BuildReport>("build_project", { root, profile });
+export function buildProject(
+	root: string,
+	profile: BuildProfile,
+	target: string | null = null,
+): Promise<BuildReport> {
+	return invoke<BuildReport>("build_project", { root, profile, target });
 }
 
 /** Stop the build in flight, its whole process group; a build already finished is not an error. */

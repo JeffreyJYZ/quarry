@@ -46,6 +46,9 @@ pub use generator::*;
 mod plan;
 pub use plan::*;
 
+mod plan_decisions;
+pub use plan_decisions::*;
+
 mod configure;
 pub use configure::*;
 

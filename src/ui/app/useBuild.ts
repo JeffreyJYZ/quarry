@@ -3,6 +3,7 @@ import type { Diagnostic } from "@/lib/project/api";
 import { stopBuild } from "@/lib/project/api";
 import { buildOnce } from "@/lib/project/buildOnce";
 import { describeError } from "@/lib/project/errors";
+import type { BuildProfile } from "@/lib/settings/model";
 
 /**
  * The Build action and the profile menu beside it.
@@ -16,7 +17,7 @@ import { describeError } from "@/lib/project/errors";
  */
 export function useBuild(options: {
 	root: string | null;
-	profile: "debug" | "release";
+	profile: BuildProfile;
 	onDiagnostics: (diagnostics: Diagnostic[]) => void;
 	onNotice: (message: string) => void;
 }) {

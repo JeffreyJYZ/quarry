@@ -46,7 +46,7 @@ pub mod tests_group_4 {
     }
 
     #[test]
-    pub fn cmake_argv_carries_the_profile_and_the_configure_step() {
+    pub fn cmake_argv_carries_the_profile_the_target_and_the_configure_step() {
         let configure = cmake_configure_argv("/projects/demo", "/projects/demo/build", false);
         assert_eq!(
             configure.iter().map(String::as_str).collect::<Vec<_>>(),
@@ -67,7 +67,7 @@ pub mod tests_group_4 {
                 .any(|arg| arg == "-DCMAKE_BUILD_TYPE=Release")
         );
 
-        let debug = cmake_build_argv("/projects/demo/build", false);
+        let debug = cmake_build_argv("/projects/demo/build", false, None);
         assert_eq!(
             debug.iter().map(String::as_str).collect::<Vec<_>>(),
             vec![
@@ -79,7 +79,7 @@ pub mod tests_group_4 {
             ]
         );
 
-        let release = cmake_build_argv("/projects/demo/build", true);
+        let release = cmake_build_argv("/projects/demo/build", true, None);
         assert_eq!(
             release.iter().map(String::as_str).collect::<Vec<_>>(),
             vec![

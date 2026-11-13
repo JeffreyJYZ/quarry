@@ -57,8 +57,10 @@ import {
 	plainFixture,
 	positionOf,
 	presetsFixture,
+	profileFixture,
 	systemHeaderFixture,
 	toolchainFixture,
+	twoTargetsFixture,
 } from "./cpp-parity-fixtures";
 import { fileUri, LspClient } from "./lsp-client";
 
@@ -95,6 +97,10 @@ interface PlainSection {
 interface CmakeSection {
 	program: string | null;
 	options: { preset: string; buildDir: string; toolchainFile: string };
+	/** The profile the plan was asked for, in the spelling the settings file uses. */
+	profile: string;
+	/** The one target the plan names, or null when it builds everything. */
+	target: string | null;
 	buildRoot: string;
 	cwd: string;
 	configure: string[];
@@ -123,7 +129,8 @@ interface Measurement {
 	diagnostics: string[];
 }
 
-type Verdict = "PASS" | "FAIL";
+/** `PASS`/`FAIL` are measured; `n/a` is a consumer the row does not exercise. */
+type Verdict = "PASS" | "FAIL" | "n/a";
 
 interface Row {
 	capability: string;
@@ -370,8 +377,18 @@ function writeFixture(root: string, fixture: Fixture) {
 	}
 }
 
-/** Build `quarry-plan` once and return the executable cargo produced. */
+/**
+ * Build `quarry-plan` once and return the executable cargo produced.
+ *
+ * `QUARRY_PLAN_BIN` skips the build so a caller can measure a planner built from another commit —
+ * that is how the before/after in this task's report was taken, without editing the probe.
+ */
 async function planner(): Promise<string> {
+	const override = process.env.QUARRY_PLAN_BIN;
+	if (override !== undefined && override !== "") {
+		if (!isFile(override)) throw new Error(`QUARRY_PLAN_BIN is not a file: ${override}`);
+		return override;
+	}
 	const result = await run(
 		"cargo",
 		["build", "--example", "quarry-plan", "--message-format=json"],
@@ -394,11 +411,20 @@ async function planner(): Promise<string> {
 	throw new Error(`cargo never reported a quarry-plan executable: ${firstError(result.stderr)}`);
 }
 
+/** What one plan is asked for on the command line: a profile, and one target or everything. */
+interface PlanFlags {
+	profile?: string;
+	target?: string;
+}
+
 /** Ask the product what it would do with `root`, right now. */
-async function askPlan(binary: string, root: string): Promise<Plan> {
-	const result = await run(binary, [root], root);
+async function askPlan(binary: string, root: string, flags: PlanFlags = {}): Promise<Plan> {
+	const args = [root];
+	if (flags.profile !== undefined) args.push("--profile", flags.profile);
+	if (flags.target !== undefined) args.push("--target", flags.target);
+	const result = await run(binary, args, root);
 	if (result.code !== 0)
-		throw new Error(`quarry-plan ${root} failed: ${firstError(result.stderr)}`);
+		throw new Error(`quarry-plan ${args.join(" ")} failed: ${firstError(result.stderr)}`);
 	return JSON.parse(result.stdout) as Plan;
 }
 
@@ -412,8 +438,12 @@ function seamFacts(): string[] {
 	const read = (path: string) => readFileSync(join(SOURCE, path), "utf8");
 	const facts: string[] = [];
 	const build = read("build_task/absolute_path.rs");
-	if (!build.includes("cmake_plan(source, release, &CmakeOptions::for_root(source))")) {
-		facts.push("run_cmake_build no longer asks cmake_plan for its build");
+	if (
+		!build.includes(
+			"cmake_plan_target(source, profile, &CmakeOptions::for_root(source), target)",
+		)
+	) {
+		facts.push("run_cmake_build no longer asks cmake_plan_target for its build and target");
 	}
 	if (!build.includes("configure_tree(")) {
 		facts.push("run_cmake_build no longer configures through the shared configure sequence");
@@ -423,6 +453,14 @@ function seamFacts(): string[] {
 	}
 	if (!build.includes("run_cmake(state, &plan.build, source_root)")) {
 		facts.push("run_cmake_build no longer runs plan.build");
+	}
+	const dispatch = read("build_task/default_cargo.rs");
+	if (!dispatch.includes("run_cmake_build(state, &info.root, profile, target)")) {
+		facts.push("build_project no longer passes the profile and target to the CMake build");
+	}
+	const profiles = read("build_task/profile.rs");
+	if (!profiles.includes('"relwithdebinfo"') || !profiles.includes('"minsizerel"')) {
+		facts.push("the build profile no longer names CLion's four configurations");
 	}
 	const model = read("build_task/cmake_model/configure.rs");
 	if (!model.includes("write_query(request.build_root)")) {
@@ -467,6 +505,268 @@ function seamFacts(): string[] {
 		facts.push("resolve_run_target no longer calls resolve_target");
 	}
 	return facts;
+}
+
+/** Whether the build wrote exactly this executable, and nothing of that name was there before. */
+function wroteExecutable(root: string, name: string): boolean {
+	return findExecutables(root, name, 0).length === 1;
+}
+
+/**
+ * One plan's build, run exactly as it was reported: configure, then build.
+ *
+ * Every row that judges a build runs this and nothing else, so the argv in the report is the argv
+ * that made the tree, not a copy of it.
+ */
+async function runBuild(
+	root: string,
+	section: CmakeSection,
+	directory: string,
+	cmake: string,
+	row: Row,
+): Promise<{ ok: boolean; reason: string }> {
+	const program = section.program ?? cmake;
+	const configure = await run(program, section.configure.slice(1), section.cwd, CMAKE_TIMEOUT);
+	row.commands.push({
+		line: `cd ${directory} && ${commandLine(root, section.configure)}`,
+		verdict: configure.code === 0 ? "PASS" : "FAIL",
+	});
+	if (configure.code !== 0) {
+		return {
+			ok: false,
+			reason: `configure exited ${configure.code}: ${firstError(configure.stderr)}`,
+		};
+	}
+	const built = await run(program, section.build.slice(1), section.cwd, CMAKE_TIMEOUT);
+	row.commands.push({
+		line: `cd ${directory} && ${commandLine(root, section.build)}`,
+		verdict: built.code === 0 ? "PASS" : "FAIL",
+	});
+	if (built.code !== 0) {
+		return { ok: false, reason: `build exited ${built.code}: ${firstError(built.stderr)}` };
+	}
+	return { ok: true, reason: "" };
+}
+
+/**
+ * The compile arguments CMake recorded for one source, from the database the plan's configure wrote.
+ *
+ * `arguments` is preferred where the generator writes it; a `command` string is split on whitespace,
+ * which is enough to tell `-g` from its absence and is never used to judge a quoted path.
+ */
+function compileArguments(database: string, source: string): string[] | null {
+	if (!isFile(database)) return null;
+	let entries: { file: string; arguments?: string[]; command?: string }[];
+	try {
+		entries = JSON.parse(readFileSync(database, "utf8"));
+	} catch {
+		return null;
+	}
+	const entry = entries.find((candidate) => basename(candidate.file) === source);
+	if (entry === undefined) return null;
+	if (Array.isArray(entry.arguments)) return entry.arguments;
+	return entry.command === undefined ? null : entry.command.split(/\s+/);
+}
+
+/**
+ * One profile row: the plan names it, CMake receives it, and the compile command carries the debug
+ * info `RelWithDebInfo` promises while `MinSizeRel` produces none.
+ *
+ * Both halves run into the same tree, so the second configure is also the proof that a profile
+ * change reconfigures the project instead of reusing the previous flags.
+ */
+async function judgeProfile(
+	fixture: Fixture,
+	root: string,
+	plannerBin: string,
+	cmake: string,
+): Promise<{ row: Row; findings: string[]; broken: boolean }> {
+	const directory = basename(root);
+	writeFixture(root, fixture);
+	const row: Row = {
+		capability: fixture.name,
+		build: "FAIL",
+		analysis: "n/a",
+		targets: "n/a",
+		tree: "PASS",
+		details: [],
+		commands: [],
+	};
+	const findings: string[] = [];
+	let broken = false;
+	let passed = true;
+	const halves = [
+		{ profile: "relwithdebinfo", configuration: "RelWithDebInfo", debugInfo: true },
+		{ profile: "minsizerel", configuration: "MinSizeRel", debugInfo: false },
+	];
+	for (const half of halves) {
+		let plan: Plan;
+		try {
+			plan = await askPlan(plannerBin, root, { profile: half.profile });
+		} catch (error) {
+			passed = false;
+			const message = error instanceof Error ? error.message : String(error);
+			row.details.push(`profile      FAIL  ${half.profile}: ${message}`);
+			findings.push(
+				`${directory}: the product cannot be asked for ${half.configuration} — \`cd ${directory} && quarry-plan . --profile ${half.profile}\` answers: ${message}`,
+			);
+			break;
+		}
+		const section = plan.cmake;
+		if (!section) {
+			broken = true;
+			row.details.push(`fixture FAIL  ${half.profile}: the product reports no CMake plan`);
+			break;
+		}
+		const wanted = `-DCMAKE_BUILD_TYPE=${half.configuration}`;
+		const named =
+			section.configure.includes(wanted) && section.build.includes(half.configuration);
+		row.details.push(
+			`profile      ${named ? "PASS" : "FAIL"}  ${half.profile}: configure ${section.configure.includes(wanted) ? "names" : "omits"} ${wanted}, build ${section.build.includes(half.configuration) ? "names" : "omits"} ${half.configuration}`,
+		);
+		if (!named) {
+			passed = false;
+			findings.push(
+				`${directory}: the ${half.profile} plan does not ask CMake for ${half.configuration} — \`cd ${directory} && quarry-plan . --profile ${half.profile}\` reports ${commandLine(root, section.build)}.`,
+			);
+		}
+		const ran = await runBuild(root, section, directory, cmake, row);
+		if (!ran.ok) {
+			broken = true;
+			row.details.push(`fixture FAIL  ${half.profile}: ${ran.reason}`);
+			break;
+		}
+		const database = join(section.buildRoot, "compile_commands.json");
+		const args = compileArguments(database, "main.cpp");
+		if (args === null) {
+			broken = true;
+			row.details.push(
+				`fixture FAIL  ${half.profile}: the build wrote no compile command for main.cpp in ${relative(root, database)}`,
+			);
+			break;
+		}
+		const hasDebug = args.includes("-g");
+		const flags = args.filter((arg) => arg.startsWith("-O") || arg === "-g").join(" ");
+		row.details.push(
+			`profile      ${hasDebug === half.debugInfo ? "PASS" : "FAIL"}  ${half.profile}: the compile command carries ${JSON.stringify(flags)}, ${hasDebug ? "with" : "without"} -g`,
+		);
+		if (hasDebug !== half.debugInfo) {
+			passed = false;
+			findings.push(
+				`${directory}: ${half.configuration} ${half.debugInfo ? "must" : "must not"} produce debug info, but the compile command ${half.debugInfo ? "has no" : "has"} -g — \`cd ${directory} && rg -- -g ${relative(root, database)}\` shows ${JSON.stringify(flags)}.`,
+			);
+		}
+	}
+	row.build = passed ? "PASS" : "FAIL";
+	return { row, findings, broken };
+}
+
+/**
+ * One target row: asking for one executable builds it and not its sibling, and asking for nothing
+ * builds both.
+ *
+ * The artefacts are checked, not the argv: a build that names a target and still writes everything
+ * would pass an argv-only test and fail the user whose second executable takes ten minutes.
+ */
+async function judgeOneTarget(
+	fixture: Fixture,
+	root: string,
+	plannerBin: string,
+	cmake: string,
+): Promise<{ row: Row; findings: string[]; broken: boolean }> {
+	const directory = basename(root);
+	writeFixture(root, fixture);
+	const row: Row = {
+		capability: fixture.name,
+		build: "FAIL",
+		analysis: "n/a",
+		targets: "FAIL",
+		tree: "PASS",
+		details: [],
+		commands: [],
+	};
+	const findings: string[] = [];
+	let broken = false;
+
+	let one: Plan;
+	try {
+		one = await askPlan(plannerBin, root, { target: "cpp:parity_one" });
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		row.details.push(
+			`target       FAIL  the product cannot be asked for one target: ${message}`,
+		);
+		findings.push(
+			`${directory}: the product cannot be asked to build one target — \`cd ${directory} && quarry-plan . --target cpp:parity_one\` answers: ${message}`,
+		);
+		one = await askPlan(plannerBin, root);
+	}
+	const section = one.cmake;
+	if (!section) {
+		broken = true;
+		row.details.push("fixture FAIL  the product reports no CMake plan");
+		return { row, findings, broken };
+	}
+	const named = section.build.join(" ").includes("--target parity_one");
+	row.details.push(
+		`target       ${named ? "PASS" : "FAIL"}  the plan names one target: ${commandLine(root, section.build)}`,
+	);
+	const first = await runBuild(root, section, directory, cmake, row);
+	if (!first.ok) {
+		broken = true;
+		row.details.push(`fixture FAIL  one-target build: ${first.reason}`);
+		return { row, findings, broken };
+	}
+	const builtOne = wroteExecutable(root, "parity_one");
+	const builtTwo = wroteExecutable(root, "parity_two");
+	row.commands.push({
+		line: `cd ${directory} && ls -l build/parity_one build/parity_two`,
+		verdict: builtOne && !builtTwo ? "PASS" : "FAIL",
+	});
+	row.details.push(
+		`build        ${builtOne && !builtTwo ? "PASS" : "FAIL"}  after --target parity_one: parity_one ${builtOne ? "written" : "missing"}, parity_two ${builtTwo ? "written" : "missing"}`,
+	);
+	row.build = named && builtOne && !builtTwo ? "PASS" : "FAIL";
+	if (row.build === "FAIL") {
+		findings.push(
+			`${directory}: asking for parity_one ${builtTwo ? "also built parity_two" : builtOne ? "did not build parity_one" : "built nothing"} — \`cd ${directory} && ${commandLine(root, section.build)}\` ${section.build.includes("--target") ? "does name a target" : "names no target, so cmake builds every target in the tree"}.`,
+		);
+	}
+
+	const all = await askPlan(plannerBin, root);
+	const everything = all.cmake;
+	if (!everything) {
+		broken = true;
+		row.details.push("fixture FAIL  the product reports no CMake plan without a target");
+		return { row, findings, broken };
+	}
+	const second = await runBuild(root, everything, directory, cmake, row);
+	if (!second.ok) {
+		broken = true;
+		row.details.push(`fixture FAIL  whole-tree build: ${second.reason}`);
+		return { row, findings, broken };
+	}
+	const bothOne = wroteExecutable(root, "parity_one");
+	const bothTwo = wroteExecutable(root, "parity_two");
+	row.commands.push({
+		line: `cd ${directory} && ls -l build/parity_one build/parity_two`,
+		verdict: bothOne && bothTwo ? "PASS" : "FAIL",
+	});
+	row.details.push(
+		`targets      ${bothOne && bothTwo ? "PASS" : "FAIL"}  after no --target: parity_one ${bothOne ? "written" : "missing"}, parity_two ${bothTwo ? "written" : "missing"}; the plan ${everything.target === null ? "names no target" : `still names ${everything.target}`}`,
+	);
+	row.targets = bothOne && bothTwo ? "PASS" : "FAIL";
+	if (row.targets === "FAIL") {
+		findings.push(
+			`${directory}: a build with no target left parity_one ${bothOne ? "written" : "missing"} and parity_two ${bothTwo ? "written" : "missing"} — \`cd ${directory} && ${commandLine(root, everything.build)}\`.`,
+		);
+	}
+	return { row, findings, broken };
+}
+
+/** A path with the fixture root written as `.`, for a detail line. */
+function relative(root: string, path: string): string {
+	return path.startsWith(`${root}/`) ? path.slice(root.length + 1) : path;
 }
 
 async function judge(
@@ -799,6 +1099,25 @@ async function main() {
 		broken = broken || judged.broken;
 		console.log(
 			`build ${judged.row.build} · analysis ${judged.row.analysis} · targets ${judged.row.targets} · tree ${judged.row.tree}`,
+		);
+	}
+
+	// Two capabilities with no language-server consumer: a profile that reaches the compiler, and a
+	// build that names one target. Each judges itself, because the columns the other rows measure
+	// (analysis, the dropdown) say nothing about either.
+	for (const extra of [
+		{ fixture: profileFixture(), judged: judgeProfile },
+		{ fixture: twoTargetsFixture(), judged: judgeOneTarget },
+	]) {
+		const root = join(tempRoot, extra.fixture.name.replace(/[/: ]+/g, "-"));
+		mkdirSync(root, { recursive: true });
+		process.stdout.write(`running ${extra.fixture.name} … `);
+		const result = await extra.judged(extra.fixture, root, plannerBin, cmake);
+		rows.push(result.row);
+		findings.push(...result.findings);
+		broken = broken || result.broken;
+		console.log(
+			`build ${result.row.build} · analysis ${result.row.analysis} · targets ${result.row.targets} · tree ${result.row.tree}`,
 		);
 	}
 

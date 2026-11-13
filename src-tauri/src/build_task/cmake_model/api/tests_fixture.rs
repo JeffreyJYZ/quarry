@@ -129,8 +129,13 @@ pub mod cmake_api_fixture {
         )
         .expect("manifest");
 
-        let report = run_cmake_build(&BuildState::default(), &root.display().to_string(), false)
-            .expect("cmake is runnable");
+        let report = run_cmake_build(
+            &BuildState::default(),
+            &root.display().to_string(),
+            false,
+            None,
+        )
+        .expect("cmake is runnable");
 
         assert!(!report.success, "the configure failed: {}", report.summary);
         assert!(

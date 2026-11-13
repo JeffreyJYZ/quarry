@@ -1,6 +1,7 @@
 import type { Diagnostic, LaunchConfig } from "@/lib/project/api";
 import { describeError } from "@/lib/project/errors";
 import type { LaunchFailure } from "@/lib/run/failureLines";
+import type { BuildProfile } from "@/lib/settings/model";
 
 /** What a build reports, narrowed to the part launching depends on. */
 type BuildOutcome = {
@@ -41,11 +42,12 @@ export type BuildThenResolveResult =
 export async function buildThenResolve(options: {
 	root: string;
 	targetId: string;
-	profile: "debug" | "release";
+	profile: BuildProfile;
 	stopOnEntry: boolean;
 	build: (
 		root: string,
-		profile: "debug" | "release",
+		profile: BuildProfile,
+		target?: string | null,
 	) => Promise<{
 		success: boolean;
 		summary: string;
@@ -56,7 +58,9 @@ export async function buildThenResolve(options: {
 }): Promise<BuildThenResolveResult> {
 	let report: BuildOutcome;
 	try {
-		report = await options.build(options.root, options.profile);
+		// The run-target id names the one CMake target this launch will run, so the build before a
+		// launch compiles that target instead of the whole tree. A Cargo id selects nothing there.
+		report = await options.build(options.root, options.profile, options.targetId);
 	} catch (error) {
 		return { ok: false, stage: "build", message: describeError(error), diagnostics: [] };
 	}

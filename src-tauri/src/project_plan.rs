@@ -16,10 +16,15 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::build_task::{CMAKE_PROGRAM, CmakeOptions, PlainPlan, cmake_plan, plain_build_plan};
-use crate::launch::{list_targets, resolve_target};
+use crate::build_task::{
+    CMAKE_PROGRAM, CmakeOptions, PlainPlan, cmake_plan_target, plain_build_plan,
+};
+use crate::launch::{cmake_build_target, list_targets, resolve_target};
 use crate::project::inspect;
 use crate::types::ProjectKind;
+
+/// Re-exported so a caller of this seam (the `quarry-plan` example) names the same type.
+pub use crate::build_task::BuildProfile;
 
 /// Everything one project would do, by consumer: build, analysis and run targets.
 #[derive(Serialize)]
@@ -45,6 +50,10 @@ pub struct CmakeSection {
     pub program: Option<String>,
     /// The project's CMake settings, echoed so a caller sees what the plan was computed from.
     pub options: Options,
+    /// The profile the plan was asked for, in the spelling the settings file uses.
+    pub profile: String,
+    /// The one target this build names, or null when it builds everything.
+    pub target: Option<String>,
     pub build_root: String,
     /// Directory both argv run in: `run_cmake_build` uses the source root for both.
     pub cwd: String,
@@ -52,6 +61,14 @@ pub struct CmakeSection {
     pub configure: Vec<String>,
     pub build: Vec<String>,
     pub note: Option<String>,
+}
+
+/// What one plan is asked for: a profile, and one target or everything.
+#[derive(Clone, Debug, Default)]
+pub struct PlanRequest {
+    pub profile: BuildProfile,
+    /// A run-target id (`cpp:<name>`) or a bare CMake target name; `None` builds everything.
+    pub target: Option<String>,
 }
 
 /// The CMake section of `.quarry/settings.json`; every value empty means "the project decides".
@@ -88,14 +105,15 @@ pub struct Handoff {
     pub database_dir: Option<String>,
 }
 
-/// Ask the product what it would do with `root`, for a debug or release profile.
-pub fn project_plan(root: &str, release: bool) -> Result<Plan, String> {
+/// Ask the product what it would do with `root`, for one profile and one target selection.
+pub fn project_plan(root: &str, request: &PlanRequest) -> Result<Plan, String> {
     let info = inspect(root)?;
     let source = Path::new(&info.root);
+    let target = request.target.as_deref().and_then(cmake_build_target);
     let cmake = match info.kind {
         ProjectKind::Cmake => {
             let options = CmakeOptions::for_root(source);
-            let plan = cmake_plan(source, release, &options)?;
+            let plan = cmake_plan_target(source, request.profile, &options, target.as_deref())?;
             Some(CmakeSection {
                 program: crate::resolve::resolve(CMAKE_PROGRAM)
                     .map(|found| found.path.display().to_string()),
@@ -104,6 +122,8 @@ pub fn project_plan(root: &str, release: bool) -> Result<Plan, String> {
                     build_dir: options.build_dir.clone(),
                     toolchain_file: options.toolchain_file.clone(),
                 },
+                profile: request.profile.wire().to_string(),
+                target,
                 build_root: plan.build_root.display().to_string(),
                 cwd: info.root.clone(),
                 configure: plan.configure,
