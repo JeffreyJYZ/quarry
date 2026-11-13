@@ -429,11 +429,22 @@ export async function judgeMsvcToolchain(
 		);
 		return { row, findings, broken: false };
 	}
-	const artifact = plan.targets[0]?.program ?? null;
-	const prints = artifact !== null && harness.isFile(artifact);
+	// The dropdown's answer after the build: the target list is refreshed the way the app refreshes
+	// it, so this is the program Run would launch rather than a prediction made before configure.
+	const after = await harness.ask();
+	row.commands.push({ line: `cd ${directory} && quarry-plan .`, verdict: "PASS" });
+	const artifact = after.targets[0]?.program ?? null;
+	const written = artifact !== null && harness.isFile(artifact);
+	const executed = written && artifact !== null ? await harness.run(artifact, [], root) : null;
+	const prints = executed !== null && executed.stdout.includes("config=1");
 	row.details.push(
-		`build        ${prints ? "PASS" : "FAIL"}  the plan's target ${artifact === null ? "is unset" : shown(root, artifact)} ${prints ? "exists" : "does not exist"}`,
+		`build        ${written && prints ? "PASS" : "FAIL"}  the plan's target ${artifact === null ? "is unset" : shown(root, artifact)} ${written ? "exists" : "does not exist"}${executed === null ? "" : ` and printed ${JSON.stringify(executed.stdout.trim())}`}`,
 	);
+	if (!(written && prints)) {
+		findings.push(
+			`${directory}: after the build the target list names ${artifact === null ? "no program" : shown(root, artifact)}, which ${written ? `printed ${JSON.stringify(executed?.stdout.trim() ?? "")} (exit ${executed?.code ?? "none"})` : "does not exist"} — \`cd ${directory} && ls -l ${artifact === null ? "." : shown(root, artifact)}\`.`,
+		);
+	}
 
 	// 3. The analysis: clangd told to query cl.exe, and answering in both the project header and the
 	//    standard one.
