@@ -46,22 +46,47 @@ pub mod tests_group_7 {
         let state = Arc::new(LspState::default());
         let root = "rust-analyzer::/tmp/quarry-lsp-claim";
 
-        // Stand in for the start that got there first: it holds the reservation, brings a session up
-        // and registers it, which is what lets the waiter proceed.
+        // Stand in for the start that got there first: it holds the reservation and registers its
+        // session only once the waiter below has proved it is already waiting, so the wait is an
+        // observed fact instead of a race against an owner thread that might finish first.
         lock(&state.in_flight).insert(root.to_string());
-        let first = Arc::clone(&state);
+        let (release, released) = std::sync::mpsc::channel::<()>();
+        let owner_state = Arc::clone(&state);
         let owner = thread::spawn(move || {
-            thread::sleep(Duration::from_millis(30));
+            released
+                .recv()
+                .expect("the test releases the owner once the waiter is waiting");
             let session = session_on_cat();
-            lock(&first.sessions).insert(root.to_string(), Arc::clone(&session));
-            lock(&first.in_flight).remove(root);
+            lock(&owner_state.sessions).insert(root.to_string(), Arc::clone(&session));
+            lock(&owner_state.in_flight).remove(root);
             session
         });
 
-        let claimed = tauri::async_runtime::block_on(claim_start(&state, root));
+        let (claims, claimed) = std::sync::mpsc::channel();
+        let waiter_state = Arc::clone(&state);
+        let waiter = thread::spawn(move || {
+            let claim = tauri::async_runtime::block_on(claim_start(&waiter_state, root));
+            let _ = claims.send(claim);
+        });
 
+        // Nothing has released the reservation yet, so a call that returned now reserved a second
+        // session instead of waiting for this one. The bound is orders of magnitude above the
+        // microseconds a return takes, so it measures the wait and not the machine's load.
+        assert!(
+            matches!(
+                claimed.recv_timeout(Duration::from_secs(2)),
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+            ),
+            "the waiter must wait for the reserved start instead of reserving a session of its own"
+        );
+
+        release.send(()).expect("the owner is waiting for it");
         let registered = owner.join().expect("the first start finished");
-        let claimed = claimed.expect("a waiter returns the session instead of reserving");
+        let claimed = claimed
+            .recv_timeout(Duration::from_secs(5))
+            .expect("the waiter returns once the session is registered")
+            .expect("a waiter returns the session instead of reserving");
+        waiter.join().expect("the waiter finished");
         assert!(Arc::ptr_eq(&claimed, &registered));
         assert_eq!(lock(&state.sessions).len(), 1);
     }

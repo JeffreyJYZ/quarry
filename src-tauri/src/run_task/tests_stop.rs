@@ -63,14 +63,38 @@ pub mod stop_tests {
         }
     }
 
+    /// A TERM-ignoring shell in its own process group that announces its installed trap on stdout.
+    fn term_ignoring_shell() -> Child {
+        use std::os::unix::process::CommandExt;
+        let mut command = Command::new("/bin/sh");
+        command
+            .args(["-c", "trap '' TERM; echo ready; while :; do :; done"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .process_group(0);
+        command.spawn().expect("spawn a TERM-ignoring shell")
+    }
+
+    /// The marker is written after `trap` took effect, so reading it is the happens-before edge the
+    /// signal needs; a sleep in its place could let a loaded machine deliver TERM before the trap
+    /// existed, and the shell would then die without escalating.
+    fn wait_for_trap(child: &mut Child) {
+        let stdout = child.stdout.take().expect("the shell's stdout");
+        let mut marker = String::new();
+        BufReader::new(stdout)
+            .read_line(&mut marker)
+            .expect("read the trap marker");
+        assert_eq!(
+            marker.trim(),
+            "ready",
+            "the shell must install its trap first"
+        );
+    }
+
     #[test]
     fn a_child_that_ignores_the_polite_signal_is_killed_hard() {
-        let child = grouped("/bin/sh", "-c")
-            .args(["trap '' TERM; while :; do :; done"])
-            .spawn()
-            .expect("spawn a TERM-ignoring shell");
-        // The trap is installed a moment after the shell starts; a TERM before that is untrapped.
-        thread::sleep(Duration::from_millis(300));
+        let mut child = term_ignoring_shell();
+        wait_for_trap(&mut child);
 
         match terminate(child, Duration::from_millis(200), Duration::from_secs(2)) {
             Terminated::Stopped(stop) => {
