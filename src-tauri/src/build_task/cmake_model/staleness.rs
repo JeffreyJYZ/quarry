@@ -16,9 +16,9 @@
 //! configured again.
 //!
 //! [`super::model_inputs`] decides which files count. Detail: the comparison lives in `build_task`
-//! because the build is what must decide it. The LSP hand-off keeps its own narrower check
-//! (`lsp/handoff/freshness.rs`, which scans two levels and compares nothing else) and should adopt
-//! [`super::model_inputs`] when its lane is next touched.
+//! because the build is what must decide it; the language-server hand-off asks the same function
+//! rather than keeping a scan of its own, and synthesises a missing database from a current reply
+//! instead of configuring again for it.
 
 #![allow(unused_imports)]
 

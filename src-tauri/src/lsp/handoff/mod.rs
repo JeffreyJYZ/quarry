@@ -28,14 +28,8 @@ pub use configure::*;
 mod database;
 pub use database::*;
 
-mod freshness;
-pub use freshness::*;
-
 mod tests_handoff;
 pub use tests_handoff::*;
-
-mod tests_freshness;
-pub use tests_freshness::*;
 
 mod tests_plan;
 pub use tests_plan::*;

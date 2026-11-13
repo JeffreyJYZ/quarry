@@ -119,46 +119,33 @@ pub fn run_cmake_build(
     let mut body = String::new();
     let mut success = true;
     let mut stopped = false;
-    let mut configured = false;
 
     if need.is_some() {
-        // The query has to exist before the configure that answers it: CMake writes only the
-        // objects a client asked for, and it reads the query once, as the configure starts.
-        if let Err(error) = write_query(&plan.build_root) {
-            notes.push(error);
-        }
-
-        // Both steps run from the project root: `--preset` is looked up against the working
-        // directory, while an absolute `--build <path>` does not care where it starts.
-        let configure = run_cmake(state, &plan.configure, source_root)?;
-        body.push_str(&configure.text);
-        success = configure.success;
-        stopped = configure.stopped;
-        configured = true;
-
-        // The reply and the model on disk are the last configure that succeeded, so a failure here
-        // says so instead of letting the old targets pass for current ones. The database is left
-        // alone: a half-built model, or none, is worse for analysis than the previous one.
-        if !success && !stopped && reconfigured {
-            notes.push(format!(
-                "the configure failed, so {} still holds the model of its last successful configure",
-                plan.build_root.display()
-            ));
-        }
+        // The whole configure sequence lives in one place, shared with the language-server
+        // hand-off: query first, the plan's own configure, then the database from the reply where
+        // the generator writes none.
+        let outcome = configure_tree(
+            ConfigureRequest {
+                build_root: &plan.build_root,
+                argv: &plan.configure,
+                had_previous: reconfigured,
+            },
+            |argv| {
+                let run = run_cmake(state, argv, source_root)?;
+                Ok(ConfigureRun {
+                    success: run.success,
+                    stopped: run.stopped,
+                    text: run.text,
+                })
+            },
+        )?;
+        body.push_str(&outcome.text);
+        notes.extend(outcome.notes);
+        success = outcome.success;
+        stopped = outcome.stopped;
     }
 
     if success && !stopped {
-        // Read only after a configure that succeeded: a failed one can leave a reply half written,
-        // and a database built from half a project is worse than the previous one still on disk.
-        if configured {
-            match synthesize_database(&plan.build_root) {
-                Ok(Some(written)) => notes.push(written.note()),
-                Ok(None) => {}
-                Err(why) => notes.push(format!(
-                    "no compiler database from the CMake file API: {why}"
-                )),
-            }
-        }
         let outcome = run_cmake(state, &plan.build, source_root)?;
         body.push_str(&outcome.text);
         success = outcome.success;

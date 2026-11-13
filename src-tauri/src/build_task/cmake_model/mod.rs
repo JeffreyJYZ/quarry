@@ -46,6 +46,9 @@ pub use generator::*;
 mod plan;
 pub use plan::*;
 
+mod configure;
+pub use configure::*;
+
 mod model_inputs;
 pub use model_inputs::*;
 
@@ -78,6 +81,9 @@ pub use tests_fixture::*;
 
 mod tests_staleness;
 pub use tests_staleness::*;
+
+mod tests_model_inputs;
+pub use tests_model_inputs::*;
 
 mod tests_stale_fixture;
 pub use tests_stale_fixture::*;

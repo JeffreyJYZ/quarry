@@ -9,8 +9,15 @@ use super::*;
 
 #[cfg(test)]
 pub mod tests {
+    use crate::build_task::{CmakeOptions, CmakePlan, cmake_plan};
+
     use super::support::*;
     use super::*;
+
+    fn plan_for(fixture: &Fixture) -> CmakePlan {
+        let root = fixture.root();
+        cmake_plan(&root, false, &CmakeOptions::for_root(&root)).expect("the project's own plan")
+    }
 
     #[test]
     fn the_presets_binary_directory_is_named_when_it_holds_a_database() {
@@ -65,11 +72,11 @@ pub mod tests {
         let fixture = Fixture::new("plan-argv");
         fixture.write("CMakeLists.txt", CMAKE_LISTS);
         fixture.write("CMakePresets.json", PRESETS);
-        let root = fixture.root();
-        let build = root.join("out/debug");
         fixture.write("out/debug/CMakeCache.txt", "");
+        let plan = plan_for(&fixture);
+        assert_eq!(plan.build_root, fixture.root().join("out/debug"));
 
-        let flags = configure_argv(&root, &build);
+        let flags = configure_argv(&plan);
 
         assert!(flags.iter().any(|flag| flag == "--preset"), "{flags:?}");
         assert!(flags.iter().any(|flag| flag == "debug"), "{flags:?}");
@@ -80,9 +87,7 @@ pub mod tests {
             "{flags:?}"
         );
         assert!(
-            !flags
-                .iter()
-                .any(|flag| flag.starts_with("-DCMAKE_BUILD_TYPE=")),
+            !flags.iter().any(|flag| flag.starts_with(BUILD_TYPE_FLAG)),
             "the preset carries its own build type: {flags:?}"
         );
     }
@@ -91,11 +96,10 @@ pub mod tests {
     fn a_configured_tree_that_is_not_a_preset_keeps_its_build_type() {
         let fixture = Fixture::new("recipe-argv");
         fixture.write("CMakeLists.txt", CMAKE_LISTS);
-        let root = fixture.root();
-        let build = root.join("build");
         fixture.write("build/CMakeCache.txt", "");
+        let plan = plan_for(&fixture);
 
-        let flags = configure_argv(&root, &build);
+        let flags = configure_argv(&plan);
 
         assert!(
             flags
@@ -104,10 +108,22 @@ pub mod tests {
             "{flags:?}"
         );
         assert!(
-            !flags
-                .iter()
-                .any(|flag| flag.starts_with("-DCMAKE_BUILD_TYPE=")),
+            !flags.iter().any(|flag| flag.starts_with(BUILD_TYPE_FLAG)),
             "reconfiguring an existing tree must not flip its build type: {flags:?}"
+        );
+    }
+
+    #[test]
+    fn a_fresh_directory_keeps_the_build_type_the_plan_forces() {
+        let fixture = Fixture::new("fresh-argv");
+        fixture.write("CMakeLists.txt", CMAKE_LISTS);
+        let plan = plan_for(&fixture);
+
+        let flags = configure_argv(&plan);
+
+        assert!(
+            flags.iter().any(|flag| flag.starts_with(BUILD_TYPE_FLAG)),
+            "a tree that has never been configured gets the plan's build type: {flags:?}"
         );
     }
 }

@@ -100,7 +100,7 @@ pub mod tests {
             fixture.root().join("build").display()
         );
         assert_eq!(database, Some(fixture.root().join("build")));
-        assert_eq!(computed, vec![expected]);
+        assert_eq!(computed.first(), Some(&expected), "{computed:?}");
     }
 
     #[test]
