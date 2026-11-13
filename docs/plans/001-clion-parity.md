@@ -99,6 +99,36 @@ Launch configuration lives at `.quarry/launch.json` in the project root:
 | embedded terminal                                                | `portable-pty`                                           | work |
 | git status, gutter, blame, diff                                  | `git` CLI                                                | work |
 
+### 4.1 What the C/C++ compile-and-analysis path verifies, and where
+
+`scripts/cpp-parity-probe.ts` is the acceptance test for the compiler half of this matrix. It builds
+real projects the way CLion builds them, asks the product what it would run
+(`src-tauri/examples/quarry-plan.rs` → `project_plan`), executes exactly that, and judges analysis
+with a real clangd started on the reported flags. Run it with `bun scripts/cpp-parity-probe.ts`; the
+`integration` CI job runs it on every push to `main`.
+
+Verified on macOS with Apple clang 21, Homebrew GCC 16, CMake 4.4/4.5:
+
+| capability                       | what it proves                                                                                |
+| -------------------------------- | --------------------------------------------------------------------------------------------- |
+| presets                          | configure goes through `--preset`, lands in the preset's `binaryDir`                          |
+| toolchain file                   | `CMAKE_TOOLCHAIN_FILE` reaches the configure                                                  |
+| multi-target                     | a library header and an `extern` resolve; targets come from CMake's model                     |
+| generator: Xcode                 | no database written by the generator → one synthesised from the file API, in the plan's tree  |
+| generator: Ninja Multi-Config    | same, plus per-configuration artefacts                                                        |
+| system headers                   | resolve through the compiler CMake chose (`--query-driver`)                                   |
+| plain                            | a project with no CMake and no database analyses from flags derived from its build            |
+| mixed-languages                  | a `.c` unit is compiled and analysed as C, a `.cpp` as C++, and the link crosses `extern "C"` |
+| profile                          | `RelWithDebInfo`/`MinSizeRel` reach the compiler, and analysis uses the profile being built   |
+| two-targets                      | building one target does not build the other                                                  |
+| multi-config                     | each configuration writes, and the plan names, its own artefact                               |
+| toolchain: gcc                   | a compiler clangd cannot recognise is queried for its include paths                           |
+| toolchain: gcc behind a launcher | the same, with the compiler behind a `ccache`-shaped wrapper                                  |
+
+Not verified here, and therefore not claimed: MSVC and the Visual Studio generator, Windows or Linux
+toolchains, cross-compilers other than the one toolchain file above, and diagnostics parity beyond
+clangd's own output. A row that skips (no GCC on the machine) is a skip, never a pass.
+
 ## 5. Slices
 
 Estimates assume solo work on a familiar stack, full days.
