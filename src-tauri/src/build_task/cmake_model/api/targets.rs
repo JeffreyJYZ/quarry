@@ -80,6 +80,33 @@ pub fn target_artifact(model: &Codemodel, target: &Target) -> Option<PathBuf> {
     target.artifacts.first().cloned()
 }
 
+/// The executables one named configuration defines, with no other configuration's artifact.
+///
+/// A caller that asked for a configuration means that one: a Release build's artefact is not a
+/// substitute for the RelWithDebInfo path the caller named, and a configuration that was not built
+/// yet is answered with the path its build will write, not with a sibling's file.
+pub fn executables_in(model: &Codemodel, configuration: &str) -> Vec<(String, PathBuf)> {
+    let Some(active) = model.configuration(configuration) else {
+        return Vec::new();
+    };
+    let mut found: Vec<(String, PathBuf)> = Vec::new();
+    for target in &active.targets {
+        if !target.kind.is_executable() || found.iter().any(|(name, _)| name == &target.name) {
+            continue;
+        }
+        let artifact = target
+            .artifacts
+            .iter()
+            .find(|path| path.is_file())
+            .or_else(|| target.artifacts.first())
+            .cloned();
+        if let Some(path) = artifact {
+            found.push((target.name.clone(), path));
+        }
+    }
+    found
+}
+
 /// The executables a build tree's reply names, or nothing when there is no readable reply.
 ///
 /// A tree CMake has never configured, or one whose reply was written by a CMake too old for the
@@ -87,6 +114,17 @@ pub fn target_artifact(model: &Codemodel, target: &Target) -> Option<PathBuf> {
 pub fn cmake_run_targets(build_root: &Path) -> Vec<(String, PathBuf)> {
     match read_codemodel(build_root) {
         Ok(model) => executables(&model, PREFERRED_CONFIGURATION),
+        Err(_) => Vec::new(),
+    }
+}
+
+/// The executables one configuration of a build tree names, for a caller that asked for it.
+///
+/// A tree whose model names no such configuration — a single-config generator configured for one —
+/// answers empty, and the caller falls back to [`cmake_run_targets`] rather than losing its target.
+pub fn cmake_run_targets_in(build_root: &Path, configuration: &str) -> Vec<(String, PathBuf)> {
+    match read_codemodel(build_root) {
+        Ok(model) => executables_in(&model, configuration),
         Err(_) => Vec::new(),
     }
 }

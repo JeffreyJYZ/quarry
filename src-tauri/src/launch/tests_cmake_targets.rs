@@ -114,7 +114,7 @@ pub mod cmake_targets_tests {
         let root = directory.path().canonicalize().expect("canonical root");
         let info = info(&root, "demo", ProjectKind::Cmake);
 
-        let config = resolve_cpp(&info, "demo_app", true).expect("the target resolves");
+        let config = resolve_cpp_in(&info, "demo_app", true, "Debug").expect("the target resolves");
 
         assert_eq!(Path::new(&config.program), root.join("Debug/demo_app"));
         assert!(config.stop_on_entry);

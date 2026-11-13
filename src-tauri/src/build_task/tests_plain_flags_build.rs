@@ -95,6 +95,12 @@ mod tests {
 
         // The plan the probe reads spawns this same argv, and the second read writes no note.
         let plan = plain_build_plan(&path, "app").expect("the product plans a plain build");
+        assert_eq!(
+            plan.commands.len(),
+            1,
+            "one language compiles and links in one command"
+        );
+        let argv = &plan.commands[0].argv;
         for expected in [
             format!("-I{}", root.display()),
             "-DPARITY_PLAIN=1".to_string(),
@@ -104,11 +110,7 @@ mod tests {
                 .display()
                 .to_string(),
         ] {
-            assert!(
-                plan.argv.contains(&expected),
-                "{expected} in {:?}",
-                plan.argv
-            );
+            assert!(argv.contains(&expected), "{expected} in {argv:?}");
         }
         assert!(plan.note.is_none(), "unchanged flags write nothing new");
         let _ = fs::remove_dir_all(&root);

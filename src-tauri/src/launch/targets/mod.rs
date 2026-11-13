@@ -48,22 +48,44 @@ pub fn list_targets(root: &str) -> Result<Vec<RunTarget>, String> {
 /// The id's kind must match the project's: a list only ever produces its own project's ids, so a
 /// mismatched one is a stale dropdown rather than a target to guess at.
 pub fn resolve_target(root: &str, id: &str, stop_on_entry: bool) -> Result<LaunchConfig, String> {
+    resolve_target_in(root, id, stop_on_entry, None)
+}
+
+/// The launch configuration for one target, for the configuration a caller names.
+///
+/// `configuration` is the CMake configuration the build will use; `None` reads the project's own
+/// saved profile. A CMake project lists one artifact per configuration, so this is what keeps Run
+/// pointing at the file the configuration's build writes.
+pub fn resolve_target_in(
+    root: &str,
+    id: &str,
+    stop_on_entry: bool,
+    configuration: Option<&str>,
+) -> Result<LaunchConfig, String> {
     let info = project::inspect(root)?;
+    let configuration = configuration
+        .map(str::to_string)
+        .unwrap_or_else(|| resolve_cpp_configuration(&info));
     match (info.kind, parse_target_id(id)?) {
         (ProjectKind::Cargo, TargetId::Cargo { package, target }) => {
             resolve_cargo(&info, &package, &target, stop_on_entry)
         }
         (ProjectKind::Cmake | ProjectKind::CompileCommands, TargetId::Cpp { target }) => {
-            resolve_cpp(&info, &target, stop_on_entry)
+            resolve_cpp_in(&info, &target, stop_on_entry, &configuration)
         }
         (ProjectKind::Unknown, TargetId::Cpp { target }) if plain_cpp(&info) => {
-            resolve_cpp(&info, &target, stop_on_entry)
+            resolve_cpp_in(&info, &target, stop_on_entry, &configuration)
         }
         (kind, _) => Err(format!(
             "run target \"{id}\" does not belong to a {kind:?} project ({}): list the targets again",
             info.root
         )),
     }
+}
+
+/// The configuration a project's own settings name, which is what its builds use.
+fn resolve_cpp_configuration(info: &ProjectInfo) -> String {
+    crate::launch::saved_configuration(Path::new(&info.root))
 }
 
 /// Whether this directory is a C/C++ project quarry compiles itself.

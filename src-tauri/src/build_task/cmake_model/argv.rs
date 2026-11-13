@@ -21,15 +21,30 @@ pub fn cmake_configure_argv(
     build_root: &str,
     profile: impl Into<BuildProfile>,
 ) -> Vec<String> {
-    vec![
+    cmake_configure_argv_with(source_root, build_root, Some(cmake_config(profile)))
+}
+
+/// Configure a tree, naming the build type only when the generator takes one at configure time.
+///
+/// `build_type` is `None` for a multi-config generator: it chooses its configuration on the build
+/// command line, and a `-DCMAKE_BUILD_TYPE` there is a value the tree never uses.
+pub fn cmake_configure_argv_with(
+    source_root: &str,
+    build_root: &str,
+    build_type: Option<&str>,
+) -> Vec<String> {
+    let mut argv = vec![
         CMAKE_PROGRAM.to_string(),
         "-S".to_string(),
         source_root.to_string(),
         "-B".to_string(),
         build_root.to_string(),
-        format!("-DCMAKE_BUILD_TYPE={}", cmake_config(profile)),
-        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON".to_string(),
-    ]
+    ];
+    if let Some(build_type) = build_type {
+        argv.push(format!("-DCMAKE_BUILD_TYPE={build_type}"));
+    }
+    argv.push("-DCMAKE_EXPORT_COMPILE_COMMANDS=ON".to_string());
+    argv
 }
 
 /// `cmake --build <build root> --config <configuration> [--target <name>]`.

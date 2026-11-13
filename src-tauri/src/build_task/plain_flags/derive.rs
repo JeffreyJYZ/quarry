@@ -67,20 +67,36 @@ impl PlainFlags {
         }
     }
 
-    /// The driver this project compiles with.
-    pub fn compiler(&self) -> &'static str {
-        if self.cxx { "clang++" } else { "clang" }
+    /// Whether one source is C: its own extension decides, never the project's mixed set.
+    ///
+    /// `cxx` only says the project contains C++; a `.c` file inside it is still C, and compiling it
+    /// with the C++ driver and `-std=c++20` breaks every C-only construct it uses.
+    pub fn is_c(source: &Path) -> bool {
+        crate::extensions::extension_of(source) == "c"
     }
 
-    /// The standard for this project's language, used when the project names none.
-    pub fn standard(&self) -> &'static str {
-        if self.cxx { CXX_STANDARD } else { C_STANDARD }
+    /// The driver one source compiles with.
+    pub fn compiler_for(&self, source: &Path) -> &'static str {
+        if Self::is_c(source) {
+            "clang"
+        } else {
+            "clang++"
+        }
+    }
+
+    /// The standard one source is compiled against when the project names none.
+    pub fn standard_for(&self, source: &Path) -> &'static str {
+        if Self::is_c(source) {
+            C_STANDARD
+        } else {
+            CXX_STANDARD
+        }
     }
 
     /// What the build command and a database entry share: the searches, then the project's own flags.
     ///
     /// The standard is left out on purpose: the build command lets a project-supplied `-std=` win by
-    /// appending it later, and [`Self::command_flags`] is what a database entry records.
+    /// appending it later, and [`Self::command_flags_for`] is what a database entry records.
     pub fn flags(&self) -> Vec<String> {
         let mut flags: Vec<String> = self
             .includes
@@ -91,18 +107,30 @@ impl PlainFlags {
         flags
     }
 
-    /// The flags one translation unit compiles with, this project's standard included once.
-    pub fn command_flags(&self) -> Vec<String> {
+    /// The flags one translation unit compiles with, its language's standard included once.
+    pub fn command_flags_for(&self, source: &Path) -> Vec<String> {
         let mut flags = self.flags();
         if !flags.iter().any(|flag| flag.starts_with("-std=")) {
-            flags.push(self.standard().to_string());
+            flags.push(self.standard_for(source).to_string());
         }
         flags
     }
 
     /// The flags as one readable line, for the note a build reports.
-    pub fn summary(&self) -> String {
-        self.command_flags().join(" ")
+    ///
+    /// A mixed project carries one standard per language, so the line names each of them once
+    /// instead of claiming the C++ one for a file compiled as C.
+    pub fn summary_for(&self, sources: &[PathBuf]) -> String {
+        let mut flags = self.flags();
+        if !flags.iter().any(|flag| flag.starts_with("-std=")) {
+            for source in sources {
+                let standard = self.standard_for(source).to_string();
+                if !flags.contains(&standard) {
+                    flags.push(standard);
+                }
+            }
+        }
+        flags.join(" ")
     }
 }
 
