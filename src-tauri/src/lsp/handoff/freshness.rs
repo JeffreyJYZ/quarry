@@ -97,42 +97,6 @@ fn configure_lock() -> std::sync::MutexGuard<'static, ()> {
     SLOT.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// `cmake -S <root> -B <database dir> -DCMAKE_EXPORT_COMPILE_COMMANDS=ON`.
-///
-/// The build type is only set for a directory that has never been configured: reconfiguring an
-/// existing Release tree must not flip it to Debug just to export the database.
-pub fn configure(root: &Path, database_dir: &Path) -> Result<(), String> {
-    let mut command = crate::resolve::command(crate::build_task::CMAKE_PROGRAM)?;
-    command
-        .args(argv(root, database_dir))
-        .current_dir(root)
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped());
-    let stderr = run_bounded(command, CONFIGURE_TIMEOUT)?;
-    if stderr.success {
-        return Ok(());
-    }
-    Err(format!("cmake configure failed: {}", tail(&stderr.text)))
-}
-
-/// The configure command line, program excluded.
-pub fn argv(root: &Path, database_dir: &Path) -> Vec<String> {
-    let mut argv = vec![
-        "-S".to_string(),
-        root.display().to_string(),
-        "-B".to_string(),
-        database_dir.display().to_string(),
-        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON".to_string(),
-    ];
-    if !database_dir.join("CMakeCache.txt").is_file() {
-        argv.push(format!(
-            "-DCMAKE_BUILD_TYPE={}",
-            crate::build_task::CMAKE_CONFIG_DEBUG
-        ));
-    }
-    argv
-}
-
 /// What a bounded run reported.
 pub struct Bounded {
     pub success: bool,

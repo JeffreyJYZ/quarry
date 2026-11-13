@@ -16,8 +16,14 @@ pub(crate) use crate::types::{ProjectInfo, ProjectKind};
 
 use super::*;
 
+mod cache;
+pub use cache::*;
+
 mod compose;
 pub use compose::*;
+
+mod configure;
+pub use configure::*;
 
 mod database;
 pub use database::*;
@@ -30,6 +36,15 @@ pub use tests_handoff::*;
 
 mod tests_freshness;
 pub use tests_freshness::*;
+
+mod tests_plan;
+pub use tests_plan::*;
+
+mod tests_cache;
+pub use tests_cache::*;
+
+mod tests_support;
+pub use tests_support::*;
 
 mod tests_real;
 pub use tests_real::*;

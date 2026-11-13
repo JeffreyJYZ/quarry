@@ -44,8 +44,13 @@ pub fn clangd_args(user: &[String], database: Option<&Path>) -> Vec<String> {
         args.push(format!("{COMPILE_COMMANDS_DIR}={}", database.display()));
     }
     if !carries_flag(user, QUERY_DRIVER) {
-        let drivers =
-            crate::project::compiler_drivers(&database.join(crate::project::DATABASE_FILE));
+        // The configured tree's own compiler is the sharper answer; the database is asked when the
+        // tree has no cache to name one, which is the case for a vendor tree somebody else wrote.
+        let mut drivers = cache_drivers(database);
+        if drivers.is_empty() {
+            drivers =
+                crate::project::compiler_drivers(&database.join(crate::project::DATABASE_FILE));
+        }
         if !drivers.is_empty() {
             args.push(format!("{QUERY_DRIVER}={}", drivers.join(",")));
         }
