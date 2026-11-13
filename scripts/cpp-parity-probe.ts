@@ -7,7 +7,7 @@
  * toolchain file, a library plus an app that includes it by a build-system-only path, a project
  * configured into `cmake-build-debug/`, a generator that writes no compiler database, standard
  * headers through the compiler CMake chose. For each one the probe asks the product what it would
- * do, then does exactly that, and reports the three consumers separately:
+ * do, then does exactly that, and reports the consumers separately:
  *
  *   build     the argv `src-tauri/examples/quarry-plan.rs` reports, spawned in the working directory
  *             it reports. That binary prints the answer of `cmake_plan` — the same function
@@ -21,6 +21,9 @@
  *             cross-check of the expectation, so a wrong expectation fails the probe, not the row.
  *   targets   the rows `list_run_targets` offers and the program `resolve_run_target` names for the
  *             first of them, which is what Run would launch.
+ *   tree      whether opening the project left a second build tree behind. The plan names the tree
+ *             analysis reads, so a `build/` created only to have a database for clangd is a failure
+ *             even when the hover happens to pass through it.
  *
  * It prints PASS/FAIL per capability, a capability × consumer table, then one finding per failure
  * with the command that produced it. Exit 1 when a capability fails, 2 when a fixture or the seam
@@ -116,6 +119,8 @@ interface Row {
 	build: Verdict;
 	analysis: Verdict;
 	targets: Verdict;
+	/** The trees the product created beside the plan's own: a fallback tree is not a capability. */
+	tree: Verdict;
 	details: string[];
 	/** Every command the row ran, with what it proved. */
 	commands: { line: string; verdict: Verdict }[];
@@ -319,6 +324,33 @@ function findExecutables(root: string, name: string, depth = 0): string[] {
 	return found;
 }
 
+/** The file API objects a CLion-grade CMake project asks for, written by the probe's own build. */
+const QUERY_BODY = JSON.stringify(
+	{
+		requests: [
+			{ kind: "codemodel", version: { major: 2 } },
+			{ kind: "toolchains", version: { major: 1 } },
+			{ kind: "cmakeFiles", version: { major: 1 } },
+		],
+	},
+	null,
+	2,
+);
+
+/**
+ * Write the file API query into a build directory before CMake configures it.
+ *
+ * A CLion project's build directory carries one — CLion asks for the model, and so does quarry —
+ * and the reply index it produces is the record of a finished configure. Without it every fixture
+ * tree would read as never configured, and the probe could not tell "opening reconfigured a current
+ * tree" from "opening produced the model this tree never had".
+ */
+function writeQuery(root: string, buildDir: string) {
+	const directory = join(root, buildDir, ".cmake", "api", "v1", "query", "client-parity");
+	mkdirSync(directory, { recursive: true });
+	writeFileSync(join(directory, "query.json"), QUERY_BODY);
+}
+
 function writeFixture(root: string, fixture: Fixture) {
 	for (const [path, text] of Object.entries(fixture.files)) {
 		const target = join(root, path);
@@ -372,11 +404,32 @@ function seamFacts(): string[] {
 	if (!build.includes("cmake_plan(source, release, &CmakeOptions::for_root(source))")) {
 		facts.push("run_cmake_build no longer asks cmake_plan for its build");
 	}
-	if (!build.includes("run_cmake(state, &plan.configure, source_root)")) {
-		facts.push("run_cmake_build no longer runs plan.configure");
+	if (!build.includes("configure_tree(")) {
+		facts.push("run_cmake_build no longer configures through the shared configure sequence");
+	}
+	if (!build.includes("run_cmake(state, argv, source_root)")) {
+		facts.push("run_cmake_build no longer runs the plan's configure argv");
 	}
 	if (!build.includes("run_cmake(state, &plan.build, source_root)")) {
 		facts.push("run_cmake_build no longer runs plan.build");
+	}
+	const model = read("build_task/cmake_model/configure.rs");
+	if (!model.includes("write_query(request.build_root)")) {
+		facts.push("the shared configure no longer writes the file API query before configuring");
+	}
+	if (!model.includes("synthesize_database(request.build_root)")) {
+		facts.push("the shared configure no longer synthesises the database on success");
+	}
+	const handoff = read("lsp/handoff/configure.rs");
+	if (!handoff.includes("configure_tree(request")) {
+		facts.push("the hand-off no longer configures through the shared configure sequence");
+	}
+	if (!handoff.includes("configure_need(root, &plan.build_root")) {
+		facts.push("the hand-off no longer asks the model whether the tree is current");
+	}
+	const database = read("lsp/handoff/database.rs");
+	if (!database.includes("ensure_database(root, &plan)")) {
+		facts.push("the hand-off no longer takes its database directory from the plan");
 	}
 	const session = read("lsp/start_session.rs");
 	if (!session.includes("server_args(server, &info, &overrides.args)")) {
@@ -411,6 +464,7 @@ async function judge(
 		build: "FAIL",
 		analysis: "FAIL",
 		targets: "FAIL",
+		tree: "PASS",
 		details: [],
 		commands: [],
 	};
@@ -418,6 +472,7 @@ async function judge(
 	let broken = false;
 
 	// 1. The build a CLion user's project already has: the fixture's own proof of life.
+	writeQuery(root, dirname(fixture.userDb));
 	for (const args of fixture.userBuild) {
 		const result = await run(cmake, args, root);
 		row.commands.push({
@@ -466,15 +521,10 @@ async function judge(
 	});
 	const openedTarget = opened.targets[0] ?? null;
 	const cacheAfter = isFile(fixtureCache) ? statSync(fixtureCache).mtimeMs : null;
-	const madeBuildTree = !madeBuildTreeBefore && isFile(join(root, "build", "CMakeCache.txt"));
 	if (cacheBefore !== null && cacheAfter !== cacheBefore) {
 		row.details.push("handoff      FAIL  opening re-configured the project's own tree");
 		findings.push(
 			`${directory}: opening the project re-configured ${relative(dirname(userDb))}, though its compile_commands.json was current — \`cd ${directory} && ls -l --time-style=full-iso ${relative(fixtureCache)}\` changes across \`quarry-plan .\`.`,
-		);
-	} else if (!userDbExists && madeBuildTree) {
-		row.details.push(
-			"handoff      note  the build writes no database, so the hand-off configured build/ for it",
 		);
 	}
 
@@ -594,7 +644,30 @@ async function judge(
 		);
 	}
 
-	// 7. A build tree inside the source directory is a CLion deviation worth naming.
+	// 7. A second tree is not a capability. The plan names the tree analysis reads, so a `build/`
+	//    the product configured only to have a database to hand clangd is a tree nobody wants: a
+	//    project whose plan names another directory must be analysed from that directory.
+	const planTree = opened.cmake?.buildRoot ?? null;
+	const fallbackTree = join(root, "build");
+	if (
+		!madeBuildTreeBefore &&
+		isFile(join(fallbackTree, "CMakeCache.txt")) &&
+		planTree !== fallbackTree
+	) {
+		row.tree = "FAIL";
+		row.details.push(
+			`tree         FAIL  the hand-off configured ${relative(fallbackTree)} though the plan names ${planTree === null ? "no tree" : relative(planTree)}`,
+		);
+		findings.push(
+			`${directory}: opening the project configured a second tree — ${relative(fallbackTree)} holds a CMakeCache.txt the fixture's own build never wrote, while the plan names ${planTree === null ? "no tree" : relative(planTree)}. \`cd ${directory} && ls build/CMakeCache.txt\`.`,
+		);
+	} else {
+		row.details.push(
+			`tree         PASS  no fallback tree; the plan names ${planTree === null ? "no tree" : relative(planTree)}`,
+		);
+	}
+
+	// 8. A build tree inside the source directory is a CLion deviation worth naming.
 	if (existsSync(join(root, "CMakeCache.txt"))) {
 		row.details.push(
 			"tree         FAIL  a configure wrote CMakeCache.txt into the source directory",
@@ -650,18 +723,18 @@ async function main() {
 		findings.push(...judged.findings);
 		broken = broken || judged.broken;
 		console.log(
-			`build ${judged.row.build} · analysis ${judged.row.analysis} · targets ${judged.row.targets}`,
+			`build ${judged.row.build} · analysis ${judged.row.analysis} · targets ${judged.row.targets} · tree ${judged.row.tree}`,
 		);
 	}
 
-	const columns = ["capability", "build", "analysis", "targets"];
+	const columns = ["capability", "build", "analysis", "targets", "tree"];
 	const width = Math.max(...rows.map((row) => row.capability.length), columns[0].length);
 	const line = (cells: string[]) =>
-		`${cells[0].padEnd(width)}  ${cells[1].padEnd(6)}  ${cells[2].padEnd(8)}  ${cells[3]}`;
+		`${cells[0].padEnd(width)}  ${cells[1].padEnd(6)}  ${cells[2].padEnd(8)}  ${cells[3].padEnd(6)}  ${cells[4]}`;
 	console.log("");
 	console.log(line(columns));
 	for (const row of rows) {
-		console.log(line([row.capability, row.build, row.analysis, row.targets]));
+		console.log(line([row.capability, row.build, row.analysis, row.targets, row.tree]));
 	}
 
 	console.log("\ndetails");
@@ -684,7 +757,11 @@ async function main() {
 	}
 
 	const failed = rows.filter(
-		(row) => row.build === "FAIL" || row.analysis === "FAIL" || row.targets === "FAIL",
+		(row) =>
+			row.build === "FAIL" ||
+			row.analysis === "FAIL" ||
+			row.targets === "FAIL" ||
+			row.tree === "FAIL",
 	).length;
 	const seconds = ((Date.now() - started) / 1000).toFixed(1);
 	console.log(

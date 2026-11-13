@@ -26,45 +26,19 @@ pub fn database_for(info: &ProjectInfo, user: &[String]) -> Option<PathBuf> {
     cmake_database(root)
 }
 
-/// Where a CMake project's database belongs, and the one configure that puts it there.
+/// Where a CMake project's database belongs: the tree the plan names, and one configure through it.
 ///
-/// The model already decides the build tree and the argv a build runs, so the hand-off asks it
-/// instead of scanning for `build/` or a two-level-deep directory: a preset `binaryDir` outside the
-/// conventional names is the project's answer, and a tree without a database is configured through
-/// its preset, its toolchain and the export flag rather than a bare `-S … -B build` that a
-/// preset-only project rejects.
+/// The model already decides the build tree, the argv a build runs and whether the tree is current,
+/// so the hand-off asks it instead of scanning for `build/` or a two-level-deep directory. The same
+/// configure the build runs also synthesises the database from the CMake file API where the
+/// generator writes none, so that tree holds one either way; there is no second tree configured only
+/// to have a database to read.
 fn cmake_database(root: &Path) -> Option<PathBuf> {
     let options = CmakeOptions::for_root(root);
     let Ok(plan) = cmake_plan(root, false, &options) else {
         // A model the project's own files cannot produce must not keep the session from starting.
         return crate::project::locate_database(root, root);
     };
-    if plan
-        .build_root
-        .join(crate::project::DATABASE_FILE)
-        .is_file()
-    {
-        // A failed configure leaves the old database in place, which is still better than none.
-        let _ = refresh(root, &plan.build_root);
-        return Some(plan.build_root);
-    }
-    if configure(root, &plan.build_root).is_err() {
-        return None;
-    }
-    if plan
-        .build_root
-        .join(crate::project::DATABASE_FILE)
-        .is_file()
-    {
-        return Some(plan.build_root);
-    }
-    // A generator that never writes a compiler database (Xcode, Visual Studio) leaves clangd with
-    // no flags at all. The one recipe this hand-off always ran is kept as the last resort, into the
-    // directory it has always used, so analysis still has a database to read.
-    let fallback = root.join(crate::build_task::BUILD_DIR);
-    configure(root, &fallback).ok()?;
-    fallback
-        .join(crate::project::DATABASE_FILE)
-        .is_file()
-        .then_some(fallback)
+    // A failed configure leaves the old database in place, which is still better than none.
+    ensure_database(root, &plan).then_some(plan.build_root)
 }

@@ -71,16 +71,23 @@ pub fn compile_entry(
 /// Split one recorded fragment into argv tokens.
 ///
 /// CMake writes a fragment as the flags it passes, sometimes several in one string
-/// (`-g -arch arm64`), so whitespace is the token boundary; a double-quoted run is one token, which
-/// is how CMake escapes a flag whose value itself contains a space.
+/// (`-g -arch arm64`), so whitespace is the token boundary; a quoted run is one token, which is how
+/// CMake escapes a flag whose value itself contains a space. Both quote kinds are quoting: the
+/// Makefiles and Ninja generators write double quotes, while the Xcode generator records a flag
+/// that carries `=` as `'-std=gnu++20'`, and leaving those quotes on the token hides the standard
+/// from everything that reads the database.
 pub fn fragment_tokens(fragment: &str) -> Vec<String> {
     let mut tokens: Vec<String> = Vec::new();
     let mut current = String::new();
-    let mut quoted = false;
+    let mut quote: Option<char> = None;
     for character in fragment.chars() {
         match character {
-            '"' => quoted = !quoted,
-            character if character.is_whitespace() && !quoted => {
+            '"' | '\'' => match quote {
+                Some(open) if open == character => quote = None,
+                Some(_) => current.push(character),
+                None => quote = Some(character),
+            },
+            character if character.is_whitespace() && quote.is_none() => {
                 if !current.is_empty() {
                     tokens.push(std::mem::take(&mut current));
                 }

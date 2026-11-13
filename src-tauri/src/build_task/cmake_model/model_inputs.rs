@@ -26,6 +26,17 @@ pub const SCAN_DEPTH: usize = 3;
 /// The cache entry naming the toolchain a tree was configured with.
 pub const TOOLCHAIN_VARIABLE: &str = "CMAKE_TOOLCHAIN_FILE";
 
+/// Whether a path's file name is one whose content re-describes the whole tree.
+///
+/// This is the edited-file test the watcher needs, and it names the same files [`model_inputs`]
+/// reads, so "a manifest changed" cannot mean one set of files to the configure and another to the
+/// session that decides whether to reconfigure for it.
+pub fn is_model_input(path: &Path) -> bool {
+    path.file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .is_some_and(|name| name == MANIFEST || PRESET_FILES.contains(&name.as_str()))
+}
+
 /// Every file whose content decides what a configure produces.
 pub fn model_inputs(
     source_root: &Path,

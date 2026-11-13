@@ -43,7 +43,7 @@ pub async fn lsp_watched_files(
     if let (true, Some(database)) = (server == CLANGD, database)
         && changes
             .iter()
-            .any(|change| is_configure_marker(Path::new(&change.path)))
+            .any(|change| crate::build_task::is_model_input(Path::new(&change.path)))
         && let Some(project) = project_root(&root)
         && reconfigure(project, database.clone()).await
     {

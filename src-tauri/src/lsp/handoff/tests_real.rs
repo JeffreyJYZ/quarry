@@ -140,7 +140,14 @@ pub mod tests {
             "CMakeLists.txt",
             &format!("{CMAKE_LISTS}add_compile_definitions(DEMO_VERSION=2)\n"),
         );
-        assert!(database_is_stale(&build, &root));
+        assert!(
+            crate::build_task::configure_need(
+                &root,
+                &build,
+                &crate::build_task::ConfigureIntent::default()
+            )
+            .is_some()
+        );
 
         let (args, named) = server_args("clangd", &fixture.info(), &[]);
         assert_eq!(

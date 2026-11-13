@@ -179,5 +179,10 @@ pub mod compile_tests {
             vec!["-DFOO=one two"],
             "a double-quoted run stays one argv token, which is how a define holding a space travels"
         );
+        assert_eq!(
+            fragment_tokens("'-std=gnu++20' -g"),
+            vec!["-std=gnu++20", "-g"],
+            "the Xcode generator quotes a flag carrying `=`, and the quotes are not part of it"
+        );
     }
 }
