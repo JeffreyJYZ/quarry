@@ -14,6 +14,11 @@ use super::*;
 ///
 /// The compile runs through `run_child` like every other build, so a cancelled compile is signalled
 /// and a quit during one cannot leave `clang` behind.
+///
+/// The flags are the project's own knowledge, from [`build_flags`]: a real database's when it has
+/// one, otherwise the ones its layout and settings state. The same answer is written as a
+/// `compile_commands.json` in the build directory, so the clangd session started for this project
+/// analyses the code with the flags this compiler used.
 pub fn run_plain_clang_build(
     state: &BuildState,
     root: &str,
@@ -25,15 +30,8 @@ pub fn run_plain_clang_build(
         return Err(no_build_system());
     }
 
-    let compiler = if sources
-        .iter()
-        .all(|path| path.extension().map(|e| e == "c").unwrap_or(false))
-    {
-        "clang"
-    } else {
-        "clang++"
-    };
-
+    let flags = build_flags(root_path, &sources);
+    let compiler = flags.plain.compiler();
     let resolved = crate::resolve::resolve(compiler).ok_or_else(|| {
         format!("{compiler} is not on PATH: C/C++ support needs {compiler} installed")
     })?;
@@ -42,15 +40,21 @@ pub fn run_plain_clang_build(
     std::fs::create_dir_all(&build_dir)
         .map_err(|error| format!("cannot create {}: {error}", build_dir.display()))?;
 
-    // A project whose only build description is a compile database keeps that database's include
-    // paths and defines: without them its sources do not compile even though its own build does.
-    let database = crate::project::locate_database(root_path, root_path)
-        .map(|dir| dir.join(crate::project::DATABASE_FILE));
-    let flags = database.map_or_else(Vec::new, |database| {
-        crate::project::database_flags(&database, compiler != "clang")
-    });
+    // Written before the compile so a failing build still leaves analysis a description to use.
+    let mut notes: Vec<String> = Vec::new();
+    match synthesize_plain_database(root_path, &sources) {
+        Ok(Some(written)) => {
+            if let Some(note) = written.note() {
+                notes.push(note);
+            }
+        }
+        // A project that describes itself needs nothing said about it.
+        Ok(None) => {}
+        // A failed write must not fail the build: it is still a working compile without a database.
+        Err(why) => notes.push(format!("no compiler database for the plain build: {why}")),
+    }
 
-    let argv = plain_clang_argv_with(root, name, &sources, &flags);
+    let argv = plain_clang_argv_with(root, name, &sources, &flags.flags);
 
     let started = Instant::now();
     let mut command = Command::new(&resolved.path);
@@ -58,9 +62,16 @@ pub fn run_plain_clang_build(
     let captured = run_child(state, &mut command, compiler, root)?;
     let duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
 
-    let mut text = String::from_utf8_lossy(&captured.stdout).into_owned();
-    text.push('\n');
-    text.push_str(&String::from_utf8_lossy(&captured.stderr));
+    let mut body = String::from_utf8_lossy(&captured.stdout).into_owned();
+    body.push('\n');
+    body.push_str(&String::from_utf8_lossy(&captured.stderr));
+    // Notes precede the output they describe, as in `run_cmake_build`: the status bar reports the
+    // last line, which must stay the compiler's own verdict.
+    let text = notes
+        .iter()
+        .map(|note| format!("note: {note}\n"))
+        .collect::<String>()
+        + &body;
 
     let mut diagnostics = parse_text_diagnostics(&text, root_path);
     for diagnostic in &mut diagnostics {
@@ -68,15 +79,20 @@ pub fn run_plain_clang_build(
     }
 
     let success = captured.success && !captured.stopped;
+    let summary = if captured.stopped {
+        CANCELLED_SUMMARY.to_string()
+    } else {
+        summarize_text_with(&body, DEFAULT_CLANG_SUMMARY)
+    };
 
     Ok(BuildReport {
         success,
         diagnostics,
         duration_ms,
-        summary: if captured.stopped {
-            CANCELLED_SUMMARY.to_string()
+        summary: if success && !notes.is_empty() {
+            truncate(&format!("{summary} · {}", notes.join(" · ")), SUMMARY_LIMIT)
         } else {
-            summarize_text_with(&text, DEFAULT_CLANG_SUMMARY)
+            summary
         },
         // A failed compile leaves whatever the previous build wrote at this path, so naming it
         // would report a program this build never produced; `run_cmake_build` gates the same way.

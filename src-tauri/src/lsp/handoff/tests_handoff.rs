@@ -76,10 +76,11 @@ pub mod tests {
         assert_eq!(database, None);
     }
 
+    /// A directory with nothing to compile has nothing to analyse, so it is handed no directory —
+    /// the plain C/C++ case that *does* gain one lives in `tests_plain.rs`.
     #[test]
-    fn a_project_without_a_database_gains_no_flag() {
+    fn a_directory_with_no_source_gains_no_flag() {
         let fixture = Fixture::new("plain");
-        fixture.write("main.cpp", "int main() { return 0; }\n");
         let (computed, database) = server_args(
             "clangd",
             &fixture.info(ProjectKind::Unknown),

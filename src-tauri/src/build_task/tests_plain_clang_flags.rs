@@ -77,9 +77,9 @@ mod tests {
         ));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("src")).expect("create source directory");
-        std::fs::create_dir_all(root.join("include/demo")).expect("create include directory");
+        std::fs::create_dir_all(root.join("vendor/demo")).expect("create vendor directory");
         std::fs::write(
-            root.join("include/demo/greeting.hpp"),
+            root.join("vendor/demo/greeting.hpp"),
             "#pragma once\ninline int greeting() { return 7; }\n",
         )
         .expect("write header");
@@ -94,13 +94,13 @@ mod tests {
             run_plain_clang_build(&BuildState::default(), &path, "app").expect("build run");
         assert!(
             !without.success,
-            "without the database this header is not on the include path"
+            "a vendor header outside every convention is only reachable through the database"
         );
 
         std::fs::write(
             root.join(crate::project::DATABASE_FILE),
             format!(
-                r#"[{{"directory": "{path}", "arguments": ["clang++", "-Iinclude", "-c", "src/main.cpp"]}}]"#
+                r#"[{{"directory": "{path}", "arguments": ["clang++", "-Ivendor", "-c", "src/main.cpp"]}}]"#
             ),
         )
         .expect("write database");

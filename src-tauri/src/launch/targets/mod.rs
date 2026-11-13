@@ -1,9 +1,11 @@
 //! Auto-detected run targets: what the toolbar dropdown lists and resolves.
 //!
 //! Detection never builds. Cargo targets come from one `cargo metadata --no-deps` run, C/C++
-//! targets come from the conventional build outputs [`compose_cpp`] already probes, and an unknown
-//! directory has none. Resolution takes one of those ids back to a [`LaunchConfig`], so a fresh
-//! project is runnable with no configuration file.
+//! targets come from the conventional build outputs [`compose_cpp`] already probes, and a directory
+//! with no source of any kind has none. A C/C++ directory with no build system is one of those:
+//! quarry compiles it itself, so the program that build writes is a target like any other.
+//! Resolution takes one of those ids back to a [`LaunchConfig`], so a fresh project is runnable with
+//! no configuration file.
 
 #![allow(unused_imports)]
 
@@ -36,6 +38,7 @@ pub fn list_targets(root: &str) -> Result<Vec<RunTarget>, String> {
     match info.kind {
         ProjectKind::Cargo => list_cargo_targets(&info),
         ProjectKind::Cmake | ProjectKind::CompileCommands => Ok(list_cpp_targets(&info)),
+        ProjectKind::Unknown if plain_cpp(&info) => Ok(list_cpp_targets(&info)),
         ProjectKind::Unknown => Ok(Vec::new()),
     }
 }
@@ -53,9 +56,21 @@ pub fn resolve_target(root: &str, id: &str, stop_on_entry: bool) -> Result<Launc
         (ProjectKind::Cmake | ProjectKind::CompileCommands, TargetId::Cpp { target }) => {
             resolve_cpp(&info, &target, stop_on_entry)
         }
+        (ProjectKind::Unknown, TargetId::Cpp { target }) if plain_cpp(&info) => {
+            resolve_cpp(&info, &target, stop_on_entry)
+        }
         (kind, _) => Err(format!(
             "run target \"{id}\" does not belong to a {kind:?} project ({}): list the targets again",
             info.root
         )),
     }
+}
+
+/// Whether this directory is a C/C++ project quarry compiles itself.
+///
+/// The plain build treats any directory holding a source as one; a directory with none compiles
+/// nothing, so it lists no target and resolves none.
+fn plain_cpp(info: &ProjectInfo) -> bool {
+    crate::build_task::collect_plain_clang_sources(Path::new(&info.root))
+        .is_ok_and(|sources| !sources.is_empty())
 }

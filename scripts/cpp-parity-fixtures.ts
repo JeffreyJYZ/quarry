@@ -32,15 +32,22 @@ export interface Fixture {
 	name: string;
 	/** Relative path to file contents. */
 	files: Record<string, string>;
+	/**
+	 * `"cmake"` for a project with a build system (the default), `"plain"` for one quarry compiles
+	 * itself: the latter has no manifest, no database and no build of its own to borrow flags from.
+	 */
+	kind?: "cmake" | "plain";
 	/** The build a CLion user's project already has, argv arrays run in order. */
-	userBuild: string[][];
+	userBuild?: string[][];
 	/** Where that build writes `compile_commands.json`, relative to the fixture root. */
-	userDb: string;
+	userDb?: string;
 	/**
 	 * True when this fixture's whole point is that the build may record no database (a generator that
 	 * ignores `CMAKE_EXPORT_COMPILE_COMMANDS`), so a missing one is a finding, not a broken fixture.
 	 */
 	dbOptional?: boolean;
+	/** A plain project's own build, argv arrays run in order: its proof that its sources compile. */
+	plainBuild?: string[][];
 	/** Positions the analysis is judged at. */
 	probes: AnalysisProbe[];
 }
@@ -386,8 +393,79 @@ int main() {
 	};
 }
 
-/** The character offset of `needle` as an LSP position. */
-export function positionOf(text: string, needle: string): { line: number; character: number } {
+/**
+ * A C++ project with no build system at all: no `CMakeLists.txt`, no `compile_commands.json`.
+ *
+ * quarry compiles this one itself, so the flags the analysis needs are the ones that build derives
+ * rather than ones a generator recorded: the project root on the search path (a header included by
+ * its root-relative path), the define the project's own settings state, and a C++ standard above the
+ * compiler's default. None of the three is discoverable from the source tree alone, which is why a
+ * hand-off with no arguments leaves the analysis unable to answer any of these positions.
+ */
+export function plainFixture(): Fixture {
+	return {
+		name: "plain",
+		kind: "plain",
+		files: {
+			"lib/greet.h": `#pragma once
+
+#ifndef PARITY_PLAIN
+#error "PARITY_PLAIN comes from the project's own flags"
+#endif
+int plain_greeting();
+`,
+			"lib/greet.cpp": `#include "greet.h"
+
+int plain_greeting() {
+\treturn PARITY_PLAIN;
+}
+`,
+			"src/main.cpp": `#include "lib/greet.h"
+
+#include <format>
+#include <string>
+
+int main() {
+\treturn static_cast<int>(std::format("{}", plain_greeting()).size());
+}
+`,
+			".quarry/settings.json": `{ "cppFlags": "-DPARITY_PLAIN=1" }
+`,
+		},
+		plainBuild: [
+			[
+				"clang++",
+				"-std=c++20",
+				"-DPARITY_PLAIN=1",
+				"-I",
+				".",
+				"-o",
+				"app",
+				"src/main.cpp",
+				"lib/greet.cpp",
+			],
+		],
+		probes: [
+			{
+				file: "src/main.cpp",
+				needle: "plain_greeting()",
+				needs: "the project root on the include path, which only this build's own flags give",
+				expect: "int plain_greeting()",
+			},
+			{
+				file: "src/main.cpp",
+				needle: "format(",
+				needs: "the C++20 standard this build passes: <format> is C++20 only",
+				expect: "basic_string<char>",
+			},
+		],
+	};
+}
+
+/** The character offset of `needle` as an LSP position. */ export function positionOf(
+	text: string,
+	needle: string,
+): { line: number; character: number } {
 	const index = text.indexOf(needle);
 	if (index < 0) throw new Error(`needle not found in source: ${JSON.stringify(needle)}`);
 	const before = text.slice(0, index);

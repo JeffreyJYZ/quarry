@@ -79,6 +79,28 @@ pub mod support {
                 launch_config: None,
             }
         }
+
+        /// A C++ project with no build system: no manifest, no database, one source of each kind.
+        pub fn plain_project(&self) -> ProjectInfo {
+            self.write("lib/greet.h", "int greeting();\n");
+            self.write(
+                "src/main.cpp",
+                "#include \"lib/greet.h\"\nint main() { return greeting(); }\n",
+            );
+            self.plain_info()
+        }
+
+        pub fn plain_info(&self) -> ProjectInfo {
+            let root = self.root().display().to_string();
+            ProjectInfo {
+                root: root.clone(),
+                opened_root: root.clone(),
+                name: "demo".to_string(),
+                kind: ProjectKind::Unknown,
+                build_root: root,
+                launch_config: None,
+            }
+        }
     }
 
     impl Drop for Fixture {
