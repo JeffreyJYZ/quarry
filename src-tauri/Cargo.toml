@@ -4,6 +4,9 @@ version = "0.1.0-alpha.92"
 description = "Rust and C/C++ IDE"
 authors = ["Yizhou Jiang"]
 edition = "2024"
+# The crate has more than one target (the app plus `examples/quarry-plan.rs`), so the bundler needs
+# to be told which one is the application it packages.
+default-run = "quarry"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
