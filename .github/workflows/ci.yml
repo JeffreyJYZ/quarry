@@ -98,6 +98,77 @@ jobs:
                   QUARRY_PLAN_BIN: src-tauri\target\debug\examples\quarry-plan.exe
               run: bun scripts/cpp-parity-probe.ts --windows
 
+    # Linux is the third half of the compiler matrix, and the one where CLion's own default differs:
+    # gcc/g++ rather than Apple clang, ELF objects rather than Mach-O, artefacts with no `.app` or
+    # `.exe` beside them, and `cc`/`c++` recorded as the tree's compilers. The probe's Linux subset
+    # configures the same real projects, runs the plan the product reports, and starts clangd on the
+    # database it names; a row this runner cannot measure says so by name.
+    linux:
+        name: linux
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v7
+
+            - name: Setup Bun
+              uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: "1"
+
+            - name: Setup Rust
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Cache Rust
+              uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: src-tauri
+
+            - name: Install dependencies
+              run: bun install --frozen-lockfile
+
+            # Two sets, both required. The toolchains are what the rows build and analyse with:
+            # cmake, ninja, clang, clangd, gcc/g++ and binutils' readelf, which is the row's DWARF
+            # reader on ELF. The rest are Tauri's own Linux build dependencies — the example links
+            # the app crate, so `cargo build` needs webkit2gtk and friends even though this job
+            # never opens a window. Same list as `release.yml`'s Ubuntu job, for the same reason.
+            - name: Install toolchains and Tauri's Linux libraries
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y \
+                      cmake ninja-build clang clangd gcc g++ binutils \
+                      build-essential curl wget file pkg-config \
+                      libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
+                      libayatana-appindicator3-dev librsvg2-dev
+
+            # Built here rather than by the probe so a compile error is one named step, and so the
+            # probe measures the planner this job reports on instead of rebuilding it.
+            - name: Build quarry-plan
+              run: cargo build --example quarry-plan --manifest-path src-tauri/Cargo.toml
+
+            # A missing toolchain should name itself, in one line per tool. The generator list is
+            # printed in full because it is what the subset selects from: Ninja Multi-Config is a
+            # row, and an image that lists no Xcode generator is the expected Linux answer.
+            - name: Detect tools
+              run: |
+                  cmake --version
+                  ninja --version
+                  clang --version
+                  clang++ --version
+                  clangd --version
+                  gcc --version
+                  g++ --version
+                  readelf --version
+                  echo "--- cmake generators ---"
+                  cmake --help
+
+            # The probe prints its own table, details and findings; a failing row names the command
+            # that produced it, so the first run of this job is itself the measurement.
+            - name: C/C++ parity probe (Linux subset)
+              env:
+                  QUARRY_PLAN_BIN: src-tauri/target/debug/examples/quarry-plan
+              run: bun scripts/cpp-parity-probe.ts --linux
+
     # The LSP and debugger probes are a separate job: they need toolchains the gate does not, and
     # a hung language server should not hold the gate job hostage. `bun scripts/integration.ts`
     # exits non-zero only when a probe that ran fails; probes whose tool is missing are SKIPPED and
