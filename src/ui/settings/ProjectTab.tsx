@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 import {
+	BUILD_PROFILE_LABELS,
 	BUILD_PROFILES,
 	type BuildProfile,
 	type EffectivePreferences,
@@ -72,7 +73,7 @@ export function ProjectTab(props: {
 						allowInherit
 						options={BUILD_PROFILES.map((profile) => ({
 							value: profile,
-							label: profile,
+							label: BUILD_PROFILE_LABELS[profile],
 						}))}
 						onChange={(next) => onChange({ buildProfile: next })}
 					/>

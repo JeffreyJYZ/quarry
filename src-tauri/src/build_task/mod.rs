@@ -43,6 +43,9 @@ pub use parsedbuild::*;
 mod absolute_path;
 pub use absolute_path::*;
 
+mod profile;
+pub use profile::*;
+
 mod cmakeoutcome;
 pub use cmakeoutcome::*;
 
@@ -90,6 +93,9 @@ pub use tests_5::*;
 
 mod tests_choice;
 pub use tests_choice::*;
+
+mod tests_profiles;
+pub use tests_profiles::*;
 
 mod tests_plain_clang_sources;
 pub use tests_plain_clang_sources::*;

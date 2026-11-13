@@ -65,7 +65,7 @@ where
 {
     let value = Option::<String>::deserialize(deserializer).unwrap_or(None);
     Ok(match value {
-        Some(v) if v == "debug" || v == "release" => Some(v),
+        Some(v) if crate::build_task::BUILD_PROFILES.contains(&v.as_str()) => Some(v),
         _ => None,
     })
 }

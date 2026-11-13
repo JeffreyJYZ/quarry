@@ -157,4 +157,19 @@ pub mod cmake_targets_tests {
             "the manifest's target and the conventional build tree, as before"
         );
     }
+
+    #[test]
+    pub fn a_run_target_id_names_the_cmake_target_a_build_should_ask_for() {
+        assert_eq!(
+            cmake_build_target("cpp:parity_app").as_deref(),
+            Some("parity_app")
+        );
+        assert_eq!(
+            cmake_build_target("parity_app").as_deref(),
+            Some("parity_app"),
+            "a bare name is already a CMake target"
+        );
+        assert_eq!(cmake_build_target("cargo:demo:demo"), None);
+        assert_eq!(cmake_build_target("   "), None);
+    }
 }

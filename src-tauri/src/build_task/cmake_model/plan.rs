@@ -11,12 +11,15 @@
 //! empty build type, which means no `-g`, no debug info, and a breakpoint that never resolves. When
 //! a preset names `CMAKE_BUILD_TYPE` that value is used; when it does not, the profile's
 //! configuration is passed and the note says so.
+//!
+//! [`cmake_plan_target`] also decides *what* is built: a named target adds `--target <name>`, and
+//! `None` keeps the whole tree, which is what the toolbar's Build action asks for.
 
 #![allow(unused_imports)]
 
 pub use std::path::{Path, PathBuf};
 
-pub use crate::build_task::{CMAKE_PROGRAM, cmake_config};
+pub use crate::build_task::{BuildProfile, CMAKE_PROGRAM, cmake_config};
 
 use super::*;
 
@@ -33,11 +36,26 @@ pub struct CmakePlan {
 }
 
 /// Decide the whole build: the directory, both argv, and any note worth reporting.
+///
+/// A boolean profile is still accepted for the language-server hand-off, which configures Debug and
+/// has no user in front of it to choose otherwise.
 pub fn cmake_plan(
     source_root: &Path,
-    release: bool,
+    profile: impl Into<BuildProfile>,
     options: &CmakeOptions,
 ) -> Result<CmakePlan, String> {
+    cmake_plan_target(source_root, profile, options, None)
+}
+
+/// Decide one build of one target: `target` adds `--target <name>`, `None` builds everything.
+pub fn cmake_plan_target(
+    source_root: &Path,
+    profile: impl Into<BuildProfile>,
+    options: &CmakeOptions,
+    target: Option<&str>,
+) -> Result<CmakePlan, String> {
+    let profile = profile.into();
+    let target = target.map(str::trim).filter(|name| !name.is_empty());
     let presets = super::preset::load(source_root);
     let selected = select_configure(&presets, &options.preset)?;
     let mut notes: Vec<String> = Vec::new();
@@ -66,7 +84,7 @@ pub fn cmake_plan(
     let Some(preset) = resolved else {
         let build_root = super::build_root::resolve(source_root, options, None);
         let dir = build_root.display().to_string();
-        let mut configure = cmake_configure_argv(&source, &dir, release);
+        let mut configure = cmake_configure_argv(&source, &dir, profile);
         let toolchain = options
             .toolchain()
             .map(|value| absolute(source_root, value));
@@ -76,10 +94,10 @@ pub fn cmake_plan(
         return Ok(CmakePlan {
             build_root,
             configure,
-            build: cmake_build_argv(&dir, release),
+            build: cmake_build_argv(&dir, profile, target),
             intent: ConfigureIntent {
                 toolchain,
-                build_type: Some(cmake_config(release).to_string()),
+                build_type: Some(cmake_config(profile).to_string()),
             },
             note: join(notes),
         });
@@ -88,7 +106,7 @@ pub fn cmake_plan(
     let binary = super::preset_resolve::preset_binary(&preset, source_root);
     let build_root = super::build_root::resolve(source_root, options, Some(&binary));
     let dir = build_root.display().to_string();
-    let configuration = configuration(&presets, &preset, release);
+    let configuration = configuration(&presets, &preset, profile);
     let build_type = build_type(&preset, &configuration, &mut notes);
     let database = compile_database(&preset, &mut notes);
     let settings_toolchain = options
@@ -110,14 +128,23 @@ pub fn cmake_plan(
         toolchain_arg.as_deref(),
     );
     let build = match build_preset(&presets, &preset.name) {
-        Some(named) if build_root == binary => preset_build_argv(&named.name, &configuration),
-        _ => vec![
-            CMAKE_PROGRAM.to_string(),
-            "--build".to_string(),
-            dir,
-            "--config".to_string(),
-            configuration,
-        ],
+        Some(named) if build_root == binary => {
+            preset_build_argv(&named.name, &configuration, target)
+        }
+        _ => {
+            let mut argv = vec![
+                CMAKE_PROGRAM.to_string(),
+                "--build".to_string(),
+                dir,
+                "--config".to_string(),
+                configuration,
+            ];
+            if let Some(target) = target {
+                argv.push("--target".to_string());
+                argv.push(target.to_string());
+            }
+            argv
+        }
     };
 
     Ok(CmakePlan {
@@ -130,65 +157,4 @@ pub fn cmake_plan(
         },
         note: join(notes),
     })
-}
-
-/// The toolchain file a preset configures with, expanded against the tree it describes.
-fn preset_toolchain(preset: &ResolvedConfigure, root: &Path) -> Option<PathBuf> {
-    let value = preset.cache.get(TOOLCHAIN_VARIABLE)?;
-    Some(absolute(
-        root,
-        &super::preset_resolve::expand(value, root, &preset.name),
-    ))
-}
-
-/// The configuration this build uses: the build preset's, then the configure preset's, then the profile.
-fn configuration(presets: &Presets, preset: &ResolvedConfigure, release: bool) -> String {
-    let named = build_preset(presets, &preset.name)
-        .and_then(|named| super::preset_resolve::resolve_build(presets, &named.name));
-    named
-        .and_then(|named| named.configuration)
-        .or_else(|| preset.cache.get("CMAKE_BUILD_TYPE").cloned())
-        .unwrap_or_else(|| cmake_config(release).to_string())
-}
-
-/// The build type to pass, or `None` when the preset's own value stands.
-fn build_type(
-    preset: &ResolvedConfigure,
-    configuration: &str,
-    notes: &mut Vec<String>,
-) -> Option<String> {
-    if preset.cache.contains_key("CMAKE_BUILD_TYPE") {
-        return None;
-    }
-    if is_multi_config(preset.generator.as_deref()) {
-        // A multi-config generator takes its configuration at build time; nothing to force here.
-        return None;
-    }
-    notes.push(format!(
-        "preset {} sets no CMAKE_BUILD_TYPE, so -DCMAKE_BUILD_TYPE={configuration} keeps debug info",
-        preset.name
-    ));
-    Some(configuration.to_string())
-}
-
-/// Whether a compiler database will be written, honouring a value the project set itself.
-fn compile_database(preset: &ResolvedConfigure, notes: &mut Vec<String>) -> bool {
-    match preset.cache.get("CMAKE_EXPORT_COMPILE_COMMANDS") {
-        Some(value) if is_cache_on(value) => writes_compile_database(preset.generator.as_deref()),
-        Some(value) => {
-            notes.push(format!(
-                "preset sets CMAKE_EXPORT_COMPILE_COMMANDS={value}, so no compiler database is written"
-            ));
-            false
-        }
-        None => writes_compile_database(preset.generator.as_deref()),
-    }
-}
-
-fn join(notes: Vec<String>) -> Option<String> {
-    if notes.is_empty() {
-        None
-    } else {
-        Some(notes.join("; "))
-    }
 }

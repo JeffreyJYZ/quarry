@@ -6,7 +6,7 @@
  * resolves a project's optional overrides against the user's preferences.
  */
 
-import { DEFAULT_PREFERENCES, FONT_SIZE_RANGE } from "@/lib/consts/settings";
+import { BUILD_PROFILES, DEFAULT_PREFERENCES, FONT_SIZE_RANGE } from "@/lib/consts/settings";
 import { clampPanelSizes, type PanelSizes } from "@/lib/layout/model";
 import type { TerminalCursorStyle } from "@/lib/settings/terminal";
 import {
@@ -27,11 +27,12 @@ function clampTerminalFontSize(value: unknown, fallback: number): number {
 	return Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, number));
 }
 
-export type BuildProfile = "debug" | "release";
+export type BuildProfile = "debug" | "release" | "relwithdebinfo" | "minsizerel";
 export type TerminalPlacement = "bottom" | "right";
 export type TabSize = 2 | 4 | 8;
 
 export {
+	BUILD_PROFILE_LABELS,
 	BUILD_PROFILES,
 	DEFAULT_PREFERENCES,
 	DEFAULT_PROJECT_SETTINGS,
@@ -92,7 +93,7 @@ function readPlacement(value: unknown): TerminalPlacement {
 }
 
 function readBuildProfile(value: unknown): BuildProfile | null {
-	return value === "debug" || value === "release" ? value : null;
+	return BUILD_PROFILES.find((profile) => profile === value) ?? null;
 }
 
 function readText(value: unknown): string {

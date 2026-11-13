@@ -185,7 +185,7 @@ impl Preferences {
         if !matches!(self.editor_tab_size, 2 | 4 | 8) {
             self.editor_tab_size = 4;
         }
-        if self.build_profile != "debug" && self.build_profile != "release" {
+        if !crate::build_task::BUILD_PROFILES.contains(&self.build_profile.as_str()) {
             self.build_profile = "debug".to_string();
         }
         self.panel_sizes.normalize();

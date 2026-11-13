@@ -19,8 +19,8 @@ describe("buildOnce", () => {
 			});
 		};
 
-		const first = buildOnce("/projects/demo", "debug", build);
-		const second = buildOnce("/projects/demo", "debug", build);
+		const first = buildOnce("/projects/demo", "debug", null, build);
+		const second = buildOnce("/projects/demo", "debug", null, build);
 		release(report("ok"));
 
 		const [a, b] = await Promise.all([first, second]);
@@ -36,13 +36,13 @@ describe("buildOnce", () => {
 			return report("ok");
 		};
 
-		await buildOnce("/projects/demo", "debug", build);
-		await buildOnce("/projects/demo", "debug", build);
+		await buildOnce("/projects/demo", "debug", null, build);
+		await buildOnce("/projects/demo", "debug", null, build);
 
 		expect(calls).toBe(2);
 	});
 
-	test("a different tree or profile is a different build", async () => {
+	test("a different tree, profile or target is a different build", async () => {
 		let calls = 0;
 		const build = async () => {
 			calls += 1;
@@ -50,11 +50,13 @@ describe("buildOnce", () => {
 		};
 
 		await Promise.all([
-			buildOnce("/projects/demo", "debug", build),
-			buildOnce("/projects/demo", "release", build),
-			buildOnce("/projects/other", "debug", build),
+			buildOnce("/projects/demo", "debug", null, build),
+			buildOnce("/projects/demo", "release", null, build),
+			buildOnce("/projects/other", "debug", null, build),
+			buildOnce("/projects/demo", "debug", "cpp:one", build),
+			buildOnce("/projects/demo", "debug", "cpp:two", build),
 		]);
 
-		expect(calls).toBe(3);
+		expect(calls).toBe(5);
 	});
 });

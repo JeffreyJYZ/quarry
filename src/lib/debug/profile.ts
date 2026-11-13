@@ -1,4 +1,7 @@
-export type BuildProfile = "debug" | "release";
+import type { BuildProfile } from "@/lib/settings/model";
+
+/** Re-exported so a debug helper and the settings page name one profile type. */
+export type { BuildProfile };
 
 /** Pure decision helpers for debug launches driven by the selected build profile. */
 

@@ -3,6 +3,7 @@ import { type LaunchConfig, resolveRunTarget } from "@/lib/project/api";
 import { buildOnce } from "@/lib/project/buildOnce";
 import { buildThenResolve } from "@/lib/run/buildThenRun";
 import type { LaunchFailure } from "@/lib/run/failureLines";
+import type { BuildProfile } from "@/lib/settings/model";
 
 /** Which button asked for the launch. Run has a console; Debug reports somewhere else. */
 export type LaunchSource = "run" | "debug";
@@ -24,7 +25,7 @@ export type LaunchSource = "run" | "debug";
  */
 export function useRunLauncher(options: {
 	root: string | null;
-	profile: "debug" | "release";
+	profile: BuildProfile;
 	targetId: string | null;
 	onRun: (config: LaunchConfig) => void;
 	onDebug: (config: LaunchConfig) => void;

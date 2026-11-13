@@ -50,3 +50,21 @@ pub fn parse_target_id(id: &str) -> Result<TargetId, String> {
 pub fn unknown_id(id: &str) -> String {
     format!("unknown run target id \"{id}\": expected cargo:<package>:<bin> or cpp:<name>")
 }
+
+/// The CMake target a build should name for one run-target selection.
+///
+/// The run dropdown hands over the id it produced (`cpp:parity_app`), and the CMake model names
+/// targets, so the id is the one place the two already agree. A bare name is accepted too — that is
+/// what a caller asks for when it has no dropdown, and CMake's own `--target` takes exactly that. A
+/// Cargo id names no CMake target, so it builds everything.
+pub fn cmake_build_target(selection: &str) -> Option<String> {
+    let selection = selection.trim();
+    if selection.is_empty() {
+        return None;
+    }
+    match parse_target_id(selection) {
+        Ok(TargetId::Cpp { target }) => Some(target),
+        Ok(TargetId::Cargo { .. }) => None,
+        Err(_) => Some(selection.to_string()),
+    }
+}

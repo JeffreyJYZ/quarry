@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 import {
+	BUILD_PROFILE_LABELS,
 	BUILD_PROFILES,
 	type BuildProfile,
 	DEFAULT_PREFERENCES,
@@ -26,7 +27,7 @@ export function ShellSections(props: {
 						value={user.buildProfile}
 						options={BUILD_PROFILES.map((profile) => ({
 							value: profile,
-							label: profile,
+							label: BUILD_PROFILE_LABELS[profile],
 						}))}
 						onChange={(next) => {
 							if (next !== null) onChange({ buildProfile: next });
