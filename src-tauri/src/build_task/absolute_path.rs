@@ -99,27 +99,44 @@ pub fn run_cmake_build(
     let plan = cmake_plan(source, release, &CmakeOptions::for_root(source))?;
     let started = Instant::now();
     let started_at = SystemTime::now();
-    let mut text = String::new();
-    // The note goes first so a failing configure still ends the text with its own error, which is
-    // what the status bar reports.
-    if let Some(note) = &plan.note {
-        text.push_str(&format!("note: {note}\n"));
+    // Notes are collected rather than appended as they happen: the status bar reports the last line,
+    // which must stay the compiler's own verdict, so every note precedes the output it describes.
+    let mut notes: Vec<String> = plan.note.iter().cloned().collect();
+
+    // The query has to exist before the configure that answers it: CMake writes only the objects a
+    // client asked for, and it reads the query once, as the configure starts.
+    if let Err(error) = write_query(&plan.build_root) {
+        notes.push(error);
     }
 
     // Both steps run from the project root: `--preset` is looked up against the working directory,
     // while an absolute `--build <path>` does not care where it starts.
     let configure = run_cmake(state, &plan.configure, source_root)?;
-    text.push_str(&configure.text);
+    let mut body = configure.text;
     let mut success = configure.success;
     let mut stopped = configure.stopped;
 
+    // Read only after a configure that succeeded: a failed one can leave a reply half written, and a
+    // database built from half a project is worse than the previous one still on disk.
     if success && !stopped {
+        match synthesize_database(&plan.build_root) {
+            Ok(Some(written)) => notes.push(written.note()),
+            Ok(None) => {}
+            Err(why) => notes.push(format!(
+                "no compiler database from the CMake file API: {why}"
+            )),
+        }
         let outcome = run_cmake(state, &plan.build, source_root)?;
-        text.push_str(&outcome.text);
+        body.push_str(&outcome.text);
         success = outcome.success;
         stopped = outcome.stopped;
     }
 
+    let text = notes
+        .iter()
+        .map(|note| format!("note: {note}\n"))
+        .collect::<String>()
+        + &body;
     let duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
     let summary = if stopped {
         CANCELLED_SUMMARY.to_string()
@@ -132,9 +149,10 @@ pub fn run_cmake_build(
         duration_ms,
         // A successful build says which tree it used and what it had to decide; a failing one keeps
         // the compiler's own last line, which is the part the user acts on.
-        summary: match (&plan.note, success && !stopped) {
-            (Some(note), true) => truncate(&format!("{summary} · {note}"), SUMMARY_LIMIT),
-            _ => summary,
+        summary: if success && !stopped && !notes.is_empty() {
+            truncate(&format!("{summary} · {}", notes.join(" · ")), SUMMARY_LIMIT)
+        } else {
+            summary
         },
         // The program the build just wrote, resolved against the tree this build configured.
         artifact: if success {

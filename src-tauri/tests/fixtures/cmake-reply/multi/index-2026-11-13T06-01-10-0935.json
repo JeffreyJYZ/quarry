@@ -1,0 +1,18 @@
+{
+	"cmake": {
+		"generator": { "multiConfig": true, "name": "Ninja Multi-Config" },
+		"version": { "major": 4, "minor": 4, "patch": 5, "string": "4.4.5" }
+	},
+	"objects": [
+		{
+			"jsonFile": "codemodel-v2-00000000000000000011.json",
+			"kind": "codemodel",
+			"version": { "major": 2, "minor": 11 }
+		},
+		{
+			"jsonFile": "toolchains-v1-00000000000000000012.json",
+			"kind": "toolchains",
+			"version": { "major": 1, "minor": 1 }
+		}
+	]
+}

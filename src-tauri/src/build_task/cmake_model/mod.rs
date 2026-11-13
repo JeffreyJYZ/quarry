@@ -43,6 +43,9 @@ pub use argv::*;
 mod plan;
 pub use plan::*;
 
+mod api;
+pub use api::*;
+
 mod tests_root;
 pub use tests_root::*;
 

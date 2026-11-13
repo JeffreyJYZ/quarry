@@ -1,0 +1,77 @@
+{
+	"kind": "codemodel",
+	"paths": { "build": "/proj/build", "source": "/proj" },
+	"version": { "major": 2, "minor": 11 },
+	"configurations": [
+		{
+			"name": "Debug",
+			"directories": [
+				{
+					"build": ".",
+					"jsonFile": "directory-.-Debug-00000000000000000019.json",
+					"source": ".",
+					"targetIndexes": [0, 1, 2]
+				}
+			],
+			"projects": [{ "name": "demo", "targetIndexes": [0, 1, 2] }],
+			"targets": [
+				{
+					"directoryIndex": 0,
+					"id": "demo_app::@00000000000000000000",
+					"jsonFile": "target-demo_app-Debug-00000000000000000013.json",
+					"name": "demo_app",
+					"projectIndex": 0
+				},
+				{
+					"directoryIndex": 0,
+					"id": "helper::@00000000000000000000",
+					"jsonFile": "target-helper-Debug-00000000000000000014.json",
+					"name": "helper",
+					"projectIndex": 0
+				},
+				{
+					"directoryIndex": 0,
+					"id": "tool::@00000000000000000000",
+					"jsonFile": "target-tool-Debug-00000000000000000015.json",
+					"name": "tool",
+					"projectIndex": 0
+				}
+			]
+		},
+		{
+			"name": "Release",
+			"directories": [
+				{
+					"build": ".",
+					"jsonFile": "directory-.-Release-00000000000000000019.json",
+					"source": ".",
+					"targetIndexes": [0, 1, 2]
+				}
+			],
+			"projects": [{ "name": "demo", "targetIndexes": [0, 1, 2] }],
+			"targets": [
+				{
+					"directoryIndex": 0,
+					"id": "demo_app::@00000000000000000000",
+					"jsonFile": "target-demo_app-Release-00000000000000000016.json",
+					"name": "demo_app",
+					"projectIndex": 0
+				},
+				{
+					"directoryIndex": 0,
+					"id": "helper::@00000000000000000000",
+					"jsonFile": "target-helper-Release-00000000000000000017.json",
+					"name": "helper",
+					"projectIndex": 0
+				},
+				{
+					"directoryIndex": 0,
+					"id": "tool::@00000000000000000000",
+					"jsonFile": "target-tool-Release-00000000000000000018.json",
+					"name": "tool",
+					"projectIndex": 0
+				}
+			]
+		}
+	]
+}

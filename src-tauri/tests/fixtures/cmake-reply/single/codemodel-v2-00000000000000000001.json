@@ -1,0 +1,28 @@
+{
+	"kind": "codemodel",
+	"paths": { "build": "/proj/build", "source": "/proj" },
+	"version": { "major": 2, "minor": 11 },
+	"configurations": [
+		{
+			"name": "Debug",
+			"directories": [
+				{
+					"build": ".",
+					"jsonFile": "directory-.-Debug-00000000000000000009.json",
+					"source": ".",
+					"targetIndexes": [0]
+				}
+			],
+			"projects": [{ "name": "demo", "targetIndexes": [0] }],
+			"targets": [
+				{
+					"directoryIndex": 0,
+					"id": "demo::@00000000000000000000",
+					"jsonFile": "target-demo-Debug-00000000000000000004.json",
+					"name": "demo",
+					"projectIndex": 0
+				}
+			]
+		}
+	]
+}

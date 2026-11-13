@@ -1,0 +1,19 @@
+{
+	"artifacts": [{ "path": "Debug/tool" }],
+	"codemodelVersion": { "major": 2, "minor": 11 },
+	"compileGroups": [
+		{
+			"compileCommandFragments": [{ "fragment": "-g -arch arm64" }],
+			"defines": [{ "define": "TOOL_FLAG" }],
+			"includes": [{ "path": "/proj/include" }],
+			"language": "C",
+			"sourceIndexes": [0]
+		}
+	],
+	"id": "tool::@00000000000000000000",
+	"name": "tool",
+	"nameOnDisk": "tool",
+	"paths": { "build": ".", "source": "." },
+	"sources": [{ "compileGroupIndex": 0, "path": "tools/other.c", "sourceGroupIndex": 0 }],
+	"type": "EXECUTABLE"
+}

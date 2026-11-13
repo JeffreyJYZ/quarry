@@ -5,9 +5,10 @@
 //! error telling the user to build first. `initCommands` carries the Rust formatter entry the spike
 //! measured: without it a `Vec<u8>` arrives as the raw `{buf, len}` struct.
 //!
-//! C/C++: no manifest names the executable, so [`compose_cpp`] probes the conventional build outputs
-//! and, when nothing is built yet, names the path that build will write. The form is prefilled
-//! either way instead of failing like the Cargo branch does.
+//! C/C++: a configured CMake project answers from the model its own build wrote; anything else is a
+//! best-effort composition. [`compose_cpp`] probes the conventional build outputs and, when nothing
+//! is built yet, names the path that build will write. The form is prefilled either way instead of
+//! failing like the Cargo branch does.
 //!
 //! Only two processes ever run (`cargo metadata` and `rustc --print sysroot`), each on a blocking
 //! thread and each awaited to completion. Nothing is written to disk.
@@ -26,6 +27,9 @@ pub use default_cargo::*;
 
 mod default_cpp;
 pub use default_cpp::*;
+
+mod cmake_targets;
+pub use cmake_targets::*;
 
 mod find_with_xcrun;
 pub use find_with_xcrun::*;
@@ -53,6 +57,9 @@ pub use tests_5::*;
 
 mod tests_6;
 pub use tests_6::*;
+
+mod tests_cmake_targets;
+pub use tests_cmake_targets::*;
 
 /// The launch configuration for a project that has no preset, chosen by project kind.
 ///

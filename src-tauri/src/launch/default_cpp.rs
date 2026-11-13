@@ -32,9 +32,10 @@ pub const CMAKE_PROJECT: &str = r"(?im)^[ \t]*project[ \t]*\([ \t\r\n]*([A-Za-z0
 
 /// Builds the launch configuration for a C/C++ project without running a build.
 ///
-/// No manifest names the executable, so this is a best-effort composition: an artifact a build
-/// already produced wins, and before the first build the configuration still names the path that
-/// build will write. That keeps the run form prefilled instead of failing like the Cargo branch
+/// A configured CMake project answers from its file API reply, so the default launch is the first
+/// executable the project itself defines. Anything else is a best-effort composition: an artifact a
+/// build already produced wins, and before the first build the configuration still names the path
+/// that build will write. That keeps the run form prefilled instead of failing like the Cargo branch
 /// does for a missing binary, because the user can build from the toolbar and press Run again.
 pub fn compose_cpp(info: &ProjectInfo, stop_on_entry: bool) -> LaunchConfig {
     let root = Path::new(&info.root);
@@ -55,11 +56,17 @@ pub fn compose_cpp(info: &ProjectInfo, stop_on_entry: bool) -> LaunchConfig {
 /// The executables a C/C++ project can name, one per candidate name, most likely first.
 ///
 /// This is the only candidate walk: [`compose_cpp`] takes the first entry, so the default launch and
-/// the toolbar's target list cannot disagree about which program a project has. A project with
-/// nothing built yet still yields one entry, the path its build will write, which is what the
-/// prefilled composition names.
+/// the toolbar's target list cannot disagree about which program a project has. A CMake project
+/// whose build wrote a file API reply answers with its own targets; anything else is a name search,
+/// and a project with nothing built yet still yields one entry, the path its build will write.
 pub fn cpp_executables(info: &ProjectInfo) -> Vec<(String, PathBuf)> {
     let root = Path::new(&info.root);
+    // A configured CMake project knows its own targets, so no file name is guessed for it.
+    if info.kind == ProjectKind::Cmake
+        && let Some(targets) = cmake_candidates(root)
+    {
+        return targets;
+    }
     let names = program_names(root, &info.name, info.kind);
     let mut found: Vec<(String, PathBuf)> = Vec::new();
 
