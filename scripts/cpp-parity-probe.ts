@@ -73,6 +73,7 @@ import {
 	toolchainFixture,
 	twoTargetsFixture,
 } from "./cpp-parity-fixtures";
+import { readDebugInfo } from "./cpp-parity-debug-info";
 import { findGcc, NO_GCC, type GccHarness } from "./cpp-parity-gcc";
 import { judgeGccToolchain } from "./cpp-parity-gcc-row";
 import { judgeMsvcToolchain, judgeVisualStudio } from "./cpp-parity-vs-row";
@@ -222,10 +223,13 @@ function run(bin: string, args: string[], cwd: string, timeout = 120_000): Promi
 /** A tool the way quarry's `resolve` finds one: PATH first, then the install dirs a GUI launch lacks. */
 function findTool(name: string): string | null {
 	const windows = process.platform === "win32";
+	const apple = process.platform === "darwin";
 	const files = windows ? [name, `${name}.exe`] : [name];
 	const dirs = [
 		...(process.env.PATH ?? "").split(delimiter).filter(Boolean),
-		...(windows ? [] : ["/opt/homebrew/bin", "/usr/local/bin"]),
+		// Homebrew's two prefixes are the dirs a Dock-launched app lacks; Linux keeps everything the
+		// app needs on PATH, and stat-ing macOS paths there is a lookup that cannot answer.
+		...(apple ? ["/opt/homebrew/bin", "/usr/local/bin"] : []),
 		`${process.env.HOME}/.cargo/bin`,
 	];
 	for (const dir of dirs) {
@@ -235,7 +239,7 @@ function findTool(name: string): string | null {
 		}
 	}
 	// `xcrun` is Apple's; asking for it on another platform is a wasted spawn, not a fallback.
-	if (!windows && (name === "clangd" || name === "cargo")) {
+	if (apple && (name === "clangd" || name === "cargo")) {
 		const xcrun = Bun.spawnSync(["xcrun", "--find", name]);
 		const found = xcrun.stdout.toString().trim();
 		if (found && existsSync(found)) return found;
@@ -245,9 +249,9 @@ function findTool(name: string): string | null {
 
 function serverPath(binary: string): string {
 	const inherited = (process.env.PATH ?? "").split(delimiter).filter(Boolean);
-	const apple =
-		process.platform === "win32" ? [] : ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"];
-	return [dirname(binary), ...apple, ...inherited].join(delimiter);
+	const apple = process.platform === "darwin" ? ["/opt/homebrew/bin", "/usr/local/bin"] : [];
+	const posix = process.platform === "win32" ? [] : ["/usr/bin"];
+	return [dirname(binary), ...apple, ...posix, ...inherited].join(delimiter);
 }
 
 function isFile(path: string): boolean {
@@ -1168,9 +1172,10 @@ interface ConfigHalf {
  * And the synthesised database held one entry per source per configuration, of which clangd reads
  * the first, so `Release` was analysed with Debug's defines.
  *
- * Debug info is read from the object the configuration compiled with `otool -l`, not from the flags:
- * this linker keeps DWARF in the object, so the executable is identical either way and only the
- * object can tell the two configurations apart.
+ * Debug info is read from the object the configuration compiled, not from the flags: this linker
+ * keeps DWARF in the object, so the executable is identical either way and only the object can tell
+ * the two configurations apart. The tool that reads it is the platform's — `otool -l` on macOS,
+ * `readelf -S` for ELF — which is why the reader lives in `cpp-parity-debug-info.ts`.
  */
 async function judgeMultiConfig(
 	fixture: Fixture,
@@ -1346,19 +1351,26 @@ async function judgeMultiConfig(
 				continue;
 			}
 			const object = objects[0] as string;
-			const otool = await run("/usr/bin/otool", ["-l", object], root);
-			const dwarf = otool.stdout.includes("__DWARF");
+			// The tool is the platform's, not the row's: macOS names its debug segment in Mach-O,
+			// Linux lists it as an ELF section, and neither leaves the flags as the only evidence.
+			const read = await readDebugInfo(
+				object,
+				relativeTo(root, object),
+				process.platform,
+				(bin, args) => run(bin, args, root),
+			);
+			const holds = read.dwarf === half.debugInfo;
 			row.commands.push({
-				line: `cd ${directory} && otool -l ${relativeTo(root, object)} | rg __DWARF`,
-				verdict: dwarf === half.debugInfo ? "PASS" : "FAIL",
+				line: `cd ${directory} && ${read.command}`,
+				verdict: read.dwarf === null ? "SKIP" : holds ? "PASS" : "FAIL",
 			});
 			row.details.push(
-				`debug info   ${dwarf === half.debugInfo ? "PASS" : "FAIL"}  ${half.profile}: ${relativeTo(root, object)} ${dwarf ? "carries" : "carries no"} __DWARF`,
+				`debug info   ${read.dwarf === null ? "SKIP" : holds ? "PASS" : "FAIL"}  ${half.profile}: ${read.dwarf === null ? read.reason : `${relativeTo(root, object)} carries ${read.dwarf ? "debug info" : "no debug info"}`}`,
 			);
-			if (dwarf !== half.debugInfo) {
+			if (read.dwarf !== null && !holds) {
 				passed = false;
 				findings.push(
-					`${directory}: ${half.configuration} must compile ${half.debugInfo ? "with" : "without"} debug info, but \`cd ${directory} && otool -l ${relativeTo(root, object)}\` ${dwarf ? "shows a __DWARF segment" : "shows no __DWARF segment"}.`,
+					`${directory}: ${half.configuration} must compile ${half.debugInfo ? "with" : "without"} debug info, but \`cd ${directory} && ${read.command}\` reads ${read.dwarf ? "a debug section" : "no debug section"}.`,
 				);
 			}
 		}
@@ -1658,6 +1670,10 @@ async function judge(
 async function main() {
 	const started = Date.now();
 	const windowsOnly = process.argv.includes("--windows");
+	// The Linux subset: the rows a Linux runner can answer. It is a subset rather than a default
+	// because two of them are toolchain-specific and only one platform has each — an Xcode
+	// generator, a Visual Studio generator — and naming that difference is what the table is for.
+	const linuxOnly = process.argv.includes("--linux");
 	const cmake = findTool("cmake");
 	const clangd = findTool("clangd");
 	if (!cmake) throw new Error("cmake is not installed");
@@ -1672,6 +1688,7 @@ async function main() {
 
 	const plannerBin = await planner();
 	console.log("C/C++ parity probe — quarry");
+	console.log(`  subset    ${windowsOnly ? "Windows" : linuxOnly ? "Linux" : "all rows"}`);
 	console.log(`  fixtures  ${tempRoot}`);
 	console.log(`  planner   ${plannerBin}`);
 	console.log(`  cmake     ${firstLine((await run(cmake, ["--version"], tempRoot)).stdout)}`);
@@ -1705,8 +1722,19 @@ async function main() {
 	const rows: Row[] = [];
 	const findings: string[] = [];
 
+	// A row this platform cannot measure says so in the table, by name and with a reason. Xcode is
+	// the one generator with no Linux build, and an absent row reading as "not applicable" is the
+	// silent skip this table exists to replace.
+	if (linuxOnly) {
+		console.log(`skipping generator: Xcode … ${XCODE_MACOS_ONLY}`);
+		rows.push(skipped("generator: Xcode", XCODE_MACOS_ONLY));
+	}
+
 	const fixtures: Fixture[] = [presetsFixture(), toolchainFixture(), multiTargetFixture()];
-	if (generators.includes("Xcode")) {
+	// Gated on the subset rather than only on `cmake --help`: a Linux runner must not configure an
+	// Xcode project even if some cmake there listed the generator, because nothing else on it can
+	// read the tree that generator writes.
+	if (!linuxOnly && generators.includes("Xcode")) {
 		fixtures.push(generatorFixture("generator: Xcode", "Xcode"));
 	}
 	if (generators.includes("Ninja Multi-Config")) {
@@ -1770,15 +1798,7 @@ async function main() {
 	if (gcc === null) {
 		for (const capability of ["toolchain: gcc", "toolchain: gcc behind a launcher"]) {
 			console.log(`skipping ${capability} … ${NO_GCC}`);
-			rows.push({
-				capability,
-				build: "SKIP",
-				analysis: "SKIP",
-				targets: "SKIP",
-				tree: "SKIP",
-				details: [`skipped      ${NO_GCC}`],
-				commands: [],
-			});
+			rows.push(skipped(capability, NO_GCC));
 		}
 	} else {
 		for (const fixture of gccFixtures) {
@@ -1793,6 +1813,10 @@ async function main() {
 				firstError,
 				isFile,
 				writeFixture: () => writeFixture(root, fixture),
+				// macOS pairs clang with libc++ and GCC with libstdc++, so an unqueried clangd there
+				// genuinely cannot answer; where both compilers share one standard library the
+				// control is evidence, not a requirement.
+				requiresDriverControl: process.platform === "darwin",
 			};
 			process.stdout.write(`running ${fixture.name} … `);
 			const result = await judgeGccToolchain(fixture, root, gcc, harness);
@@ -1818,6 +1842,23 @@ async function main() {
 /** The Visual Studio generator search: the candidates `cmake --help` listed, and how each answered. */
 interface VsStatus extends VsDetection {
 	candidates: string[];
+}
+
+/** Why the Xcode row is skipped off macOS, in one line a reader can act on. */
+const XCODE_MACOS_ONLY =
+	"the Xcode generator is macOS-only: this runner's cmake has no Xcode project layout to write, and nothing here can read one — run the probe on macOS for that row";
+
+/** A row nobody measured, with the reason in its first cell's own column. */
+function skipped(capability: string, reason: string): Row {
+	return {
+		capability,
+		build: "SKIP",
+		analysis: "SKIP",
+		targets: "SKIP",
+		tree: "SKIP",
+		details: [`skipped      ${reason}`],
+		commands: [],
+	};
 }
 
 /**
