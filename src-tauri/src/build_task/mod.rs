@@ -57,6 +57,9 @@ pub use cmake_artifact::*;
 mod cmake_output;
 pub use cmake_output::*;
 
+mod cmake_model;
+pub use cmake_model::*;
+
 mod tests_1;
 pub use tests_1::*;
 

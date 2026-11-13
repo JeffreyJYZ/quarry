@@ -36,7 +36,14 @@ const SETTINGS_KEYS: [&str; 13] = [
 ];
 
 /// Every key `ProjectSettings` owns.
-const PROJECT_KEYS: [&str; 3] = ["editorTabSize", "formatOnSave", "buildProfile"];
+const PROJECT_KEYS: [&str; 6] = [
+    "editorTabSize",
+    "formatOnSave",
+    "buildProfile",
+    "cmakePreset",
+    "cmakeBuildDir",
+    "cmakeToolchainFile",
+];
 
 /// The settings file, or the error explaining why it was reset and where the old bytes went.
 pub fn read_settings_at(path: &Path) -> Result<SettingsRead, String> {

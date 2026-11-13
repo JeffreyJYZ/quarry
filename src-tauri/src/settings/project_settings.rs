@@ -17,6 +17,15 @@ pub struct ProjectSettings {
     pub format_on_save: Option<bool>,
     #[serde(default, deserialize_with = "deserialize_project_build_profile")]
     pub build_profile: Option<String>,
+    /// CMake configure preset from `CMakePresets.json`; empty uses the only visible one.
+    #[serde(default)]
+    pub cmake_preset: String,
+    /// CMake build directory; empty detects the configured tree, then falls back to `<root>/build`.
+    #[serde(default)]
+    pub cmake_build_dir: String,
+    /// CMake toolchain file; empty keeps the preset's own `CMAKE_TOOLCHAIN_FILE`.
+    #[serde(default)]
+    pub cmake_toolchain_file: String,
     /// Fields written by another build, kept verbatim so a save from this build never drops them.
     #[serde(flatten)]
     pub extra: serde_json::Map<String, serde_json::Value>,

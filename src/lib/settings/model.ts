@@ -68,28 +68,15 @@ export type ProjectSettings = {
 	editorTabSize: TabSize | null;
 	formatOnSave: boolean | null;
 	buildProfile: BuildProfile | null;
+	/** CMake configure preset name; empty picks the project's only visible preset. */
+	cmakePreset: string;
+	/** CMake build directory; empty detects the configured tree, then `<root>/build`. */
+	cmakeBuildDir: string;
+	/** CMake toolchain file; empty keeps the preset's own `CMAKE_TOOLCHAIN_FILE`. */
+	cmakeToolchainFile: string;
 };
 
-export type EffectivePreferences = ThemePreferences & {
-	editorFontSize: number;
-	editorTabSize: TabSize;
-	terminalFontSize: number;
-	terminalLineHeight: number;
-	terminalCursorStyle: TerminalCursorStyle;
-	terminalCursorBlink: boolean;
-	terminalScrollback: number;
-	terminalLetterSpacing: number;
-	formatOnSave: boolean;
-	buildProfile: BuildProfile;
-	terminalPlacement: TerminalPlacement;
-	editorFontFamily: string;
-	terminalFontFamily: string;
-	rustAnalyzerPath: string;
-	rustAnalyzerArgs: string;
-	clangdPath: string;
-	clangdArgs: string;
-	panelSizes: PanelSizes;
-};
+export type EffectivePreferences = Preferences;
 
 export function clampFontSize(value: unknown, fallback: number): number {
 	if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
@@ -167,6 +154,9 @@ export function normalizeProjectSettings(input: unknown): ProjectSettings {
 		editorTabSize: readTabSize(source.editorTabSize),
 		formatOnSave: typeof source.formatOnSave === "boolean" ? source.formatOnSave : null,
 		buildProfile: readBuildProfile(source.buildProfile),
+		cmakePreset: readText(source.cmakePreset),
+		cmakeBuildDir: readText(source.cmakeBuildDir),
+		cmakeToolchainFile: readText(source.cmakeToolchainFile),
 	};
 	return withUnknownKeys(known, source);
 }
@@ -190,6 +180,9 @@ export function projectSettingsAreEmpty(settings: ProjectSettings): boolean {
 	return (
 		settings.editorTabSize === null &&
 		settings.formatOnSave === null &&
-		settings.buildProfile === null
+		settings.buildProfile === null &&
+		settings.cmakePreset === "" &&
+		settings.cmakeBuildDir === "" &&
+		settings.cmakeToolchainFile === ""
 	);
 }

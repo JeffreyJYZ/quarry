@@ -31,4 +31,7 @@ export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
 	editorTabSize: null,
 	formatOnSave: null,
 	buildProfile: null,
+	cmakePreset: "",
+	cmakeBuildDir: "",
+	cmakeToolchainFile: "",
 };

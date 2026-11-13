@@ -9,16 +9,16 @@ pub use std::path::{Path, PathBuf};
 use super::*;
 
 /// Directory CMake projects conventionally build into.
-pub const CMAKE_BUILD_DIR: &str = "build";
+pub use crate::build_task::BUILD_DIR as CMAKE_BUILD_DIR;
 
 /// Directory quarry's own plain-clang build writes, relative to the project root.
-pub const QUARRY_BUILD_DIR: &str = ".quarry/build";
+pub use crate::build_task::QUARRY_BUILD_DIR;
 
 /// Subdirectories a multi-config generator (Xcode, Visual Studio) adds under the build directory.
 pub const MULTI_CONFIG_DIRS: [&str; 2] = ["Debug", "Release"];
 
 /// Out-of-source directories CLion creates by convention.
-pub const CLION_BUILD_DIRS: [&str; 2] = ["cmake-build-debug", "cmake-build-release"];
+pub use crate::build_task::CLION_BUILD_DIRS;
 
 /// The root manifest an executable target is read from; `cmp`-free, one file only.
 pub const CMAKE_MANIFEST: &str = "CMakeLists.txt";
@@ -116,21 +116,39 @@ pub fn cmake_target(root: &Path) -> Option<String> {
     None
 }
 
+/// The tree this project builds in, as detection and the project's saved settings decide it.
+///
+/// A build configures the project's preset or the tree already configured on disk, so a launch has
+/// to look in the same place: naming `<root>/build` unconditionally sent Run to a path the build
+/// never wrote once a preset or CLion directory was in play.
+pub fn cpp_build_root(root: &Path) -> PathBuf {
+    let options = crate::build_task::CmakeOptions::for_root(root);
+    crate::build_task::detect_build_root(root, &options).0
+}
+
 /// The conventional locations one name may occupy, by project kind.
 pub fn paths_for_name(root: &Path, name: &str, kind: ProjectKind) -> Vec<PathBuf> {
     match kind {
         ProjectKind::Cmake => {
-            let build = root.join(CMAKE_BUILD_DIR);
-            let mut paths = vec![root.join(name)];
+            let detected = cpp_build_root(root);
+            let mut paths = Vec::new();
+            push_candidate(&mut paths, &detected, name);
             for config in MULTI_CONFIG_DIRS {
-                paths.push(root.join(config).join(name));
+                push_path(&mut paths, detected.join(config).join(name));
             }
-            paths.push(build.join(name));
+            push_candidate(&mut paths, root, name);
             for config in MULTI_CONFIG_DIRS {
-                paths.push(build.join(config).join(name));
+                push_path(&mut paths, root.join(config).join(name));
+            }
+            push_candidate(&mut paths, &root.join(CMAKE_BUILD_DIR), name);
+            for config in MULTI_CONFIG_DIRS {
+                push_path(
+                    &mut paths,
+                    root.join(CMAKE_BUILD_DIR).join(config).join(name),
+                );
             }
             for directory in CLION_BUILD_DIRS {
-                paths.push(root.join(directory).join(name));
+                push_candidate(&mut paths, &root.join(directory), name);
             }
             paths
         }
@@ -142,6 +160,16 @@ pub fn paths_for_name(root: &Path, name: &str, kind: ProjectKind) -> Vec<PathBuf
     }
 }
 
+fn push_candidate(paths: &mut Vec<PathBuf>, dir: &Path, name: &str) {
+    push_path(paths, dir.join(name));
+}
+
+fn push_path(paths: &mut Vec<PathBuf>, path: PathBuf) {
+    if !paths.contains(&path) {
+        paths.push(path);
+    }
+}
+
 /// The first candidate a build has already produced, or `None` before the first build.
 pub fn first_existing(candidates: &[PathBuf]) -> Option<PathBuf> {
     candidates.iter().find(|path| path.is_file()).cloned()
@@ -149,19 +177,12 @@ pub fn first_existing(candidates: &[PathBuf]) -> Option<PathBuf> {
 
 /// The path to name before any build exists.
 ///
-/// A CMake project with a `build` directory gets an out-of-source path under it; otherwise the
-/// top-level path a generator in the root writes. The other kinds get quarry's own build output,
-/// which is the only executable quarry itself knows how to produce for them.
+/// A CMake project names the program its next build writes, in the tree that build configures;
+/// the other kinds get quarry's own build output, which is the only executable quarry itself knows
+/// how to produce for them.
 pub fn fallback_program(root: &Path, name: &str, kind: ProjectKind) -> PathBuf {
     match kind {
-        ProjectKind::Cmake => {
-            let build = root.join(CMAKE_BUILD_DIR);
-            if build.is_dir() {
-                build.join(name)
-            } else {
-                root.join(name)
-            }
-        }
+        ProjectKind::Cmake => cpp_build_root(root).join(name),
         _ => root.join(QUARRY_BUILD_DIR).join(name),
     }
 }
