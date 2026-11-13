@@ -9,7 +9,7 @@
  * headers through the compiler CMake chose. For each one the probe asks the product what it would
  * do, then does exactly that, and reports the three consumers separately:
  *
- *   build     the argv `src-tauri/src/bin/quarry-plan.rs` reports, spawned in the working directory
+ *   build     the argv `src-tauri/examples/quarry-plan.rs` reports, spawned in the working directory
  *             it reports. That binary prints the answer of `cmake_plan` — the same function
  *             `run_cmake_build` calls — so presets, the detected build root and the toolchain file
  *             are the product's decisions, not this script's.
@@ -331,7 +331,7 @@ function writeFixture(root: string, fixture: Fixture) {
 async function planner(): Promise<string> {
 	const result = await run(
 		"cargo",
-		["build", "--bin", "quarry-plan", "--message-format=json"],
+		["build", "--example", "quarry-plan", "--message-format=json"],
 		MANIFEST,
 		CARGO_TIMEOUT,
 	);
