@@ -77,27 +77,27 @@ Launch configuration lives at `.quarry/launch.json` in the project root:
 
 ## 4. Parity matrix
 
-| CLion capability                                                 | Where it comes from                                      | Cost |
-| ---------------------------------------------------------------- | -------------------------------------------------------- | ---- |
-| completion, diagnostics, hover, goto def/impl/type               | LSP                                                      | free |
-| find references, rename, signature help, inlay hints, folding    | LSP                                                      | free |
-| call and type hierarchy                                          | LSP                                                      | free |
-| quick-fixes / clang-tidy fixes                                   | LSP`codeAction`                                          | free |
-| inline errors without saving                                     | rust-analyzer `checkOnSave`, clangd diagnostics          | free |
-| format on save, code style                                       | rustfmt / clang-format                                   | free |
-| project-wide search                                              | `ripgrep`                                                | free |
-| build system, target and profile picker                          | `cargo metadata`, CMake targets, `compile_commands.json` | work |
-| mixed C and C++ in one tree                                      | per-language compile commands, one link                  | done |
-| multi-config trees (Xcode, Visual Studio, Ninja Multi-Config)    | file API targets, `--config`, no `CMAKE_BUILD_TYPE`      | done |
-| run and debug configurations                                     | `.quarry/launch.json` + `Project`                        | work |
-| debugger panel: breakpoints, frames, scopes, variables, evaluate | DAP                                                      | work |
-| conditional and log breakpoints                                  | DAP                                                      | work |
-| hardware watchpoints (data breakpoints)                          | DAP`supportsDataBreakpoints`                             | work |
-| memory view, disassembly                                         | DAP`readMemory`, `disassemble`                           | work |
-| Rust `Vec` / `String` / `Option` pretty printing                 | LLDB Rust plugin formatters                              | free |
-| test runner UI                                                   | `cargo test --message-format=json`, gtest/ctest listing  | work |
-| embedded terminal                                                | `portable-pty`                                           | work |
-| git status, gutter, blame, diff                                  | `git` CLI                                                | work |
+| CLion capability                                                 | Where it comes from                                                                             | Cost |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---- |
+| completion, diagnostics, hover, goto def/impl/type               | LSP                                                                                             | free |
+| find references, rename, signature help, inlay hints, folding    | LSP                                                                                             | free |
+| call and type hierarchy                                          | LSP                                                                                             | free |
+| quick-fixes / clang-tidy fixes                                   | LSP`codeAction`                                                                                 | free |
+| inline errors without saving                                     | rust-analyzer `checkOnSave`, clangd diagnostics                                                 | free |
+| format on save, code style                                       | rustfmt / clang-format                                                                          | free |
+| project-wide search                                              | `ripgrep`                                                                                       | free |
+| build system, target and profile picker                          | `cargo metadata`, CMake targets, `compile_commands.json`                                        | work |
+| mixed C and C++ in one tree                                      | per-language compile commands, one link                                                         | done |
+| multi-config trees (Xcode, Visual Studio, Ninja Multi-Config)    | file API targets, `--config`, no `CMAKE_BUILD_TYPE`, and a database for the built configuration | done |
+| run and debug configurations                                     | `.quarry/launch.json` + `Project`                                                               | work |
+| debugger panel: breakpoints, frames, scopes, variables, evaluate | DAP                                                                                             | work |
+| conditional and log breakpoints                                  | DAP                                                                                             | work |
+| hardware watchpoints (data breakpoints)                          | DAP`supportsDataBreakpoints`                                                                    | work |
+| memory view, disassembly                                         | DAP`readMemory`, `disassemble`                                                                  | work |
+| Rust `Vec` / `String` / `Option` pretty printing                 | LLDB Rust plugin formatters                                                                     | free |
+| test runner UI                                                   | `cargo test --message-format=json`, gtest/ctest listing                                         | work |
+| embedded terminal                                                | `portable-pty`                                                                                  | work |
+| git status, gutter, blame, diff                                  | `git` CLI                                                                                       | work |
 
 ### 4.1 What the C/C++ compile-and-analysis path verifies, and where
 
@@ -121,7 +121,7 @@ Verified on macOS with Apple clang 21, Homebrew GCC 16, CMake 4.4/4.5:
 | mixed-languages                  | a `.c` unit is compiled and analysed as C, a `.cpp` as C++, and the link crosses `extern "C"` |
 | profile                          | `RelWithDebInfo`/`MinSizeRel` reach the compiler, and analysis uses the profile being built   |
 | two-targets                      | building one target does not build the other                                                  |
-| multi-config                     | each configuration writes, and the plan names, its own artefact                               |
+| multi-config                     | one entry per source for the configuration being built, and that configuration's artefact     |
 | toolchain: gcc                   | a compiler clangd cannot recognise is queried for its include paths                           |
 | toolchain: gcc behind a launcher | the same, with the compiler behind a `ccache`-shaped wrapper                                  |
 

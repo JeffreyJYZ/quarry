@@ -63,6 +63,7 @@ import {
 	generatorFixture,
 	mixedLanguagesFixture,
 	multiConfigFixture,
+	MULTI_CONFIG_LEVELS,
 	multiTargetFixture,
 	plainFixture,
 	positionOf,
@@ -547,12 +548,17 @@ function seamFacts(): string[] {
 	if (!model.includes("write_query(request.build_root)")) {
 		facts.push("the shared configure no longer writes the file API query before configuring");
 	}
-	if (!model.includes("synthesize_database(request.build_root)")) {
-		facts.push("the shared configure no longer synthesises the database on success");
+	if (!model.includes("synthesize_database(request.build_root, request.configuration)")) {
+		facts.push(
+			"the shared configure no longer synthesises the database for the configuration it built",
+		);
 	}
 	const handoff = read("lsp/handoff/configure.rs");
 	if (!handoff.includes("configure_tree(request")) {
 		facts.push("the hand-off no longer configures through the shared configure sequence");
+	}
+	if (!handoff.includes("synthesize_database(&plan.build_root, &plan.configuration)")) {
+		facts.push("the hand-off no longer derives the database for the profile's configuration");
 	}
 	if (!handoff.includes("configure_need(root, &plan.build_root")) {
 		facts.push("the hand-off no longer asks the model whether the tree is current");
@@ -1147,16 +1153,20 @@ interface ConfigHalf {
 	profile: string;
 	configuration: string;
 	debugInfo: boolean;
+	/** The `PARITY_LEVEL` this configuration's flags define, which its analysis must read. */
+	level: number;
 }
 
 /**
- * A multi-config tree built twice: the configuration reaches the compiler, and the run target
- * follows the configuration asked for.
+ * A multi-config tree built twice: the configuration reaches the compiler, the run target follows
+ * the configuration asked for, and analysis reads that configuration's own compile command.
  *
- * Two things are measured, and both were wrong for a tree that takes `--config` at build time. The
- * plan used to force `-DCMAKE_BUILD_TYPE` on a tree whose generator ignores it, which is the one
- * flag a multi-config configure must never carry. And the run target was resolved for `Debug`
+ * Three things are measured, and all three were wrong for a tree that takes `--config` at build
+ * time. The plan used to force `-DCMAKE_BUILD_TYPE` on a tree whose generator ignores it, which is
+ * the one flag a multi-config configure must never carry. The run target was resolved for `Debug`
  * whatever the profile, so it named the Debug artefact of a Release build — a path nothing wrote.
+ * And the synthesised database held one entry per source per configuration, of which clangd reads
+ * the first, so `Release` was analysed with Debug's defines.
  *
  * Debug info is read from the object the configuration compiled with `otool -l`, not from the flags:
  * this linker keeps DWARF in the object, so the executable is identical either way and only the
@@ -1167,6 +1177,7 @@ async function judgeMultiConfig(
 	root: string,
 	plannerBin: string,
 	cmake: string,
+	clangd: string,
 ): Promise<{ row: Row; findings: string[]; broken: boolean }> {
 	const directory = basename(root);
 	writeFixture(root, fixture);
@@ -1184,6 +1195,7 @@ async function judgeMultiConfig(
 	let broken = false;
 	let passed = true;
 	let named = true;
+	let analysed = true;
 	let buildRoot: string | null = null;
 
 	for (const args of fixture.userBuild ?? []) {
@@ -1200,8 +1212,18 @@ async function judgeMultiConfig(
 	if (broken) return { row, findings, broken };
 
 	const halves: ConfigHalf[] = [
-		{ profile: "release", configuration: "Release", debugInfo: false },
-		{ profile: "relwithdebinfo", configuration: "RelWithDebInfo", debugInfo: true },
+		{
+			profile: "release",
+			configuration: "Release",
+			debugInfo: false,
+			level: MULTI_CONFIG_LEVELS.Release as number,
+		},
+		{
+			profile: "relwithdebinfo",
+			configuration: "RelWithDebInfo",
+			debugInfo: true,
+			level: MULTI_CONFIG_LEVELS.RelWithDebInfo as number,
+		},
 	];
 	for (const half of halves) {
 		const plan = await askPlan(plannerBin, root, { profile: half.profile });
@@ -1258,20 +1280,56 @@ async function judgeMultiConfig(
 			);
 		} else {
 			const executed = await run(artifact as string, [], root);
-			const prints = executed.code === 0 && executed.stdout.includes("variant=7");
+			const prints =
+				executed.code === 0 &&
+				executed.stdout.includes("variant=7") &&
+				executed.stdout.includes(`level=${half.level}`);
 			row.commands.push({
 				line: `cd ${directory} && ${relativeTo(root, artifact as string)}`,
 				verdict: prints ? "PASS" : "FAIL",
 			});
 			row.details.push(
-				`build        ${prints ? "PASS" : "FAIL"}  ${half.profile}: the artefact printed ${JSON.stringify(executed.stdout.trim())} (wants "variant=7")`,
+				`build        ${prints ? "PASS" : "FAIL"}  ${half.profile}: the artefact printed ${JSON.stringify(executed.stdout.trim())} (wants "variant=7 level=${half.level}")`,
 			);
 			if (!prints) {
 				passed = false;
 				findings.push(
-					`${directory}: the ${half.profile} artefact printed ${JSON.stringify(executed.stdout.trim())} (exit ${executed.code}) — \`cd ${directory} && ${relativeTo(root, artifact as string)}\`.`,
+					`${directory}: the ${half.profile} artefact printed ${JSON.stringify(executed.stdout.trim())} (exit ${executed.code}), so it was not compiled with this configuration's defines — \`cd ${directory} && ${relativeTo(root, artifact as string)}\`.`,
+
 				);
 			}
+		}
+
+		// Analysis of the configuration just built, through the arguments a session start would use
+		// now: the build's own configure rewrote the tree, so the database is derived again for the
+		// profile being built, exactly as opening the project again does.
+		const session = await askPlan(plannerBin, root, { profile: half.profile });
+		const handoffArgs = session.handoff?.args ?? [];
+		const clangdCommand = commandLine(root, ["clangd", ...handoffArgs]);
+		const probe: AnalysisProbe = {
+			file: "main.cpp",
+			needle: "PARITY_LEVEL",
+			needs: `the ${half.configuration} compile command, which defines PARITY_LEVEL=${half.level}`,
+			expect: `Value = \`${half.level}\``,
+		};
+		const clangdLine = row.commands.length;
+		row.commands.push({ line: `cd ${directory} && ${clangdCommand}`, verdict: "PASS" });
+		const measured = await analyse(clangd, root, [probe], handoffArgs);
+		const hover = measured[0]?.hover ?? null;
+		const diagnostics = measured[0]?.diagnostics ?? [];
+		const reads = (hover?.includes(probe.expect) ?? false) && diagnostics.length === 0;
+		const text = readFileSync(join(root, probe.file), "utf8");
+		const position = positionOf(text, probe.needle);
+		row.commands[clangdLine].verdict = reads ? "PASS" : "FAIL";
+		row.details.push(
+			`analysis     ${reads ? "PASS" : "FAIL"}  ${half.profile}: main.cpp:${position.line + 1}:${position.character + 1} \`${probe.needle}\` -> ${describe(hover)}${diagnostics.length > 0 ? `, with "${diagnostics[0]}"` : ", no diagnostics"} (wants ${JSON.stringify(probe.expect)})`,
+		);
+		if (!reads) {
+			analysed = false;
+			const database = session.handoff?.databaseDir ?? null;
+			findings.push(
+				`${directory}: the ${half.profile} analysis must read the ${half.configuration} compile command, which defines PARITY_LEVEL=${half.level}, but \`cd ${directory} && ${clangdCommand}\` answers ${describe(hover)}${diagnostics.length > 0 ? `, with "${diagnostics[0]}"` : ""}. ${database === null ? "The plan named no compile database" : relative(root, database)} must hold one entry per source for ${half.configuration}, so the hover and the build agree.`,
+			);
 		}
 	}
 
@@ -1314,6 +1372,7 @@ async function judgeMultiConfig(
 		);
 	}
 	row.build = passed ? "PASS" : "FAIL";
+	row.analysis = analysed ? "PASS" : "FAIL";
 	row.targets = named ? "PASS" : "FAIL";
 	return { row, findings, broken };
 }

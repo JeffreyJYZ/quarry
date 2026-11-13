@@ -29,6 +29,12 @@ pub struct CmakePlan {
     pub build_root: PathBuf,
     pub configure: Vec<String>,
     pub build: Vec<String>,
+    /// The configuration this build uses, which is also the one analysis must describe.
+    ///
+    /// A multi-config generator builds one configuration per `--config`, and CLion analyses the one
+    /// being built, so this name travels with the plan: the hand-off selects that configuration's
+    /// entries instead of the `Debug` ones that lead CMake's reply.
+    pub configuration: String,
     /// What this configure must carry, so a tree configured with other values reads as stale.
     pub intent: ConfigureIntent,
     /// One line naming a choice the user might not expect, or `None` when everything was obvious.
@@ -103,6 +109,7 @@ pub fn cmake_plan_target(
             build_root,
             configure,
             build: cmake_build_argv(&dir, profile, target),
+            configuration: cmake_config(profile).to_string(),
             intent: ConfigureIntent {
                 toolchain,
                 build_type: typed.then(|| cmake_config(profile).to_string()),
@@ -145,7 +152,7 @@ pub fn cmake_plan_target(
                 "--build".to_string(),
                 dir,
                 "--config".to_string(),
-                configuration,
+                configuration.clone(),
             ];
             if let Some(target) = target {
                 argv.push("--target".to_string());
@@ -159,6 +166,7 @@ pub fn cmake_plan_target(
         build_root,
         configure,
         build,
+        configuration,
         intent: ConfigureIntent {
             toolchain,
             build_type,

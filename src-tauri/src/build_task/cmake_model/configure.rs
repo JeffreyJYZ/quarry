@@ -40,6 +40,8 @@ pub struct ConfigureRequest<'a> {
     pub build_root: &'a Path,
     /// The plan's configure, program first.
     pub argv: &'a [String],
+    /// The configuration this build uses, so the database describes that one and not Debug.
+    pub configuration: &'a str,
     /// Whether this tree ever finished a configure, so a failure can say the old model stands.
     pub had_previous: bool,
 }
@@ -71,7 +73,7 @@ where
     // Read only after a configure that succeeded: a failed one can leave a reply half written, and
     // a database built from half a project is worse than the previous one still on disk.
     if run.success && !run.stopped {
-        match synthesize_database(request.build_root) {
+        match synthesize_database(request.build_root, request.configuration) {
             Ok(Some(written)) => notes.push(written.note()),
             Ok(None) => {}
             Err(why) => notes.push(format!(
