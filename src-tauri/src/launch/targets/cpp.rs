@@ -43,13 +43,16 @@ pub fn executable_stem(path: &Path, name: &str) -> String {
 /// Resolve one named executable; a name the project does not offer is an error naming it.
 ///
 /// The C/C++ branch never fails on a missing file, matching [`compose_cpp`]: before the first build
-/// it names the path that build will write, and the toolbar's build step writes it.
-pub fn resolve_cpp(
+/// it names the path that build will write, and the toolbar's build step writes it. The artifact is
+/// the one the configuration's build writes, so a caller that knows the profile gets that
+/// configuration's file rather than the first one the model happens to describe.
+pub fn resolve_cpp_in(
     info: &ProjectInfo,
     target: &str,
     stop_on_entry: bool,
+    configuration: &str,
 ) -> Result<LaunchConfig, String> {
-    let known = cpp_executables(info);
+    let known = crate::launch::configured_executables(info, configuration);
     let found = known
         .iter()
         .find(|(name, path)| executable_stem(path, name) == target)
@@ -68,6 +71,19 @@ pub fn resolve_cpp(
         stop_on_entry,
         init_commands: Vec::new(),
     })
+}
+
+/// The CMake configuration the project's own settings ask for, which is what its builds use.
+///
+/// A project setting outranks the profile default, exactly as the build sees it; without one the
+/// default profile decides, so the answer never depends on the order a caller asked its questions.
+pub fn saved_configuration(root: &Path) -> String {
+    crate::settings::read_project_settings(root.display().to_string())
+        .build_profile
+        .and_then(|value| crate::build_task::BuildProfile::from_wire(&value).ok())
+        .unwrap_or_default()
+        .cmake_config()
+        .to_string()
 }
 
 /// The executable names a project offers, quoted, for an error a reader can act on.

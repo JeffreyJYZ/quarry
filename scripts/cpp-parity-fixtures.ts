@@ -513,6 +513,110 @@ add_executable(parity_two two.cpp)
 	};
 }
 
+/**
+ * A plain project whose C and C++ translation units meet through one header.
+ *
+ * The C file is C only: `void *` converts to `int *` implicitly in C and not in C++, so compiling
+ * it as C++ fails outright. That is the point — a project-wide `-std=c++20` and one C++ driver for
+ * every source, which is what a mixed tree must not do, cannot build this fixture. The header is
+ * the boundary: `extern "C"` in C++, a plain declaration in C, so the link agrees on one symbol.
+ */
+export function mixedLanguagesFixture(): Fixture {
+	return {
+		name: "mixed-languages",
+		kind: "plain",
+		files: {
+			"include/parity/mix.h": `#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+int mix_value(int seed);
+#ifdef __cplusplus
+}
+#endif
+`,
+			"mix.c": `#include <parity/mix.h>
+
+#include <stdlib.h>
+
+/* \`void *\` converts to \`int *\` in C and not in C++, so only a C compile of this file succeeds. */
+int mix_value(int seed) {
+	int *values = malloc(sizeof(int));
+	values[0] = seed;
+	int result = values[0];
+	free(values);
+	return result;
+}
+`,
+			"main.cpp": `#include <parity/mix.h>
+
+#include <iostream>
+
+int main() {
+	std::cout << "mix=" << mix_value(21) << "\\n";
+	return 0;
+}
+`,
+		},
+		plainBuild: [
+			["clang", "-std=c17", "-Iinclude", "-c", "mix.c", "-o", "mix.o"],
+			["clang++", "-std=c++20", "-Iinclude", "-c", "main.cpp", "-o", "main.o"],
+			["clang++", "-o", "mixed", "mix.o", "main.o"],
+		],
+		probes: [
+			{
+				file: "mix.c",
+				needle: "mix_value(int seed) {",
+				needs: "the C driver and the C standard: a .c entry is not a C++ command",
+				expect: "int mix_value(int seed)",
+			},
+			{
+				file: "main.cpp",
+				needle: "mix_value(21)",
+				needs: 'the extern "C" declaration through the C++ compiler',
+				expect: "int mix_value(int seed)",
+			},
+		],
+	};
+}
+
+/**
+ * A multi-config tree: one target, two configurations, each with its own output directory.
+ *
+ * `Ninja Multi-Config` takes its configuration at build time and writes no `compile_commands.json`,
+ * so the tree is configured once and built twice. `CMAKE_BUILD_TYPE` is deliberately never set —
+ * that is the hand-off rule this fixture measures, and a configure that forces one has already
+ * broken the tree it is asking about.
+ */
+export function multiConfigFixture(generator: string): Fixture {
+	return {
+		name: `multi-config: ${generator}`,
+		files: {
+			"CMakeLists.txt": `${cmakeHeader("parity_multiconfig")}
+add_executable(parity_multiconfig main.cpp variant.cpp)
+`,
+			"variant.cpp": `int variant() {
+	return 7;
+}
+`,
+			"main.cpp": `#include <cstdio>
+
+int variant();
+
+int main() {
+	std::printf("variant=%d\\n", variant());
+	return 0;
+}
+`,
+		},
+		userBuild: [
+			["-S", ".", "-B", "build", "-G", generator, "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"],
+		],
+		probes: [],
+	};
+}
+
 /** The character offset of `needle` as an LSP position. */ export function positionOf(
 	text: string,
 	needle: string,

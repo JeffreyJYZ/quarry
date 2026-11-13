@@ -53,6 +53,8 @@ import {
 	type AnalysisProbe,
 	type Fixture,
 	generatorFixture,
+	mixedLanguagesFixture,
+	multiConfigFixture,
 	multiTargetFixture,
 	plainFixture,
 	positionOf,
@@ -88,10 +90,27 @@ interface Plan {
 
 /** The build quarry runs itself for a project with no build system. */
 interface PlainSection {
-	program: string | null;
-	cwd: string;
-	argv: string[];
+	/** The commands in the order the build runs them: one per compiler, then the link. */
+	commands?: PlainCommand[];
+	/** The single command an older planner reported, read so its rows stay measurable. */
+	program?: string | null;
+	argv?: string[];
+	cwd?: string;
 	note: string | null;
+}
+
+/** One command a plain build runs; `program` is the resolved path the product would spawn. */
+interface PlainCommand {
+	program: string | null;
+	argv: string[];
+	cwd: string;
+}
+
+/** The commands a plain plan reports, whichever shape the planner printed. */
+function plainCommands(section: PlainSection): PlainCommand[] {
+	if (Array.isArray(section.commands)) return section.commands;
+	if (!Array.isArray(section.argv)) return [];
+	return [{ program: section.program ?? null, argv: section.argv, cwd: section.cwd ?? "." }];
 }
 
 interface CmakeSection {
@@ -344,6 +363,34 @@ function findExecutables(root: string, name: string, depth = 0): string[] {
 	return found;
 }
 
+/** Every file named `name` under `root`, so a configuration's own object can be found. */
+function findNamed(root: string, name: string, depth = 0): string[] {
+	if (depth > 5) return [];
+	const found: string[] = [];
+	for (const entry of readdirSync(root)) {
+		const path = join(root, entry);
+		let stat: ReturnType<typeof statSync>;
+		try {
+			stat = statSync(path);
+		} catch {
+			continue;
+		}
+		if (stat.isDirectory()) found.push(...findNamed(path, name, depth + 1));
+		else if (entry === name && stat.isFile()) found.push(path);
+	}
+	return found;
+}
+
+/** A compile command as a report token: the driver and the flags that decide its language. */
+function describeArguments(args: string[] | null): string {
+	if (args === null) return "no compile command";
+	const language = args.filter(
+		(arg) => arg.startsWith("-std=") || arg.startsWith("--std=") || arg === "-x",
+	);
+	const driver = basename(args[0] ?? "");
+	return `${driver} ${language.join(" ")}`.trim();
+}
+
 /** The file API objects a CLion-grade CMake project asks for, written by the probe's own build. */
 const QUERY_BODY = JSON.stringify(
 	{
@@ -551,6 +598,31 @@ async function runBuild(
 	});
 	if (built.code !== 0) {
 		return { ok: false, reason: `build exited ${built.code}: ${firstError(built.stderr)}` };
+	}
+	return { ok: true, reason: "" };
+}
+
+/**
+ * A plain project's build, run exactly as it was reported: every command in order, in its own cwd.
+ *
+ * A mixed C/C++ project needs more than one compiler, so the plan reports a sequence: one command
+ * per compiler for the sources, then the link that joins them. The first failing command stops it.
+ */
+async function runPlainBuild(
+	root: string,
+	section: PlainSection,
+	directory: string,
+	row: Row,
+): Promise<{ ok: boolean; reason: string }> {
+	for (const command of plainCommands(section)) {
+		const program = command.program ?? command.argv[0];
+		const result = await run(program, command.argv.slice(1), command.cwd, CMAKE_TIMEOUT);
+		const line = `cd ${directory} && ${commandLine(root, command.argv)}`;
+		row.commands.push({ line, verdict: result.code === 0 ? "PASS" : "FAIL" });
+		if (result.code !== 0) {
+			const reason = `\`${line}\` exits ${result.code}: "${firstError(result.stderr)}"`;
+			return { ok: false, reason };
+		}
 	}
 	return { ok: true, reason: "" };
 }
@@ -896,6 +968,324 @@ async function judgeOneTarget(
 	return { row, findings, broken };
 }
 
+/**
+ * A mixed C/C++ plain project: each translation unit compiled as its own language, one link.
+ *
+ * Four consumers, because the defect this row exists for has four faces. The plan's database is
+ * where a per-language command is recorded — a `.c` entry carrying a C++ driver or `-std=c++20` is
+ * a C file compiled as C++, which breaks C the moment it uses something C-only. The build must
+ * actually run those commands, the artefact must print the value the C function returned across the
+ * `extern "C"` boundary, and clangd must answer in both translation units with no diagnostics —
+ * a hover that answers while the file holds a "not allowed with C" error was never analysed as C.
+ */
+async function judgeMixedLanguages(
+	fixture: Fixture,
+	root: string,
+	plannerBin: string,
+	_cmake: string,
+	clangd: string,
+): Promise<{ row: Row; findings: string[]; broken: boolean }> {
+	const directory = basename(root);
+	writeFixture(root, fixture);
+	const row: Row = {
+		capability: fixture.name,
+		build: "FAIL",
+		analysis: "FAIL",
+		targets: "FAIL",
+		tree: "PASS",
+		details: [],
+		commands: [],
+	};
+	const findings: string[] = [];
+	let broken = false;
+
+	// The fixture's own proof: each unit compiled by its own driver, linked, and run.
+	for (const argv of fixture.plainBuild ?? []) {
+		const result = await run(argv[0], argv.slice(1), root);
+		row.commands.push({
+			line: `cd ${directory} && ${argv.join(" ")}`,
+			verdict: result.code === 0 ? "PASS" : "FAIL",
+		});
+		if (result.code !== 0) {
+			broken = true;
+			row.details.push(`fixture FAIL  ${argv.join(" ")}: ${firstError(result.stderr)}`);
+		}
+	}
+	const reference = await run(join(root, "mixed"), [], root);
+	if (!broken && (reference.code !== 0 || !reference.stdout.includes("mix=21"))) {
+		broken = true;
+		row.details.push(
+			`fixture FAIL  ./mixed printed ${JSON.stringify(reference.stdout)} (wants "mix=21")`,
+		);
+	}
+
+	const plan = await askPlan(plannerBin, root);
+	row.commands.push({
+		line: `cd ${directory} && quarry-plan .`,
+		verdict: plan.plain ? "PASS" : "FAIL",
+	});
+	const section = plan.plain;
+	if (!section) {
+		broken = true;
+		row.details.push("fixture FAIL  the product reports no plain build for this project");
+		return { row, findings, broken };
+	}
+
+	// 1. The database the hand-off names: one entry per translation unit, each in its own language.
+	const database = plan.handoff?.databaseDir ?? null;
+	const file = database === null ? null : join(database, "compile_commands.json");
+	const cEntry = file === null ? null : compileArguments(file, "mix.c");
+	const cxxEntry = file === null ? null : compileArguments(file, "main.cpp");
+	const cDriver = cEntry === null ? "" : basename(cEntry[0] ?? "");
+	const cxxDriver = cxxEntry === null ? "" : basename(cxxEntry[0] ?? "");
+	const cStandard =
+		cEntry !== null && cEntry.some((arg) => arg === "-std=c17" || arg === "-std=gnu17");
+	const noCxxFlag = cEntry !== null && !cEntry.some((arg) => /^--?std=(gnu\+\+|c\+\+)/.test(arg));
+	const cxxStandard =
+		cxxEntry !== null && cxxEntry.some((arg) => arg === "-std=c++20" || arg === "-std=gnu++20");
+	const languages = cDriver === "clang" && cStandard && noCxxFlag && cxxDriver === "clang++";
+	row.details.push(
+		`language     ${languages && cxxStandard ? "PASS" : "FAIL"}  ${database === null ? "no database" : relative(root, file as string)}: mix.c is ${JSON.stringify(describeArguments(cEntry))}, main.cpp is ${JSON.stringify(describeArguments(cxxEntry))}`,
+	);
+	if (!(languages && cxxStandard)) {
+		row.build = "FAIL";
+		findings.push(
+			`${directory}: \`cd ${directory} && quarry-plan .\` names ${database === null ? "no compile database" : relative(root, file as string)}, whose mix.c entry is ${JSON.stringify(describeArguments(cEntry))} and whose main.cpp entry is ${JSON.stringify(describeArguments(cxxEntry))}. A C translation unit must be compiled as C and a C++ one as C++, so the .c entry needs the C driver and the C standard, never a C++ one.`,
+		);
+	}
+
+	// 2. The build the product reports: the sequence, then what it produced.
+	const ran = await runPlainBuild(root, section, directory, row);
+	if (!ran.ok) {
+		findings.push(
+			`${directory}: the plain build fails — ${ran.reason}${section.note ? ` (it noted: ${section.note})` : ""}.`,
+		);
+	} else {
+		row.details.push(`build        PASS  ${plainCommands(section).length} command(s)`);
+	}
+	const artifact = plan.targets[0]?.program ?? null;
+	const executed = artifact === null ? null : await run(artifact, [], root);
+	const prints = executed !== null && executed.code === 0 && executed.stdout.includes("mix=21");
+	row.commands.push({
+		line: `cd ${directory} && ${artifact === null ? "(no artifact)" : relative(root, artifact)}`,
+		verdict: prints ? "PASS" : "FAIL",
+	});
+	row.targets = prints ? "PASS" : "FAIL";
+	row.details.push(
+		`targets      ${prints ? "PASS" : "FAIL"}  ${artifact === null ? "no target" : relative(root, artifact)} printed ${executed === null ? "nothing" : JSON.stringify(executed.stdout.trim())} (wants "mix=21")`,
+	);
+	if (!prints) {
+		findings.push(
+			`${directory}: the built program ${artifact === null ? "is unset" : relative(root, artifact)} printed ${executed === null ? "nothing" : JSON.stringify(executed.stdout.trim())} (exit ${executed?.code ?? "none"}), so the value the C function returns does not cross the extern "C" boundary — \`cd ${directory} && ls -l ${artifact === null ? "." : relative(root, artifact)}\`.`,
+		);
+	}
+	row.build = languages && cxxStandard && ran.ok && prints ? "PASS" : "FAIL";
+
+	// 3. Analysis in both translation units, with no diagnostic: an error in mix.c means its
+	//    command is not a C one, however plausible the hover looks.
+	const handoffArgs = plan.handoff?.args ?? [];
+	const clangdCommand = commandLine(root, ["clangd", ...handoffArgs]);
+	const clangdLine = row.commands.length;
+	row.commands.push({ line: `cd ${directory} && ${clangdCommand}`, verdict: "PASS" });
+	const measured = await analyse(clangd, root, fixture.probes, handoffArgs);
+	let analysed = true;
+	fixture.probes.forEach((probe, index) => {
+		const hover = measured[index]?.hover ?? null;
+		const diagnostics = measured[index]?.diagnostics ?? [];
+		const ok = (hover?.includes(probe.expect) ?? false) && diagnostics.length === 0;
+		const text = readFileSync(join(root, probe.file), "utf8");
+		const position = positionOf(text, probe.needle);
+		row.details.push(
+			`analysis     ${ok ? "PASS" : "FAIL"}  ${probe.file}:${position.line + 1}:${position.character + 1} \`${probe.needle}\` -> ${describe(hover)}${diagnostics.length > 0 ? `, with "${diagnostics[0]}"` : ", no diagnostics"} (wants ${JSON.stringify(probe.expect)})`,
+		);
+		if (!ok) {
+			analysed = false;
+			findings.push(
+				`${directory}: the analysis cannot answer at ${probe.file}:${position.line + 1}:${position.character + 1} as ${probe.file.endsWith(".c") ? "C" : "C++"}, which needs ${probe.needs}. \`cd ${directory} && ${clangdCommand}\` answers ${describe(hover)}${diagnostics.length > 0 ? `, with "${diagnostics[0]}"` : ""}${database === null ? "" : `; the plan named ${relative(root, file as string)}`}.`,
+			);
+		}
+	});
+	row.analysis = analysed ? "PASS" : "FAIL";
+	row.commands[clangdLine].verdict = row.analysis;
+	return { row, findings, broken };
+}
+
+/** The configuration each build of a multi-config tree asks for, and what it must leave behind. */
+interface ConfigHalf {
+	profile: string;
+	configuration: string;
+	debugInfo: boolean;
+}
+
+/**
+ * A multi-config tree built twice: the configuration reaches the compiler, and the run target
+ * follows the configuration asked for.
+ *
+ * Two things are measured, and both were wrong for a tree that takes `--config` at build time. The
+ * plan used to force `-DCMAKE_BUILD_TYPE` on a tree whose generator ignores it, which is the one
+ * flag a multi-config configure must never carry. And the run target was resolved for `Debug`
+ * whatever the profile, so it named the Debug artefact of a Release build — a path nothing wrote.
+ *
+ * Debug info is read from the object the configuration compiled with `otool -l`, not from the flags:
+ * this linker keeps DWARF in the object, so the executable is identical either way and only the
+ * object can tell the two configurations apart.
+ */
+async function judgeMultiConfig(
+	fixture: Fixture,
+	root: string,
+	plannerBin: string,
+	cmake: string,
+): Promise<{ row: Row; findings: string[]; broken: boolean }> {
+	const directory = basename(root);
+	writeFixture(root, fixture);
+	writeQuery(root, "build");
+	const row: Row = {
+		capability: fixture.name,
+		build: "FAIL",
+		analysis: "n/a",
+		targets: "FAIL",
+		tree: "PASS",
+		details: [],
+		commands: [],
+	};
+	const findings: string[] = [];
+	let broken = false;
+	let passed = true;
+	let named = true;
+	let buildRoot: string | null = null;
+
+	for (const args of fixture.userBuild ?? []) {
+		const result = await run(cmake, args, root);
+		row.commands.push({
+			line: `cd ${directory} && cmake ${args.join(" ")}`,
+			verdict: result.code === 0 ? "PASS" : "FAIL",
+		});
+		if (result.code !== 0) {
+			broken = true;
+			row.details.push(`fixture FAIL  cmake ${args.join(" ")}: ${firstError(result.stderr)}`);
+		}
+	}
+	if (broken) return { row, findings, broken };
+
+	const halves: ConfigHalf[] = [
+		{ profile: "release", configuration: "Release", debugInfo: false },
+		{ profile: "relwithdebinfo", configuration: "RelWithDebInfo", debugInfo: true },
+	];
+	for (const half of halves) {
+		const plan = await askPlan(plannerBin, root, { profile: half.profile });
+		const section = plan.cmake;
+		if (!section) {
+			broken = true;
+			row.details.push(`fixture FAIL  ${half.profile}: the product reports no CMake plan`);
+			break;
+		}
+		buildRoot = section.buildRoot;
+		const forced = section.configure.find((arg) => arg.startsWith("-DCMAKE_BUILD_TYPE="));
+		const builds =
+			section.build.includes("--config") && section.build.includes(half.configuration);
+		row.details.push(
+			`profile      ${forced === undefined && builds ? "PASS" : "FAIL"}  ${half.profile}: configure ${forced === undefined ? "names no build type" : `forces ${forced}`}, build ${builds ? `names ${half.configuration}` : `does not name ${half.configuration}`}`,
+		);
+		if (forced !== undefined || !builds) {
+			passed = false;
+			findings.push(
+				`${directory}: the ${half.profile} plan must let the generator take its configuration at build time, but \`cd ${directory} && quarry-plan . --profile ${half.profile}\` runs ${commandLine(root, section.configure)} and ${commandLine(root, section.build)}. A multi-config tree never gets a -DCMAKE_BUILD_TYPE.`,
+			);
+		}
+
+		// The target the dropdown names, before the build: it must be this configuration's artefact.
+		const target = plan.targets[0] ?? null;
+		const program = target?.program ?? null;
+		const artifact =
+			target === null ? null : join(section.buildRoot, half.configuration, target.target);
+		const names = program !== null && program === artifact;
+		row.details.push(
+			`target       ${names ? "PASS" : "FAIL"}  ${half.profile}: the plan names ${program === null ? "no program" : relative(root, program)} (wants ${artifact === null ? "a target" : relative(root, artifact)})`,
+		);
+		if (!names) {
+			named = false;
+			findings.push(
+				`${directory}: \`cd ${directory} && quarry-plan . --profile ${half.profile}\` names ${program === null ? "no program" : relative(root, program)} for its first target, but a ${half.configuration} build writes ${artifact === null ? "no artefact" : relative(root, artifact)}. The configuration asked for decides the artefact, not the Debug one.`,
+			);
+		}
+
+		const ran = await runBuild(root, section, directory, cmake, row);
+		if (!ran.ok) {
+			broken = true;
+			row.details.push(`fixture FAIL  ${half.profile}: ${ran.reason}`);
+			break;
+		}
+		const written = artifact !== null && isFile(artifact);
+		row.details.push(
+			`build        ${written ? "PASS" : "FAIL"}  ${half.profile}: ${artifact === null ? "no artefact named" : relative(root, artifact)} ${written ? "written" : "missing"}`,
+		);
+		if (!written) {
+			passed = false;
+			findings.push(
+				`${directory}: the ${half.profile} build wrote no ${artifact === null ? "artefact" : relative(root, artifact)} — \`cd ${directory} && ${commandLine(root, section.build)}\`.`,
+			);
+		} else {
+			const executed = await run(artifact as string, [], root);
+			const prints = executed.code === 0 && executed.stdout.includes("variant=7");
+			row.commands.push({
+				line: `cd ${directory} && ${relative(root, artifact as string)}`,
+				verdict: prints ? "PASS" : "FAIL",
+			});
+			row.details.push(
+				`build        ${prints ? "PASS" : "FAIL"}  ${half.profile}: the artefact printed ${JSON.stringify(executed.stdout.trim())} (wants "variant=7")`,
+			);
+			if (!prints) {
+				passed = false;
+				findings.push(
+					`${directory}: the ${half.profile} artefact printed ${JSON.stringify(executed.stdout.trim())} (exit ${executed.code}) — \`cd ${directory} && ${relative(root, artifact as string)}\`.`,
+				);
+			}
+		}
+	}
+
+	// Debug info, from the object each configuration compiled: the tool, not the flags.
+	if (buildRoot !== null && !broken) {
+		for (const half of halves) {
+			const objects = findNamed(buildRoot, "main.cpp.o").filter((path) =>
+				path.split("/").includes(half.configuration),
+			);
+			if (objects.length !== 1) {
+				broken = true;
+				row.details.push(
+					`fixture FAIL  ${half.profile}: ${objects.length} main.cpp.o under ${relative(root, buildRoot)} for ${half.configuration}`,
+				);
+				continue;
+			}
+			const object = objects[0] as string;
+			const otool = await run("/usr/bin/otool", ["-l", object], root);
+			const dwarf = otool.stdout.includes("__DWARF");
+			row.commands.push({
+				line: `cd ${directory} && otool -l ${relative(root, object)} | rg __DWARF`,
+				verdict: dwarf === half.debugInfo ? "PASS" : "FAIL",
+			});
+			row.details.push(
+				`debug info   ${dwarf === half.debugInfo ? "PASS" : "FAIL"}  ${half.profile}: ${relative(root, object)} ${dwarf ? "carries" : "carries no"} __DWARF`,
+			);
+			if (dwarf !== half.debugInfo) {
+				passed = false;
+				findings.push(
+					`${directory}: ${half.configuration} must compile ${half.debugInfo ? "with" : "without"} debug info, but \`cd ${directory} && otool -l ${relative(root, object)}\` ${dwarf ? "shows a __DWARF segment" : "shows no __DWARF segment"}.`,
+				);
+			}
+		}
+	}
+
+	if (existsSync(join(root, "CMakeCache.txt"))) {
+		row.tree = "FAIL";
+		findings.push(
+			`${directory}: a configure wrote CMakeCache.txt into the source directory — \`cd ${directory} && ls CMakeCache.txt\`.`,
+		);
+	}
+	row.build = passed ? "PASS" : "FAIL";
+	row.targets = named ? "PASS" : "FAIL";
+	return { row, findings, broken };
+}
+
 /** A path with the fixture root written as `.`, for a detail line. */
 function relative(root: string, path: string): string {
 	return path.startsWith(`${root}/`) ? path.slice(root.length + 1) : path;
@@ -1051,27 +1441,16 @@ async function judge(
 			row.details.push("build        FAIL  the product reports no build for this project");
 			findings.push(`${directory}: the product reports no build, so nothing would run.`);
 		} else {
-			const built = await run(
-				plainSection.program ?? "clang++",
-				plainSection.argv.slice(1),
-				plainSection.cwd,
-				CMAKE_TIMEOUT,
-			);
-			const command = commandLine(root, plainSection.argv);
-			row.commands.push({
-				line: `cd ${directory} && ${command}`,
-				verdict: built.code === 0 ? "PASS" : "FAIL",
-			});
-			row.build = built.code === 0 ? "PASS" : "FAIL";
-			if (row.build === "FAIL") {
-				const reason = firstError(built.stderr);
-				row.details.push(`build        FAIL  ${command} exited ${built.code}: ${reason}`);
+			const ran = await runPlainBuild(root, plainSection, directory, row);
+			row.build = ran.ok ? "PASS" : "FAIL";
+			if (!ran.ok) {
+				row.details.push(`build        FAIL  the plain build ${ran.reason}`);
 				findings.push(
-					`${directory}: the plain build fails — \`cd ${directory} && ${command}\` exits ${built.code}: "${reason}"${plainSection.note ? ` (it noted: ${plainSection.note})` : ""}.`,
+					`${directory}: the plain build fails — ${ran.reason}${plainSection.note ? ` (it noted: ${plainSection.note})` : ""}.`,
 				);
 			} else {
 				row.details.push(
-					`build        PASS  ${command} in ${plainSection.cwd === root ? "." : relative(plainSection.cwd)}`,
+					`build        PASS  ${plainCommands(plainSection).length} command(s) in ${plainCommands(plainSection)[0]?.cwd === root ? "." : relative(plainCommands(plainSection)[0]?.cwd ?? root)}`,
 				);
 			}
 			if (plainSection.note) row.details.push(`note         ${plainSection.note}`);
@@ -1234,17 +1613,32 @@ async function main() {
 		);
 	}
 
-	// Two capabilities with no language-server consumer: a profile that reaches the compiler, and a
-	// build that names one target. Each judges itself, because the columns the other rows measure
-	// (analysis, the dropdown) say nothing about either.
-	for (const extra of [
+	// Capabilities with no shared consumer: a mixed-language plain project, a profile that reaches
+	// the compiler, a build that names one target, and a multi-config tree built twice. Each judges
+	// itself, because the columns the other rows measure say nothing about it.
+	type Judge = (
+		fixture: Fixture,
+		root: string,
+		plannerBin: string,
+		cmake: string,
+		clangd: string,
+	) => Promise<{ row: Row; findings: string[]; broken: boolean }>;
+	const extras: { fixture: Fixture; judged: Judge }[] = [
+		{ fixture: mixedLanguagesFixture(), judged: judgeMixedLanguages },
 		{ fixture: profileFixture(), judged: judgeProfile },
 		{ fixture: twoTargetsFixture(), judged: judgeOneTarget },
-	]) {
+	];
+	if (generators.includes("Ninja Multi-Config")) {
+		extras.push({
+			fixture: multiConfigFixture("Ninja Multi-Config"),
+			judged: judgeMultiConfig,
+		});
+	}
+	for (const extra of extras) {
 		const root = join(tempRoot, extra.fixture.name.replace(/[/: ]+/g, "-"));
 		mkdirSync(root, { recursive: true });
 		process.stdout.write(`running ${extra.fixture.name} … `);
-		const result = await extra.judged(extra.fixture, root, plannerBin, cmake);
+		const result = await extra.judged(extra.fixture, root, plannerBin, cmake, clangd);
 		rows.push(result.row);
 		findings.push(...result.findings);
 		broken = broken || result.broken;

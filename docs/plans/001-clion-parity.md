@@ -87,6 +87,8 @@ Launch configuration lives at `.quarry/launch.json` in the project root:
 | format on save, code style                                       | rustfmt / clang-format                                   | free |
 | project-wide search                                              | `ripgrep`                                                | free |
 | build system, target and profile picker                          | `cargo metadata`, CMake targets, `compile_commands.json` | work |
+| mixed C and C++ in one tree                                      | per-language compile commands, one link                  | done |
+| multi-config trees (Xcode, Visual Studio, Ninja Multi-Config)    | file API targets, `--config`, no `CMAKE_BUILD_TYPE`      | done |
 | run and debug configurations                                     | `.quarry/launch.json` + `Project`                        | work |
 | debugger panel: breakpoints, frames, scopes, variables, evaluate | DAP                                                      | work |
 | conditional and log breakpoints                                  | DAP                                                      | work |

@@ -9,6 +9,9 @@
 
 use super::*;
 
+/// The cache entry naming the generator a tree was configured with.
+pub const GENERATOR_VARIABLE: &str = "CMAKE_GENERATOR";
+
 /// Xcode and Visual Studio are multi-config: they take `--config` at build time.
 pub fn is_multi_config(generator: Option<&str>) -> bool {
     generator.is_some_and(|name| {
@@ -16,6 +19,14 @@ pub fn is_multi_config(generator: Option<&str>) -> bool {
             || name.starts_with("Visual Studio")
             || name == "Ninja Multi-Config"
     })
+}
+
+/// The generator a configured tree records, so a plan can honour what the tree already is.
+///
+/// A project with no preset states its generator only in its cache, and a configure that skips it
+/// would ask a multi-config tree for a `CMAKE_BUILD_TYPE` it never uses.
+pub fn generator_at(build_root: &Path) -> Option<String> {
+    cache_value(build_root, GENERATOR_VARIABLE)
 }
 
 /// Only a single-config Makefiles or Ninja generator implements `CMAKE_EXPORT_COMPILE_COMMANDS`.

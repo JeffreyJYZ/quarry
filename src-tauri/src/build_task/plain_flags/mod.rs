@@ -17,6 +17,10 @@
 //! with its flags exactly as before), `compile_flags.txt` and `.clangd` (the user's own instruction
 //! to clangd, which reads them itself, so a database of ours would silently replace it). Those keep
 //! a project byte-identical to what it did before this module existed.
+//!
+//! A project holding both C and C++ is compiled per language: each source by the driver and standard
+//! of its own extension, then one link. The database records exactly those commands, so a `.c`
+//! entry is a C one and clangd cannot analyse the file as C++ by way of its entry.
 
 #![allow(unused_imports)]
 
@@ -35,6 +39,9 @@ pub use instruction::*;
 
 mod database;
 pub use database::*;
+
+mod commands;
+pub use commands::*;
 
 mod plan;
 pub use plan::*;

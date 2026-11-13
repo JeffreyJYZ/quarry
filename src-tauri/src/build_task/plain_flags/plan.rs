@@ -1,9 +1,11 @@
 //! What a plain C/C++ build would run, as data.
 //!
 //! `project_plan` asks this so a probe can run the product's own build instead of re-deriving it:
-//! the argv comes from the same [`build_flags`] and [`plain_clang_argv_with`] the build calls, and
-//! the note is what the synthesis wrote, if it wrote anything. Like the CMake section, reading it is
-//! not free of side effects: the database is synthesised the way opening the project does.
+//! the commands come from the same [`build_flags`] and [`plain_build_commands`] the build calls, and
+//! the note is what the synthesis wrote, if it wrote anything. A mixed C/C++ project reports more
+//! than one command, because its C and C++ sources are not compiled by the same driver. Like the
+//! CMake section, reading it is not free of side effects: the database is synthesised the way
+//! opening the project does.
 
 #![allow(unused_imports)]
 
@@ -14,15 +16,23 @@ pub use serde::Serialize;
 
 use super::*;
 
-/// One plain C/C++ build: the program, the argv, the directory it runs in, and any note.
+/// One command a plain C/C++ build runs, with the program the product resolved for it.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlainStep {
+    /// The compiler this step spawns, or null when it cannot be found.
+    pub program: Option<String>,
+    /// Full argv, program first, exactly as `run_plain_clang_build` spawns it.
+    pub argv: Vec<String>,
+    pub cwd: String,
+}
+
+/// One plain C/C++ build: every command in order, and any note.
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlainPlan {
-    /// The compiler the product would spawn, or null when it cannot find one.
-    pub program: Option<String>,
-    pub cwd: String,
-    /// Full argv, program first, exactly as `run_plain_clang_build` spawns it.
-    pub argv: Vec<String>,
+    /// The compile commands and the link, in the order the build runs them.
+    pub commands: Vec<PlainStep>,
     pub note: Option<String>,
 }
 
@@ -34,16 +44,29 @@ pub fn plain_build_plan(root: &str, name: &str) -> Result<PlainPlan, String> {
         return Err(no_build_system());
     }
     let flags = build_flags(path, &sources);
-    let argv = plain_clang_argv_with(root, name, &sources, &flags.flags);
+    let commands = plain_build_commands(root, name, &sources, &flags);
+    // A mixed project's commands write objects beside the binary, because the build itself creates
+    // that directory before it compiles; the plan reports commands that run as reported, so it does
+    // the same preparation the build does.
+    if commands.len() > 1 {
+        let objects = plain_clang_build_dir(path).join(OBJECT_DIR);
+        let _ = std::fs::create_dir_all(objects);
+    }
+    let steps = commands
+        .into_iter()
+        .map(|command| PlainStep {
+            program: crate::resolve::resolve(&command.program)
+                .map(|found| found.path.display().to_string()),
+            argv: command.argv,
+            cwd: root.to_string(),
+        })
+        .collect();
     let note = synthesize_plain_database(path, &sources)
         .ok()
         .flatten()
         .and_then(|written| written.note());
     Ok(PlainPlan {
-        program: crate::resolve::resolve(flags.plain.compiler())
-            .map(|found| found.path.display().to_string()),
-        cwd: root.to_string(),
-        argv,
+        commands: steps,
         note,
     })
 }

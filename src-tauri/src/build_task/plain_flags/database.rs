@@ -23,7 +23,8 @@ use super::*;
 pub struct PlainSynthesis {
     pub path: PathBuf,
     pub files: usize,
-    pub compiler: &'static str,
+    /// The drivers these entries name, in source order and without repeats.
+    pub compiler: String,
     pub flags: String,
     /// Whether this call wrote the file; false when it already held these entries.
     pub written: bool,
@@ -76,20 +77,36 @@ pub fn synthesize_plain_database(
     Ok(Some(PlainSynthesis {
         path,
         files: entries.len(),
-        compiler: flags.compiler(),
-        flags: flags.summary(),
+        compiler: drivers(&flags, sources),
+        flags: flags.summary_for(sources),
         written,
     }))
 }
 
+/// The drivers these sources compile with, in source order and named once each.
+fn drivers(flags: &PlainFlags, sources: &[PathBuf]) -> String {
+    let mut names: Vec<&'static str> = Vec::new();
+    for source in sources {
+        let driver = flags.compiler_for(source);
+        if !names.contains(&driver) {
+            names.push(driver);
+        }
+    }
+    names.join(", ")
+}
+
 /// One entry per source, each recording the command this project's build compiles it with.
+///
+/// The driver and the standard come from the source's own extension, so a `.c` file in a project
+/// that also holds C++ is recorded as C. clangd reads this file and has nothing else to decide the
+/// language from, and a C++ command for a C file is an error it reports on every line that matters.
 fn entries(root: &Path, flags: &PlainFlags, sources: &[PathBuf]) -> Vec<CompileEntry> {
     sources
         .iter()
         .map(|source| {
             let file = root.join(source).display().to_string();
-            let mut arguments = vec![flags.compiler().to_string()];
-            arguments.extend(flags.command_flags());
+            let mut arguments = vec![flags.compiler_for(source).to_string()];
+            arguments.extend(flags.command_flags_for(source));
             arguments.push("-c".to_string());
             arguments.push(file.clone());
             CompileEntry {

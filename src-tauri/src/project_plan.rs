@@ -5,7 +5,7 @@
 //! re-derived those decisions in TypeScript would measure the probe, so this module asks the three
 //! questions of the functions that already decide them — [`cmake_plan`] for the build tree and both
 //! argv, [`plain_build_plan`] for a project with no build system, [`server_args`] for the clangd
-//! hand-off, [`list_targets`]/[`resolve_target`] for the run dropdown — and
+//! hand-off, [`list_targets`]/[`resolve_target_in`] for the run dropdown — and
 //! `src/bin/quarry-plan.rs` prints the answers as JSON.
 //!
 //! Reading it is not free of side effects, because the product is not: the hand-off configures a
@@ -19,7 +19,7 @@ use serde::Serialize;
 use crate::build_task::{
     CMAKE_PROGRAM, CmakeOptions, PlainPlan, cmake_plan_target, plain_build_plan,
 };
-use crate::launch::{cmake_build_target, list_targets, resolve_target};
+use crate::launch::{cmake_build_target, list_targets, resolve_target_in};
 use crate::project::inspect;
 use crate::types::ProjectKind;
 
@@ -148,7 +148,14 @@ pub fn project_plan(root: &str, request: &PlanRequest) -> Result<Plan, String> {
         .unwrap_or_default()
         .into_iter()
         .map(|target| {
-            let resolved = resolve_target(&info.root, &target.id, false);
+            // The configuration the build was asked for decides which artifact this names: a
+            // multi-config tree has one executable per configuration and Run launches this one.
+            let resolved = resolve_target_in(
+                &info.root,
+                &target.id,
+                false,
+                Some(request.profile.cmake_config()),
+            );
             Target {
                 id: target.id,
                 label: target.label,

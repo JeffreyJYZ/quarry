@@ -112,6 +112,9 @@ pub use tests_plain_database::*;
 mod tests_plain_flags_build;
 pub use tests_plain_flags_build::*;
 
+mod tests_plain_mixed;
+pub use tests_plain_mixed::*;
+
 mod tests_cmake_artifact;
 pub use tests_cmake_artifact::*;
 

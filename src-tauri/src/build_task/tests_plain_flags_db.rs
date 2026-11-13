@@ -74,12 +74,20 @@ mod tests {
         let root = scratch("language");
 
         let cxx = PlainFlags::for_project(&root, &[PathBuf::from("main.cpp")]);
-        assert_eq!(cxx.compiler(), "clang++");
-        assert_eq!(cxx.standard(), "-std=c++20");
+        assert_eq!(cxx.compiler_for(Path::new("main.cpp")), "clang++");
+        assert_eq!(cxx.standard_for(Path::new("main.cpp")), "-std=c++20");
 
         let c = PlainFlags::for_project(&root, &[PathBuf::from("main.c")]);
-        assert_eq!(c.compiler(), "clang");
-        assert_eq!(c.standard(), "-std=c17");
+        assert_eq!(c.compiler_for(Path::new("main.c")), "clang");
+        assert_eq!(c.standard_for(Path::new("main.c")), "-std=c17");
+
+        // A mixed project is both at once: the extension of each source decides, not the set.
+        let mixed =
+            PlainFlags::for_project(&root, &[PathBuf::from("main.c"), PathBuf::from("main.cpp")]);
+        assert_eq!(mixed.compiler_for(Path::new("main.c")), "clang");
+        assert_eq!(mixed.compiler_for(Path::new("main.cpp")), "clang++");
+        assert_eq!(mixed.standard_for(Path::new("main.c")), "-std=c17");
+        assert_eq!(mixed.standard_for(Path::new("main.cpp")), "-std=c++20");
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -96,11 +104,8 @@ mod tests {
 
         assert!(flags.flags().contains(&"-DPARITY_PLAIN=1".to_string()));
         assert!(flags.flags().contains(&"-Wall".to_string()));
-        assert!(
-            flags.summary().contains("-std=c++20"),
-            "{}",
-            flags.summary()
-        );
+        let summary = flags.summary_for(&[PathBuf::from("main.cpp")]);
+        assert!(summary.contains("-std=c++20"), "{summary}");
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -114,7 +119,7 @@ mod tests {
         );
 
         let flags = PlainFlags::for_project(&root, &[PathBuf::from("main.cpp")]);
-        let command = flags.command_flags();
+        let command = flags.command_flags_for(Path::new("main.cpp"));
         let standards: Vec<&String> = command
             .iter()
             .filter(|flag| flag.starts_with("-std="))

@@ -84,7 +84,15 @@ pub fn cmake_plan_target(
     let Some(preset) = resolved else {
         let build_root = super::build_root::resolve(source_root, options, None);
         let dir = build_root.display().to_string();
-        let mut configure = cmake_configure_argv(&source, &dir, profile);
+        // A multi-config generator takes its configuration at build time, so it never gets one
+        // here; a tree already configured records the generator in its cache and nothing else does.
+        let typed = !super::generator::generator_at(&build_root)
+            .is_some_and(|name| is_multi_config(Some(&name)));
+        let mut configure = if typed {
+            cmake_configure_argv(&source, &dir, profile)
+        } else {
+            cmake_configure_argv_with(&source, &dir, None)
+        };
         let toolchain = options
             .toolchain()
             .map(|value| absolute(source_root, value));
@@ -97,7 +105,7 @@ pub fn cmake_plan_target(
             build: cmake_build_argv(&dir, profile, target),
             intent: ConfigureIntent {
                 toolchain,
-                build_type: Some(cmake_config(profile).to_string()),
+                build_type: typed.then(|| cmake_config(profile).to_string()),
             },
             note: join(notes),
         });
