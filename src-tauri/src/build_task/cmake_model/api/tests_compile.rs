@@ -26,7 +26,7 @@ pub mod compile_tests {
     pub fn includes_defines_and_fragments_become_per_file_flags() {
         let directory = single("compile-single");
 
-        let synthesis = synthesize_database(directory.path())
+        let synthesis = synthesize_database(directory.path(), "Debug")
             .expect("the reply synthesizes")
             .expect("no generator database exists, so one is written");
 
@@ -64,36 +64,32 @@ pub mod compile_tests {
     }
 
     #[test]
-    pub fn every_configuration_contributes_its_own_entries() {
+    pub fn the_configuration_being_built_gets_one_entry_per_source() {
         let directory = multi("compile-multi");
 
-        synthesize_database(directory.path())
+        let synthesis = synthesize_database(directory.path(), "Release")
             .expect("the reply synthesizes")
             .expect("a multi-config tree gets a database");
 
+        assert_eq!(synthesis.configurations, vec!["Release".to_string()]);
+        assert_eq!(synthesis.files, 3, "three targets, one entry each");
         let entries = read_database(directory.path());
         assert_eq!(
             entries.len(),
-            6,
-            "three targets per configuration, two configurations"
+            3,
+            "one entry per source for the configuration the build uses"
         );
-        let debug = entries
-            .iter()
-            .find(|entry| {
-                entry.file == "/proj/src/main.cpp" && entry.arguments.contains(&"-g".to_string())
-            })
-            .expect("the Debug entry");
-        let release = entries
-            .iter()
-            .find(|entry| {
-                entry.file == "/proj/src/main.cpp" && entry.arguments.contains(&"-O3".to_string())
-            })
-            .expect("the Release entry");
-        assert!(debug.arguments.contains(&"-DDEMO_FLAG=1".to_string()));
+        let main = find(&entries, "/proj/src/main.cpp");
         assert!(
-            release.arguments.contains(&"-DNDEBUG".to_string()),
-            "the Release fragments survive: {:?}",
-            release.arguments
+            main.arguments.contains(&"-O3".to_string())
+                && main.arguments.contains(&"-DNDEBUG".to_string()),
+            "the Release command is the one written: {:?}",
+            main.arguments
+        );
+        assert!(
+            !main.arguments.contains(&"-g".to_string()),
+            "Debug's flags are not left behind: {:?}",
+            main.arguments
         );
         assert!(
             entries
@@ -112,8 +108,8 @@ pub mod compile_tests {
             "[{\"directory\":\"/generated\",\"file\":\"/proj/main.cpp\",\"arguments\":[]}]\n";
         fs::write(&path, sentinel).expect("the generator database");
 
-        let synthesis =
-            synthesize_database(directory.path()).expect("an existing database is not an error");
+        let synthesis = synthesize_database(directory.path(), "Debug")
+            .expect("an existing database is not an error");
 
         assert!(synthesis.is_none(), "no second database is written");
         assert_eq!(
@@ -126,17 +122,18 @@ pub mod compile_tests {
     #[test]
     pub fn a_multi_config_database_is_refreshed_on_the_next_configure() {
         let directory = multi("compile-refresh");
-        synthesize_database(directory.path())
+        synthesize_database(directory.path(), "Debug")
             .expect("the reply synthesizes")
             .expect("the first database is written");
         let path = directory.path().join(DATABASE_FILE);
         fs::write(&path, "[]\n").expect("a stale copy of our own database");
 
-        let again = synthesize_database(directory.path())
+        let again = synthesize_database(directory.path(), "Debug")
             .expect("the reply still synthesizes")
             .expect("our own database is rewritten");
 
-        assert_eq!(again.files, 6);
+        assert!(again.changed, "a database that is not current is rewritten");
+        assert_eq!(again.files, 3);
         assert!(
             fs::read_to_string(&path)
                 .expect("the fresh database")
@@ -149,7 +146,8 @@ pub mod compile_tests {
     pub fn an_unreadable_reply_writes_no_database() {
         let directory = broken("compile-broken");
 
-        let error = synthesize_database(directory.path()).expect_err("a broken reply is an error");
+        let error =
+            synthesize_database(directory.path(), "Debug").expect_err("a broken reply is an error");
 
         assert!(error.contains("codemodel-v2-absent"), "{error}");
         assert!(

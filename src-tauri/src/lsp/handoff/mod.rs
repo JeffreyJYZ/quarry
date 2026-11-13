@@ -58,6 +58,9 @@ pub use tests_msvc::*;
 mod tests_profile;
 pub use tests_profile::*;
 
+mod tests_multi_config;
+pub use tests_multi_config::*;
+
 mod tests_support;
 pub use tests_support::*;
 

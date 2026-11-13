@@ -38,10 +38,14 @@ pub mod cmake_api_fixture {
             "Ninja Multi-Config writes no compile_commands.json, which is the gap this fills"
         );
 
-        let synthesis = synthesize_database(&build)
+        let synthesis = synthesize_database(&build, "Debug")
             .expect("the reply reads")
             .expect("the fallback database is written");
-        assert!(synthesis.files >= 2, "every source of every configuration");
+        assert!(
+            synthesis.files >= 1,
+            "one entry per source for the configuration being built"
+        );
+        assert_eq!(synthesis.configurations, vec!["Debug".to_string()]);
         let entries: Vec<CompileEntry> =
             serde_json::from_str(&fs::read_to_string(build.join(DATABASE_FILE)).expect("database"))
                 .expect("database JSON");
@@ -66,9 +70,24 @@ pub mod cmake_api_fixture {
             debug_main.arguments
         );
         assert!(
-            entries.iter().any(|entry| entry.file.ends_with("main.cpp")
+            synthesize_database(&build, "Release")
+                .expect("the reply reads")
+                .expect("the fallback database is written")
+                .changed,
+            "a Debug profile followed by Release rewrites the file for Release"
+        );
+        let release: Vec<CompileEntry> =
+            serde_json::from_str(&fs::read_to_string(build.join(DATABASE_FILE)).expect("database"))
+                .expect("database JSON");
+        let mains = release
+            .iter()
+            .filter(|entry| entry.file.ends_with("main.cpp"))
+            .count();
+        assert_eq!(mains, 1, "clangd reads one entry per source: {release:?}");
+        assert!(
+            release.iter().any(|entry| entry.file.ends_with("main.cpp")
                 && entry.arguments.iter().any(|token| token == "-O3")),
-            "the Release configuration carries its own flags"
+            "the entry is the Release configuration's: {release:?}"
         );
     }
 

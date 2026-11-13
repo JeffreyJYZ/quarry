@@ -9,6 +9,11 @@
 //! `compile_commands.json` themselves, from the real command lines of the compiler they run, so the
 //! reply's model is not consulted there at all; only a generator that writes none (Xcode, Visual
 //! Studio, Ninja Multi-Config) gets the synthesized file.
+//!
+//! A multi-config generator describes every configuration, and clangd reads the first entry for a
+//! source, so the file holds one entry per source for the configuration the build is using. The
+//! chosen configuration is also part of what makes the file current: a tree whose database still
+//! holds another configuration's entries is rewritten, so switching profile changes analysis too.
 
 #![allow(unused_imports)]
 
@@ -27,11 +32,14 @@ pub const DATABASE_FILE: &str = crate::project::DATABASE_FILE;
 pub struct Synthesis {
     pub path: PathBuf,
     pub files: usize,
+    /// The configuration the entries describe; one name, since the file describes one build.
     pub configurations: Vec<String>,
+    /// False when the file already held exactly these entries, so nothing was rewritten.
+    pub changed: bool,
 }
 
 impl Synthesis {
-    /// One line naming what was written, and for which configurations.
+    /// One line naming what was written, and for which configuration.
     pub fn note(&self) -> String {
         format!(
             "wrote {} from the CMake file API for {} ({} entries)",
@@ -46,13 +54,21 @@ impl Synthesis {
 ///
 /// Authority is decided by the generator the reply names, not by the file's presence alone: a
 /// single-config Makefiles or Ninja configure writes `compile_commands.json` itself every time, so
-/// that file is left untouched, while a multi-config tree's database can only be one this function
-/// wrote earlier and is refreshed with the configure that just ran.
+/// that file is left untouched, while a multi-config generator describes every configuration — in
+/// its own file as well — and is replaced by the one entry per source this build uses.
+///
+/// `configuration` is the one the build (and therefore analysis) uses, so a multi-config tree gets
+/// exactly that configuration's entries. A reply that describes other configurations is an error
+/// naming them: a `MinSizeRel` profile on a tree configured without that configuration must say so
+/// rather than hand clangd the Debug flags and let the user believe they are compiling optimised.
 ///
 /// `Ok(None)` means the generator's own database stays authoritative. An unreadable or incomplete
 /// reply is `Err` so the caller can note it and keep building; nothing is written in that case, so
 /// a failed configure never leaves a half-read model on disk.
-pub fn synthesize_database(build_root: &Path) -> Result<Option<Synthesis>, String> {
+pub fn synthesize_database(
+    build_root: &Path,
+    configuration: &str,
+) -> Result<Option<Synthesis>, String> {
     let reply = read_reply(build_root)?;
     let path = build_root.join(DATABASE_FILE);
     if path.is_file() && writes_compile_database(reply.generator.as_deref()) {
@@ -60,23 +76,60 @@ pub fn synthesize_database(build_root: &Path) -> Result<Option<Synthesis>, Strin
     }
     let model = read_codemodel(build_root)?;
     let compilers = Compilers::load(build_root);
-    let entries = compile_entries(&model, &compilers);
+    let chosen = described(&model, reply.multi_config, configuration)?;
+    let entries: Vec<CompileEntry> = chosen
+        .iter()
+        .flat_map(|configuration| configuration_entries(configuration, &compilers))
+        .collect();
     if entries.is_empty() {
         return Err(format!(
             "the CMake codemodel in {} names no compilable source",
             build_root.display()
         ));
     }
-    write_database(&path, &entries)?;
+    let text = encode_database(&entries)?;
+    let changed = fs::read_to_string(&path).ok().as_deref() != Some(text.as_str());
+    if changed {
+        write_text(&path, &text)?;
+    }
     Ok(Some(Synthesis {
         path,
         files: entries.len(),
-        configurations: model
-            .configurations
+        configurations: chosen
             .iter()
             .map(|configuration| configuration.name.clone())
             .collect(),
+        changed,
     }))
+}
+
+/// The configurations a database must hold: the build's own when the generator describes many.
+///
+/// A single-config tree describes one configuration, which is the one it was configured for, so the
+/// whole model is the answer and nothing is selected. A profile a multi-config reply does not
+/// describe is an error naming what the reply does describe, never a fall back to Debug.
+fn described<'a>(
+    model: &'a Codemodel,
+    multi_config: bool,
+    configuration: &str,
+) -> Result<Vec<&'a Configuration>, String> {
+    if !multi_config {
+        return Ok(model.configurations.iter().collect());
+    }
+    if let Some(found) = model.configuration(configuration) {
+        return Ok(vec![found]);
+    }
+    let named: Vec<&str> = model
+        .configurations
+        .iter()
+        .map(|described| described.name.as_str())
+        .collect();
+    Err(format!(
+        "the CMake codemodel in {} describes {} and not the {configuration} configuration this \
+         build uses",
+        model.build_root.display(),
+        named.join(", ")
+    ))
 }
 
 /// The exact text a database file holds for `entries`.
@@ -94,7 +147,11 @@ pub fn encode_database(entries: &[CompileEntry]) -> Result<String, String> {
 /// clangd may be reading the directory while a build runs, so a half-written database is never
 /// visible: the array goes to a sibling temporary file and is renamed over the destination.
 pub fn write_database(path: &Path, entries: &[CompileEntry]) -> Result<(), String> {
-    let text = encode_database(entries)?;
+    write_text(path, &encode_database(entries)?)
+}
+
+/// Replace `path` with `text`, atomically.
+fn write_text(path: &Path, text: &str) -> Result<(), String> {
     let temporary = path.with_extension("json.tmp");
     fs::write(&temporary, text)
         .map_err(|error| format!("cannot write {}: {error}", temporary.display()))?;

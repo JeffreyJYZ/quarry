@@ -11,7 +11,7 @@ use super::*;
 /// What discovery found: the directory clangd should read, and why a start had to configure.
 pub struct Database {
     pub dir: Option<PathBuf>,
-    /// One line a session start reports when the tree had to be reconfigured for the profile.
+    /// One line a session start reports: a reconfigure, or a database written for another profile.
     pub note: Option<String>,
 }
 

@@ -5,8 +5,9 @@
 //! fragments, then an `-I`/`-isystem` per include and a `-D` per define, then `-c <file>`.
 //!
 //! Every configuration contributes its own entries. Ninja Multi-Config, Xcode and Visual Studio
-//! build each configuration with different flags, and a consumer that only understands one entry
-//! per file takes the first — Debug leads because that is the configuration CMake reports first.
+//! build each configuration with different flags, and a consumer that reads one entry per file
+//! takes the first — Debug leads because that is the configuration CMake reports first. So the
+//! database writer asks for the configuration the build is using, one entry per source.
 
 #![allow(unused_imports)]
 
@@ -24,15 +25,20 @@ pub struct CompileEntry {
     pub arguments: Vec<String>,
 }
 
-/// Every entry a model produces, configuration by configuration and target by target.
-pub fn compile_entries(model: &Codemodel, compilers: &Compilers) -> Vec<CompileEntry> {
+/// Every entry one configuration produces.
+///
+/// A multi-config generator describes the same sources once per configuration with different
+/// flags, and clangd reads the first entry it finds for a file. The database therefore holds the
+/// configuration the build is using, so the flags analysis reads are the ones the compiler ran.
+pub fn configuration_entries(
+    configuration: &Configuration,
+    compilers: &Compilers,
+) -> Vec<CompileEntry> {
     let mut entries = Vec::new();
-    for configuration in &model.configurations {
-        for target in &configuration.targets {
-            for group in &target.groups {
-                for source in &group.sources {
-                    entries.push(compile_entry(target, group, source, compilers));
-                }
+    for target in &configuration.targets {
+        for group in &target.groups {
+            for source in &group.sources {
+                entries.push(compile_entry(target, group, source, compilers));
             }
         }
     }

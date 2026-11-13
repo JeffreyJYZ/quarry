@@ -40,9 +40,9 @@ pub const CONFIGURE_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// What a start may report: whether the tree holds a database now, and why it configured.
 pub struct Ensured {
-    /// True when the plan's tree holds a readable compiler database afterwards.
+    /// True when the plan's tree holds a compiler database for this build's configuration.
     pub current: bool,
-    /// One line saying the tree was reconfigured, when it was and the configure succeeded.
+    /// One line saying the tree was reconfigured, or the database rewritten for the profile.
     pub note: Option<String>,
 }
 
@@ -58,6 +58,10 @@ pub struct Ensured {
 /// `--compile-commands-dir` points at that tree and nowhere else. A failed configure is not an
 /// error to the session: the previous database stays in place where there is one, and the session
 /// starts either way.
+///
+/// The chosen configuration is part of "current": a multi-config tree describes every configuration
+/// and clangd reads the first entry for a source, so a database written for another one is rewritten
+/// rather than left for analysis to read.
 pub fn ensure_database(root: &Path, plan: &CmakePlan) -> Ensured {
     let _guard = configure_lock();
     let database = plan.build_root.join(DATABASE_FILE);
@@ -67,6 +71,7 @@ pub fn ensure_database(root: &Path, plan: &CmakePlan) -> Ensured {
         let request = ConfigureRequest {
             build_root: &plan.build_root,
             argv: &argv,
+            configuration: &plan.configuration,
             // A tree that already holds a database keeps it when this configure fails.
             had_previous: database.is_file(),
         };
@@ -78,14 +83,30 @@ pub fn ensure_database(root: &Path, plan: &CmakePlan) -> Ensured {
         {
             note = Some(reason);
         }
-    } else if !database.is_file() {
-        // The reply is current, so only the derived file is missing: synthesise from the model
-        // rather than pay for a configure that would produce the same reply.
-        let _ = synthesize_database(&plan.build_root);
     }
+    // Configured or not, the database must describe the configuration this build uses: a reply that
+    // is already current still gets its derived file written for this one, which is what makes a
+    // profile switch visible to analysis and what a configure that failed still owes the session.
+    let (current, derived) = derived_database(plan);
     Ensured {
-        current: database.is_file(),
-        note,
+        current,
+        note: note.or(derived),
+    }
+}
+
+/// The derived database for the plan's configuration, and the one line worth reporting about it.
+///
+/// `false` means there is nothing honest to point clangd at: a reply that cannot name this
+/// configuration must not leave another one's flags to be read as if they were this one's.
+fn derived_database(plan: &CmakePlan) -> (bool, Option<String>) {
+    let name = &plan.configuration;
+    match synthesize_database(&plan.build_root, &plan.configuration) {
+        Ok(Some(synthesis)) => (true, synthesis.changed.then(|| synthesis.note())),
+        Ok(None) => (true, None),
+        Err(why) => (
+            false,
+            Some(format!("no compiler database for {name}: {why}")),
+        ),
     }
 }
 

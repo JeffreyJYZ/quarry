@@ -130,6 +130,7 @@ pub fn run_cmake_build(
             ConfigureRequest {
                 build_root: &plan.build_root,
                 argv: &plan.configure,
+                configuration: &plan.configuration,
                 had_previous: reconfigured,
             },
             |argv| {
