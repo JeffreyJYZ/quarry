@@ -33,6 +33,9 @@ const PROBES: Probe[] = [
 	{ name: "lsp-ux-smoke", file: "lsp-ux-smoke.ts", requires: ["rust-analyzer"] },
 	{ name: "cxx-smoke", file: "cxx-smoke.ts", requires: ["clang++"] },
 	{ name: "lsp-cmake-probe", file: "lsp-cmake-probe.ts", requires: ["clangd", "cmake"] },
+	// The acceptance test for C/C++ parity: six real projects, each measured through the plan the
+	// product itself would run, so a row cannot pass on a flag quarry does not pass.
+	{ name: "cpp-parity", file: "cpp-parity-probe.ts", requires: ["clangd", "cmake", "c++"] },
 	{
 		name: "dap-cpp-probe",
 		file: "dap-cpp-probe.ts",
