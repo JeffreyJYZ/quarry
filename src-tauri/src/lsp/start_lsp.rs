@@ -105,10 +105,12 @@ pub async fn start_lsp_session(
         root: project_root,
         mut pipe,
         legend,
+        database,
     } = started;
     let frames = pipe.take_frames();
     let session = Arc::new(Mutex::new(Session {
         server: server.to_string(),
+        database,
         pipe,
         documents: HashMap::new(),
         document_ends: HashMap::new(),

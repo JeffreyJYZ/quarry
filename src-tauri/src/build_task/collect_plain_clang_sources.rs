@@ -71,7 +71,18 @@ fn is_ignored_dir(name: &str) -> bool {
     crate::ignore::is_dir(name) || PLAIN_CLANG_EXTRA_IGNORED_DIRS.contains(&name)
 }
 
-pub fn plain_clang_argv<P: AsRef<Path>>(root: &str, name: &str, sources: &[P]) -> Vec<String> {
+/// The command a plain-clang build runs, with the project's own database flags spliced in.
+///
+/// A project whose only build description is `compile_commands.json` compiles with the include
+/// paths and defines it records — those are the flags that make its sources compile at all. The
+/// language standard is the one exception: the database's wins over the default, because it is what
+/// the project's own build uses.
+pub fn plain_clang_argv_with<P: AsRef<Path>>(
+    root: &str,
+    name: &str,
+    sources: &[P],
+    extra: &[String],
+) -> Vec<String> {
     let c_only = sources.iter().all(|source| {
         source
             .as_ref()
@@ -86,15 +97,16 @@ pub fn plain_clang_argv<P: AsRef<Path>>(root: &str, name: &str, sources: &[P]) -
         .display()
         .to_string();
 
-    let mut argv = vec![
-        compiler.to_string(),
-        std_flag.to_string(),
-        "-g".to_string(),
-        "-O0".to_string(),
-        "-fno-color-diagnostics".to_string(),
-        "-o".to_string(),
-        output,
-    ];
+    let mut argv = vec![compiler.to_string()];
+    if !extra.iter().any(|flag| flag.starts_with("-std=")) {
+        argv.push(std_flag.to_string());
+    }
+    argv.push("-g".to_string());
+    argv.push("-O0".to_string());
+    argv.push("-fno-color-diagnostics".to_string());
+    argv.extend(extra.iter().cloned());
+    argv.push("-o".to_string());
+    argv.push(output);
     for source in sources {
         argv.push(source.as_ref().to_string_lossy().into_owned());
     }

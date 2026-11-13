@@ -3,8 +3,8 @@
 //! Cargo projects build with `cargo build --message-format=json`; the machine-readable stream
 //! becomes `Diagnostic`s. CMake projects configure with `cmake -S … -B …` when their build root
 //! holds no generator file, then build with `cmake --build`; their diagnostics are parsed from
-//! the compiler's plain-text output. A `compile_commands.json` project has no known build system,
-//! so it names the kind and points at `.quarry/launch.json` instead of guessing a command.
+//! the compiler's plain-text output. A project whose only marker is `compile_commands.json` builds
+//! with clang directly, using the include paths and defines its database records.
 //!
 //! A failing build is a result, not a command error: only a missing tool or a spawn failure is
 //! `Err`. The build never runs the program and never writes into the source tree.
@@ -77,6 +77,9 @@ pub use tests_choice::*;
 
 mod tests_plain_clang_sources;
 pub use tests_plain_clang_sources::*;
+
+mod tests_plain_clang_flags;
+pub use tests_plain_clang_flags::*;
 
 mod tests_cmake_artifact;
 pub use tests_cmake_artifact::*;

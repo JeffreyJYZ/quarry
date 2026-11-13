@@ -12,6 +12,9 @@ pub use std::path::{Path, PathBuf};
 mod cargo_manifest;
 pub use cargo_manifest::*;
 
+mod compile_database;
+pub use compile_database::*;
+
 mod descend;
 pub use descend::*;
 

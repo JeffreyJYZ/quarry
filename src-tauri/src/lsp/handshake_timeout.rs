@@ -54,6 +54,9 @@ pub struct LspState {
 /// A live server process plus the documents opened against it.
 pub struct Session {
     pub(crate) server: String,
+    /// The compile-database directory this session was started with, when there is one. A marker
+    /// edit reconfigures this exact tree; `None` means the user named their own or there is none.
+    pub(crate) database: Option<std::path::PathBuf>,
     pub(crate) pipe: ProcessPipe,
     /// Open document path to the version last sent, so `didChange` speaks the same version the
     /// server last heard.
