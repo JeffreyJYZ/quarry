@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 // biome-ignore-all lint/suspicious/noExplicitAny: LSP payloads are untyped JSON
-import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { fileUri, LspClient } from "./lsp-client";
 
 /** Resolve `rust-analyzer` the way detect-tools does: PATH first, then the usual install dirs. */
 function findServerBinary(): string {
@@ -41,100 +41,17 @@ function serverPath(binary: string): string {
 	return [...dirs, ...inherited].join(":");
 }
 
-function fileUri(path: string): string {
-	let uri = "file://";
-	for (const byte of Buffer.from(path, "utf8")) {
-		if (
-			(byte >= 0x41 && byte <= 0x5a) ||
-			(byte >= 0x61 && byte <= 0x7a) ||
-			(byte >= 0x30 && byte <= 0x39) ||
-			byte === 0x2d ||
-			byte === 0x2e ||
-			byte === 0x5f ||
-			byte === 0x7e ||
-			byte === 0x2f
-		) {
-			uri += String.fromCharCode(byte);
-		} else {
-			uri += `%${byte.toString(16).padStart(2, "0").toUpperCase()}`;
-		}
-	}
-	return uri;
-}
-
-class LspClient {
-	child: ChildProcess;
-	buffer = Buffer.alloc(0);
-	stderr = "";
-	notifications: any[] = [];
-	responses: any[] = [];
-	exited = false;
-	constructor(binary: string) {
-		this.child = spawn(binary, [], {
-			cwd: ROOT,
-			env: { ...process.env, PATH: serverPath(binary) },
-			stdio: ["pipe", "pipe", "pipe"],
-		});
-		this.child.stdout?.on("data", (c: Buffer) => this.onData(c));
-		this.child.stderr?.on("data", (c: Buffer) => {
-			this.stderr += c.toString("utf8");
-		});
-		this.child.on("exit", (code, signal) => {
-			this.exited = true;
-			this.stderr += `\n[exit code=${code} signal=${signal}]\n`;
-		});
-	}
-	send(m: any) {
-		const body = JSON.stringify(m);
-		this.child.stdin?.write(
-			`Content-Length: ${Buffer.byteLength(body, "utf8")}\r\n\r\n${body}`,
-		);
-	}
-	private onData(chunk: Buffer) {
-		this.buffer = Buffer.concat([this.buffer, chunk]);
-		for (;;) {
-			const he = this.buffer.indexOf("\r\n\r\n");
-			if (he < 0) return;
-			const header = this.buffer.subarray(0, he).toString("ascii");
-			const m = /Content-Length:\s*(\d+)/i.exec(header);
-			if (!m) return;
-			const len = Number(m[1]);
-			const start = he + 4;
-			if (this.buffer.length < start + len) return;
-			const raw = this.buffer.subarray(start, start + len).toString("utf8");
-			this.buffer = this.buffer.subarray(start + len);
-			try {
-				const msg = JSON.parse(raw);
-				if (msg.method === undefined) this.responses.push(msg);
-				else this.notifications.push(msg);
-			} catch {}
-		}
-	}
-	kill() {
-		if (!this.exited)
-			try {
-				this.child.kill("SIGKILL");
-			} catch {}
-	}
-	async waitForResponse(id: number, timeout: number): Promise<any> {
-		const deadline = Date.now() + timeout;
-		while (Date.now() < deadline) {
-			const r = this.responses.find((x) => x.id === id);
-			if (r) return r;
-			if (this.exited) return null;
-			await new Promise((r) => setTimeout(r, 50));
-		}
-		return null;
-	}
-}
-
 let reqId = 100;
 function nextId() {
 	return reqId++;
 }
 
 async function main() {
-	const client = new LspClient(SERVER_BINARY);
+	const client = new LspClient({
+		binary: SERVER_BINARY,
+		cwd: ROOT,
+		path: serverPath(SERVER_BINARY),
+	});
 	const rootUri = fileUri(ROOT);
 	const sourceUri = fileUri(SOURCE);
 	let fatal = false;
