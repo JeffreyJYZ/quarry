@@ -1,0 +1,13 @@
+{
+	"kind": "toolchains",
+	"toolchains": [
+		{
+			"language": "C",
+			"compiler": { "id": "AppleClang", "path": "/usr/bin/cc", "version": "21.0.0.21000401" }
+		},
+		{
+			"language": "CXX",
+			"compiler": { "id": "AppleClang", "path": "/usr/bin/c++", "version": "21.0.0.21000401" }
+		}
+	]
+}

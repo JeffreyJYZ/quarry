@@ -163,9 +163,13 @@ pub fn is_multi_config(generator: Option<&str>) -> bool {
     })
 }
 
-/// Only the Makefiles and Ninja generators implement `CMAKE_EXPORT_COMPILE_COMMANDS`.
+/// Only a single-config Makefiles or Ninja generator implements `CMAKE_EXPORT_COMPILE_COMMANDS`.
+///
+/// Ninja Multi-Config is multi-config but takes its `--config` at build time; measured on cmake
+/// 4.4.5 it writes no database even with the variable on, which is why analysis falls back to the
+/// file API for it rather than to a file nobody writes.
 pub fn writes_compile_database(generator: Option<&str>) -> bool {
-    !generator.is_some_and(|name| name.starts_with("Xcode") || name.starts_with("Visual Studio"))
+    !is_multi_config(generator)
 }
 
 fn is_on(value: &str) -> bool {

@@ -6,6 +6,9 @@
 //! the compiler's plain-text output. A project whose only marker is `compile_commands.json` builds
 //! with clang directly, using the include paths and defines its database records.
 //!
+//! A CMake configure also asks CMake's file API for the project model, and the reply becomes a
+//! compiler database where the generator writes none (Xcode, Visual Studio, Ninja Multi-Config).
+//!
 //! A failing build is a result, not a command error: only a missing tool or a spawn failure is
 //! `Err`. The build never runs the program and never writes into the source tree.
 

@@ -1,0 +1,19 @@
+{
+	"artifacts": [{ "path": "demo" }],
+	"codemodelVersion": { "major": 2, "minor": 11 },
+	"compileGroups": [
+		{
+			"compileCommandFragments": [{ "fragment": "-g -arch arm64" }],
+			"defines": [{ "define": "DEMO_FLAG=1" }],
+			"includes": [{ "path": "/proj/include" }],
+			"language": "CXX",
+			"sourceIndexes": [0]
+		}
+	],
+	"id": "demo::@00000000000000000000",
+	"name": "demo",
+	"nameOnDisk": "demo",
+	"paths": { "build": ".", "source": "." },
+	"sources": [{ "compileGroupIndex": 0, "path": "main.cpp", "sourceGroupIndex": 0 }],
+	"type": "EXECUTABLE"
+}

@@ -1,0 +1,5 @@
+{
+	"kind": "cmakeFiles",
+	"paths": { "build": "/proj/build", "source": "/proj" },
+	"inputs": [{ "path": "CMakeLists.txt" }]
+}
