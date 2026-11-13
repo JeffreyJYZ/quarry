@@ -143,6 +143,13 @@ is always the Debug command, and the MSVC control run is reported as evidence ra
 — when clangd answers without `--query-driver`, the row says so. A row that skips (no GCC on the
 machine, no Visual Studio toolset) is a skip, never a pass.
 
+The generator version is discovered, never assumed: `cmake --help` names what that cmake supports,
+and a runner image can list a generator whose Visual Studio instance is absent, so the probe
+configures a scratch project with each candidate — newest first, with the same `-A x64` argv the
+fixtures use — and prints one line per attempt. A hardcoded `Visual Studio 17 2022` failed on an image
+that lists a newer generator only; the probe now prints the chosen name and every failure, so a
+runner with none says why instead of skipping quietly.
+
 ## 5. Slices
 
 Estimates assume solo work on a familiar stack, full days.

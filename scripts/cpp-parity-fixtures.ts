@@ -30,6 +30,13 @@ export interface AnalysisProbe {
 export interface Fixture {
 	/** Directory name under the probe's temp root, and the table's capability label. */
 	name: string;
+	/**
+	 * The CMake generator this fixture's own build uses, when it is not the platform default.
+	 *
+	 * A Windows row cannot name a version up front: the runner's images move, and the generator that
+	 * exists there is discovered, so it is carried on the fixture rather than hardcoded in the row.
+	 */
+	generator?: string;
 	/** Relative path to file contents. */
 	files: Record<string, string>;
 	/**
