@@ -79,6 +79,50 @@ export function ProjectTab(props: {
 				</div>
 			</section>
 			<section className="settings-section">
+				<h3 className="settings-heading">CMake</h3>
+				<div className="settings-row">
+					<label htmlFor="settings-cmake-preset">Configure preset</label>
+					<input
+						id="settings-cmake-preset"
+						type="text"
+						className="settings-text"
+						value={project?.cmakePreset ?? ""}
+						placeholder="empty: the project's only preset"
+						spellCheck={false}
+						onChange={(event) => onChange({ cmakePreset: event.target.value })}
+					/>
+				</div>
+				<div className="settings-row">
+					<label htmlFor="settings-cmake-build-dir">Build directory</label>
+					<input
+						id="settings-cmake-build-dir"
+						type="text"
+						className="settings-text"
+						value={project?.cmakeBuildDir ?? ""}
+						placeholder="empty: detect, then build"
+						spellCheck={false}
+						onChange={(event) => onChange({ cmakeBuildDir: event.target.value })}
+					/>
+				</div>
+				<div className="settings-row">
+					<label htmlFor="settings-cmake-toolchain">Toolchain file</label>
+					<input
+						id="settings-cmake-toolchain"
+						type="text"
+						className="settings-text"
+						value={project?.cmakeToolchainFile ?? ""}
+						placeholder="empty: the preset's own"
+						spellCheck={false}
+						onChange={(event) => onChange({ cmakeToolchainFile: event.target.value })}
+					/>
+				</div>
+				<p className="settings-hint">
+					A name from CMakePresets.json, the directory the build runs in and the toolchain
+					it configures with. Empty means the project decides: detection uses an
+					already-configured tree, else the preset's directory, else "build".
+				</p>
+			</section>
+			<section className="settings-section">
 				<div className="settings-row">
 					<span className="settings-hint">
 						Effective: tab {effective.editorTabSize} · format{" "}

@@ -81,8 +81,8 @@ pub mod tests_group_3 {
         );
         assert_eq!(
             Path::new(&composed.program),
-            directory.path().join("app"),
-            "the composed program is not the manifest target"
+            directory.path().join(CMAKE_BUILD_DIR).join("app"),
+            "an unbuilt project names the program its next build writes, in the tree it configures"
         );
     }
 
@@ -164,18 +164,21 @@ pub mod tests_group_3 {
         let composed = compose(&root, false).expect("a CMake project composes without a build");
         let canonical = directory.path().canonicalize().expect("canonical root");
 
-        assert_eq!(Path::new(&composed.program), canonical.join("app"));
+        assert_eq!(
+            Path::new(&composed.program),
+            canonical.join(CMAKE_BUILD_DIR).join("app")
+        );
         assert_eq!(Path::new(&composed.cwd), canonical);
     }
 
     #[test]
-    pub fn cmake_candidates_try_the_top_level_binary_first() {
+    pub fn cmake_candidates_try_the_detected_build_tree_first() {
         let root = Path::new("/work/demo");
 
         let paths = paths_for_name(root, "app", ProjectKind::Cmake);
 
-        assert_eq!(paths[0], PathBuf::from("/work/demo/app"));
-        assert!(paths.contains(&PathBuf::from("/work/demo/build/app")));
+        assert_eq!(paths[0], PathBuf::from("/work/demo/build/app"));
+        assert!(paths.contains(&PathBuf::from("/work/demo/app")));
         assert!(paths.contains(&PathBuf::from("/work/demo/build/Debug/app")));
         assert!(paths.contains(&PathBuf::from("/work/demo/cmake-build-debug/app")));
     }

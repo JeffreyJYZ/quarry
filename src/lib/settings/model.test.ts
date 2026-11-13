@@ -4,6 +4,7 @@ import { DEFAULT_THEME_ID } from "@/lib/themes/model";
 import {
 	clampFontSize,
 	DEFAULT_PREFERENCES,
+	DEFAULT_PROJECT_SETTINGS,
 	effectivePreferences,
 	normalizePreferences,
 	normalizeProjectSettings,
@@ -81,11 +82,7 @@ describe("normalizePreferences", () => {
 
 describe("normalizeProjectSettings", () => {
 	test("reads missing values as inherited", () => {
-		expect(normalizeProjectSettings({})).toEqual({
-			editorTabSize: null,
-			formatOnSave: null,
-			buildProfile: null,
-		});
+		expect(normalizeProjectSettings({})).toEqual(DEFAULT_PROJECT_SETTINGS);
 		expect(normalizeProjectSettings(null)).toEqual(normalizeProjectSettings({}));
 	});
 
@@ -110,9 +107,7 @@ describe("normalizeProjectSettings", () => {
 describe("effectivePreferences", () => {
 	test("inherits every unset project value", () => {
 		const effective = effectivePreferences(DEFAULT_PREFERENCES, {
-			editorTabSize: null,
-			formatOnSave: null,
-			buildProfile: null,
+			...DEFAULT_PROJECT_SETTINGS,
 		});
 		expect(effective.editorTabSize).toBe(DEFAULT_PREFERENCES.editorTabSize);
 		expect(effective.formatOnSave).toBe(DEFAULT_PREFERENCES.formatOnSave);
@@ -122,6 +117,7 @@ describe("effectivePreferences", () => {
 	test("a project override wins, including a false boolean", () => {
 		const user = { ...DEFAULT_PREFERENCES, formatOnSave: true, buildProfile: "debug" as const };
 		const effective = effectivePreferences(user, {
+			...DEFAULT_PROJECT_SETTINGS,
 			editorTabSize: 2,
 			formatOnSave: false,
 			buildProfile: "release",
@@ -143,16 +139,19 @@ describe("projectSettingsAreEmpty", () => {
 	test("true only when nothing is overridden", () => {
 		expect(
 			projectSettingsAreEmpty({
-				editorTabSize: null,
-				formatOnSave: null,
-				buildProfile: null,
+				...DEFAULT_PROJECT_SETTINGS,
 			}),
 		).toBe(true);
 		expect(
 			projectSettingsAreEmpty({
+				...DEFAULT_PROJECT_SETTINGS,
 				editorTabSize: 2,
-				formatOnSave: null,
-				buildProfile: null,
+			}),
+		).toBe(false);
+		expect(
+			projectSettingsAreEmpty({
+				...DEFAULT_PROJECT_SETTINGS,
+				cmakePreset: "dev",
 			}),
 		).toBe(false);
 	});

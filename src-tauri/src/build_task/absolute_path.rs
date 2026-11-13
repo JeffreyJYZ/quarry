@@ -85,85 +85,62 @@ pub fn truncate(text: &str, limit: usize) -> String {
     text.chars().take(limit).collect()
 }
 
-/// Builds a CMake project: configure the build root when it holds no generator file, then build.
+/// Builds a CMake project the way the project's own configuration says: pick the tree, configure
+/// through its preset when it has one, then build that tree.
 ///
 /// A failing configure or build is a result, not an error: only a missing `cmake` or a failed
 /// spawn is `Err`.
 pub fn run_cmake_build(
     state: &BuildState,
     source_root: &str,
-    build_root: &str,
     release: bool,
 ) -> Result<BuildReport, String> {
+    let source = Path::new(source_root);
+    let plan = cmake_plan(source, release, &CmakeOptions::for_root(source))?;
     let started = Instant::now();
     let started_at = SystemTime::now();
     let mut text = String::new();
+    // The note goes first so a failing configure still ends the text with its own error, which is
+    // what the status bar reports.
+    if let Some(note) = &plan.note {
+        text.push_str(&format!("note: {note}\n"));
+    }
 
-    // Configure on every build: the configure step is cheap and idempotent, and it is the only
-    // place the build type is set. Skipping it for an already-configured directory left a project
-    // built with no debug info forever.
-    let configure = run_cmake(
-        state,
-        &cmake_configure_argv(source_root, build_root, release),
-        build_root,
-    )?;
+    // Both steps run from the project root: `--preset` is looked up against the working directory,
+    // while an absolute `--build <path>` does not care where it starts.
+    let configure = run_cmake(state, &plan.configure, source_root)?;
     text.push_str(&configure.text);
     let mut success = configure.success;
     let mut stopped = configure.stopped;
 
     if success && !stopped {
-        let outcome = run_cmake(state, &cmake_build_argv(build_root, release), build_root)?;
+        let outcome = run_cmake(state, &plan.build, source_root)?;
         text.push_str(&outcome.text);
         success = outcome.success;
         stopped = outcome.stopped;
     }
 
     let duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+    let summary = if stopped {
+        CANCELLED_SUMMARY.to_string()
+    } else {
+        summarize_text(&text)
+    };
     Ok(BuildReport {
         success,
         diagnostics: cmake_diagnostics(&text, source_root),
         duration_ms,
-        summary: if stopped {
-            CANCELLED_SUMMARY.to_string()
-        } else {
-            summarize_text(&text)
+        // A successful build says which tree it used and what it had to decide; a failing one keeps
+        // the compiler's own last line, which is the part the user acts on.
+        summary: match (&plan.note, success && !stopped) {
+            (Some(note), true) => truncate(&format!("{summary} · {note}"), SUMMARY_LIMIT),
+            _ => summary,
         },
-        // The program the build just wrote. CMake names its targets as text (`Built target …`),
-        // so those names are resolved against the build tree; when none resolves, the newest file
-        // the build touched is the answer, which is what this did before CMake's names were read.
+        // The program the build just wrote, resolved against the tree this build configured.
         artifact: if success {
-            cmake_artifact(&text, Path::new(build_root), started_at)
+            cmake_artifact(&text, &plan.build_root, started_at)
         } else {
             None
         },
     })
-}
-
-/// `cmake -S <source> -B <build> -DCMAKE_BUILD_TYPE=<Debug|Release> …`.
-///
-/// The build type is not optional: a single-config generator (Makefiles, Ninja — the common case on
-/// macOS) ignores `--config` at build time and defaults to an empty build type, which means no `-g`
-/// and therefore no debug info. A binary without debug info cannot resolve a breakpoint, so the
-/// debugger appears to ignore every dot the user sets.
-pub fn cmake_configure_argv(source_root: &str, build_root: &str, release: bool) -> Vec<String> {
-    vec![
-        CMAKE_PROGRAM.to_string(),
-        "-S".to_string(),
-        source_root.to_string(),
-        "-B".to_string(),
-        build_root.to_string(),
-        format!("-DCMAKE_BUILD_TYPE={}", cmake_config(release)),
-        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON".to_string(),
-    ]
-}
-
-/// `cmake --build <build root> --config <Debug|Release>`.
-pub fn cmake_build_argv(build_root: &str, release: bool) -> Vec<String> {
-    vec![
-        CMAKE_PROGRAM.to_string(),
-        "--build".to_string(),
-        build_root.to_string(),
-        "--config".to_string(),
-        cmake_config(release).to_string(),
-    ]
 }

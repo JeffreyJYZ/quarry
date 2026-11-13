@@ -66,7 +66,7 @@ pub fn build(state: &BuildState, root: &str, release: bool) -> Result<BuildRepor
             require_cargo(info.kind)?;
             run_build(state, &info.build_root, release)
         }
-        ProjectKind::Cmake => run_cmake_build(state, &info.root, &info.build_root, release),
+        ProjectKind::Cmake => run_cmake_build(state, &info.root, release),
         ProjectKind::CompileCommands => run_plain_clang_build(state, &info.root, &info.name),
         ProjectKind::Unknown => run_plain_clang_build(state, &info.root, &info.name),
     }
