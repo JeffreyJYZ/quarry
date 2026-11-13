@@ -9,6 +9,7 @@ use super::*;
 
 #[cfg(test)]
 pub mod tests {
+    use super::support::handoff_for;
     use super::*;
     use std::env;
     use std::process::Command;
@@ -87,7 +88,7 @@ pub mod tests {
             return;
         }
         let fixture = project();
-        let (args, database) = server_args("clangd", &fixture.info(), &[]);
+        let Handoff { args, database, .. } = handoff_for("clangd", &fixture.info(), &[]);
 
         let build = fixture.root().join("build");
         assert_eq!(database, Some(build.clone()));
@@ -149,7 +150,11 @@ pub mod tests {
             .is_some()
         );
 
-        let (args, named) = server_args("clangd", &fixture.info(), &[]);
+        let Handoff {
+            args,
+            database: named,
+            ..
+        } = handoff_for("clangd", &fixture.info(), &[]);
         assert_eq!(
             named,
             Some(build.clone()),

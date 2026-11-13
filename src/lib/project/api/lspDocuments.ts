@@ -6,11 +6,15 @@ export function startLsp(
 	root: string,
 	serverPath = "",
 	serverArgs: string[] = [],
+	profile = "",
 ): Promise<LspStatus> {
 	return invoke<LspStatus>("start_lsp", {
 		root,
 		serverPath: serverPath === "" ? null : serverPath,
 		serverArgs: serverArgs.length === 0 ? null : serverArgs,
+		// The build profile the window has in effect, so the hand-off configures the tree the build
+		// would and clangd analyses the flags the user compiled with.
+		profile: profile === "" ? null : profile,
 	});
 }
 

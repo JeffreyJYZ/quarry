@@ -31,6 +31,9 @@ pub use configure::*;
 mod database;
 pub use database::*;
 
+mod profile;
+pub use profile::*;
+
 mod tests_handoff;
 pub use tests_handoff::*;
 
@@ -42,6 +45,9 @@ pub use tests_plain::*;
 
 mod tests_cache;
 pub use tests_cache::*;
+
+mod tests_profile;
+pub use tests_profile::*;
 
 mod tests_support;
 pub use tests_support::*;

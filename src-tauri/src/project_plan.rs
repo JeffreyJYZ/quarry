@@ -103,6 +103,8 @@ pub struct Handoff {
     pub args: Vec<String>,
     /// The compile-database directory clangd was pointed at, when one was found or configured.
     pub database_dir: Option<String>,
+    /// Why the session had to configure the tree, when it did; a start reports it once.
+    pub note: Option<String>,
 }
 
 /// Ask the product what it would do with `root`, for one profile and one target selection.
@@ -159,13 +161,16 @@ pub fn project_plan(root: &str, request: &PlanRequest) -> Result<Plan, String> {
         .collect();
 
     // rust-analyzer has a manifest and needs no database, so only the C/C++ kinds are handed one.
+    // The profile is the request's own: the plan the probe reads is the one that build would run,
+    // and clangd is pointed at the tree configured with its flags.
     let handoff = match info.kind {
         ProjectKind::Cmake | ProjectKind::CompileCommands | ProjectKind::Unknown => {
-            let (args, database) = crate::lsp::server_args("clangd", &info, &[]);
+            let handoff = crate::lsp::server_args("clangd", &info, &[], request.profile);
             Some(Handoff {
                 server: "clangd".to_string(),
-                args,
-                database_dir: database.map(|dir| dir.display().to_string()),
+                args: handoff.args,
+                database_dir: handoff.database.map(|dir| dir.display().to_string()),
+                note: handoff.note,
             })
         }
         _ => None,

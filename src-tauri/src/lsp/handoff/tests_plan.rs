@@ -9,14 +9,15 @@ use super::*;
 
 #[cfg(test)]
 pub mod tests {
-    use crate::build_task::{CmakeOptions, CmakePlan, cmake_plan};
+    use crate::build_task::{BuildProfile, CmakeOptions, CmakePlan, cmake_plan};
 
     use super::support::*;
     use super::*;
 
     fn plan_for(fixture: &Fixture) -> CmakePlan {
         let root = fixture.root();
-        cmake_plan(&root, false, &CmakeOptions::for_root(&root)).expect("the project's own plan")
+        cmake_plan(&root, BuildProfile::Debug, &CmakeOptions::for_root(&root))
+            .expect("the project's own plan")
     }
 
     #[test]
@@ -25,7 +26,7 @@ pub mod tests {
         let info = fixture.preset_project();
         fixture.write("out/debug/compile_commands.json", "[]");
 
-        let (args, database) = server_args("clangd", &info, &[]);
+        let Handoff { args, database, .. } = handoff_for("clangd", &info, &[]);
 
         let expected = fixture.root().join("out/debug");
         assert_eq!(database, Some(expected.clone()));
@@ -46,7 +47,7 @@ pub mod tests {
         let info = fixture.preset_project();
         let expected = fixture.root().join("out/debug");
 
-        let (args, database) = server_args("clangd", &info, &[]);
+        let Handoff { args, database, .. } = handoff_for("clangd", &info, &[]);
 
         assert!(
             !fixture.root().join("build").exists(),
@@ -93,10 +94,10 @@ pub mod tests {
     }
 
     #[test]
-    fn a_configured_tree_that_is_not_a_preset_keeps_its_build_type() {
+    fn a_tree_configured_for_the_same_profile_keeps_its_build_type() {
         let fixture = Fixture::new("recipe-argv");
         fixture.write("CMakeLists.txt", CMAKE_LISTS);
-        fixture.write("build/CMakeCache.txt", "");
+        fixture.write("build/CMakeCache.txt", "CMAKE_BUILD_TYPE:STRING=Debug\n");
         let plan = plan_for(&fixture);
 
         let flags = configure_argv(&plan);
@@ -109,7 +110,48 @@ pub mod tests {
         );
         assert!(
             !flags.iter().any(|flag| flag.starts_with(BUILD_TYPE_FLAG)),
-            "reconfiguring an existing tree must not flip its build type: {flags:?}"
+            "reconfiguring a tree for the profile it already uses must not touch its build type: {flags:?}"
+        );
+    }
+
+    #[test]
+    fn a_tree_configured_for_another_profile_is_given_the_plans_build_type() {
+        let fixture = Fixture::new("recipe-profile");
+        fixture.write("CMakeLists.txt", CMAKE_LISTS);
+        fixture.write(
+            "build/CMakeCache.txt",
+            "CMAKE_BUILD_TYPE:STRING=RelWithDebInfo\n",
+        );
+        let plan = plan_for(&fixture);
+
+        let flags = configure_argv(&plan);
+
+        assert!(
+            flags.iter().any(|flag| flag == "-DCMAKE_BUILD_TYPE=Debug"),
+            "a tree configured for another profile is a genuine reconfigure: {flags:?}"
+        );
+    }
+
+    #[test]
+    fn a_multi_config_tree_is_never_asked_for_a_build_type() {
+        let fixture = Fixture::new("multi-config-profile");
+        fixture.write("CMakeLists.txt", CMAKE_LISTS);
+        fixture.write(
+            "build/CMakeCache.txt",
+            "CMAKE_GENERATOR:INTERNAL=Ninja Multi-Config\nCMAKE_BUILD_TYPE:STRING=\n",
+        );
+        let plan = plan_for(&fixture);
+
+        assert_eq!(
+            wanted_build_type(&plan),
+            None,
+            "the generator takes it at build time"
+        );
+        assert!(!build_type_changed(&plan));
+        let flags = configure_argv(&plan);
+        assert!(
+            !flags.iter().any(|flag| flag.starts_with(BUILD_TYPE_FLAG)),
+            "{flags:?}"
         );
     }
 

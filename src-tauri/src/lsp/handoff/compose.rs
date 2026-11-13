@@ -2,6 +2,7 @@
 
 pub use std::path::{Path, PathBuf};
 
+pub use crate::build_task::BuildProfile;
 pub(crate) use crate::types::{ProjectInfo, ProjectKind};
 
 use super::*;
@@ -15,20 +16,41 @@ pub const COMPILE_COMMANDS_DIR: &str = "--compile-commands-dir";
 /// clangd's own flag for drivers it may execute to learn the system include paths.
 pub const QUERY_DRIVER: &str = "--query-driver";
 
+/// What the session hands clangd, plus the one line a start may report.
+pub struct Handoff {
+    /// Arguments for the server, the user's own first.
+    pub args: Vec<String>,
+    /// The database clangd was pointed at, which a marker edit reconfigures.
+    pub database: Option<PathBuf>,
+    /// Why the tree had to be configured, when it did.
+    pub note: Option<String>,
+}
+
 /// Arguments for the server about to start, and the database clangd was pointed at.
 ///
 /// rust-analyzer is handed the user's arguments untouched: it has no compile database to read, and
 /// a `--compile-commands-dir` naming a directory it does not have would be a flag it never wanted.
+/// clangd gets the database the build profile's own tree holds, so the analysis it runs uses the
+/// flags that build compiled with.
 pub fn server_args(
     server: &str,
     info: &ProjectInfo,
     user: &[String],
-) -> (Vec<String>, Option<PathBuf>) {
+    profile: BuildProfile,
+) -> Handoff {
     if server != CLANGD {
-        return (user.to_vec(), None);
+        return Handoff {
+            args: user.to_vec(),
+            database: None,
+            note: None,
+        };
     }
-    let database = database_for(info, user);
-    (clangd_args(user, database.as_deref()), database)
+    let found = database_for(info, user, profile);
+    Handoff {
+        args: clangd_args(user, found.dir.as_deref()),
+        database: found.dir,
+        note: found.note,
+    }
 }
 
 /// The user's arguments, then whatever the database adds that they did not already name.

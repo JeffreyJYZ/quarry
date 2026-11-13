@@ -34,9 +34,13 @@ pub async fn lsp_watched_files(
         return Ok(());
     }
     let session = session_for(&state, &root)?;
-    let (server, database) = {
+    let (server, database, profile) = {
         let session = lock(&session);
-        (session.server.clone(), session.database.clone())
+        (
+            session.server.clone(),
+            session.database.clone(),
+            session.profile,
+        )
     };
 
     let mut changes = changes;
@@ -45,7 +49,7 @@ pub async fn lsp_watched_files(
             .iter()
             .any(|change| crate::build_task::is_model_input(Path::new(&change.path)))
         && let Some(project) = project_root(&root)
-        && reconfigure(project, database.clone()).await
+        && reconfigure(project, database.clone(), profile).await
     {
         changes.push(WatchedFileChange {
             path: database
@@ -76,8 +80,8 @@ fn project_root(session_id: &str) -> Option<PathBuf> {
 }
 
 /// Reconfigure on the blocking pool: a configure takes seconds and the async worker must stay free.
-async fn reconfigure(project: PathBuf, database: PathBuf) -> bool {
-    tauri::async_runtime::spawn_blocking(move || refresh(&project, &database))
+async fn reconfigure(project: PathBuf, database: PathBuf, profile: BuildProfile) -> bool {
+    tauri::async_runtime::spawn_blocking(move || refresh(&project, &database, profile))
         .await
         .unwrap_or(false)
 }

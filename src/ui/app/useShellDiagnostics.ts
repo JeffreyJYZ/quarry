@@ -11,6 +11,8 @@ export type ShellDiagnosticsOptions = {
 	activeText: string;
 	report: (message: string) => void;
 	overrides: Partial<Record<ServerKind, { path?: string; args?: string[] }>>;
+	/** The build profile in effect: the CMake hand-off analyses the tree it configures for. */
+	profile: string;
 	runningRef: MutableRefObject<ReadonlySet<ServerKind>>;
 	restartToken: number;
 	onRestarted: (token: number) => void;
@@ -34,6 +36,7 @@ export function useShellDiagnostics(options: ShellDiagnosticsOptions): {
 		activeText: options.activeText,
 		report: options.report,
 		overrides: options.overrides,
+		profile: options.profile,
 		onRestarted: options.onRestarted,
 		runningRef: options.runningRef,
 		restartToken: options.restartToken,

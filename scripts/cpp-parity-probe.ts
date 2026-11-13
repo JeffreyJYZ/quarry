@@ -121,6 +121,8 @@ interface Handoff {
 	server: string;
 	args: string[];
 	databaseDir: string | null;
+	/** Why the start had to configure the tree, when it did. */
+	note: string | null;
 }
 
 /** One probe's answer from one clangd session. */
@@ -480,6 +482,9 @@ function seamFacts(): string[] {
 	if (!database.includes("ensure_database(root, &plan)")) {
 		facts.push("the hand-off no longer takes its database directory from the plan");
 	}
+	if (!database.includes("cmake_database(root, profile)")) {
+		facts.push("the hand-off no longer configures the tree for the build profile");
+	}
 	if (!database.includes("plain_database(root)")) {
 		facts.push("the hand-off no longer synthesises a database for a plain project");
 	}
@@ -491,10 +496,12 @@ function seamFacts(): string[] {
 		facts.push("the plain build no longer writes the database it analyses with");
 	}
 	const session = read("lsp/start_session.rs");
-	if (!session.includes("server_args(server, &info, &overrides.args)")) {
-		facts.push("start_session no longer composes the server arguments with server_args");
+	if (!session.includes("server_args(server, &info, &overrides.args, overrides.profile)")) {
+		facts.push(
+			"start_session no longer composes the server arguments with the profile in effect",
+		);
 	}
-	if (!session.includes("command.args(&args)")) {
+	if (!session.includes("command.args(&handoff.args)")) {
 		facts.push("start_session no longer spawns the server with the composed arguments");
 	}
 	const commands = read("launch/targets/commands.rs");
@@ -568,12 +575,47 @@ function compileArguments(database: string, source: string): string[] | null {
 	return entry.command === undefined ? null : entry.command.split(/\s+/);
 }
 
+/** One profile's expectation: the configuration CMake names, its optimisation and its debug info. */
+interface ProfileHalf {
+	profile: string;
+	configuration: string;
+	optimisation: string;
+	debugInfo: boolean;
+}
+
+/** Whether a compile command carries the optimisation and the debug info a profile promises. */
+function profileFlags(args: string[], half: ProfileHalf): boolean {
+	return args.includes(half.optimisation) && args.includes("-g") === half.debugInfo;
+}
+
+/** The `-O`/`-g` flags in a compile command, as one quoted fragment for a report line. */
+function describeFlags(args: string[] | null): string {
+	if (args === null) return "no compile command";
+	const flags = args.filter((arg) => arg.startsWith("-O") || arg === "-g").join(" ");
+	return flags === "" ? "no -O/-g flags" : JSON.stringify(flags);
+}
+
+/** `CMAKE_BUILD_TYPE` from a tree's own cache, or null when it has no cache to read. */
+function cacheBuildType(tree: string): string | null {
+	const file = join(tree, "CMakeCache.txt");
+	if (!isFile(file)) return null;
+	const line = readFileSync(file, "utf8")
+		.split("\n")
+		.find((row) => row.startsWith("CMAKE_BUILD_TYPE:"));
+	return line === undefined ? "" : (line.split("=")[1] ?? "").trim();
+}
+
 /**
  * One profile row: the plan names it, CMake receives it, and the compile command carries the debug
  * info `RelWithDebInfo` promises while `MinSizeRel` produces none.
  *
  * Both halves run into the same tree, so the second configure is also the proof that a profile
  * change reconfigures the project instead of reusing the previous flags.
+ *
+ * The session is then started the way the window starts it — `quarry-plan --profile` is the seam
+ * `start_lsp` hands the profile through — so the analysis half proves the hand-off reads the tree
+ * the build wrote: its cache keeps the profile's configuration, its database carries the profile's
+ * own optimization and debug info, and switching the profile back reconfigures once and says so.
  */
 async function judgeProfile(
 	fixture: Fixture,
@@ -586,7 +628,7 @@ async function judgeProfile(
 	const row: Row = {
 		capability: fixture.name,
 		build: "FAIL",
-		analysis: "n/a",
+		analysis: "FAIL",
 		targets: "n/a",
 		tree: "PASS",
 		details: [],
@@ -595,9 +637,21 @@ async function judgeProfile(
 	const findings: string[] = [];
 	let broken = false;
 	let passed = true;
+	let analysed = true;
+	let buildRoot: string | null = null;
 	const halves = [
-		{ profile: "relwithdebinfo", configuration: "RelWithDebInfo", debugInfo: true },
-		{ profile: "minsizerel", configuration: "MinSizeRel", debugInfo: false },
+		{
+			profile: "relwithdebinfo",
+			configuration: "RelWithDebInfo",
+			optimisation: "-O2",
+			debugInfo: true,
+		},
+		{
+			profile: "minsizerel",
+			configuration: "MinSizeRel",
+			optimisation: "-Os",
+			debugInfo: false,
+		},
 	];
 	for (const half of halves) {
 		let plan: Plan;
@@ -618,6 +672,7 @@ async function judgeProfile(
 			row.details.push(`fixture FAIL  ${half.profile}: the product reports no CMake plan`);
 			break;
 		}
+		buildRoot = section.buildRoot;
 		const wanted = `-DCMAKE_BUILD_TYPE=${half.configuration}`;
 		const named =
 			section.configure.includes(wanted) && section.build.includes(half.configuration);
@@ -645,19 +700,96 @@ async function judgeProfile(
 			);
 			break;
 		}
-		const hasDebug = args.includes("-g");
-		const flags = args.filter((arg) => arg.startsWith("-O") || arg === "-g").join(" ");
+		const carries = profileFlags(args, half);
 		row.details.push(
-			`profile      ${hasDebug === half.debugInfo ? "PASS" : "FAIL"}  ${half.profile}: the compile command carries ${JSON.stringify(flags)}, ${hasDebug ? "with" : "without"} -g`,
+			`profile      ${carries ? "PASS" : "FAIL"}  ${half.profile}: the compile command carries ${describeFlags(args)}, ${half.debugInfo ? "with" : "without"} -g`,
 		);
-		if (hasDebug !== half.debugInfo) {
+		if (!carries) {
 			passed = false;
 			findings.push(
-				`${directory}: ${half.configuration} ${half.debugInfo ? "must" : "must not"} produce debug info, but the compile command ${half.debugInfo ? "has no" : "has"} -g — \`cd ${directory} && rg -- -g ${relative(root, database)}\` shows ${JSON.stringify(flags)}.`,
+				`${directory}: ${half.configuration} must compile with ${half.optimisation} and ${half.debugInfo ? "with" : "without"} -g, but the compile command carries ${describeFlags(args)} — \`cd ${directory} && rg -- ${half.optimisation} ${relative(root, database)}\`.`,
+			);
+		}
+
+		// The session start for this profile: the hand-off must read the tree the build wrote, and
+		// that tree must still describe the profile this build compiled with.
+		const opened = await askPlan(plannerBin, root, { profile: half.profile });
+		const tree = opened.handoff?.databaseDir ?? null;
+		const openArgs =
+			tree === null
+				? null
+				: compileArguments(join(tree, "compile_commands.json"), "main.cpp");
+		const configured = tree === null ? null : cacheBuildType(tree);
+		const followed =
+			tree === section.buildRoot &&
+			configured === half.configuration &&
+			openArgs !== null &&
+			profileFlags(openArgs, half);
+		row.commands.push({
+			line: `cd ${directory} && quarry-plan . --profile ${half.profile}`,
+			verdict: followed ? "PASS" : "FAIL",
+		});
+		row.details.push(
+			`analysis     ${followed ? "PASS" : "FAIL"}  ${half.profile}: the hand-off names ${tree === null ? "no database" : relative(root, tree)} configured for ${configured ?? "nothing"} and carries ${describeFlags(openArgs)}`,
+		);
+		if (!followed) {
+			analysed = false;
+			findings.push(
+				`${directory}: a ${half.profile} session must analyse the tree the ${half.configuration} build wrote, but \`cd ${directory} && quarry-plan . --profile ${half.profile}\` names ${tree === null ? "no compile database" : relative(root, tree)}, whose CMAKE_BUILD_TYPE is ${configured ?? "unset"} and whose main.cpp entry carries ${describeFlags(openArgs)}.`,
+			);
+		}
+	}
+
+	// Switching the profile in settings must make the next session follow it: the loop leaves the
+	// tree as MinSizeRel, so a RelWithDebInfo start is a genuine reconfigure — once, and said once.
+	if (!broken && buildRoot !== null) {
+		const cache = join(buildRoot, "CMakeCache.txt");
+		const switched = await askPlan(plannerBin, root, { profile: "relwithdebinfo" });
+		const tree = switched.handoff?.databaseDir ?? null;
+		const switchedArgs =
+			tree === null
+				? null
+				: compileArguments(join(tree, "compile_commands.json"), "main.cpp");
+		const switchedType = tree === null ? null : cacheBuildType(tree);
+		const followed =
+			switchedType === "RelWithDebInfo" &&
+			switchedArgs !== null &&
+			profileFlags(switchedArgs, {
+				profile: "relwithdebinfo",
+				configuration: "RelWithDebInfo",
+				optimisation: "-O2",
+				debugInfo: true,
+			}) &&
+			(switched.handoff?.note ?? "") !== "";
+		row.commands.push({
+			line: `cd ${directory} && quarry-plan . --profile relwithdebinfo`,
+			verdict: followed ? "PASS" : "FAIL",
+		});
+		row.details.push(
+			`analysis     ${followed ? "PASS" : "FAIL"}  switching to relwithdebinfo: the tree is ${switchedType ?? "unconfigured"}, the database carries ${describeFlags(switchedArgs)}, and the start ${switched.handoff?.note ? `says ${JSON.stringify(switched.handoff.note)}` : "says nothing"}`,
+		);
+		if (!followed) {
+			analysed = false;
+			findings.push(
+				`${directory}: switching the profile to relwithdebinfo must reconfigure the tree it analyses and report that once, but \`cd ${directory} && quarry-plan . --profile relwithdebinfo\` leaves ${relative(root, cache)} at ${switchedType ?? "unset"}, names a database carrying ${describeFlags(switchedArgs)}, and ${switched.handoff?.note ? "noted it" : "said nothing"}.`,
+			);
+		}
+
+		const stable = statSync(cache).mtimeMs;
+		const settled = await askPlan(plannerBin, root, { profile: "relwithdebinfo" });
+		const quiet = (settled.handoff?.note ?? "") === "" && statSync(cache).mtimeMs === stable;
+		row.details.push(
+			`analysis     ${quiet ? "PASS" : "FAIL"}  a second start with the same profile ${quiet ? "does not configure again" : "reconfigured the tree again"}`,
+		);
+		if (!quiet) {
+			analysed = false;
+			findings.push(
+				`${directory}: a second start with the profile unchanged must not configure again, but ${relative(root, cache)} changed or the start reported a reconfigure.`,
 			);
 		}
 	}
 	row.build = passed ? "PASS" : "FAIL";
+	row.analysis = analysed ? "PASS" : "FAIL";
 	return { row, findings, broken };
 }
 

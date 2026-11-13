@@ -26,7 +26,7 @@ pub mod tests {
         fixture.write("lib/greet.cpp", "#include \"greet.h\"\n");
         let info = fixture.plain_project();
 
-        let (args, database) = server_args("clangd", &info, &[]);
+        let Handoff { args, database, .. } = handoff_for("clangd", &info, &[]);
 
         let expected = build_directory(&fixture);
         assert_eq!(database, Some(expected.clone()));
@@ -67,7 +67,7 @@ pub mod tests {
         fixture.write("compile_flags.txt", "-std=c++23\n");
         let info = fixture.plain_info();
 
-        let (args, database) = server_args("clangd", &info, &[]);
+        let Handoff { args, database, .. } = handoff_for("clangd", &info, &[]);
 
         assert_eq!(database, None, "the user's own file is what clangd reads");
         assert!(!build_directory(&fixture).exists());
@@ -84,7 +84,7 @@ pub mod tests {
         fixture.write("build/compile_commands.json", "[]");
         let info = fixture.plain_info();
 
-        let (_, database) = server_args("clangd", &info, &[]);
+        let Handoff { database, .. } = handoff_for("clangd", &info, &[]);
 
         assert_eq!(database, Some(fixture.root().join("build")));
         assert!(
@@ -98,7 +98,7 @@ pub mod tests {
         let fixture = Fixture::new("plain-empty");
         let info = fixture.plain_info();
 
-        let (args, database) = server_args("clangd", &info, &[]);
+        let Handoff { args, database, .. } = handoff_for("clangd", &info, &[]);
 
         assert_eq!(database, None);
         assert!(args.is_empty(), "{args:?}");
@@ -111,7 +111,7 @@ pub mod tests {
         let info = fixture.plain_project();
         let user = vec![format!("{COMPILE_COMMANDS_DIR}=/elsewhere")];
 
-        let (args, database) = server_args("clangd", &info, &user);
+        let Handoff { args, database, .. } = handoff_for("clangd", &info, &user);
 
         assert_eq!(database, None);
         assert_eq!(
