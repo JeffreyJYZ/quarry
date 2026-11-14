@@ -109,10 +109,11 @@ describe("cppEditing reproduction", () => {
 		}
 	});
 
-	test("a stale search match reproduces the overlay's exact message", () => {
-		// useEditorSearch.step() re-dispatches matchesRef.current, the React copy, which keeps the
-		// positions an earlier document had. An effect-only transaction is not validated, so the next
-		// change maps those positions through a shorter changeset and throws the screenshot's message.
+	test("a stale search match is dropped instead of throwing on the next keystroke", () => {
+		// This is the shape that produced the screenshot's message: `step()` re-dispatches
+		// `matchesRef.current`, the React copy, which keeps the positions an earlier document had.
+		// The field now refuses a match past the live document, so the stale list degrades to nothing
+		// and the next keystroke is an ordinary edit.
 		const longer = "class A {\n".padEnd(62, "a");
 		const state = EditorState.create({ doc: longer, extensions: [searchField] });
 		const matched = state.update({
@@ -124,8 +125,7 @@ describe("cppEditing reproduction", () => {
 		const stale = shorter.update({
 			effects: setSearchMatches.of({ matches: [{ from: 61, to: 62 }], active: 0 }),
 		}).state;
-		expect(() => stale.update({ changes: { from: 0, insert: "x" } }).state).toThrow(
-			"Position 61 is out of range for changeset of length 52",
-		);
+		expect(() => stale.update({ changes: { from: 0, insert: "x" } }).state).not.toThrow();
+		expect(stale.update({ changes: { from: 0, insert: "x" } }).state.doc.length).toBe(53);
 	});
 });
