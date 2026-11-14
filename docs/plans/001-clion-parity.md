@@ -138,29 +138,32 @@ row that cannot run there says why instead of passing.
 Two more rows run in the same `windows` job, from their own scripts, because they measure the app's
 other seams rather than the compiler's:
 
-| capability  | script                            | what it proves                                                                                                                                                                                                                                         |
-| ----------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| test-runner | `scripts/parity-windows-tests.ts` | GoogleTest cases are discovered from `<program> --gtest_list_tests` under a 20 s kill and one runs through `--gtest_filter=Suite.Case` without its sibling's output; Cargo discovery labels the integration test with the file it lives in and runs it |
-| debugger    | `scripts/parity-windows-debug.ts` | a Debug build from the Visual Studio generator launches through the image's `lldb-dap`, a breakpoint verifies at the statement, the stopped frame names that line, `evaluate` reads a local before and after a step, and continue exits                |
+| capability  | script                            | what it proves                                                                                                                                                                                                                                                                             |
+| ----------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| test-runner | `scripts/parity-windows-tests.ts` | GoogleTest cases are discovered from `<program> --gtest_list_tests` under a 20 s kill and one runs through `--gtest_filter=Suite.Case` without its sibling's output; Cargo discovery labels the integration test with the file it lives in and runs it                                     |
+| debugger    | `scripts/parity-windows-debug.ts` | a Debug build from the discovered Visual Studio generator — or the generator `PARITY_DEBUG_GENERATOR` names — launches through `lldb-dap`, a breakpoint verifies at the statement, the stopped frame names that line, `evaluate` reads a local before and after a step, and continue exits |
 
-Neither hardcodes what the image ships: the generator is discovered with `cmake --help` plus a real
-configure per candidate, and `lldb-dap` is looked for on `PATH`, in `%ProgramFiles%\LLVM\bin` and in
-each `…\Microsoft Visual Studio\<year>\<edition>\VC\Tools\Llvm\<arch>\bin` directory read off disk —
-which is also what the product's own resolver now does, so an install that only ships LLVM inside
-Visual Studio is not invisible to the app. The row then launches each candidate before using it and
-takes the first that starts, printing every rejected one with its exit status, its own stderr and the
-DLLs beside it: a binary can be found and still die while it loads, and that is what the first
-adapter launch on the image did.
+On Windows neither hardcodes what the image ships: the generator is discovered with `cmake --help`
+plus a real configure per candidate, and `lldb-dap` is looked for on `PATH`, in `%ProgramFiles%\LLVM\bin`
+and in each `…\Microsoft Visual Studio\<year>\<edition>\VC\Tools\Llvm\<arch>\bin` directory read off
+disk — which is also what the product's own resolver now does, so an install that only ships LLVM
+inside Visual Studio is not invisible to the app. The row then launches each candidate before using it
+and takes the first that starts, printing every rejected one with its exit status, its own stderr and
+the DLLs beside it: a binary can be found and still die while it loads, and that is what the first
+adapter launch on the image did. A machine that is not Windows supplies those two facts instead, with
+`PARITY_DEBUG_GENERATOR` and `PARITY_DEBUG_ADAPTER`, and nothing else about the row changes.
 
 Not verified here, and therefore not claimed: cross-compilers other than the one toolchain file above,
 and diagnostics parity beyond clangd's own output. The MSVC control run is reported as evidence rather
 than required — when clangd answers without `--query-driver`, the row says so. Both non-compiler rows
-run in the same job and their verdicts are the job's own output: the test-runner row has passed there,
-and the debugger row has no verdict: every run so far died before its first assertion, in the probe's
-own fixture writer, at adapter startup, in the probe's own `uv_spawn`, and then in the adapter probe
-itself.
+run in the same job and their verdicts are the job's own output: the test-runner row has passed there.
 
-That last one is measured now, and it is an image fact, not a quarry defect. On `windows-latest` the
+The debugger row is measured **two ways, and the two are not interchangeable**: on `windows-latest` it
+records that the image's adapters refuse to start, and on a developer machine it measures quarry's
+request sequence. The earlier runs of the row died in its own code — the fixture writer, adapter
+startup, `uv_spawn`, the adapter probe — so those were fixed before either measurement existed.
+
+The Windows half is an image fact, not a quarry defect. On `windows-latest` the
 row finds seven adapters — `PATH`, `%ProgramFiles%\LLVM\bin`, `%ProgramW6432%`, `%ProgramFiles(x86)%`,
 and Visual Studio's `LLVM\x64` and `LLVM\ARM64` (the ARM64 copy is a wrong-architecture file for an
 x64 host and is expected to be refused) — and **none of them starts**: `--version` exits `53 (0x35)`
@@ -172,12 +175,31 @@ returned. An adapter that ends before answering `initialize` never started, so t
 later step is still a `FAIL`, because from that point it is quarry's request sequence being measured.
 The row also prefers the route that answered, so a session is never started differently from the probe.
 
-**Windows debugger parity is therefore unmeasurable on that image, not failing.** The same row passes
-in full against a local `lldb-dap` — six assertions, adapter exit `0 (0x0)` — so the request sequence,
-the breakpoint, the frame, both `evaluate`s, the step and the exit are measured; what is unmeasured is
-that image's own `lldb-dap`. Nothing in the product changed for this: its launch path still spawns the
-adapter once, still reports the adapter's stderr and exit status when it dies, and still fails a launch
-the user asked for — the skip is the row's, because a measurement that cannot run is not a defect.
+**On `windows-latest` the debugger sequence is therefore unmeasurable, not failing.** That row records
+that the image's own adapters refuse to start; it does not measure the sequence there.
+
+The sequence itself is measured on a developer machine, by the same script, with the two machine facts
+named instead of discovered:
+
+```sh
+PARITY_DEBUG_GENERATOR="Ninja Multi-Config" bun scripts/parity-windows-debug.ts
+```
+
+`PARITY_DEBUG_GENERATOR` is the CMake generator to configure with (`Xcode` and `Ninja Multi-Config` both
+work, and both really write the artefact to `build/Debug/parity_windows_debug` — the platform's
+executable suffix, so no `.exe` outside Windows). `PARITY_DEBUG_ADAPTER` names the adapter and defaults
+to `PATH`, then to `xcrun --find lldb-dap` on macOS, which is the only place Xcode installs it. Nothing
+else changes: the fixture, the breakpoint, the frame, both `evaluate`s, the step, the continue and the
+`AdapterGone` skip are the same requests and the same assertions. Run on 2026-11-14 against Xcode's
+`lldb-dap` (`LLVM 21.0.0`), it printed the probe lines, `starts (direct)`, six assertion lines and
+`verdict PASS (6 assertions)`, with the adapter exiting `0 (0x0)`; two runs agreed. Without the
+variable the row still SKIPs on macOS, by name, which is the CI behaviour for that platform.
+
+So the request sequence, the breakpoint, the frame, both `evaluate`s, the step and the exit are
+measured here, and what stays unmeasured is that image's own `lldb-dap`. Nothing in the product changed
+for this: its launch path still spawns the adapter once, still reports the adapter's stderr and exit
+status when it dies, and still fails a launch the user asked for — the skip is the row's, because a
+measurement that cannot run is not a defect.
 
 Both Windows rows analyse the configuration they built: the synthesised database holds one entry per
 source for that configuration, and the rows hover the define each configuration compiles with, so a

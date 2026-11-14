@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
- * The project the Windows debugger row debugs: two translation units, linked, built by the Visual
- * Studio generator in `Debug`.
+ * The project the Windows debugger row debugs: two translation units, linked, built by a
+ * multi-config generator in `Debug`.
  *
  * Two files rather than one on purpose. A single-file program cannot show that a stopped frame
  * names the source it came from, and the product's whole C/C++ path is a library plus an app that
@@ -12,11 +12,16 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-/** The target's name, which the generator writes as `build/Debug/<name>.exe`. */
+/** The target's name, which a multi-config generator writes as `build/<Config>/<name><suffix>`. */
 export const TARGET = "parity_windows_debug";
 
 /** The configuration the row builds: debug info, no optimisation, which is what a debugger needs. */
 export const CONFIGURATION = "Debug";
+
+/** What an executable is called on a platform: `.exe` on Windows, nothing anywhere else. */
+export function exeSuffix(platform: string = process.platform): string {
+	return platform === "win32" ? ".exe" : "";
+}
 
 /** The shared header, so the app calls the library's function rather than copying it. */
 export const HEADER = `#pragma once
@@ -118,8 +123,15 @@ function listing(directory: string, label: string): string {
 	}
 }
 
-/** The binary the generator writes for this target, named the way Windows names an executable. */
+/**
+ * The binary the generator writes for this target.
+ *
+ * Every multi-config generator this row accepts — Visual Studio, `Xcode`, `Ninja Multi-Config` —
+ * appends the configuration to the output directory, so the artefact is `build/<Config>/<name>` and
+ * only the platform's executable suffix differs. That is the layout CMake really produces; the
+ * fixture does not redirect it, because a row that asserted a hand-picked output directory would
+ * measure the fixture's CMakeLists instead of the generator's behaviour.
+ */
 export function programPath(build: string, platform: string = process.platform): string {
-	const suffix = platform === "win32" ? ".exe" : "";
-	return join(build, CONFIGURATION, `${TARGET}${suffix}`);
+	return join(build, CONFIGURATION, `${TARGET}${exeSuffix(platform)}`);
 }
