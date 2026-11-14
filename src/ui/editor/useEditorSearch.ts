@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
-import { emptySearchState, setSearchMatches, type SearchMatch } from "@/lib/editor/search";
+import {
+	collectMatches,
+	emptySearchState,
+	setSearchMatches,
+	type SearchMatch,
+} from "@/lib/editor/search";
 import { replacementChanges } from "@/lib/search/replace";
 
 /** In-file search and replace: matches are pushed into the search field as a decoration set. */
@@ -30,53 +35,36 @@ export function useEditorSearch(viewRef: { current: EditorView | null }) {
 	const activeRef = useRef(active);
 	activeRef.current = active;
 
+	/** Matches measured on `text` now: a list from before an edit describes another document. */
+	const findMatches = (text: string) =>
+		collectMatches(text, queryRef.current, {
+			caseSensitive: caseRef.current,
+			regex: regexRef.current,
+		});
+
 	const recompute = () => {
 		const view = viewRef.current;
 		if (view === null) return;
-		const q = queryRef.current;
-		if (!searchOpenRef.current || q === "") {
+		if (!searchOpenRef.current || queryRef.current === "") {
 			setMatches([]);
 			setActive(0);
 			setError(null);
 			view.dispatch({ effects: setSearchMatches.of(emptySearchState) });
 			return;
 		}
-		let source = q;
-		if (!regexRef.current) source = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-		let re: RegExp;
-		try {
-			re = new RegExp(source, caseRef.current ? "g" : "gi");
-		} catch {
+		const found = findMatches(view.state.doc.toString());
+		if (found === null) {
 			setMatches([]);
 			setActive(0);
-			setError(`invalid regular expression: ${q}`);
+			setError(`invalid regular expression: ${queryRef.current}`);
 			view.dispatch({ effects: setSearchMatches.of(emptySearchState) });
 			return;
 		}
 		setError(null);
-		const text = view.state.doc.toString();
-		const found: SearchMatch[] = [];
-		re.lastIndex = 0;
-		let match: RegExpExecArray | null = re.exec(text);
-		while (match !== null) {
-			if (match[0].length === 0) {
-				re.lastIndex += 1;
-				match = re.exec(text);
-				continue;
-			}
-			found.push({ from: match.index, to: match.index + match[0].length });
-			if (found.length > 10000) break;
-			match = re.exec(text);
-		}
 		setMatches(found);
 		const nextActive = found.length > 0 ? 0 : -1;
 		setActive(Math.max(nextActive, 0));
-		view.dispatch({
-			effects: setSearchMatches.of({
-				matches: found,
-				active: nextActive >= 0 ? nextActive : -1,
-			}),
-		});
+		view.dispatch({ effects: setSearchMatches.of({ matches: found, active: nextActive }) });
 		if (found.length > 0) {
 			const first = found[0];
 			view.dispatch({ selection: { anchor: first.from, head: first.to } });
@@ -103,13 +91,18 @@ export function useEditorSearch(viewRef: { current: EditorView | null }) {
 	};
 
 	const step = (delta: number) => {
-		const current = matchesRef.current;
-		if (current.length === 0) return;
+		const view = viewRef.current;
+		if (view === null) return;
+		const current = findMatches(view.state.doc.toString()) ?? [];
+		if (current.length === 0) {
+			// Republish empty rather than select a match that belonged to a longer document.
+			recompute();
+			return;
+		}
 		const next = (activeRef.current + delta + current.length) % current.length;
 		setActive(next);
 		activeRef.current = next;
-		const view = viewRef.current;
-		if (view === null) return;
+		setMatches(current);
 		view.dispatch({ effects: setSearchMatches.of({ matches: current, active: next }) });
 		const m = current[next];
 		view.dispatch({ selection: { anchor: m.from, head: m.to } });
@@ -117,9 +110,13 @@ export function useEditorSearch(viewRef: { current: EditorView | null }) {
 
 	const replaceOne = () => {
 		const view = viewRef.current;
-		const current = matchesRef.current;
-		if (view === null || current.length === 0) return;
+		if (view === null) return;
+		const current = findMatches(view.state.doc.toString()) ?? [];
 		const m = current[activeRef.current];
+		if (m === undefined) {
+			recompute();
+			return;
+		}
 		view.dispatch({ changes: { from: m.from, to: m.to, insert: replacementRef.current } });
 	};
 

@@ -119,7 +119,7 @@ const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 	const occurrenceHistoryRef = useRef<EditorSelection[]>([]);
 
 	const runFormatText = useFormatDocument({ viewRef, rootRef, pathRef, onNotice: onNoticeRef });
-	useEditorHandle({ ref, viewRef, latestRef, runFormatText });
+	useEditorHandle({ ref, viewRef, latestRef, runFormatText, onNotice: onNoticeRef });
 	const menu = useEditorContextMenu({
 		viewRef,
 		path,

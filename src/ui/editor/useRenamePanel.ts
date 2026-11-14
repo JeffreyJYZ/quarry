@@ -36,6 +36,9 @@ export function useRenamePanel(options: {
 		setRenameOpen(false);
 		if (name === "") return;
 		const { line, character } = toLspPosition(view, view.state.selection.main.head);
+		// The rename is computed against this document. If it came back after an edit, the ranges
+		// describe text that is no longer there.
+		const requested = view.state.doc;
 		void (async () => {
 			let result: FileEdit[] = [];
 			try {
@@ -51,6 +54,13 @@ export function useRenamePanel(options: {
 			}
 			if (result.length === 0) {
 				onNotice.current?.("Rename unavailable here");
+				return;
+			}
+			const live = viewRef.current;
+			if (live === null || live.state.doc !== requested) {
+				onNotice.current?.(
+					"The document changed while the rename was computed; nothing was applied.",
+				);
 				return;
 			}
 			onApplyEdits.current?.(result);
