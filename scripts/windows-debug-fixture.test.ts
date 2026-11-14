@@ -10,7 +10,8 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import type { DapClient } from "./windows-debug-dap-client";
-import { Checks, integerValue } from "./windows-debug-dap-session";
+import { Checks } from "./windows-debug-checks";
+import { integerValue } from "./windows-debug-dap-session";
 import {
 	BREAKPOINT_NEEDLE,
 	CONFIGURATION,
@@ -70,6 +71,14 @@ describe("what a failing assertion prints", () => {
 		checks.add("stopped frame is app/main.cpp:7", true, "", 0, 1);
 		expect(checks.hadFailure).toBe(false);
 		expect(checks.count).toBe(1);
+		expect(checks.failures(client)).toEqual([]);
+	});
+
+	test("an evidence note is printed without deciding the run", () => {
+		const checks = new Checks();
+		checks.note("the verbatim spelling the project tree carries", "the adapter refused it");
+		expect(checks.count).toBe(0);
+		expect(checks.hadFailure).toBe(false);
 		expect(checks.failures(client)).toEqual([]);
 	});
 });
