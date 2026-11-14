@@ -147,15 +147,19 @@ Neither hardcodes what the image ships: the generator is discovered with `cmake 
 configure per candidate, and `lldb-dap` is looked for on `PATH`, in `%ProgramFiles%\LLVM\bin` and in
 each `…\Microsoft Visual Studio\<year>\<edition>\VC\Tools\Llvm\<arch>\bin` directory read off disk —
 which is also what the product's own resolver now does, so an install that only ships LLVM inside
-Visual Studio is not invisible to the app.
+Visual Studio is not invisible to the app. The row then launches each candidate before using it and
+takes the first that starts, printing every rejected one with its exit status, its own stderr and the
+DLLs beside it: a binary can be found and still die while it loads, and that is what the first
+adapter launch on the image did.
 
 Not verified here, and therefore not claimed: cross-compilers other than the one toolchain file above,
 and diagnostics parity beyond clangd's own output. The MSVC control run is reported as evidence rather
 than required — when clangd answers without `--query-driver`, the row says so. Both non-compiler rows
 run in the same job and their verdicts are the job's own output: the test-runner row has passed there,
-and the debugger row has no verdict yet — its first run died inside the probe's own fixture writer,
-before it reached an assertion, so nothing below the fixture has been measured. A row that skips
-(no GCC on the machine, no Visual Studio toolset, no lldb-dap) is a skip, never a pass.
+and the debugger row has no verdict yet — its two runs died before the first assertion, first in the
+probe's own fixture writer and then at adapter startup, so what it measures below the adapter is
+unverified on the image even though that same sequence passes against a local `lldb-dap`. A row that
+skips (no GCC on the machine, no Visual Studio toolset, no lldb-dap) is a skip, never a pass.
 
 Both Windows rows analyse the configuration they built: the synthesised database holds one entry per
 source for that configuration, and the rows hover the define each configuration compiles with, so a

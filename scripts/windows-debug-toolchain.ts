@@ -1,15 +1,13 @@
 #!/usr/bin/env bun
 /**
- * What a Windows debugger row needs before it speaks DAP: the adapter the image installed, a process
- * runner, and the path comparison a Windows runner needs.
+ * What a Windows debugger row needs before it speaks DAP: a process runner, the skip reasons, and
+ * the path comparisons a Windows runner needs.
  *
- * `lldb-dap` is not one install. LLVM ships `lldb-dap.exe` in its `bin`, and Visual Studio ships the
- * same tool inside `VC\Tools\Llvm\<arch>\bin`; neither is guaranteed on `PATH` for a GUI launch, and
- * a name without `.exe` names nothing at all there. So the search walks `PATH` first — the same
- * order the product's resolver uses — and then the directories an installer writes into.
+ * Finding the adapter is its own module (`windows-debug-adapter.ts`), because finding one and
+ * starting one are different questions: this file only has to run a command and compare paths.
  */
 
-import { existsSync, readdirSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { RunResult } from "./cpp-parity/types";
 import { NO_TOOLSET, NO_VS } from "./cpp-parity/windows";
@@ -42,11 +40,6 @@ export function skipReason(input: SkipInput): string | null {
 	return null;
 }
 
-/** The file names an adapter may carry on this platform; `.exe` is the whole difference. */
-export function adapterNames(platform: string = process.platform): string[] {
-	return platform === "win32" ? ["lldb-dap.exe"] : ["lldb-dap"];
-}
-
 /** The entries of the `PATH` a child would inherit, split the way the platform splits it. */
 export function pathEntries(
 	environment: Record<string, string | undefined>,
@@ -55,21 +48,6 @@ export function pathEntries(
 	const value = environment.PATH ?? environment.Path ?? "";
 	const separator = platform === "win32" ? ";" : ":";
 	return value.split(separator).filter((entry) => entry !== "");
-}
-
-/** Every directory `lldb-dap` ships in under a Windows program-files root. */
-export function adapterDirectories(
-	environment: Record<string, string | undefined>,
-	platform: string = process.platform,
-): string[] {
-	if (platform !== "win32") return [];
-	const directories: string[] = [];
-	for (const root of [environment.ProgramFiles, environment["ProgramFiles(x86)"]]) {
-		if (root === undefined || root === "") continue;
-		directories.push(join(root, "LLVM", "bin"));
-		directories.push(...visualStudioLlvmBins(root));
-	}
-	return directories;
 }
 
 /**
@@ -101,25 +79,6 @@ function subdirectories(directory: string): string[] {
 	} catch {
 		return [];
 	}
-}
-
-/** The first `lldb-dap` this machine has, searched the way the product searches for one. */
-export function findAdapter(
-	environment: Record<string, string | undefined>,
-	platform: string = process.platform,
-	isFile: (path: string) => boolean = existsSync,
-): string | null {
-	const directories = [
-		...pathEntries(environment, platform),
-		...adapterDirectories(environment, platform),
-	];
-	for (const directory of directories) {
-		for (const name of adapterNames(platform)) {
-			const candidate = join(directory, name);
-			if (isFile(candidate)) return candidate;
-		}
-	}
-	return null;
 }
 
 /** One path as DAP will compare it: no verbatim prefix, forward slashes, no case difference. */

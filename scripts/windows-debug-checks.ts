@@ -3,12 +3,13 @@
  * The record of what a row asserted, and what it prints when one of them failed.
  *
  * Each assertion is printed as it is decided and keeps the window of the conversation it was judged
- * on, so the failure block can quote the exact request and response — a Windows runner cannot be
- * replayed by hand, so the log is the only evidence there is. Evidence that does not decide the run
- * goes through [`Checks::note`] and never fails it.
+ * on, so the failure block can quote the exact request and response. The block also carries how the
+ * adapter was spawned and how it ended: a startup death has no exchange to quote, and those two
+ * facts are then the whole evidence. Evidence that decides nothing goes through [`Checks.note`].
  */
 
-import type { DapClient } from "./windows-debug-dap-client";
+import type { SessionTrace } from "./windows-debug-dap-report";
+import { stderrBlock, report, contextBlock } from "./windows-debug-dap-report";
 
 /** One assertion's verdict, and the window of the conversation it is judged on. */
 export interface Check {
@@ -47,17 +48,16 @@ export class Checks {
 		return this.items.length;
 	}
 
-	/** The exact request/response pair behind every failure, then whatever the adapter said. */
-	failures(client: DapClient): string[] {
+	/** The exact request/response pair behind every failure, then the process and its words. */
+	failures(trace: SessionTrace): string[] {
 		const failures = this.items.filter((entry) => !entry.ok);
 		if (failures.length === 0) return [];
 		const lines: string[] = [];
 		for (const item of failures) {
 			lines.push(`--- ${item.label} (${item.detail}) ---`);
-			lines.push(...client.report(item.from, item.to));
+			lines.push(...report(trace, item.from, item.to));
 		}
-		const stderr = client.stderrLines().filter((line) => line.trim() !== "");
-		if (stderr.length > 0) lines.push("--- lldb-dap stderr ---", ...stderr);
+		lines.push(...contextBlock(trace), ...stderrBlock(trace));
 		return lines;
 	}
 }

@@ -33,4 +33,33 @@ impl ProcessPipe {
             thread::sleep(EXIT_POLL_INTERVAL);
         }
     }
+
+    /// Wait up to `timeout` for the child to exit on its own, reaping it, and answer its status.
+    ///
+    /// [`wait_exit`] throws the status away, which is enough for a shutdown and not enough for a
+    /// startup death: an adapter that ends before its first answer is only diagnosable with the code
+    /// it left. `None` means it is still running, or that the status could not be read.
+    pub fn exit_code(&mut self, timeout: Duration) -> Option<i32> {
+        if self.finished {
+            return None;
+        }
+        let deadline = Instant::now() + timeout;
+        loop {
+            match self.child.try_wait() {
+                Ok(Some(status)) => {
+                    self.finished = true;
+                    return status.code();
+                }
+                Ok(None) => {}
+                Err(_) => {
+                    self.finished = true;
+                    return None;
+                }
+            }
+            if Instant::now() >= deadline {
+                return None;
+            }
+            thread::sleep(EXIT_POLL_INTERVAL);
+        }
+    }
 }

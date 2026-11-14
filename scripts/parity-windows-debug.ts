@@ -30,6 +30,7 @@ import {
 } from "./cpp-parity/windows";
 import { assertDebugSession } from "./windows-debug-assertions";
 import { DapClient } from "./windows-debug-dap-client";
+import { disconnect } from "./windows-debug-dap-session";
 import {
 	BREAKPOINT_NEEDLE,
 	CONFIGURATION,
@@ -39,7 +40,13 @@ import {
 	programPath,
 	writeFixture,
 } from "./windows-debug-fixture";
-import { findAdapter, run, skipReason } from "./windows-debug-toolchain";
+import {
+	adapterCandidates,
+	chooseAdapter,
+	describeExit,
+	describeProbe,
+} from "./windows-debug-adapter";
+import { run, skipReason } from "./windows-debug-toolchain";
 
 /** The prefix every line of the row carries, so a CI log can be grepped for its verdict. */
 const LOG = "parity-windows-debug";
@@ -48,10 +55,10 @@ async function main(): Promise<number> {
 	const cmake = Bun.which("cmake");
 	const help = cmake === null ? "" : (await run(cmake, ["--help"], process.cwd())).stdout;
 	const generators = vsGenerators(help);
-	const adapter = findAdapter(process.env);
+	const candidates = adapterCandidates(process.env);
 	const scratch = mkdtempSync(join(tmpdir(), "quarry-win-debug-"));
 
-	const canProbe = cmake !== null && generators.length > 0 && adapter !== null;
+	const canProbe = cmake !== null && generators.length > 0 && candidates.length > 0;
 	const detection = canProbe
 		? await detectVsGenerator(generators, join(scratch, "generators"), cmake, run)
 		: { generator: null, attempts: [] as string[] };
@@ -60,7 +67,7 @@ async function main(): Promise<number> {
 		cmake: cmake !== null,
 		generators,
 		configured: detection.generator,
-		adapter,
+		adapter: candidates[0]?.path ?? null,
 	});
 	if (skip !== null) {
 		for (const attempt of detection.attempts) console.log(`${LOG}  attempt  ${attempt}`);
@@ -68,7 +75,22 @@ async function main(): Promise<number> {
 		return 0;
 	}
 	const generator = detection.generator;
-	if (generator === null || cmake === null || adapter === null) return 0;
+	if (generator === null || cmake === null) return 0;
+
+	// Which adapter starts, not merely which exists: the image can ship a copy that is found and
+	// cannot run, and the row must use the one a debugger actually works on. Every probe is printed,
+	// so a rejected candidate says why it was rejected.
+	const { chosen, probes } = await chooseAdapter(candidates, run);
+	for (const probe of probes) {
+		for (const line of describeProbe(probe)) console.log(`${LOG}  ${line}`);
+	}
+	if (chosen === null) {
+		console.log(
+			`${LOG}  FAIL  no lldb-dap on this machine could start (${candidates.length} found)`,
+		);
+		return 1;
+	}
+	const adapter = chosen.path;
 
 	// The project directory is canonicalised before the launch, which is the product's own rule: a
 	// `/var/…` versus `/private/var/…` style mismatch leaves every breakpoint unverified.
@@ -115,8 +137,11 @@ async function main(): Promise<number> {
 		breakpointLine: lineOf(MAIN, BREAKPOINT_NEEDLE),
 		stepLine: lineOf(MAIN, STEP_NEEDLE),
 	});
-	const exit = await client.waitForExit();
-	console.log(`${LOG}  note  lldb-dap exit ${exit ?? "still running after 10s"}`);
+	// The product's own shutdown first: lldb-dap stays alive until it is disconnected, so a row that
+	// only waits would sit out its timeout and then kill a session that had already finished.
+	await disconnect(client);
+	const exit = await client.waitForExit(3000);
+	console.log(`${LOG}  note  lldb-dap exit ${describeExit(exit)}`);
 	await client.stop();
 
 	if (checks.hadFailure) {

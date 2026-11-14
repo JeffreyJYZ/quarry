@@ -11,7 +11,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { DapClient } from "./windows-debug-dap-client";
+import type { SessionTrace } from "./windows-debug-dap-report";
 import { Checks } from "./windows-debug-checks";
 import { integerValue } from "./windows-debug-dap-session";
 import {
@@ -88,23 +88,38 @@ describe("reading an evaluated result", () => {
 });
 
 describe("what a failing assertion prints", () => {
-	const client = {
-		report: (from: number, to: number) => [`→ request ${from}`, `← response ${to}`],
-		stderrLines: () => ["error: no debug info"],
-	} as unknown as DapClient;
+	const trace = {
+		log: [
+			{ kind: "request", message: { seq: 3, type: "request", command: "evaluate" } },
+			{ kind: "response", message: { seq: 3, request_seq: 3, success: true } },
+		],
+		errors: ["error: no debug info"],
+		spawn: "lldb-dap.exe (cwd C:\\work)",
+		exit: 53,
+	} as unknown as SessionTrace;
 
-	test("the exact exchange of the failed assertion, and the adapter's own words", () => {
+	test("the exact exchange of the failed assertion, then the process and its words", () => {
 		const checks = new Checks();
 		checks.add("stopped frame is app/main.cpp:7", true, "", 0, 1);
-		checks.add("evaluate total before the step reads 0", false, 'result "3"', 1, 2);
+		checks.add("evaluate total before the step reads 0", false, 'result "3"', 0, 2);
 		expect(checks.hadFailure).toBe(true);
-		expect(checks.failures(client)).toEqual([
-			'--- evaluate total before the step reads 0 (result "3") ---',
-			"→ request 1",
-			"← response 2",
-			"--- lldb-dap stderr ---",
-			"error: no debug info",
-		]);
+		const printed = checks.failures(trace).join("\n");
+
+		expect(printed).toContain('--- evaluate total before the step reads 0 (result "3") ---');
+		expect(printed).toContain('→ {"seq":3,"type":"request","command":"evaluate"}');
+		expect(printed).toContain('← {"seq":3,"request_seq":3,"success":true}');
+		expect(printed).toContain("--- spawn: lldb-dap.exe (cwd C:\\work) ---");
+		expect(printed).toContain("--- exit: 53 (0x35) ---");
+		expect(printed).toContain("error: no debug info");
+	});
+
+	test("a session that died before any exchange still says how it died", () => {
+		const checks = new Checks();
+		checks.add("the session reached every step", false, "initialize was never answered", 0, 0);
+		const printed = checks.failures({ ...trace, log: [], errors: [] }).join("\n");
+		expect(printed).toContain("the session reached every step");
+		expect(printed).toContain("exit: 53 (0x35)");
+		expect(printed).toContain("(empty)");
 	});
 
 	test("a passing row has nothing to print", () => {
@@ -112,7 +127,7 @@ describe("what a failing assertion prints", () => {
 		checks.add("stopped frame is app/main.cpp:7", true, "", 0, 1);
 		expect(checks.hadFailure).toBe(false);
 		expect(checks.count).toBe(1);
-		expect(checks.failures(client)).toEqual([]);
+		expect(checks.failures(trace)).toEqual([]);
 	});
 
 	test("an evidence note is printed without deciding the run", () => {
@@ -120,6 +135,6 @@ describe("what a failing assertion prints", () => {
 		checks.note("the verbatim spelling the project tree carries", "the adapter refused it");
 		expect(checks.count).toBe(0);
 		expect(checks.hadFailure).toBe(false);
-		expect(checks.failures(client)).toEqual([]);
+		expect(checks.failures(trace)).toEqual([]);
 	});
 });
