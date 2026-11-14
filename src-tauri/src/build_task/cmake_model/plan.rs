@@ -10,7 +10,9 @@
 //! A build type: a single-config generator ignores `--config` at build time and falls back to an
 //! empty build type, which means no `-g`, no debug info, and a breakpoint that never resolves. When
 //! a preset names `CMAKE_BUILD_TYPE` that value is used; when it does not, the profile's
-//! configuration is passed and the note says so.
+//! configuration is passed and the note says so. A tree that names no generator at all keeps the
+//! type for the same reason and the note says CMake is the one choosing; once the tree reports its
+//! generator, every later plan follows that report instead of guessing.
 //!
 //! [`cmake_plan_target`] also decides *what* is built: a named target adds `--target <name>`, and
 //! `None` keeps the whole tree, which is what the toolbar's Build action asks for.
@@ -37,6 +39,11 @@ pub struct CmakePlan {
     /// being built, so this name travels with the plan: the hand-off selects that configuration's
     /// entries instead of the `Debug` ones that lead CMake's reply.
     pub configuration: String,
+    /// The generator the plan honoured, or `None` when nothing on disk named one.
+    ///
+    /// Reported as data rather than prose: a caller can say what the build was configured with, and
+    /// `None` is the one honest answer for a tree whose generator CMake is still to choose.
+    pub generator: Option<String>,
     /// What this configure must carry, so a tree configured with other values reads as stale.
     pub intent: ConfigureIntent,
     /// One line naming a choice the user might not expect, or `None` when everything was obvious.
@@ -92,29 +99,24 @@ pub fn cmake_plan_target(
     let Some(preset) = resolved else {
         let build_root = super::build_root::resolve(source_root, options, None);
         let dir = build_root.display().to_string();
-        // A multi-config generator takes its configuration at build time, so it never gets one
-        // here; a tree already configured records the generator in its cache and its reply, and a
-        // fresh one states it only in a preset this branch does not have.
-        let typed = !tree_multi_config(&build_root, None);
-        let mut configure = if typed {
-            cmake_configure_argv(&source, &dir, profile)
-        } else {
-            cmake_configure_argv_with(&source, &dir, None)
-        };
+        let recipe = recipe_configure(&source, &dir, &build_root, profile, &mut notes);
+        let mut configure = recipe.configure;
         let toolchain = options
             .toolchain()
             .map(|value| absolute(source_root, value));
         if let Some(toolchain) = &toolchain {
             configure.push(format!("-DCMAKE_TOOLCHAIN_FILE={}", external(toolchain)));
         }
+        let generator = generator_name(&build_root, None);
         return Ok(CmakePlan {
             build_root,
             configure,
             build: cmake_build_argv(&dir, profile, target),
             configuration: cmake_config(profile).to_string(),
+            generator,
             intent: ConfigureIntent {
                 toolchain,
-                build_type: typed.then(|| cmake_config(profile).to_string()),
+                build_type: recipe.build_type,
             },
             note: join(notes),
         });
@@ -164,11 +166,13 @@ pub fn cmake_plan_target(
         }
     };
 
+    let generator = generator_name(&build_root, preset.generator.as_deref());
     Ok(CmakePlan {
         build_root,
         configure,
         build,
         configuration,
+        generator,
         intent: ConfigureIntent {
             toolchain,
             build_type,

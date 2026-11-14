@@ -10,8 +10,8 @@
 
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { basename, join } from "node:path";
-import type { GccToolchain } from "./cpp-parity-gcc";
-import type { Plan } from "./cpp-parity-probe";
+import type { GccToolchain } from "./gcc";
+import type { Plan } from "./types";
 
 /** Whether two paths name the same file, whichever of Homebrew's two spellings CMake kept. */
 export function samePath(one: string, other: string): boolean {

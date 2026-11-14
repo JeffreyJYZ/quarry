@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { errorLines, toolsetMissing, vsGenerators } from "./cpp-parity-windows";
+import { errorLines, toolsetMissing, vsGenerators } from "./cpp-parity/windows";
 
 /** What `cmake --help` prints on the windows-2022 image, newest generator last as cmake orders it. */
 const WINDOWS_HELP = `Generators

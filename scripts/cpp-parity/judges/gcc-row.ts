@@ -17,11 +17,12 @@
 
 import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
-import { GCC_STDOUT } from "./cpp-parity-fixtures";
-import type { Fixture } from "./cpp-parity-fixtures";
-import type { Row } from "./cpp-parity-probe";
-import { databaseEvidence, handoffEvidence, treeEvidence } from "./cpp-parity-gcc-evidence";
-import type { GccHarness, GccToolchain } from "./cpp-parity-gcc";
+import { GCC_STDOUT } from "../fixtures/gcc";
+import type { Fixture } from "../fixtures/types";
+import type { Row } from "../types";
+import { databaseEvidence, handoffEvidence, treeEvidence } from "../gcc-evidence";
+import type { GccHarness, GccToolchain } from "../gcc";
+import { driverControl } from "./gcc-control";
 
 /**
  * One row judged end to end, from the plan to the running program.
@@ -143,29 +144,9 @@ export async function judgeGccToolchain(
 	row.analysis = analysed && handoff.ok ? "PASS" : "FAIL";
 	row.commands[clangdLine].verdict = row.analysis;
 
-	const control = await harness.analyse(fixture.probes, [`--compile-commands-dir=${tree}`]);
-	const blind = control.some((measurement, index) => {
-		const hover = measurement.hover ?? "";
-		const wanted = fixture.probes[index]?.expect ?? "";
-		return !hover.includes(wanted) || measurement.diagnostics.length > 0;
-	});
-	if (blind) {
-		row.details.push(
-			"control      PASS  without --query-driver the same clangd cannot read GCC's standard header",
-		);
-	} else if (harness.requiresDriverControl) {
-		broken = true;
-		row.details.push(
-			"control      FAIL  the same clangd answers without --query-driver, so this fixture cannot tell a queried driver from an unqueried one",
-		);
-	} else {
-		// Both compilers read the same C++ standard library here, so clangd finds its headers with
-		// no query at all: the row still measures the product's arguments, but this machine cannot
-		// prove the query is what made the analysis work. Named, never passed off as a check.
-		row.details.push(
-			"control      note  the same clangd answers without --query-driver, because this platform's clang and GCC share one C++ standard library, so the control cannot discriminate here",
-		);
-	}
+	const control = await driverControl(harness, fixture.probes, tree);
+	row.details.push(control.detail);
+	broken = broken || control.broken;
 
 	// 5. The build's own result: the target the dropdown names, and the program it runs.
 	const after = await harness.ask();

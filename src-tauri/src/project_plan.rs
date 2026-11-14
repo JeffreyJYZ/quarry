@@ -56,6 +56,8 @@ pub struct CmakeSection {
     pub profile: String,
     /// The one target this build names, or null when it builds everything.
     pub target: Option<String>,
+    /// The generator the plan honoured, or null when nothing on disk named one and cmake chooses.
+    pub generator: Option<String>,
     pub build_root: String,
     /// Directory both argv run in: `run_cmake_build` uses the source root for both.
     pub cwd: String,
@@ -127,6 +129,7 @@ pub fn project_plan(root: &str, request: &PlanRequest) -> Result<Plan, String> {
                 },
                 profile: request.profile.wire().to_string(),
                 target,
+                generator: plan.generator.clone(),
                 build_root: external(&plan.build_root),
                 cwd: external(source),
                 configure: plan.configure,

@@ -34,14 +34,29 @@ pub struct Resolved {
 /// A Finder-launched app gets launchd's `PATH`, which on this machine is empty: the rustup shims
 /// (`rust-analyzer`, `cargo`) and the Homebrew bin are invisible, so a Rust project opened from the
 /// Dock would silently have no language server and therefore no diagnostics.
+///
+/// The same holds on Windows, where a Dock- or Start-menu-launched app gets the system `PATH` and not
+/// the one a developer's shell builds: LLVM installed beside the product (`%ProgramFiles%\LLVM`) and
+/// the LLVM Visual Studio ships inside itself (`…\VC\Tools\Llvm\<arch>\bin`, where `lldb-dap.exe`
+/// lives) are both absent from it. Listing the macOS paths on Windows was worse than useless: it made
+/// the search look complete while never finding the adapter the image actually installed.
 pub fn fallback_directories() -> Vec<PathBuf> {
-    let mut directories = vec![
-        PathBuf::from("/opt/homebrew/opt/rustup/bin"),
-        PathBuf::from("/opt/homebrew/bin"),
-        PathBuf::from("/usr/local/bin"),
-    ];
-    if let Some(home) = env::var_os("HOME") {
-        let home = PathBuf::from(home);
+    let mut directories = Vec::new();
+
+    #[cfg(target_os = "macos")]
+    {
+        directories.push(PathBuf::from("/opt/homebrew/opt/rustup/bin"));
+        directories.push(PathBuf::from("/opt/homebrew/bin"));
+        directories.push(PathBuf::from("/usr/local/bin"));
+    }
+
+    #[cfg(windows)]
+    {
+        directories.extend(windows_llvm::directories());
+    }
+
+    let home = env::var_os("HOME").map(PathBuf::from);
+    if let Some(home) = home {
         directories.push(home.join(".cargo").join("bin"));
         directories.push(home.join(".local").join("bin"));
     }
