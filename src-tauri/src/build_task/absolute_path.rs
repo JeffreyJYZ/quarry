@@ -177,9 +177,11 @@ pub fn run_cmake_build(
         } else {
             summary
         },
-        // The program the build just wrote, resolved against the tree this build configured.
+        // The program the build just wrote, resolved against the tree this build configured. A
+        // build with nothing to do wrote no file, so the target it was asked for names the binary
+        // Run is about to launch again.
         artifact: if success {
-            cmake_artifact(&text, &plan.build_root, started_at)
+            cmake_artifact_for(&text, &plan.build_root, started_at, target)
         } else {
             None
         },

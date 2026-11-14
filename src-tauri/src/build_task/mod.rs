@@ -73,6 +73,9 @@ pub use newest_executable::*;
 mod cmake_artifact;
 pub use cmake_artifact::*;
 
+mod cmake_targets;
+pub use cmake_targets::*;
+
 mod cmake_output;
 pub use cmake_output::*;
 
@@ -126,3 +129,6 @@ pub use tests_cmake_artifact::*;
 
 mod tests_build;
 pub use tests_build::*;
+
+mod tests_cmake_rerun;
+pub use tests_cmake_rerun::*;
