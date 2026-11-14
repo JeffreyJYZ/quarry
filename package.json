@@ -1,7 +1,7 @@
 {
 	"name": "quarry",
 	"private": true,
-	"version": "0.1.0-alpha.99",
+	"version": "0.1.0-alpha.100",
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
