@@ -117,7 +117,7 @@ export function databaseEvidence(
 	const spilled = [...(cxx ?? []), ...(c ?? [])].some((arg) => basename(arg).startsWith("clang"));
 	const ok = okCxx && okC && !spilled;
 	const cxxDriver = basename(cxx?.[0] ?? "");
-	const cDriver = basename(c[0] ?? "");
+	const cDriver = basename(c?.[0] ?? "");
 	const wording =
 		launcher === null
 			? `the compile database must name GCC's own drivers, but main.cpp is compiled by ${cxxDriver} and value.c by ${cDriver}`

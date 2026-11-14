@@ -164,7 +164,7 @@ export async function judgeVisualStudio(
 	let named = true;
 	let analysed: Verdict = "n/a";
 	for (const half of VS_HALVES) {
-		const judged = await judgeHalf(root, harness, row, half, findings);
+		const judged = await judgeHalf(fixture, root, harness, row, half, findings);
 		if (judged.broken) {
 			broken = true;
 			break;
@@ -199,6 +199,7 @@ function worst(current: Verdict, next: Verdict): Verdict {
 
 /** One configuration: the plan's argv, the synthesised database, and the artefact it names. */
 async function judgeHalf(
+	fixture: Fixture,
 	root: string,
 	harness: WindowsHarness,
 	row: Row,
@@ -338,7 +339,7 @@ async function judgeHalf(
 	const analysis = await judgeAnalysis(fixture, root, harness, row, findings, plan, [
 		configProbe(half),
 	]);
-	return { ok: ok && written && prints, named, plan, broken: false, analysis };
+	return { ok: ok && written && prints, named: names, plan, broken: false, analysis };
 }
 
 /** The analysis both rows share: the product's clangd arguments, and the probes they must answer. */
