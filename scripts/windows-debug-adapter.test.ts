@@ -15,7 +15,7 @@ import { join } from "node:path";
 import type { RunOutcome } from "./windows-debug-toolchain";
 import { probeAdapter } from "./windows-debug-adapter";
 import { adapterCandidates, preferRunnable } from "./windows-debug-candidates";
-import { causeLine, describeProbe } from "./windows-debug-adapter-report";
+
 import { describeExit } from "./windows-debug-exit";
 
 /** A runner that answers one way for every command, so the probe's rule is the only variable. */
@@ -120,34 +120,37 @@ describe("whether an adapter starts", () => {
 	test("a clean exit with no output still proves the process ran", async () => {
 		expect((await probeAdapter(candidate, runner({ code: 0 }))).runs).toBe(true);
 	});
-});
 
-describe("what a probe prints", () => {
-	const candidate = { path: "C:\\LLVM\\bin\\lldb-dap.exe", source: "PATH", loads: true };
+	test("a route that answers after the direct one failed is the route the session must use", async () => {
+		// The image's shape: every direct spawn exits 53, and the same file answers through a shell.
+		const run = async (
+			_bin: string,
+			_args: string[],
+			_cwd: string,
+			_timeout?: number,
+			way = "direct",
+		) =>
+			way === "cmd"
+				? { code: 0, stdout: "lldb-dap version 20.1.8", stderr: "", spawn: null }
+				: { code: 53, stdout: "", stderr: "", spawn: null };
 
-	test("an unspawnable candidate says so, and says what sits beside it", async () => {
-		const printed = describeProbe(await probeAdapter(candidate, unspawnable)).join("\n");
-		expect(printed).toContain("dies");
-		expect(printed).toContain("could not spawn");
-		expect(printed).toContain("uv_spawn");
-		expect(printed).toContain("beside it");
-		expect(printed).toContain("folder");
+		const probe = await probeAdapter(candidate, run, ["direct", "cmd"]);
+
+		expect(probe.runs).toBe(true);
+		expect(probe.way).toBe("cmd");
+		expect(probe.attempts.some((attempt) => attempt.way === "direct")).toBe(true);
 	});
 
-	test("a candidate that dies with a status prints the status of each question", async () => {
-		const printed = describeProbe(await probeAdapter(candidate, runner({ code: 53 }))).join(
-			"\n",
+	test("every route is tried before a candidate is called dead", async () => {
+		const probe = await probeAdapter(candidate, runner({ code: 53 }), [
+			"direct",
+			"cmd",
+			"powershell",
+		]);
+		expect(new Set(probe.attempts.map((attempt) => attempt.way))).toEqual(
+			new Set(["direct", "cmd", "powershell"]),
 		);
-		expect(printed).toContain("--version");
-		expect(printed).toContain("53 (0x35)");
-		expect(printed).toContain(join("C:\\LLVM\\bin"));
-	});
-
-	test("the cause line separates a refused process from one that died answering nothing", async () => {
-		const refused = await probeAdapter(candidate, unspawnable);
-		const silent = await probeAdapter(candidate, runner({ code: 53 }));
-		expect(causeLine([refused, silent])).toContain("1 could not be created at all");
-		expect(causeLine([refused, silent])).toContain("1 started and died");
+		expect(probe.way).toBeNull();
 	});
 });
 

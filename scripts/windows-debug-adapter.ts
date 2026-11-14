@@ -12,9 +12,12 @@
 import { readdirSync } from "node:fs";
 import type { RunOutcome } from "./windows-debug-toolchain";
 import { directoryOf, type Candidate } from "./windows-debug-candidates";
+import { WAYS, type Way } from "./windows-debug-launch";
 
 /** One launch of a candidate, asked to say what it is rather than to speak DAP. */
 export interface Attempt {
+	/** Which launch route this was: the direct spawn, or a shell that builds its own command line. */
+	way: Way;
 	/** Where the launch was started from: the row's own directory, or the adapter's. */
 	cwd: string;
 	args: string[];
@@ -31,46 +34,66 @@ export interface Probe {
 	attempts: Attempt[];
 	/** True when the process started and answered: it printed something, or it exited cleanly. */
 	runs: boolean;
+	/** The route that answered, which the session must then use as well. */
+	way: Way | null;
 	/** Interesting entries beside it: the adapter itself, its loader, and how many other DLLs. */
 	neighbours: string[];
 	/** The directory listing, so an unreadable or empty folder is visible rather than implied. */
 	directory: string;
 }
 
-type Runner = (bin: string, args: string[], cwd: string) => Promise<RunOutcome>;
+type Runner = (
+	bin: string,
+	args: string[],
+	cwd: string,
+	timeout?: number,
+	way?: Way,
+) => Promise<RunOutcome>;
 
 /**
- * Ask one candidate what it is, from two directories.
+ * Ask one candidate what it is, through every route, from the directories worth trying.
  *
  * `--version` from the row's own cwd and again from the adapter's own directory: a program that
- * loads a library beside itself can answer only one of those, and which one is the whole difference
- * between "the install is unusable" and "the launch directory is wrong".
+ * loads a library beside itself can answer only one of those. Each route is a different way to
+ * create the process, because a Windows image whose every copy of a program exits the same odd
+ * status is far more likely to be a spawn path than five broken installs.
  */
-export async function probeAdapter(candidate: Candidate, run: Runner): Promise<Probe> {
+export async function probeAdapter(
+	candidate: Candidate,
+	run: Runner,
+	ways: Way[] = WAYS,
+): Promise<Probe> {
 	const attempts: Attempt[] = [];
-	for (const cwd of [process.cwd(), directoryOf(candidate.path)]) {
-		for (const args of [["--version"], ["-h"]]) {
-			const attempt = await attemptLaunch(run, candidate, cwd, args);
-			attempts.push(attempt);
-			if (answered(attempt)) return { ...describe(candidate), attempts, runs: true };
-			// The file could not be created at all; asking it a second question from the same
-			// directory would repeat the same answer.
-			if (attempt.spawn !== null) break;
+	for (const way of ways) {
+		const directories =
+			way === "direct"
+				? [process.cwd(), directoryOf(candidate.path)]
+				: [directoryOf(candidate.path)];
+		for (const cwd of directories) {
+			for (const args of [["--version"], ["-h"]]) {
+				const attempt = await attemptLaunch(run, candidate, way, cwd, args);
+				attempts.push(attempt);
+				if (answered(attempt)) return { ...describe(candidate), attempts, runs: true, way };
+				// The file could not be created at all; asking it a second question from the same
+				// directory would repeat the same answer.
+				if (attempt.spawn !== null) break;
+			}
 		}
 	}
-	return { ...describe(candidate), attempts, runs: false };
+	return { ...describe(candidate), attempts, runs: false, way: null };
 }
 
 /** One launch, with a failure to create the process kept as data rather than thrown. */
 async function attemptLaunch(
 	run: Runner,
 	candidate: Candidate,
+	way: Way,
 	cwd: string,
 	args: string[],
 ): Promise<Attempt> {
-	const empty = { cwd, args, exit: null, stdout: "", stderr: "" };
+	const empty = { way, cwd, args, exit: null, stdout: "", stderr: "" };
 	try {
-		const result = await run(candidate.path, args, cwd);
+		const result = await run(candidate.path, args, cwd, undefined, way);
 		return {
 			...empty,
 			spawn: result.spawn,

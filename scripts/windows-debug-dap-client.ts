@@ -9,6 +9,7 @@
  */
 
 import { describeExit } from "./windows-debug-exit";
+import { describeWay, spawnArgs, type Way } from "./windows-debug-launch";
 import { readFrames } from "./windows-debug-dap-frames";
 import { type Exchange, type SessionTrace, stderrTail } from "./windows-debug-dap-report";
 
@@ -34,10 +35,15 @@ export class DapClient implements SessionTrace {
 	private buffer = "";
 	private seq = 0;
 
-	/** Start one adapter in `cwd`, which is the directory the product launches it in. */
-	constructor(adapter: string, cwd: string) {
-		this.spawn = `${adapter} (cwd ${cwd})`;
-		this.child = Bun.spawn([adapter], {
+	/**
+	 * Start one adapter in `cwd`, by the route the probe proved works on this machine.
+	 *
+	 * The route is not cosmetic: on the image every direct spawn of the adapter exited an odd status,
+	 * so the session has to be started the same way the probe started it or nothing below is measured.
+	 */
+	constructor(adapter: string, cwd: string, way: Way = "direct") {
+		this.spawn = `${adapter} (cwd ${cwd}, ${describeWay(way)})`;
+		this.child = Bun.spawn(spawnArgs(way, adapter, []), {
 			cwd,
 			stdin: "pipe",
 			stdout: "pipe",

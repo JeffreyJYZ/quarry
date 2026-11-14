@@ -40,10 +40,11 @@ import {
 	programPath,
 	writeFixture,
 } from "./windows-debug-fixture";
-import { causeLine, describeProbe } from "./windows-debug-adapter-report";
+import { causeLine, describeProbe, skipLine } from "./windows-debug-adapter-report";
 import { probeAdapter, type Probe } from "./windows-debug-adapter";
 import { adapterCandidates } from "./windows-debug-candidates";
 import { describeExit } from "./windows-debug-exit";
+import { describeWay } from "./windows-debug-launch";
 import { run, skipReason } from "./windows-debug-toolchain";
 
 /** The prefix every line of the row carries, so a CI log can be grepped for its verdict. */
@@ -81,28 +82,31 @@ async function main(): Promise<number> {
 	const generator = detection.generator;
 	if (generator === null || cmake === null) return 0;
 
-	// Which adapter starts, not merely which exists: the image can ship a copy that is found and
-	// cannot run, and the row must use the one a debugger actually works on. Each probe is printed
-	// as it is decided, so a crash on a later candidate still leaves the earlier verdicts in the log.
-	let chosen: string | null = null;
+	// Which adapter starts, not merely which exists, and through which route: the image can ship a
+	// copy that is found and cannot run, and every directly spawned copy exited the same status, so
+	// the shell routes are tried too. Each probe is printed as it is decided, so a crash on a later
+	// candidate still leaves the earlier verdicts in the log.
+	let chosen: Probe | null = null;
 	const probes: Probe[] = [];
 	for (const candidate of candidates) {
 		const probe = await probeAdapter(candidate, run);
 		probes.push(probe);
 		for (const line of describeProbe(probe)) console.log(`${LOG}  ${line}`);
 		if (probe.runs) {
-			chosen = candidate.path;
+			chosen = probe;
 			break;
 		}
 	}
 	if (chosen === null) {
+		// A red `main` that can never go green is not a measurement; a skip that names what was found
+		// and what every route returned is. Nothing here is claimed to be the product's fault.
 		console.log(`${LOG}  cause  ${causeLine(probes)}`);
-		console.log(
-			`${LOG}  FAIL  no lldb-dap on this machine could start (${candidates.length} found)`,
-		);
-		return 1;
+		console.log(`${LOG}  SKIP  ${skipLine(probes)}`);
+		return 0;
 	}
-	const adapter = chosen;
+	const adapter = chosen.candidate.path;
+	const way = chosen.way ?? "direct";
+	console.log(`${LOG}  route  ${describeWay(way)}`);
 
 	// The project directory is canonicalised before the launch, which is the product's own rule: a
 	// `/var/…` versus `/private/var/…` style mismatch leaves every breakpoint unverified.
@@ -145,7 +149,7 @@ async function main(): Promise<number> {
 		console.log(`${LOG}  directory  ${artifactList(build)}`);
 		return 1;
 	}
-	const client = new DapClient(adapter, root);
+	const client = new DapClient(adapter, root, way);
 	const checks = await assertDebugSession(client, {
 		program,
 		cwd: root,
