@@ -11,6 +11,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { RunResult } from "./cpp-parity/types";
 import { NO_TOOLSET, NO_VS } from "./cpp-parity/windows";
+import { spawnArgs, type Way } from "./windows-debug-launch";
 
 /** Why a machine with neither installer skips the row, in words that name the fix. */
 export const NO_ADAPTER =
@@ -128,10 +129,11 @@ export async function run(
 	args: string[],
 	cwd: string,
 	timeout = 180_000,
+	way: Way = "direct",
 ): Promise<RunOutcome> {
 	let child: ReturnType<typeof Bun.spawn>;
 	try {
-		child = Bun.spawn([bin, ...args], {
+		child = Bun.spawn(spawnArgs(way, bin, args), {
 			cwd,
 			stdin: "ignore",
 			stdout: "pipe",

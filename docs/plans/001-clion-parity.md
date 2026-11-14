@@ -156,15 +156,23 @@ Not verified here, and therefore not claimed: cross-compilers other than the one
 and diagnostics parity beyond clangd's own output. The MSVC control run is reported as evidence rather
 than required — when clangd answers without `--query-driver`, the row says so. Both non-compiler rows
 run in the same job and their verdicts are the job's own output: the test-runner row has passed there,
-and the debugger row has no verdict yet — its three runs died before the first assertion: in the
-probe's own fixture writer, at adapter startup, and in the probe's own `uv_spawn` when the first
-candidate could not be created at all. So nothing below the adapter is measured on the image, even
-though that same sequence passes against a local `lldb-dap`. The row now records a candidate it
-cannot create as a fact about that candidate, prints both launch directories, the status or spawn
-error of each question, the folder listing and the DLLs beside it, and tries the next one — including
-the tool directories ordered with the ones carrying `liblldb.dll` first, which is the product
-resolver's own rule, so the row and the app cannot disagree about which adapter a user gets. A row
-that skips (no GCC on the machine, no Visual Studio toolset, no lldb-dap) is a skip, never a pass.
+and the debugger row has no verdict yet — every run so far died before the first assertion, in the
+probe's own fixture writer, at adapter startup, in the probe's own `uv_spawn`, and then in the adapter
+probe itself. So nothing below the adapter is measured on the image, even though that same sequence
+passes against a local `lldb-dap`.
+
+The last of those is the one that matters for this image: it ships five `lldb-dap.exe` files, and
+every one of them exits `53 (0x35)` for `--version` and for `-h` — a request that debugs nothing —
+from both the row's directory and the adapter's own, with `liblldb.dll` beside one of them. Five
+independent installs do not fail alike; one spawn path can. So each candidate is now asked through
+three routes: the direct spawn the row used before, `cmd.exe /c` with a quoted command string, and
+PowerShell with a base64 script that no shell can re-quote — and the session uses whichever route
+answered, because a session started another way would measure nothing. If no route answers, the row
+ends in a named `SKIP` that prints the candidates and their sources, whether the library sat beside
+them, and the status or spawn error every route returned: Windows debugger parity is then recorded as
+unmeasurable on that image, not as a failure, because a red `main` that can never go green is not a
+measurement. A row that skips (no GCC, no Visual Studio toolset, no lldb-dap, none launchable) is a
+skip, never a pass.
 
 Both Windows rows analyse the configuration they built: the synthesised database holds one entry per
 source for that configuration, and the rows hover the define each configuration compiles with, so a
