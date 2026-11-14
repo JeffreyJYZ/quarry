@@ -17,7 +17,7 @@ import {
 	configurationDone,
 	evaluate,
 	integerValue,
-	launchSession,
+	launchAdapter,
 	runToExit,
 	setBreakpoint,
 	stepOver,
@@ -44,7 +44,7 @@ export async function assertDebugSession(
 	const checks = new Checks();
 	let from = client.mark();
 	try {
-		await launchSession(client, { program: target.program, cwd: target.cwd });
+		await launchAdapter(client, { program: target.program, cwd: target.cwd });
 
 		// The verbatim spelling first, because the plain one is the breakpoint the session keeps:
 		// setting the same file again replaces it. What the adapter does with the prefix is evidence,

@@ -49,9 +49,20 @@ export interface Frame {
 }
 
 /** `initialize`, `launch`, then the `initialized` event: the product's handshake, in that order. */
-export async function launchSession(client: DapClient, launch: Launch): Promise<void> {
-	const from = client.mark();
+/**
+ * `initialize`, on its own, because of what its absence means.
+ *
+ * An adapter that exits before answering this never started: it refused the image, not the session,
+ * and that is a skip with a reason rather than a job that can never be green. Everything after this
+ * answer is quarry's own request sequence, so it is a real failure when it breaks.
+ */
+export async function initializeSession(client: DapClient): Promise<void> {
 	await client.send("initialize", INITIALIZE_ARGUMENTS);
+}
+
+/** `launch`, then the `initialized` event: from here the session is quarry's to measure. */
+export async function launchAdapter(client: DapClient, launch: Launch): Promise<void> {
+	const from = client.mark();
 	await client.send("launch", {
 		program: launch.program,
 		args: [],

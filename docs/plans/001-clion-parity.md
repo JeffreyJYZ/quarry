@@ -156,23 +156,28 @@ Not verified here, and therefore not claimed: cross-compilers other than the one
 and diagnostics parity beyond clangd's own output. The MSVC control run is reported as evidence rather
 than required — when clangd answers without `--query-driver`, the row says so. Both non-compiler rows
 run in the same job and their verdicts are the job's own output: the test-runner row has passed there,
-and the debugger row has no verdict yet — every run so far died before the first assertion, in the
-probe's own fixture writer, at adapter startup, in the probe's own `uv_spawn`, and then in the adapter
-probe itself. So nothing below the adapter is measured on the image, even though that same sequence
-passes against a local `lldb-dap`.
+and the debugger row has no verdict: every run so far died before its first assertion, in the probe's
+own fixture writer, at adapter startup, in the probe's own `uv_spawn`, and then in the adapter probe
+itself.
 
-The last of those is the one that matters for this image: it ships five `lldb-dap.exe` files, and
-every one of them exits `53 (0x35)` for `--version` and for `-h` — a request that debugs nothing —
-from both the row's directory and the adapter's own, with `liblldb.dll` beside one of them. Five
-independent installs do not fail alike; one spawn path can. So each candidate is now asked through
-three routes: the direct spawn the row used before, `cmd.exe /c` with a quoted command string, and
-PowerShell with a base64 script that no shell can re-quote — and the session uses whichever route
-answered, because a session started another way would measure nothing. If no route answers, the row
-ends in a named `SKIP` that prints the candidates and their sources, whether the library sat beside
-them, and the status or spawn error every route returned: Windows debugger parity is then recorded as
-unmeasurable on that image, not as a failure, because a red `main` that can never go green is not a
-measurement. A row that skips (no GCC, no Visual Studio toolset, no lldb-dap, none launchable) is a
-skip, never a pass.
+That last one is measured now, and it is an image fact, not a quarry defect. On `windows-latest` the
+row finds seven adapters — `PATH`, `%ProgramFiles%\LLVM\bin`, `%ProgramW6432%`, `%ProgramFiles(x86)%`,
+and Visual Studio's `LLVM\x64` and `LLVM\ARM64` (the ARM64 copy is a wrong-architecture file for an
+x64 host and is expected to be refused) — and **none of them starts**: `--version` exits `53 (0x35)`
+on a direct spawn and answers only through `cmd.exe /c`, where the session then dies with
+`The network path was not found.`, which is Win32 `ERROR_BAD_NETPATH` and the same 53 the direct spawn
+returned. An adapter that ends before answering `initialize` never started, so the row prints one
+`SKIP` naming the adapter, the route, the exit status and the adapter's own words, keeps
+`--version`-route evidence above it, and exits 0; a session that answers `initialize` and then fails a
+later step is still a `FAIL`, because from that point it is quarry's request sequence being measured.
+The row also prefers the route that answered, so a session is never started differently from the probe.
+
+**Windows debugger parity is therefore unmeasurable on that image, not failing.** The same row passes
+in full against a local `lldb-dap` — six assertions, adapter exit `0 (0x0)` — so the request sequence,
+the breakpoint, the frame, both `evaluate`s, the step and the exit are measured; what is unmeasured is
+that image's own `lldb-dap`. Nothing in the product changed for this: its launch path still spawns the
+adapter once, still reports the adapter's stderr and exit status when it dies, and still fails a launch
+the user asked for — the skip is the row's, because a measurement that cannot run is not a defect.
 
 Both Windows rows analyse the configuration they built: the synthesised database holds one entry per
 source for that configuration, and the rows hover the define each configuration compiles with, so a

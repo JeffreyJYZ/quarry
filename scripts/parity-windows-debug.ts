@@ -18,7 +18,7 @@
  * Usage: bun scripts/parity-windows-debug.ts
  */
 
-import { existsSync, mkdtempSync, readdirSync, realpathSync } from "node:fs";
+import { existsSync, mkdtempSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -30,17 +30,19 @@ import {
 } from "./cpp-parity/windows";
 import { assertDebugSession } from "./windows-debug-assertions";
 import { DapClient } from "./windows-debug-dap-client";
-import { disconnect } from "./windows-debug-dap-session";
+import { AdapterGone } from "./windows-debug-dap-errors";
+import { disconnect, initializeSession } from "./windows-debug-dap-session";
 import {
 	BREAKPOINT_NEEDLE,
 	CONFIGURATION,
 	MAIN,
 	STEP_NEEDLE,
+	artifactList,
 	lineOf,
 	programPath,
 	writeFixture,
 } from "./windows-debug-fixture";
-import { causeLine, describeProbe, skipLine } from "./windows-debug-adapter-report";
+import { causeLine, describeProbe, refusalLine, skipLine } from "./windows-debug-adapter-report";
 import { probeAdapter, type Probe } from "./windows-debug-adapter";
 import { adapterCandidates } from "./windows-debug-candidates";
 import { describeExit } from "./windows-debug-exit";
@@ -138,10 +140,8 @@ async function main(): Promise<number> {
 	const built = await run(cmake, buildArgs, root);
 	if (built.code !== 0) {
 		console.log(`${LOG}  FAIL  build: cmake ${buildArgs.join(" ")}`);
-		const output = errorLines(built.stdout);
-		for (const line of output.length > 0 ? output : errorLines(built.stderr)) {
-			console.log(`${LOG}  output  ${line}`);
-		}
+		const output = `${built.stdout}\n${built.stderr}`;
+		for (const line of errorLines(output)) console.log(`${LOG}  output  ${line}`);
 		return 1;
 	}
 	if (!existsSync(program)) {
@@ -149,7 +149,31 @@ async function main(): Promise<number> {
 		console.log(`${LOG}  directory  ${artifactList(build)}`);
 		return 1;
 	}
-	const client = new DapClient(adapter, root, way);
+	// Creating the session can fail even though the probe proved the route; that is still not a
+	// measurement of quarry's requests.
+	let client: DapClient;
+	try {
+		client = new DapClient(adapter, root, way);
+	} catch (error) {
+		const said = error instanceof Error ? error.message : String(error);
+		console.log(`${LOG}  SKIP  no ${describeWay(way)} session: ${said}`);
+		return 0;
+	}
+
+	// `initialize` decides what a failure means: an adapter that ends before answering it never
+	// started, which is a skip with its own words; everything after the answer is quarry's sequence.
+	try {
+		await initializeSession(client);
+	} catch (error) {
+		await client.stop();
+		if (error instanceof AdapterGone) {
+			console.log(`${LOG}  SKIP  ${refusalLine(adapter, way, error)}`);
+			return 0;
+		}
+		console.log(`${LOG}  FAIL  initialize: ${error instanceof Error ? error.message : error}`);
+		return 1;
+	}
+
 	const checks = await assertDebugSession(client, {
 		program,
 		cwd: root,
@@ -171,24 +195,6 @@ async function main(): Promise<number> {
 	}
 	console.log(`${LOG}  verdict PASS (${checks.count} assertions)`);
 	return 0;
-}
-
-/** What the build tree holds, so a missing artefact names what is there instead of just the path. */
-function artifactList(build: string): string {
-	const parts = [listing(build, "build")];
-	const configuration = join(build, CONFIGURATION);
-	if (existsSync(configuration)) parts.push(listing(configuration, `build/${CONFIGURATION}`));
-	return parts.join("; ");
-}
-
-/** One directory's first entries, named, or the reason it could not be read. */
-function listing(directory: string, label: string): string {
-	try {
-		const entries = readdirSync(directory).slice(0, 12);
-		return `${label} holds ${entries.length === 0 ? "nothing" : entries.join(", ")}`;
-	} catch {
-		return `${label} does not exist`;
-	}
 }
 
 if (import.meta.main) process.exit(await main());

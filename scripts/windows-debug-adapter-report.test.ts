@@ -10,7 +10,8 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { probeAdapter } from "./windows-debug-adapter";
-import { causeLine, describeProbe, skipLine } from "./windows-debug-adapter-report";
+import { causeLine, describeProbe, refusalLine, skipLine } from "./windows-debug-adapter-report";
+import { AdapterGone } from "./windows-debug-dap-errors";
 import type { RunOutcome } from "./windows-debug-toolchain";
 
 const candidate = { path: "C:\\LLVM\\bin\\lldb-dap.exe", source: "PATH", loads: true };
@@ -94,5 +95,25 @@ describe("the lines a failed walk ends on", () => {
 	test("a walk that only saw refusals says so instead of inventing a status", async () => {
 		const refused = await probeAdapter(candidate, unspawnable);
 		expect(skipLine([refused])).toContain("every route refused to create the process");
+	});
+
+	test("a refusal to start names the adapter, the route, the status and its own words", () => {
+		const line = refusalLine(
+			"C:\\Program Files\\LLVM\\bin\\lldb-dap.exe",
+			"cmd",
+			new AdapterGone("initialize", 1, "The network path was not found."),
+		);
+
+		expect(line).toContain("refused to start");
+		expect(line).toContain("lldb-dap.exe (cmd-shell)");
+		expect(line).toContain("exited 1 (0x1)");
+		expect(line).toContain("The network path was not found.");
+		expect(line).toContain("unmeasurable on this image, not failed");
+	});
+
+	test("a silent refusal says the adapter printed nothing", () => {
+		const line = refusalLine("lldb-dap", "direct", new AdapterGone("initialize", 53, ""));
+		expect(line).toContain("it printed nothing");
+		expect(line).toContain("53 (0x35)");
 	});
 });

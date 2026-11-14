@@ -9,7 +9,7 @@
  * so a line number is never written down twice: [`lineOf`] answers from the text the build compiles.
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 /** The target's name, which the generator writes as `build/Debug/<name>.exe`. */
@@ -97,6 +97,25 @@ export function writeFixture(root: string): string {
 		writeFileSync(path, file.text);
 	}
 	return join(root, MAIN_SOURCE);
+}
+
+/** What the binary the build was supposed to write is missing, when a build succeeds and writes
+ *  nothing. Named here because the project's layout is what decides the path. */
+export function artifactList(build: string): string {
+	const parts = [listing(build, "build")];
+	const configuration = join(build, CONFIGURATION);
+	if (existsSync(configuration)) parts.push(listing(configuration, `build/${CONFIGURATION}`));
+	return parts.join("; ");
+}
+
+/** One directory's first entries, named, or the reason it could not be read. */
+function listing(directory: string, label: string): string {
+	try {
+		const entries = readdirSync(directory).slice(0, 12);
+		return `${label} holds ${entries.length === 0 ? "nothing" : entries.join(", ")}`;
+	} catch {
+		return `${label} does not exist`;
+	}
 }
 
 /** The binary the generator writes for this target, named the way Windows names an executable. */
