@@ -26,6 +26,7 @@ export function useShellSnapshot(args: {
 		panelOpen: panels.panelOpen,
 		dockTab: panels.dockTab,
 		runConfigurations: runs.configurations,
+		runForms: runs.runForms,
 		preferences: settings.preferences,
 		recentFiles: workspace.recentFiles,
 		newProjectParent: panels.newProjectParent,

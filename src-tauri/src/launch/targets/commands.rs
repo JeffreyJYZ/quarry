@@ -30,3 +30,21 @@ pub async fn resolve_run_target(
         .await
         .map_err(|error| format!("run target resolution failed: {error}"))?
 }
+
+/// Whether a path is a file the run path can launch, for the run form's program fallback.
+///
+/// The title-bar Run takes the form's hand-set program only when the build named no executable, and
+/// it reports the field instead of starting a path that is not there. A path that is absent is
+/// `false` and never an error: absent is exactly the answer the caller asked for, and a command that
+/// cannot run is still not a file.
+#[tauri::command]
+pub async fn program_exists(path: String) -> bool {
+    tauri::async_runtime::spawn_blocking(move || is_program_file(&path))
+        .await
+        .unwrap_or(false)
+}
+
+/// The file test behind [`program_exists`], apart from the command so it needs no async runtime.
+pub fn is_program_file(path: &str) -> bool {
+    Path::new(path).is_file()
+}

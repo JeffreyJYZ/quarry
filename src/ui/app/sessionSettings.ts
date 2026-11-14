@@ -1,5 +1,5 @@
 import type { FileBuffer } from "@/lib/project/buffer";
-import type { ProjectInfo, RunConfiguration, Settings } from "@/lib/project/api";
+import type { ProjectInfo, RunConfiguration, RunFormEntry, Settings } from "@/lib/project/api";
 import type { DockTab } from "@/ui/tests/TestsDock";
 
 /** Everything the shell restores on launch, and writes back while it runs. */
@@ -12,6 +12,7 @@ export type SessionSnapshot = {
 	panelOpen: boolean | null;
 	dockTab: DockTab;
 	runConfigurations: RunConfiguration[];
+	runForms: RunFormEntry[];
 	preferences: Settings["preferences"];
 	recentFiles: string[];
 	newProjectParent: string;
@@ -35,6 +36,7 @@ export function settingsFromSnapshot(snapshot: SessionSnapshot): Settings {
 		dockTab: snapshot.dockTab as Settings["dockTab"],
 		dockExpanded: snapshot.panelOpen,
 		runConfigurations: snapshot.runConfigurations,
+		runForms: snapshot.runForms,
 		preferences: snapshot.preferences,
 		recentFiles: snapshot.recentFiles,
 		newProjectParent: snapshot.newProjectParent,

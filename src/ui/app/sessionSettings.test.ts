@@ -22,6 +22,7 @@ function snapshot(): SessionSnapshot {
 		panelOpen: false,
 		dockTab: "run",
 		runConfigurations: [{ name: "app", program: "/p/app", args: "", cwd: "/p", env: [] }],
+		runForms: [{ root: "/p", program: "/p/custom", args: "", cwd: "/p", env: [] }],
 		preferences: DEFAULT_PREFERENCES,
 		recentFiles: ["/p/a.cpp"],
 		newProjectParent: "/Users/jyz/dev",
@@ -39,6 +40,7 @@ describe("settingsFromSnapshot", () => {
 			dockTab: "run",
 			dockExpanded: false,
 			runConfigurations: [{ name: "app", program: "/p/app", args: "", cwd: "/p", env: [] }],
+			runForms: [{ root: "/p", program: "/p/custom", args: "", cwd: "/p", env: [] }],
 			preferences: DEFAULT_PREFERENCES,
 			recentFiles: ["/p/a.cpp"],
 			newProjectParent: "/Users/jyz/dev",
@@ -82,6 +84,9 @@ describe("settingsFromSnapshot", () => {
 		},
 		runConfigurations: (next) => {
 			next.runConfigurations = [];
+		},
+		runForms: (next) => {
+			next.runForms = [];
 		},
 		preferences: (next) => {
 			next.preferences = { ...DEFAULT_PREFERENCES, editorTabSize: 2 };

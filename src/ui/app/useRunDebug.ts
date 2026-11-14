@@ -65,6 +65,8 @@ export function useRunDebug(options: {
 		root,
 		profile,
 		targetId: targets.selected,
+		isPreset: targets.selected !== null && targets.isPreset(targets.selected),
+		runForm: { program: runs.program, args: runs.args, cwd: runs.cwd },
 		onRun,
 		onDebug,
 		onFailure: options.onLaunchFailure,

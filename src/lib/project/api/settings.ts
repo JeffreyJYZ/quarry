@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Preferences, ProjectSettings } from "@/lib/settings/model";
-import type { RunConfiguration } from "@/lib/project/api/run-configuration";
+import type { RunConfiguration, RunFormEntry } from "@/lib/project/api/run-configuration";
 
 export type Settings = {
 	lastRoot: string | null;
@@ -16,6 +16,8 @@ export type Settings = {
 	/** Directory the New project dialog last used. */
 	newProjectParent?: string | null;
 	runConfigurations?: RunConfiguration[];
+	/** Each project's run form as it was last left, so a hand-set program survives a restart. */
+	runForms?: RunFormEntry[];
 	/** User-wide preferences; absent in a file written before the settings page existed. */
 	preferences?: Preferences;
 };

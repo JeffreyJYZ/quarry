@@ -30,13 +30,21 @@ export function targetEntries(
 /**
  * Which target the Run and Debug buttons act on.
  *
- * A remembered id wins while it still exists, so a project with several binaries does not jump
- * back to the first one on every reload. With no memory, one target is the answer, then Cargo's
- * default binary (the bin named after its package), then the first row — which is what makes the
- * very first click work with no configuration at all.
+ * A remembered id wins while it still exists — a detected target or a preset, since a preset the
+ * user picked must survive the list being read again — so a project with several binaries does not
+ * jump back to the first one on every reload. With no memory, one target is the answer, then Cargo's
+ * default binary (the bin named after its package), then the first row, which is what makes the very
+ * first click work with no configuration at all. A preset is never chosen without being picked: it
+ * names a program the project itself does not build.
  */
-export function preferredTargetId(targets: RunTarget[], remembered: string | null): string | null {
-	if (remembered !== null && targets.some((target) => target.id === remembered)) {
+export function preferredTargetId(
+	targets: RunTarget[],
+	remembered: string | null,
+	presets: Pick<LaunchPreset, "name">[] = [],
+): string | null {
+	const known = new Set(targets.map((target) => target.id));
+	for (const preset of presets) known.add(preset.name);
+	if (remembered !== null && known.has(remembered)) {
 		return remembered;
 	}
 	if (targets.length === 0) return null;

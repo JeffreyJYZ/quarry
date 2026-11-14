@@ -74,4 +74,19 @@ pub mod tests_group_6 {
 
         assert_eq!(labels, vec!["demo".to_string(), "demo-server".to_string()]);
     }
+
+    #[test]
+    pub fn the_run_forms_program_fallback_accepts_a_file_and_rejects_a_directory() {
+        let root =
+            std::env::temp_dir().join(format!("quarry-program-exists-{}", std::process::id()));
+        std::fs::create_dir_all(&root).expect("creates the fixture directory");
+        let file = root.join("manual-binary");
+        std::fs::write(&file, b"#!/bin/sh\n").expect("writes the fixture program");
+
+        assert!(is_program_file(&file.to_string_lossy()));
+        assert!(!is_program_file(&root.to_string_lossy()));
+        assert!(!is_program_file(&root.join("gone").to_string_lossy()));
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }

@@ -12,6 +12,7 @@ function snapshot(overrides: Partial<SessionSnapshot> = {}): SessionSnapshot {
 		panelOpen: null,
 		dockTab: "problems",
 		runConfigurations: [],
+		runForms: [],
 		preferences: {},
 		recentFiles: [],
 		newProjectParent: "",

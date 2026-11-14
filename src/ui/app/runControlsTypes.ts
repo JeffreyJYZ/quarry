@@ -1,4 +1,4 @@
-import type { EnvVar, LaunchConfig, RunConfiguration } from "@/lib/project/api";
+import type { EnvVar, LaunchConfig, RunConfiguration, RunFormEntry } from "@/lib/project/api";
 import type { RunExit, RunLine } from "@/lib/run/runOutput";
 
 export type { RunExit, RunLine } from "@/lib/run/runOutput";
@@ -19,6 +19,8 @@ export type RunControls = {
 	cwd: string;
 	env: EnvVar[];
 	configurations: RunConfiguration[];
+	/** Each project's run form as the shell last left it; the settings file keeps this. */
+	runForms: RunFormEntry[];
 	selected: string | null;
 	argv: string;
 	setProgram: (value: string) => void;
@@ -39,4 +41,5 @@ export type RunControls = {
 	/** Write lines into the console and open it: a failed build never started a process. */
 	appendLog: (lines: string[]) => void;
 	replaceConfigurations: (next: RunConfiguration[]) => void;
+	replaceRunForms: (next: RunFormEntry[]) => void;
 };

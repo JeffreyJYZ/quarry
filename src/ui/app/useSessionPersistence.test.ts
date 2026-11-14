@@ -52,6 +52,7 @@ describe("useSessionPersistence restore", () => {
 			onNewProjectParent: () => {},
 			onDockTab: () => {},
 			onRunConfigurations: () => {},
+			onRunForms: () => {},
 			onProject: () => {},
 			onBuffers: (updater: (current: FileBuffer[]) => FileBuffer[]) => {
 				buffers.splice(0, buffers.length, ...updater(buffers));

@@ -78,6 +78,16 @@ export function resolveRunTarget(
 	return invoke<LaunchConfig>("resolve_run_target", { root, id, stopOnEntry });
 }
 
+/**
+ * Whether a path is a file the run path can launch, for the run form's program fallback.
+ *
+ * A path that is not there is `false` and never an error: absent is the answer the caller asked for,
+ * and the launch is refused with the path named instead of being started.
+ */
+export function programExists(path: string): Promise<boolean> {
+	return invoke<boolean>("program_exists", { path });
+}
+
 export function runProgram(
 	program: string,
 	args: string[],
