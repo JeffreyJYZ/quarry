@@ -182,6 +182,13 @@ jobs:
                   QUARRY_PLAN_BIN: src-tauri/target/debug/examples/quarry-plan
               run: bun scripts/cpp-parity-probe.ts --linux
 
+            # The test dock's half on Linux: GoogleTest discovery and a filtered case run, and Cargo
+            # discovery, judged through the same seam the app uses. A single-config tree writes
+            # `build/<target>` with no configuration directory and no `.exe`, which is the layout the
+            # row pins here. The first run of this step is that verdict.
+            - name: Test-runner row (Linux)
+              run: bun scripts/parity-windows-tests.ts --linux
+
     # The LSP and debugger probes are a separate job: they need toolchains the gate does not, and
     # a hung language server should not hold the gate job hostage. `bun scripts/integration.ts`
     # exits non-zero only when a probe that ran fails; probes whose tool is missing are SKIPPED and
