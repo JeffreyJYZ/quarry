@@ -1,34 +1,28 @@
 #!/usr/bin/env bun
 /**
- * Which `lldb-dap` this machine has, which of them can start, and what a startup death said.
+ * Whether one `lldb-dap` can start, asked two ways, with every answer kept.
  *
- * Two questions, answered and printed separately: whether a file exists, and whether a process from
- * it survives being launched. A row that only asks the first reports "adapter found" for a debugger
- * that dies in 200 ms — which is what the first Windows run did: the binary was there, exited 53
- * before answering `initialize`, and the log carried neither the status nor a byte of stderr.
- *
- * The candidate list is the product resolver's own (`src-tauri/src/resolve/windows_llvm.rs`): the
- * `PATH` the shell has, then `%ProgramFiles%\LLVM\bin`, then the copy Visual Studio ships inside
- * itself. The row must not prefer a different adapter than the app would.
+ * The two questions are separate on purpose: whether a file exists, and whether a process from it
+ * survives being launched. A row that only asks the first reports "adapter found" for a debugger that
+ * never ran — which is what the first two Windows runs did, one as a silent `exit 53` and one as a
+ * `uv_spawn` failure that ended the row. A process the OS refuses to create is therefore a fact
+ * about one candidate, never an exception: the point of the walk is to reach the next one.
  */
 
-import { existsSync, readdirSync } from "node:fs";
-import { dirname, join } from "node:path";
-import type { RunResult } from "./cpp-parity/types";
-import { pathEntries, visualStudioLlvmBins } from "./windows-debug-toolchain";
-
-/** One place an adapter could be, and why it is on the list. */
-export interface Candidate {
-	path: string;
-	source: string;
-}
+import { readdirSync } from "node:fs";
+import type { RunOutcome } from "./windows-debug-toolchain";
+import { directoryOf, type Candidate } from "./windows-debug-candidates";
 
 /** One launch of a candidate, asked to say what it is rather than to speak DAP. */
 export interface Attempt {
+	/** Where the launch was started from: the row's own directory, or the adapter's. */
+	cwd: string;
 	args: string[];
 	exit: number | null;
 	stdout: string;
 	stderr: string;
+	/** Why the process could not be created at all, when it could not be. */
+	spawn: string | null;
 }
 
 /** What probing one candidate found. */
@@ -37,162 +31,86 @@ export interface Probe {
 	attempts: Attempt[];
 	/** True when the process started and answered: it printed something, or it exited cleanly. */
 	runs: boolean;
-	/** The DLLs beside it, which is what a Windows loader needs before the exe runs at all. */
-	libraries: string[];
+	/** Interesting entries beside it: the adapter itself, its loader, and how many other DLLs. */
+	neighbours: string[];
+	/** The directory listing, so an unreadable or empty folder is visible rather than implied. */
+	directory: string;
 }
 
-type Runner = (bin: string, args: string[], cwd: string) => Promise<RunResult>;
-
-/** The adapter's file name on this platform; `.exe` is the whole difference. */
-export function adapterNames(platform: string = process.platform): string[] {
-	return platform === "win32" ? ["lldb-dap.exe"] : ["lldb-dap"];
-}
-
-/** The DLL an `lldb-dap.exe` from LLVM loads before any of its own code runs. */
-export const ADAPTER_LIBRARY = "liblldb.dll";
+type Runner = (bin: string, args: string[], cwd: string) => Promise<RunOutcome>;
 
 /**
- * Every adapter this machine could run, in the product resolver's order, each named by its source.
+ * Ask one candidate what it is, from two directories.
  *
- * `isFile` is a parameter so the order is testable without a Windows install: the order is the part
- * that must agree with the product, not the disk.
+ * `--version` from the row's own cwd and again from the adapter's own directory: a program that
+ * loads a library beside itself can answer only one of those, and which one is the whole difference
+ * between "the install is unusable" and "the launch directory is wrong".
  */
-export function adapterCandidates(
-	environment: Record<string, string | undefined>,
-	platform: string = process.platform,
-	isFile: (path: string) => boolean = existsSync,
-): Candidate[] {
-	const directories = [
-		...pathEntries(environment, platform).map((path) => ({ path, source: "PATH" })),
-		...windowsDirectories(environment, platform),
-	];
-	const candidates: Candidate[] = [];
-	for (const directory of directories) {
-		for (const name of adapterNames(platform)) {
-			const path = join(directory.path, name);
-			if (isFile(path)) candidates.push({ path, source: directory.source });
-		}
-	}
-	return candidates;
-}
-
-/** The directories the product resolver falls back to on Windows, in its own order. */
-export function windowsDirectories(
-	environment: Record<string, string | undefined>,
-	platform: string = process.platform,
-): { path: string; source: string }[] {
-	if (platform !== "win32") return [];
-	const found: { path: string; source: string }[] = [];
-	const roots = ["ProgramFiles", "ProgramW6432", "ProgramFiles(x86)"] as const;
-	for (const variable of roots) {
-		const root = environment[variable];
-		if (root === undefined || root === "") continue;
-		found.push({ path: join(root, "LLVM", "bin"), source: `%${variable}%\\LLVM\\bin` });
-	}
-	const home = environment.USERPROFILE;
-	if (home !== undefined && home !== "") {
-		found.push({ path: join(home, ".cargo", "bin"), source: "%USERPROFILE%\\.cargo\\bin" });
-		found.push({ path: join(home, ".local", "bin"), source: "%USERPROFILE%\\.local\\bin" });
-	}
-	const local = environment.LOCALAPPDATA;
-	if (local !== undefined && local !== "") {
-		found.push({
-			path: join(local, "Programs", "LLVM", "bin"),
-			source: "%LOCALAPPDATA%\\Programs\\LLVM\\bin",
-		});
-	}
-	for (const root of [environment.ProgramFiles, environment.ProgramW6432]) {
-		if (root === undefined || root === "") continue;
-		for (const bin of visualStudioLlvmBins(root)) {
-			found.push({ path: bin, source: "Visual Studio's LLVM" });
-		}
-	}
-	return found;
-}
-
-/** Ask one candidate what it is; a process that cannot load never answers either question. */
 export async function probeAdapter(candidate: Candidate, run: Runner): Promise<Probe> {
 	const attempts: Attempt[] = [];
-	for (const args of [["--version"], ["-h"]]) {
-		const result = await run(candidate.path, args, dirname(candidate.path));
-		attempts.push({
-			args,
+	for (const cwd of [process.cwd(), directoryOf(candidate.path)]) {
+		for (const args of [["--version"], ["-h"]]) {
+			const attempt = await attemptLaunch(run, candidate, cwd, args);
+			attempts.push(attempt);
+			if (answered(attempt)) return { ...describe(candidate), attempts, runs: true };
+			// The file could not be created at all; asking it a second question from the same
+			// directory would repeat the same answer.
+			if (attempt.spawn !== null) break;
+		}
+	}
+	return { ...describe(candidate), attempts, runs: false };
+}
+
+/** One launch, with a failure to create the process kept as data rather than thrown. */
+async function attemptLaunch(
+	run: Runner,
+	candidate: Candidate,
+	cwd: string,
+	args: string[],
+): Promise<Attempt> {
+	const empty = { cwd, args, exit: null, stdout: "", stderr: "" };
+	try {
+		const result = await run(candidate.path, args, cwd);
+		return {
+			...empty,
+			spawn: result.spawn,
 			exit: result.code,
 			stdout: result.stdout.trim(),
 			stderr: result.stderr.trim(),
-		});
-		if (answered(attempts[attempts.length - 1])) break;
+		};
+	} catch (error) {
+		return { ...empty, spawn: error instanceof Error ? error.message : String(error) };
 	}
-	return {
-		candidate,
-		attempts,
-		runs: attempts.some(answered),
-		libraries: libraryNeighbours(candidate.path),
-	};
 }
 
 /** Whether one launch answered at all: clean exit, or any output on either stream. */
 function answered(attempt: Attempt): boolean {
+	if (attempt.spawn !== null) return false;
 	return attempt.exit === 0 || attempt.stdout !== "" || attempt.stderr !== "";
 }
 
-/** The first candidate that starts, with every probe kept so the log shows what was rejected. */
-export async function chooseAdapter(
-	candidates: Candidate[],
-	run: Runner,
-): Promise<{ chosen: Candidate | null; probes: Probe[] }> {
-	const probes: Probe[] = [];
-	for (const candidate of candidates) {
-		const probe = await probeAdapter(candidate, run);
-		probes.push(probe);
-		if (probe.runs) return { chosen: candidate, probes };
-	}
-	return { chosen: null, probes };
-}
-
-/** The DLLs beside an adapter, since a loader failure names none of them itself. */
-export function libraryNeighbours(path: string): string[] {
+/** The listing half of a probe: what is beside the binary, and what the folder holds. */
+function describe(candidate: Candidate): Pick<Probe, "candidate" | "neighbours" | "directory"> {
+	const directory = directoryOf(candidate.path);
+	let entries: string[];
 	try {
-		return readdirSync(dirname(path)).filter((entry) => entry.toLowerCase().endsWith(".dll"));
+		entries = readdirSync(directory);
 	} catch {
-		return [];
+		return { candidate, neighbours: [], directory: `${directory} could not be read` };
 	}
+	const interesting = entries.filter((entry) => /^(lldb-dap|liblldb)/i.test(entry)).sort();
+	const dlls = entries.filter((entry) => entry.toLowerCase().endsWith(".dll")).length;
+	const named = dlls > interesting.length ? `${dlls} .dll in all` : null;
+	return {
+		candidate,
+		neighbours: named === null ? interesting : [...interesting, named],
+		directory: `${directory} holds ${summarise(entries)}`,
+	};
 }
 
-/** The Windows loader statuses worth naming, as unsigned words. */
-const LOADER_STATUSES: [number, string][] = [
-	[0xc0000135, "the loader could not find a DLL beside it"],
-	[0xc0000139, "a DLL beside it is not the version it was linked against"],
-	[0xc0000142, "a DLL beside it failed to initialise"],
-	[0xc0000005, "it crashed before it could answer"],
-];
-
-/** An exit code as a number and a hex word, with the loader's reason when it is one. */
-export function describeExit(code: number | null): string {
-	if (code === null) return "no exit status";
-	const unsigned = code < 0 ? code + 2 ** 32 : code;
-	const named = LOADER_STATUSES.find(([value]) => value === unsigned);
-	const hex = `0x${unsigned.toString(16)}`;
-	return named === undefined ? `${code} (${hex})` : `${code} (${hex}: ${named[1]})`;
-}
-
-/** A probe as log lines: what was asked, how each ended, what it said, and what sits beside it. */
-export function describeProbe(probe: Probe): string[] {
-	const status = probe.attempts
-		.map((attempt) => `${attempt.args.join(" ")}: ${describeExit(attempt.exit)}`)
-		.join(", ");
-	const said = oneLine(
-		probe.attempts.flatMap((attempt) => [attempt.stdout, attempt.stderr]).join(" "),
-	);
-	return [
-		`${probe.runs ? "starts" : "dies"}  ${probe.candidate.path}  (${probe.candidate.source})  ` +
-			`${status}${said === "" ? "" : `  said: ${said}`}`,
-		`beside it: ${probe.libraries.length === 0 ? "no .dll" : probe.libraries.join(", ")}`,
-	];
-}
-
-/** One log line from arbitrary output: newlines gone, long output clipped. */
-export function oneLine(text: string, limit = 200): string {
-	const flat = text.replace(/\s+/g, " ").trim();
-	return flat.length > limit ? `${flat.slice(0, limit)}…` : flat;
+/** One line from a directory listing: enough to see an empty or wrong folder at a glance. */
+function summarise(entries: string[], limit = 8): string {
+	if (entries.length === 0) return "nothing";
+	const shown = entries.slice(0, limit).join(", ");
+	return entries.length > limit ? `${shown}, … (${entries.length} entries)` : shown;
 }

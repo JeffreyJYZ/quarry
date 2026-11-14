@@ -8,7 +8,7 @@
  * where it said why.
  */
 
-import { describeExit } from "./windows-debug-adapter";
+import { describeExit } from "./windows-debug-exit";
 import { readFrames } from "./windows-debug-dap-frames";
 import { type Exchange, type SessionTrace, stderrTail } from "./windows-debug-dap-report";
 

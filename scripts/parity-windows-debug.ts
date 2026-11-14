@@ -40,12 +40,10 @@ import {
 	programPath,
 	writeFixture,
 } from "./windows-debug-fixture";
-import {
-	adapterCandidates,
-	chooseAdapter,
-	describeExit,
-	describeProbe,
-} from "./windows-debug-adapter";
+import { causeLine, describeProbe } from "./windows-debug-adapter-report";
+import { probeAdapter, type Probe } from "./windows-debug-adapter";
+import { adapterCandidates } from "./windows-debug-candidates";
+import { describeExit } from "./windows-debug-exit";
 import { run, skipReason } from "./windows-debug-toolchain";
 
 /** The prefix every line of the row carries, so a CI log can be grepped for its verdict. */
@@ -53,8 +51,8 @@ const LOG = "parity-windows-debug";
 
 async function main(): Promise<number> {
 	const cmake = Bun.which("cmake");
-	const help = cmake === null ? "" : (await run(cmake, ["--help"], process.cwd())).stdout;
-	const generators = vsGenerators(help);
+	const help = cmake === null ? null : await run(cmake, ["--help"], process.cwd());
+	const generators = vsGenerators(help?.stdout ?? "");
 	const candidates = adapterCandidates(process.env);
 	const scratch = mkdtempSync(join(tmpdir(), "quarry-win-debug-"));
 
@@ -62,6 +60,12 @@ async function main(): Promise<number> {
 	const detection = canProbe
 		? await detectVsGenerator(generators, join(scratch, "generators"), cmake, run)
 		: { generator: null, attempts: [] as string[] };
+
+	if (help?.spawn !== null && help !== null) {
+		// cmake exists on PATH but the OS will not create the process: name it, do not skip over it.
+		console.log(`${LOG}  FAIL  could not spawn ${cmake}: ${help.spawn}`);
+		return 1;
+	}
 
 	const skip = skipReason({
 		cmake: cmake !== null,
@@ -78,19 +82,27 @@ async function main(): Promise<number> {
 	if (generator === null || cmake === null) return 0;
 
 	// Which adapter starts, not merely which exists: the image can ship a copy that is found and
-	// cannot run, and the row must use the one a debugger actually works on. Every probe is printed,
-	// so a rejected candidate says why it was rejected.
-	const { chosen, probes } = await chooseAdapter(candidates, run);
-	for (const probe of probes) {
+	// cannot run, and the row must use the one a debugger actually works on. Each probe is printed
+	// as it is decided, so a crash on a later candidate still leaves the earlier verdicts in the log.
+	let chosen: string | null = null;
+	const probes: Probe[] = [];
+	for (const candidate of candidates) {
+		const probe = await probeAdapter(candidate, run);
+		probes.push(probe);
 		for (const line of describeProbe(probe)) console.log(`${LOG}  ${line}`);
+		if (probe.runs) {
+			chosen = candidate.path;
+			break;
+		}
 	}
 	if (chosen === null) {
+		console.log(`${LOG}  cause  ${causeLine(probes)}`);
 		console.log(
 			`${LOG}  FAIL  no lldb-dap on this machine could start (${candidates.length} found)`,
 		);
 		return 1;
 	}
-	const adapter = chosen.path;
+	const adapter = chosen;
 
 	// The project directory is canonicalised before the launch, which is the product's own rule: a
 	// `/var/…` versus `/private/var/…` style mismatch leaves every breakpoint unverified.
@@ -104,6 +116,10 @@ async function main(): Promise<number> {
 
 	const configureArgs = ["-S", root, "-B", build, "-G", generator, "-A", "x64"];
 	const configured = await run(cmake, configureArgs, root);
+	if (configured.spawn !== null) {
+		console.log(`${LOG}  FAIL  could not spawn ${cmake}: ${configured.spawn}`);
+		return 1;
+	}
 	if (configured.code !== 0) {
 		if (toolsetMissing(configured.stderr)) {
 			console.log(`${LOG}  SKIP  ${NO_TOOLSET}`);

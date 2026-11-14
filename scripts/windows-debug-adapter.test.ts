@@ -2,29 +2,31 @@
 /**
  * Which adapter the row picks, why it rejects one, and what a startup death says.
  *
- * The first Windows run chose the first adapter on disk and reported `exit 53` — the binary existed
- * and could not start, and neither fact was in the log. These tests pin the two questions apart
- * (found, and starts), the product's own search order, and the status decoding that names a loader
- * failure instead of printing a bare number.
+ * The first Windows run chose the first adapter on disk and reported `exit 53`; the second one threw
+ * `EUNKNOWN` out of `uv_spawn` and ended the row. So these tests pin the two questions apart (found,
+ * and starts), the product's own search order — library-bearing directories first — and a process
+ * the OS refuses to create being a fact about one candidate rather than the end of the walk.
  */
 
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { RunResult } from "./cpp-parity/types";
-import {
-	adapterCandidates,
-	chooseAdapter,
-	describeExit,
-	describeProbe,
-	probeAdapter,
-} from "./windows-debug-adapter";
+import type { RunOutcome } from "./windows-debug-toolchain";
+import { probeAdapter } from "./windows-debug-adapter";
+import { adapterCandidates, preferRunnable } from "./windows-debug-candidates";
+import { causeLine, describeProbe } from "./windows-debug-adapter-report";
+import { describeExit } from "./windows-debug-exit";
 
 /** A runner that answers one way for every command, so the probe's rule is the only variable. */
-function runner(
-	result: Partial<RunResult>,
-): (bin: string, args: string[], cwd: string) => Promise<RunResult> {
-	return async () => ({ code: 0, stdout: "", stderr: "", ...result });
+function runner(result: Partial<RunOutcome>): () => Promise<RunOutcome> {
+	return async () => ({ code: 0, stdout: "", stderr: "", spawn: null, ...result });
 }
+
+/** A runner the OS refuses to create a process for, which is what `uv_spawn` does on Windows. */
+const unspawnable = async () => {
+	throw new Error("EUNKNOWN: unknown error, uv_spawn");
+};
 
 describe("the adapters a machine offers", () => {
 	const environment = {
@@ -33,7 +35,7 @@ describe("the adapters a machine offers", () => {
 		USERPROFILE: "C:\\Users\\runner",
 	};
 
-	test("the order is the product resolver's: PATH, then Program Files, then Visual Studio", () => {
+	test("PATH comes first, then the tool directories, each named by its source", () => {
 		const existing = new Set([
 			join("C:\\LLVM\\bin", "lldb-dap.exe"),
 			join("C:\\Program Files", "LLVM", "bin", "lldb-dap.exe"),
@@ -50,6 +52,34 @@ describe("the adapters a machine offers", () => {
 		]);
 	});
 
+	test("a tool directory carrying liblldb.dll comes before one that does not", () => {
+		// A real tree, because the Visual Studio bins are read off disk rather than composed.
+		const root = mkdtempSync(join(tmpdir(), "quarry-program-files-"));
+		const llvm = join(root, "LLVM", "bin");
+		const studio = join(root, "Microsoft Visual Studio", "2026", "Community", "VC", "Tools");
+		const vsBin = join(studio, "Llvm", "x64", "bin");
+		mkdirSync(llvm, { recursive: true });
+		mkdirSync(vsBin, { recursive: true });
+		writeFileSync(join(llvm, "lldb-dap.exe"), "");
+		writeFileSync(join(vsBin, "lldb-dap.exe"), "");
+		writeFileSync(join(vsBin, "liblldb.dll"), "");
+
+		const candidates = adapterCandidates({ PATH: "", ProgramFiles: root }, "win32");
+
+		expect(candidates.map((candidate) => candidate.path)).toEqual([
+			join(vsBin, "lldb-dap.exe"),
+			join(llvm, "lldb-dap.exe"),
+		]);
+		expect(candidates.map((candidate) => candidate.loads)).toEqual([true, false]);
+	});
+
+	test("a directory without the loader is kept, only moved later", () => {
+		const bare = { path: "C:\\bare" };
+		const runnable = { path: "C:\\runnable" };
+		const isFile = (path: string) => path === join("C:\\runnable", "liblldb.dll");
+		expect(preferRunnable([bare, runnable], isFile)).toEqual([runnable, bare]);
+	});
+
 	test("an adapter with no .exe is not the one Windows runs", () => {
 		const candidates = adapterCandidates(
 			{ PATH: "C:\\LLVM\\bin" },
@@ -58,24 +88,26 @@ describe("the adapters a machine offers", () => {
 		);
 		expect(candidates).toEqual([]);
 	});
-
-	test("a machine that is not Windows has no program-files roots to search", () => {
-		expect(
-			adapterCandidates({ PATH: "/usr/bin:/opt/llvm/bin" }, "darwin", () => false),
-		).toEqual([]);
-	});
 });
 
 describe("whether an adapter starts", () => {
-	const candidate = { path: "C:\\LLVM\\bin\\lldb-dap.exe", source: "PATH" };
+	const candidate = { path: "C:\\LLVM\\bin\\lldb-dap.exe", source: "PATH", loads: false };
 
-	test("an exit status with no output on either stream means it never ran", async () => {
-		const probe = await probeAdapter(candidate, runner({ code: 53 }));
+	test("a process the OS refuses to create is a fact about the candidate, not an exception", async () => {
+		const probe = await probeAdapter(candidate, unspawnable);
 		expect(probe.runs).toBe(false);
-		expect(probe.attempts).toHaveLength(2);
+		expect(probe.attempts.every((attempt) => attempt.spawn !== null)).toBe(true);
+		expect(probe.attempts[0]?.spawn).toContain("uv_spawn");
 	});
 
-	test("a version banner is an answer, and the second question is not asked", async () => {
+	test("both launch directories are tried before the candidate is called dead", async () => {
+		const probe = await probeAdapter(candidate, runner({ code: 53 }));
+		const directories = new Set(probe.attempts.map((attempt) => attempt.cwd));
+		expect(directories).toContain(process.cwd());
+		expect(directories).toContain(join("C:\\LLVM\\bin"));
+	});
+
+	test("a version banner is an answer, and nothing further is asked", async () => {
 		const probe = await probeAdapter(
 			candidate,
 			runner({ code: 0, stdout: "lldb-dap version 20" }),
@@ -88,31 +120,34 @@ describe("whether an adapter starts", () => {
 	test("a clean exit with no output still proves the process ran", async () => {
 		expect((await probeAdapter(candidate, runner({ code: 0 }))).runs).toBe(true);
 	});
+});
 
-	test("the first candidate that starts wins, and the rejected one is kept", async () => {
-		const dead = { path: "C:\\dead\\lldb-dap.exe", source: "PATH" };
-		const live = { path: "C:\\live\\lldb-dap.exe", source: "Visual Studio's LLVM" };
-		let asked = 0;
-		const run = async (bin: string) => {
-			asked += 1;
-			return { code: bin.includes("dead") ? 53 : 0, stdout: "", stderr: "" };
-		};
+describe("what a probe prints", () => {
+	const candidate = { path: "C:\\LLVM\\bin\\lldb-dap.exe", source: "PATH", loads: true };
 
-		const { chosen, probes } = await chooseAdapter([dead, live], run);
-
-		expect(chosen).toBe(live);
-		expect(probes.map((probe) => probe.runs)).toEqual([false, true]);
-		// Both questions to the dead copy, then one to the live one, which answers it.
-		expect(asked).toBe(3);
+	test("an unspawnable candidate says so, and says what sits beside it", async () => {
+		const printed = describeProbe(await probeAdapter(candidate, unspawnable)).join("\n");
+		expect(printed).toContain("dies");
+		expect(printed).toContain("could not spawn");
+		expect(printed).toContain("uv_spawn");
+		expect(printed).toContain("beside it");
+		expect(printed).toContain("folder");
 	});
 
-	test("no candidate that starts leaves nothing chosen", async () => {
-		const { chosen, probes } = await chooseAdapter(
-			[{ path: "C:\\a\\lldb-dap.exe", source: "PATH" }],
-			runner({ code: 53 }),
+	test("a candidate that dies with a status prints the status of each question", async () => {
+		const printed = describeProbe(await probeAdapter(candidate, runner({ code: 53 }))).join(
+			"\n",
 		);
-		expect(chosen).toBeNull();
-		expect(probes).toHaveLength(1);
+		expect(printed).toContain("--version");
+		expect(printed).toContain("53 (0x35)");
+		expect(printed).toContain(join("C:\\LLVM\\bin"));
+	});
+
+	test("the cause line separates a refused process from one that died answering nothing", async () => {
+		const refused = await probeAdapter(candidate, unspawnable);
+		const silent = await probeAdapter(candidate, runner({ code: 53 }));
+		expect(causeLine([refused, silent])).toContain("1 could not be created at all");
+		expect(causeLine([refused, silent])).toContain("1 started and died");
 	});
 });
 
@@ -127,23 +162,5 @@ describe("what an exit status says", () => {
 
 	test("a status that arrives as a negative i32 keeps its hex word", () => {
 		expect(describeExit(0xc0000135 - 2 ** 32)).toContain("0xc0000135");
-	});
-
-	test("a process that has not ended has no status to print", () => {
-		expect(describeExit(null)).toBe("no exit status");
-	});
-});
-
-describe("a probe as log lines", () => {
-	test("names the adapter, its source, both questions and what sits beside it", async () => {
-		const probe = await probeAdapter(
-			{ path: join("C:\\LLVM\\bin", "lldb-dap.exe"), source: "PATH" },
-			runner({ code: 53 }),
-		);
-		const lines = describeProbe(probe).join("\n");
-		expect(lines).toContain("dies");
-		expect(lines).toContain("--version: 53 (0x35)");
-		expect(lines).toContain("-h: 53 (0x35)");
-		expect(lines).toContain("beside it:");
 	});
 });
