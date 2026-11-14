@@ -9,8 +9,9 @@
  * labels an integration test with the lib's `Running unittests src/lib.rs` header.
  */
 
-import { existsSync, readdirSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { CARGO_TEST, CARGO_TEST_SOURCE, relativeProgram, writeCargoProject } from "./fixtures";
 import {
 	type Discovery,
@@ -22,37 +23,38 @@ import {
 } from "./judge";
 import { type Harness, type Row, ask, newRow } from "./row";
 
-/** The crate's test binaries, and the directory cargo was asked to build them in. */
-const PACKAGE = "parity_cargo_tests";
-
 /**
- * The test binary cargo built for the fixture, or null when it is not under `target/debug/deps`.
+ * The test binary cargo built for the fixture, asked of cargo rather than guessed.
  *
- * The dock reads the executable out of cargo's own JSON, so this asserts the fixture's side of that
- * bargain: `cargo test --no-run` writes the harness binary into the debug profile, and a row that
- * found it elsewhere would be judging a stale or wrongly-profiled build. `CARGO_TARGET_DIR` is
- * honoured because a runner may redirect it, and it is resolved against the project root the way
- * cargo resolves it.
+ * The dock reads the executable out of cargo's own JSON, so this asserts the same bargain from the
+ * other side: `cargo test --no-run --message-format=json` in the fixture names the harness binary it
+ * wrote, and that file must exist. A target directory is not a fixed layout — `CARGO_TARGET_DIR` can
+ * redirect it, and the integration test's binary is named after the *test*, not the package — so the
+ * filename is read from cargo instead of being reconstructed.
  */
 function testBinary(root: string): string | null {
-	const configured = process.env.CARGO_TARGET_DIR?.trim();
-	const base =
-		configured === undefined || configured === ""
-			? join(root, "target")
-			: resolve(root, configured);
-	const deps = join(base, "debug", "deps");
-	if (!existsSync(deps)) return null;
-	for (const name of readdirSync(deps)) {
-		if (!name.startsWith(`${PACKAGE}-`)) continue;
-		if (/\.(d|rlib|pdb|rmeta)$/.test(name)) continue;
-		const path = join(deps, name);
+	const result = spawnSync("cargo", ["test", "--no-run", "--message-format=json"], {
+		cwd: root,
+		encoding: "utf8",
+		timeout: 180_000,
+	});
+	if (result.status !== 0) return null;
+	for (const line of result.stdout.split("\n")) {
+		if (!line.trim().startsWith("{")) continue;
+		let message: {
+			reason?: string;
+			executable?: string | null;
+			target?: { kind?: string[]; name?: string };
+		};
 		try {
-			const stat = statSync(path);
-			const runnable = process.platform === "win32" || (stat.mode & 0o111) !== 0;
-			if (stat.isFile() && runnable) return path;
+			message = JSON.parse(line);
 		} catch {
-			// An entry that cannot be read cannot be the binary; the next name is tried.
+			continue;
 		}
+		if (message.reason !== "compiler-artifact") continue;
+		if (!message.target?.kind?.includes("test")) continue;
+		if (message.executable === null || message.executable === undefined) continue;
+		if (existsSync(message.executable)) return message.executable;
 	}
 	return null;
 }
@@ -90,8 +92,8 @@ export async function cargoRow(harness: Harness): Promise<Row> {
 	row.details.push(
 		`artefacts    ${binary === null ? "FAIL" : "PASS"}  ${
 			binary === null
-				? `no ${PACKAGE}-* test binary under target/debug/deps`
-				: relative(root, binary)
+				? "cargo --no-run named no test binary, or the file it named is missing"
+				: binary
 		}`,
 	);
 	if (binary === null) {
