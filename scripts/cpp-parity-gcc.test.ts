@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findGcc, NO_GCC } from "./cpp-parity-gcc";
+import { findGcc, NO_GCC } from "./cpp-parity/gcc";
 
 test("a machine with no GCC names the reason rather than a compiler", () => {
 	expect(findGcc([])).toBeNull();

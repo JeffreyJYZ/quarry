@@ -9,8 +9,8 @@
 
 import { existsSync, readdirSync } from "node:fs";
 import { delimiter, join } from "node:path";
-import type { Fixture } from "./cpp-parity-fixtures";
-import type { Measurement, Plan, RunResult } from "./cpp-parity-probe";
+import type { Fixture } from "./fixtures/types";
+import type { Measurement, Plan, RunResult } from "./types";
 
 /** How this platform installs a second toolchain, so a skip names a command that works there. */
 const INSTALL =
