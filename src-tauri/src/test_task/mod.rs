@@ -1,15 +1,16 @@
 //! Test discovery and single-test runs.
 //!
-//! Two suites share one dock. Cargo discovery runs `cargo test -- --list --format terse` in the
-//! project's build root and parses the `path::name: test` lines; each name takes the test binary
-//! from the closest preceding `Running …` header, or the crate name when no header was seen.
-//! GoogleTest discovery asks a program the project's run configurations name for
-//! `--gtest_list_tests`, and one case runs as `--gtest_filter=Suite.Case`.
+//! Two suites share one dock. Cargo discovery runs `cargo test --no-run --message-format=json` in
+//! the project's build root, which names each test target's source file and executable, and then
+//! asks every executable for `--list --format terse`; each name is labelled with the binary's own
+//! source path, so no stream merge can decide which file a case belongs to. GoogleTest discovery
+//! asks a program the project's run configurations name for `--gtest_list_tests`, and one case runs
+//! as `--gtest_filter=Suite.Case`.
 //!
-//! Neither command builds ahead of time, so either may compile: a discovery run is killed after
-//! `LIST_TIMEOUT` (cargo) or `GTEST_LIST_TIMEOUT` (gtest), and a test run after `RUN_TIMEOUT`.
-//! A failing test, or a non-zero exit that still produced parseable output, is a result rather
-//! than a command error. Nothing is written to disk.
+//! Neither builds ahead of a run: the discovery pass compiles, so it is killed after `LIST_TIMEOUT`
+//! (cargo) plus `EXE_LIST_TIMEOUT` per binary, or `GTEST_LIST_TIMEOUT` (gtest), and a test run after
+//! `RUN_TIMEOUT`. A failing test, or a non-zero exit that still produced parseable output, is a
+//! result rather than a command error. Nothing is written to disk.
 
 #![allow(unused_imports)]
 pub(crate) use crate::project;
@@ -33,6 +34,9 @@ pub use capture::*;
 
 mod running_header;
 pub use running_header::*;
+
+mod targets;
+pub use targets::*;
 
 mod tests_1;
 pub use tests_1::*;

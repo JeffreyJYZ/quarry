@@ -138,10 +138,10 @@ row that cannot run there says why instead of passing.
 Two more rows run in the same `windows` job, from their own scripts, because they measure the app's
 other seams rather than the compiler's:
 
-| capability  | script                            | what it proves                                                                                                                                                                                                                          |
-| ----------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| test-runner | `scripts/parity-windows-tests.ts` | GoogleTest cases are discovered from `<program> --gtest_list_tests` under a 20 s kill and one runs through `--gtest_filter=Suite.Case` without its sibling's output; Cargo discovery names and runs its integration test                |
-| debugger    | `scripts/parity-windows-debug.ts` | a Debug build from the Visual Studio generator launches through the image's `lldb-dap`, a breakpoint verifies at the statement, the stopped frame names that line, `evaluate` reads a local before and after a step, and continue exits |
+| capability  | script                            | what it proves                                                                                                                                                                                                                                         |
+| ----------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| test-runner | `scripts/parity-windows-tests.ts` | GoogleTest cases are discovered from `<program> --gtest_list_tests` under a 20 s kill and one runs through `--gtest_filter=Suite.Case` without its sibling's output; Cargo discovery labels the integration test with the file it lives in and runs it |
+| debugger    | `scripts/parity-windows-debug.ts` | a Debug build from the Visual Studio generator launches through the image's `lldb-dap`, a breakpoint verifies at the statement, the stopped frame names that line, `evaluate` reads a local before and after a step, and continue exits                |
 
 Neither hardcodes what the image ships: the generator is discovered with `cmake --help` plus a real
 configure per candidate, and `lldb-dap` is looked for on `PATH`, in `%ProgramFiles%\LLVM\bin` and in
@@ -164,16 +164,16 @@ header.
 The Windows test-runner half is a second probe, `bun scripts/parity-windows-tests.ts`. It builds a
 CMake project whose suite is a GoogleTest-shaped program and a Cargo project with one integration
 test, then asks the product through `src-tauri/examples/quarry-tests.rs` → `test_plan`, so the dock's
-own `--gtest_list_tests` parse, `--gtest_filter=Suite.Case` argv and `cargo test -- --list --format
-terse` parse are what the row judges:
+own `--gtest_list_tests` parse, `--gtest_filter=Suite.Case` argv and Cargo discovery are what the row
+judges:
 
-| capability       | what it proves                                                                                                                            |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| gtest: discovery | the suite and case come from `.quarry/launch.json`'s program, named `Suite.Case` under `gtest`, and the program asked is the built `.exe` |
-| gtest: 20 s kill | a program that never answers is killed at the dock's own bound and reported as a note, not left to wedge the tree                         |
-| gtest: case run  | one case runs through `--gtest_filter=Suite.Case`, passes, and its own stdout reaches the report                                          |
-| cargo: discovery | `cargo test -- --list --format terse` names the integration test under suite `cargo`, which needs `cargo.exe` resolved on Windows         |
-| cargo: case run  | the named test runs and the report keeps cargo's own `1 passed` summary                                                                   |
+| capability       | what it proves                                                                                                                                                                                                                                            |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| gtest: discovery | the suite and case come from `.quarry/launch.json`'s program, named `Suite.Case` under `gtest`, and the program asked is the built `.exe`                                                                                                                 |
+| gtest: 20 s kill | a program that never answers is killed at the dock's own bound and reported as a note, not left to wedge the tree                                                                                                                                         |
+| gtest: case run  | one case runs through `--gtest_filter=Suite.Case`, passes, and its own stdout reaches the report                                                                                                                                                          |
+| cargo: discovery | `cargo test --no-run --message-format=json` names the test target's source and executable, that executable's own `--list` names the case, and it is grouped under `tests/parity.rs` rather than `src/lib.rs`, which needs `cargo.exe` resolved on Windows |
+| cargo: case run  | the named test runs and the report keeps cargo's own `1 passed` summary                                                                                                                                                                                   |
 
 The GoogleTest half vendors a header-only runner rather than `FetchContent`ing googletest: quarry
 never links gtest, it only speaks the binary's `--gtest_list_tests` / `--gtest_filter=` contract, so
@@ -187,16 +187,20 @@ Windows verdict is pending**: it has not run on `windows-latest` in this branch,
 that the row exists and says why it cannot run, nothing more. Locally, the same fixtures built by
 hand with Apple clang and the same `quarry-tests` binary answered: discovery named
 `ParitySuite.HoldsValues` from the built program, the case run carried `parity-case-output total=5`,
-a never-answering program was killed at 20.0 s with the dock's own note, and both Cargo answers named
-and ran `adds_two_and_three`.
+a never-answering program was killed at 20.0 s with the dock's own note, and both Cargo answers
+labelled `adds_two_and_three` with `tests/parity.rs` and ran it.
 
 One defect was found by reading before the row could run: the shared resolver stat-ed a bare `cargo`
 and never `cargo.exe`, so the dock's Cargo discovery could not have spawned cargo on Windows. It is
-fixed in `src-tauri/src/resolve/source.rs` and unit-tested. Observed and not fixed: the Cargo list
-labels the integration test `adds_two_and_three` with the binary `src/lib.rs` rather than
-`tests/parity.rs`, because cargo prints its `Running …` headers on unbuffered stderr while the test
-names arrive on buffered stdout; the name the gutter runs by is correct, and the grouping label is a
-separate slice.
+fixed in `src-tauri/src/resolve/source.rs` and unit-tested. The Cargo list also grouped
+`adds_two_and_three` under `src/lib.rs` rather than `tests/parity.rs`, because cargo prints its
+`Running …` headers on unbuffered stderr while the test names arrive on buffered stdout, so the one
+merged `--list` pass attributed each name to whichever header won the race. Discovery now builds the
+test targets with `cargo test --no-run --message-format=json`, reads each target's `src_path` and
+`executable`, and lists every executable directly, so a case's label is the file it lives in and no
+stream merge can change it; `parse_tests'` header rule remains only for a listing that still carries
+one. The row pins that label, so grouping an integration test under the lib fails it instead of
+passing on the right name.
 
 Linux is the same probe run with `--linux` by the `linux` CI job on `ubuntu-latest`, where CLion's
 own default toolchain is GCC rather than Apple clang and every artefact is an ELF file with no

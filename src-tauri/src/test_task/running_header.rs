@@ -10,11 +10,14 @@ pub use std::time::{Duration, Instant};
 
 use super::*;
 
-/// Parses `--list --format terse` output: `path::name: test` lines, deduplicated by name.
+/// Parses one test binary's `--list --format terse` output: `path::name: test` lines, deduplicated
+/// by name and binary.
 ///
 /// `: bench` lines and anything that does not end in `: test` are ignored, and an inner `::` stays
-/// part of the name. Each name takes the label of the closest preceding `Running unittests …` or
-/// `Running tests/…` header, falling back to the crate name for tests listed before any header.
+/// part of the name. The label is the binary the output came from, so a caller that lists one
+/// executable per run gets that target's source path; a `Running unittests …` or `Running tests/…`
+/// header, if one is present, re-points the label for the names after it, falling back to
+/// `crate_name` for tests listed before any header.
 pub fn parse_tests(merged: &str, crate_name: &str) -> Vec<TestItem> {
     let mut binary = crate_name.to_string();
     let mut seen = std::collections::HashSet::new();
@@ -29,7 +32,7 @@ pub fn parse_tests(merged: &str, crate_name: &str) -> Vec<TestItem> {
         let Some(name) = test_name(line) else {
             continue;
         };
-        if !seen.insert(name.clone()) {
+        if !seen.insert((name.clone(), binary.clone())) {
             continue;
         }
         items.push(TestItem {

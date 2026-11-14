@@ -21,5 +21,14 @@ export const OTHER_OUTPUT = "parity-other-output";
 export const GTEST_PROGRAM = "parity_gtest.exe";
 export const GTEST_HANG_PROGRAM = "parity_gtest_hang.exe";
 
-/** The Cargo test the dock's `cargo test -- --list --format terse` run must name. */
+/** The Cargo test the dock's Cargo discovery must name. */
 export const CARGO_TEST = "adds_two_and_three";
+
+/**
+ * The file that test lives in: the label the dock must show beside it, and never `src/lib.rs`.
+ *
+ * Cargo prints its `Running unittests src/lib.rs` header on stderr before the integration test's
+ * name reaches stdout, so a single merged `--list` pass labels the case with whichever header won
+ * the race. The row pins the honest label, not just the name.
+ */
+export const CARGO_TEST_SOURCE = "tests/parity.rs";

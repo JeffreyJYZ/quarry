@@ -144,9 +144,19 @@ pub fn cargo_program() -> String {
         .unwrap_or_else(|| DEFAULT_CARGO.to_string())
 }
 
-/// Both streams joined in arrival order, for the line-oriented parsers.
+/// Both streams joined in arrival order, for the line-oriented parsers that want them merged.
 pub fn merged_text(lines: &[Line]) -> String {
     line_texts(lines).join("\n")
+}
+
+/// One stream's lines joined: the JSON and `--list` parsers must never read the other pipe.
+pub fn stdout_text(lines: &[Line]) -> String {
+    lines
+        .iter()
+        .filter(|line| !line.stderr)
+        .map(|line| line.text.as_str())
+        .collect::<Vec<&str>>()
+        .join("\n")
 }
 
 pub fn line_texts(lines: &[Line]) -> Vec<String> {
