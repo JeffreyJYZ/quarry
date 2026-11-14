@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { closeBrackets } from "@codemirror/autocomplete";
 import { cpp } from "@codemirror/lang-cpp";
 import { EditorState } from "@codemirror/state";
-import { cppEditing, closesScopeAt, scopeIndentAt } from "@/lib/editor/cppEditing";
+import { boundedPlan, closesScopeAt, cppEditing, scopeIndentAt } from "@/lib/editor/cppEditing";
 
 const stateFor = (doc: string) =>
 	EditorState.create({ doc, extensions: [cpp(), closeBrackets(), cppEditing()] });
@@ -149,5 +149,45 @@ describe("cppEditing", () => {
 	test("a function brace is not mistaken for a class", () => {
 		const state = stateFor("void f() {\n    int x = 1;\n}\n");
 		expect(closesScopeAt(state, state.doc.toString().lastIndexOf("}") + 1)).toBe(false);
+	});
+
+	test("typing anywhere in a class body leaves the caret inside the document", () => {
+		// The property the whole filter rests on: one keystroke, one change, a plan measured on the text
+		// it lands in — every position, and the rules' own triggers.
+		const doc = "namespace n {\n    class B {\n        int y;\n    \n    }\n};\n";
+		for (let at = 0; at <= doc.length; at += 1) {
+			for (const text of ["}", "{", "{}", ":", ";"]) {
+				const typed = type(stateFor(doc), at, text);
+				expect(typed.selection.main.head).toBeLessThanOrEqual(typed.doc.length);
+			}
+		}
+	});
+
+	test("a guard: a plan can never hand CodeMirror a caret outside its document", () => {
+		// Not a user path: with no `allowMultipleSelections` typing is one change per transaction. This
+		// is the shape such an extension would make reachable, and it must not take the window down.
+		const doc = "class A {\n    int x;\n    \n}\n";
+		const typed = stateFor(doc).update({
+			changes: [
+				{ from: 21, insert: "}" },
+				{ from: 26, insert: "}" },
+			],
+			selection: { anchor: 27 },
+			userEvent: "input.type",
+		}).state;
+		expect(typed.doc.toString()).toBe("class A {\n    int x;\n};}\n");
+		expect(typed.selection.main.head).toBeLessThanOrEqual(typed.doc.length);
+	});
+
+	test("a guard: an edit past the end is dropped and a caret past it is clamped", () => {
+		const edits = [
+			{ from: 0, to: 2, insert: "" },
+			{ from: 14, insert: ";" },
+		];
+		const plan = { edits, selection: 16 };
+		// A heuristic position it cannot place disappears rather than being dispatched.
+		expect(boundedPlan(plan, 10)).toEqual({ edits: [edits[0]], selection: 8 });
+		const late = { edits: [{ from: 4, insert: ";" }], selection: 40 };
+		expect(boundedPlan(late, 10).selection).toBe(11);
 	});
 });
