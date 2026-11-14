@@ -143,10 +143,11 @@ pub async fn dap_set_data_breakpoints(
 
 #[tauri::command]
 pub async fn dap_stop(state: State<'_, DapState>, session: String) -> Result<(), String> {
-    let session = lock(&state.sessions).remove(&session);
-    if let Some(session) = session {
-        session.shutdown();
+    let stopped = lock(&state.sessions).remove(&session);
+    if let Some(stopped) = stopped {
+        stopped.shutdown();
     }
+    crate::logging::dap_exited(&session, "stopped");
 
     Ok(())
 }

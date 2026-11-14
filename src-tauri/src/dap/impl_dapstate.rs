@@ -29,12 +29,10 @@ impl DapState {
     /// Ends every debug session; used when the window goes away and on exit, so no adapter
     /// outlives it.
     pub fn shutdown_all(&self) {
-        let sessions: Vec<_> = lock(&self.sessions)
-            .drain()
-            .map(|(_, session)| session)
-            .collect();
-        for session in sessions {
+        let sessions: Vec<(String, Arc<Session>)> = lock(&self.sessions).drain().collect();
+        for (id, session) in sessions {
             session.shutdown();
+            crate::logging::dap_exited(&id, "stopped (app exit)");
         }
     }
 }
@@ -54,8 +52,11 @@ pub async fn dap_launch(
     let mut command = Command::new(&adapter);
     command.current_dir(&cwd);
     command.env("PATH", resolve::child_path(Path::new(&adapter)));
-    let (mut pipe, stderr) = ProcessPipe::spawn_with_stderr(&mut command)
-        .map_err(|error| format!("cannot start {ADAPTER} ({adapter}) for {root}: {error}"))?;
+    let (mut pipe, stderr) = ProcessPipe::spawn_with_stderr(&mut command).map_err(|error| {
+        let message = format!("cannot start {ADAPTER} ({adapter}) for {root}: {error}");
+        crate::logging::dap_failed(&root, &message);
+        message
+    })?;
 
     let captured_filters = match handshake_launch(&mut pipe, &adapter, &config, &cwd) {
         Ok(filters) => filters,
@@ -65,7 +66,9 @@ pub async fn dap_launch(
             let exit = pipe.exit_code(STDERR_WAIT);
             let said = stderr.wait(STDERR_WAIT);
             let _ = pipe.kill();
-            return Err(format_start_failure(&adapter, &reason, &said, exit));
+            let message = format_start_failure(&adapter, &reason, &said, exit);
+            crate::logging::dap_failed(&root, &message);
+            return Err(message);
         }
     };
 
@@ -77,6 +80,7 @@ pub async fn dap_launch(
         Some(config_for_session),
         captured_filters,
     )?;
+    crate::logging::dap_started(&id, &config.program);
 
     Ok(DapSession {
         id,
@@ -101,7 +105,9 @@ pub async fn dap_attach(
     let mut command = Command::new(&adapter);
     command.env("PATH", resolve::child_path(Path::new(&adapter)));
     let (mut pipe, stderr) = ProcessPipe::spawn_with_stderr(&mut command).map_err(|error| {
-        format!("cannot start {ADAPTER} ({adapter}) to attach to {pid}: {error}")
+        let message = format!("cannot start {ADAPTER} ({adapter}) to attach to {pid}: {error}");
+        crate::logging::dap_failed(&format!("attach {pid}"), &message);
+        message
     })?;
 
     let (process_name, captured_filters) = match handshake_attach(&mut pipe, &adapter, pid) {
@@ -110,11 +116,14 @@ pub async fn dap_attach(
             let exit = pipe.exit_code(STDERR_WAIT);
             let said = stderr.wait(STDERR_WAIT);
             let _ = pipe.kill();
-            return Err(format_start_failure(&adapter, &reason, &said, exit));
+            let message = format_start_failure(&adapter, &reason, &said, exit);
+            crate::logging::dap_failed(&format!("attach {pid}"), &message);
+            return Err(message);
         }
     };
 
     let id = register_session(app, &state, pipe, None, captured_filters)?;
+    crate::logging::dap_started(&id, &format!("attach {pid}"));
 
     Ok(DapSession {
         id,

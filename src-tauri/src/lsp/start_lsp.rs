@@ -45,6 +45,7 @@ pub async fn start_lsp(
     match start_lsp_session(app, state.inner(), &root, &overrides).await {
         Ok(reply) => {
             lock(&state.in_flight).remove(&root);
+            crate::logging::lsp_started(&root, &reply.status.server);
             Ok(reply)
         }
         Err(error) => {
@@ -52,6 +53,7 @@ pub async fn start_lsp(
             // later document syncs talk to a server that is not there.
             lock(&state.sessions).remove(&root);
             lock(&state.in_flight).remove(&root);
+            crate::logging::lsp_failed(&root, &error);
             Err(error)
         }
     }

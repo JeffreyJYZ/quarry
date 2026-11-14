@@ -9,6 +9,7 @@ mod git;
 mod ignore;
 mod launch;
 mod lifecycle;
+mod logging;
 mod lsp;
 mod menu;
 mod new_project;
@@ -46,6 +47,8 @@ pub use startup::*;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // First, so a panic anywhere below is already in the log file.
+    logging::install();
     let _start = process_start();
     if startup_enabled() {
         eprintln!("quarry startup: process-start (enabled by QUARRY_STARTUP/ debug build)");
@@ -64,6 +67,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             version,
             startup_ms,
+            logging::log_ui_error,
+            logging::log_path,
             toolchain::toolchains,
             project::open_project,
             workspace::list_dir,

@@ -1,5 +1,7 @@
 # Integration probes
 
+The crash log the probes help diagnose is described in [`logs.md`](logs.md).
+
 Run all probes:
 
     bun scripts/integration.ts
