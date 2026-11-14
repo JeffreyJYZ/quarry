@@ -8,7 +8,7 @@
  * startup death into a bare `exit 53` with no cause.
  */
 
-import { describeExit } from "./windows-debug-adapter";
+import { describeExit } from "./windows-debug-exit";
 
 type Json = Record<string, unknown>;
 

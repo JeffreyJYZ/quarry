@@ -109,25 +109,52 @@ export function verbatimPath(path: string, platform: string = process.platform):
 }
 
 /** Run one command to completion and keep both streams, which every failure reports verbatim. */
-export function run(
+/** What one command produced, plus the reason it could not be created at all. */
+export interface RunOutcome extends RunResult {
+	/** Why the process could not be created, when the OS refused it outright. */
+	spawn: string | null;
+}
+
+/**
+ * Run one command to completion and keep both streams, which every failure reports verbatim.
+ *
+ * A process the OS refuses to create is data, not an exception: on Windows `CreateProcess` answers
+ * `ERROR_MOD_NOT_FOUND` for a program whose DLL is missing and libuv surfaces it as `EUNKNOWN`, and
+ * the row that finds one candidate like that must still be able to try the next. The first run of
+ * the probe died exactly there — `uv_spawn` thrown out of `chooseAdapter` and out of the row.
+ */
+export async function run(
 	bin: string,
 	args: string[],
 	cwd: string,
 	timeout = 180_000,
-): Promise<RunResult> {
-	return new Promise((resolve) => {
-		const child = Bun.spawn([bin, ...args], {
+): Promise<RunOutcome> {
+	let child: ReturnType<typeof Bun.spawn>;
+	try {
+		child = Bun.spawn([bin, ...args], {
 			cwd,
 			stdin: "ignore",
 			stdout: "pipe",
 			stderr: "pipe",
 		});
-		const stdout = new Response(child.stdout as ReadableStream).text();
-		const stderr = new Response(child.stderr as ReadableStream).text();
-		const timer = setTimeout(() => child.kill(), timeout);
-		void child.exited.then(async (code) => {
-			clearTimeout(timer);
-			resolve({ code, stdout: await stdout, stderr: await stderr });
-		});
-	});
+	} catch (error) {
+		return { code: null, stdout: "", stderr: "", spawn: messageOf(error) };
+	}
+
+	const stdout = new Response(child.stdout as ReadableStream).text();
+	const stderr = new Response(child.stderr as ReadableStream).text();
+	const timer = setTimeout(() => child.kill(), timeout);
+	try {
+		const code = await child.exited;
+		clearTimeout(timer);
+		return { code, stdout: await stdout, stderr: await stderr, spawn: null };
+	} catch (error) {
+		clearTimeout(timer);
+		return { code: null, stdout: "", stderr: "", spawn: messageOf(error) };
+	}
+}
+
+/** An error as one line, whichever shape it arrives in. */
+function messageOf(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
 }
