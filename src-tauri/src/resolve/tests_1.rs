@@ -58,3 +58,36 @@ pub mod tests_group_1 {
         assert!(second_tool.exists());
     }
 }
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub mod tests_group_4 {
+    use super::*;
+
+    /// The defect the Windows test-runner row exposed: a bare `cargo` was stat-ed as `cargo`, never
+    /// `cargo.exe`, so the dock's Cargo discovery answered "cargo was not found on PATH" on Windows.
+    #[test]
+    pub fn windows_candidates_carry_the_exe_suffix() {
+        let names: Vec<String> = tool_candidates_on("cargo", true)
+            .iter()
+            .map(|name| name.to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(names, vec!["cargo".to_string(), "cargo.exe".to_string()]);
+    }
+
+    #[test]
+    pub fn a_name_that_already_ends_in_exe_is_not_doubled() {
+        assert_eq!(
+            tool_candidates_on("Cargo.EXE", true),
+            vec![OsString::from("Cargo.EXE")]
+        );
+    }
+
+    #[test]
+    pub fn other_platforms_try_the_name_alone() {
+        assert_eq!(
+            tool_candidates_on("cargo", false),
+            vec![OsString::from("cargo")]
+        );
+    }
+}

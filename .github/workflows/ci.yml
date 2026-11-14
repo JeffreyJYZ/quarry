@@ -98,9 +98,16 @@ jobs:
                   QUARRY_PLAN_BIN: src-tauri\target\debug\examples\quarry-plan.exe
               run: bun scripts/cpp-parity-probe.ts --windows
 
-            # The debugger half of CLion parity: a Debug build from the Visual Studio generator,
-            # launched through the lldb-dap the image installed, stopped at a source line and stepped.
-            # It prints one line per assertion and the full request/response window on failure.
+            # The test dock's half of CLion parity: GoogleTest discovery and a filtered case run, and
+            # Cargo discovery, judged through the same seam the app uses rather than a re-parse.
+            - name: Test-runner row (Windows)
+              env:
+                  QUARRY_TESTS_BIN: src-tauri\target\debug\examples\quarry-tests.exe
+              run: bun scripts/parity-windows-tests.ts
+
+            # The debugger half: a Debug build from the Visual Studio generator, launched through the
+            # lldb-dap the image installed, stopped at a source line and stepped. It prints one line per
+            # assertion and the full request/response window on failure.
             - name: Debugger row (Windows)
               run: bun scripts/parity-windows-debug.ts
 
