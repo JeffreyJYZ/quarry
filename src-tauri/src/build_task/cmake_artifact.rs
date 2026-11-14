@@ -6,12 +6,6 @@ pub use std::time::SystemTime;
 
 use super::*;
 
-/// The text CMake prints once a target is up to date: `[100%] Built target <name>`.
-///
-/// The percentage prefix differs by generator (Makefiles print `[100%]`, Ninja `[2/2]`), so only
-/// the marker and the name that follows it are matched.
-pub const BUILT_TARGET_MARKER: &str = "Built target ";
-
 /// How deep the nested-layout search goes under the build root.
 pub const TARGET_SEARCH_DEPTH: usize = 4;
 
@@ -22,26 +16,6 @@ pub const MULTI_CONFIG_DIRS: [&str; 4] = [
     "RelWithDebInfo",
     "MinSizeRel",
 ];
-
-/// Every target this build printed, in the order it first printed it.
-///
-/// CMake names a target whether it rebuilt it or found it up to date, and it names libraries and
-/// utility targets too, so this is a list of *candidates*, not executables. A target can appear
-/// more than once across a build, so repeats are dropped here rather than by the resolver.
-pub fn reported_targets(output: &str) -> Vec<String> {
-    let mut names: Vec<String> = Vec::new();
-    for line in output.lines() {
-        let Some((_, tail)) = line.split_once(BUILT_TARGET_MARKER) else {
-            continue;
-        };
-        let name = tail.trim();
-        if name.is_empty() || names.iter().any(|seen| seen == name) {
-            continue;
-        }
-        names.push(name.to_string());
-    }
-    names
-}
 
 /// The program a reported target wrote, when one exists under `build_root`.
 ///
@@ -91,13 +65,30 @@ pub fn resolve_target(build_root: &Path, name: &str, written_since: SystemTime) 
 /// A name that resolves feeds `choose_artifact` as the reported target, so a newer helper binary
 /// written by the same build cannot take the launch. Nothing resolving is not a failure: the
 /// mtime answer decides, which is what Run did before CMake reported targets at all.
-pub fn cmake_artifact(output: &str, build_root: &Path, started_at: SystemTime) -> Option<String> {
+///
+/// A Makefiles build prints `Built target <name>` even when it finds the target up to date, so the
+/// reported name is enough there. A Ninja or Xcode build with nothing to do prints no target line
+/// and writes no file, so both the reported target and the mtime rule say "produced nothing" for a
+/// binary that is present and current — the one the user is asking to run again.
+///
+/// The fallback is therefore narrow, and the order is what keeps a wrong binary from launching:
+/// a reported target wins, then any candidate this build actually wrote, and only when it wrote
+/// nothing at all does the target's existing executable become the answer. A build that wrote a
+/// different or newer binary still picks that one, and a target that does not exist stays `None`.
+pub fn cmake_artifact_for(
+    output: &str,
+    build_root: &Path,
+    started_at: SystemTime,
+    target: Option<&str>,
+) -> Option<String> {
     let reported = best_reported(output, build_root, started_at);
-    choose_artifact(
-        &executable_candidates(build_root),
-        started_at,
-        reported.as_deref(),
-    )
+    let candidates = executable_candidates(build_root);
+    if let Some(path) = choose_artifact(&candidates, started_at, reported.as_deref()) {
+        return Some(path);
+    }
+
+    let target = target.map(str::trim).filter(|name| !name.is_empty())?;
+    resolve_target(build_root, target, started_at).map(|path| external(&path))
 }
 
 /// The best of several reported targets: a file this build wrote first, then the newest, then path.

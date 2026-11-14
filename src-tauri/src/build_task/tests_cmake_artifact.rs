@@ -45,7 +45,7 @@ pub mod tests_group_cmake_artifact {
         // The library target reports too, and no file named `app_lib` exists.
         let output = "[ 50%] Built target app_lib\n[100%] Built target demo\n";
         assert_eq!(
-            cmake_artifact(output, root, recent()).as_deref(),
+            cmake_artifact_for(output, root, recent(), None).as_deref(),
             Some(demo.to_string_lossy().as_ref())
         );
     }
@@ -65,7 +65,7 @@ pub mod tests_group_cmake_artifact {
         write_executable(&worker);
 
         // `Built target demo` with no `demo` on disk: the reported name must not become a path.
-        let artifact = cmake_artifact("Built target demo\n", root, recent());
+        let artifact = cmake_artifact_for("Built target demo\n", root, recent(), None);
         assert_eq!(artifact.as_deref(), Some(worker.to_string_lossy().as_ref()));
     }
 
@@ -79,7 +79,7 @@ pub mod tests_group_cmake_artifact {
         write_executable(&root.join("mathlib.dylib"));
 
         assert_eq!(
-            cmake_artifact("Built target mathlib\n", root, recent()),
+            cmake_artifact_for("Built target mathlib\n", root, recent(), None),
             None
         );
     }
@@ -100,7 +100,7 @@ pub mod tests_group_cmake_artifact {
             Some(root.join("demo_test").to_string_lossy().as_ref())
         );
         assert_eq!(
-            cmake_artifact("Built target demo\n", root, recent()).as_deref(),
+            cmake_artifact_for("Built target demo\n", root, recent(), None).as_deref(),
             Some(demo.to_string_lossy().as_ref())
         );
     }
