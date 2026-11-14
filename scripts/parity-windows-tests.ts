@@ -4,12 +4,13 @@
  * build on.
  *
  * CLion's parity here is two things a user sees: the test tree is populated from the project's own
- * runner, and a case can be executed from the gutter. quarry's dock does that with
- * `cargo test -- --list --format terse` for a Cargo project, and with `<program> --gtest_list_tests`
- * plus `<program> --gtest_filter=Suite.Case` for a C/C++ project whose `.quarry/launch.json` names
- * a program. This row builds both projects on `windows-latest`, asks the product through
- * `examples/quarry-tests.rs` — so the parse, argv and exit handling judged are quarry's, not this
- * script's — and prints PASS/FAIL per capability.
+ * runner, and a case can be executed from the gutter. quarry's dock does that for a Cargo project by
+ * building the test targets with `cargo test --no-run --message-format=json` and asking each built
+ * executable for `--list --format terse`, and for a C/C++ project whose `.quarry/launch.json` names
+ * a program with `<program> --gtest_list_tests` plus `<program> --gtest_filter=Suite.Case`. This row
+ * builds both projects on `windows-latest`, asks the product through `examples/quarry-tests.rs` — so
+ * the parse, argv and exit handling judged are quarry's, not this script's — and prints PASS/FAIL
+ * per capability.
  *
  * Windows-specific facts the row pins down: the gtest program is the `<Config>/<name>.exe` the
  * Visual Studio generator writes, `--config Debug` is what puts it there, and the image ships no

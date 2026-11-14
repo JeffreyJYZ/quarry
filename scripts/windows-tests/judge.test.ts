@@ -9,7 +9,14 @@
 
 import { describe, expect, test } from "bun:test";
 import type { Discovery, Report } from "./judge";
-import { caseCarried, describeRun, findTest, onlyCaseRan, timeoutNote } from "./judge";
+import {
+	caseCarried,
+	describeRun,
+	findTest,
+	groupedUnder,
+	onlyCaseRan,
+	timeoutNote,
+} from "./judge";
 import { visualStudioGenerators } from "./tools";
 
 const listed = (items: Discovery["items"], notes: string[] = []): Discovery => ({
@@ -40,6 +47,19 @@ describe("the case a discovery answer must hold", () => {
 			{ name: "ParitySuite.HoldsOtherValues", binary: "parity_gtest.exe", suite: "gtest" },
 		]);
 		expect(findTest(discovery, "ParitySuite.HoldsValues", "gtest")).toBeNull();
+	});
+
+	test("a Cargo case is grouped under the file it lives in, not the lib", () => {
+		const cargo = (binary: string): Discovery => ({
+			items: [{ name: "adds_two_and_three", binary, suite: "cargo" }],
+			program: null,
+			notes: [],
+		});
+		const item = (discovery: Discovery) => findTest(discovery, "adds_two_and_three", "cargo");
+
+		expect(groupedUnder(item(cargo("tests/parity.rs")), "tests/parity.rs")).toBe(true);
+		expect(groupedUnder(item(cargo("src/lib.rs")), "tests/parity.rs")).toBe(false);
+		expect(groupedUnder(null, "tests/parity.rs")).toBe(false);
 	});
 });
 

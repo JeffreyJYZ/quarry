@@ -36,7 +36,7 @@ export function writeGtestProject(root: string): void {
 	});
 }
 
-/** The Cargo project: one integration test, so `--list --format terse` names it. */
+/** The Cargo project: one integration test, which the dock must label with this file. */
 export function writeCargoProject(root: string): void {
 	writeFiles(root, {
 		"Cargo.toml": CARGO_MANIFEST,

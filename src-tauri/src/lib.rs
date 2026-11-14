@@ -16,9 +16,6 @@ mod processes;
 mod project;
 /// The plan a project would run, printed by `src/bin/quarry-plan.rs` for the parity probe.
 pub mod project_plan;
-/// The test dock's discovery and single-case run, printed by `examples/quarry-tests.rs` for the
-/// parity probe.
-pub mod test_plan;
 mod protocol_pipe;
 mod pty;
 mod resolve;

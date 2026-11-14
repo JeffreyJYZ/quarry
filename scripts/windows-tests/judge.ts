@@ -8,7 +8,7 @@
 
 export interface DiscoveryItem {
 	name: string;
-	/** The test binary: the gtest program, or the Cargo source path the `Running …` header named. */
+	/** The test binary: the gtest program, or the Cargo source file the target was built from. */
 	binary: string;
 	/** `gtest` or `cargo`, the label the dock groups by. */
 	suite: string;
@@ -43,6 +43,17 @@ export function findTest(discovery: Discovery, name: string, suite?: string): Di
 export function timeoutNote(discovery: Discovery, seconds: number): string | null {
 	const wanted = `timed out after ${seconds} s`;
 	return discovery.notes.find((note) => note.includes(wanted)) ?? null;
+}
+
+/**
+ * Whether a case is grouped under the file it lives in.
+ *
+ * Cargo prints `Running unittests src/lib.rs` on stderr before an integration test's name reaches
+ * stdout, so a merged listing groups `tests/parity.rs`'s case under the lib. The label is compared
+ * exactly, separators included: the product must spell a target's source the way the row does.
+ */
+export function groupedUnder(item: DiscoveryItem | null, source: string): boolean {
+	return item !== null && item.binary === source;
 }
 
 /** Whether a case run carried the body's own output and reported success. */
