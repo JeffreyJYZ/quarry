@@ -19,9 +19,11 @@ use serde::Serialize;
 use crate::build_task::{
     CMAKE_PROGRAM, CmakeOptions, PlainPlan, cmake_plan_target, external, plain_build_plan,
 };
-use crate::launch::{cmake_build_target, list_targets, resolve_target_in};
+use crate::launch::cmake_build_target;
 use crate::project::inspect;
 use crate::types::ProjectKind;
+
+mod targets;
 
 /// Re-exported so a caller of this seam (the `quarry-plan` example) names the same type.
 pub use crate::build_task::BuildProfile;
@@ -143,28 +145,7 @@ pub fn project_plan(root: &str, request: &PlanRequest) -> Result<Plan, String> {
         }
     };
 
-    let targets = list_targets(&info.root)
-        .unwrap_or_default()
-        .into_iter()
-        .map(|target| {
-            // The configuration the build was asked for decides which artifact this names: a
-            // multi-config tree has one executable per configuration and Run launches this one.
-            let resolved = resolve_target_in(
-                &info.root,
-                &target.id,
-                false,
-                Some(request.profile.cmake_config()),
-            );
-            Target {
-                id: target.id,
-                label: target.label,
-                kind: target.kind,
-                target: target.target,
-                program: resolved.as_ref().ok().map(|config| config.program.clone()),
-                error: resolved.err(),
-            }
-        })
-        .collect();
+    let targets = targets::plan_targets(&info.root, request.profile);
 
     // rust-analyzer has a manifest and needs no database, so only the C/C++ kinds are handed one.
     // The profile is the request's own: the plan the probe reads is the one that build would run,
