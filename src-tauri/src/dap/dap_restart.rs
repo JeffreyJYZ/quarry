@@ -49,16 +49,19 @@ pub async fn dap_restart(
     let mut command = Command::new(&adapter);
     command.current_dir(&cwd);
     command.env("PATH", resolve::child_path(Path::new(&adapter)));
-    let mut pipe = ProcessPipe::spawn(&mut command)
+    let (mut pipe, stderr) = ProcessPipe::spawn_with_stderr(&mut command)
         .map_err(|error| format!("cannot start {ADAPTER} ({adapter}) for {session}: {error}"))?;
 
     let adapter_filters = match handshake_launch(&mut pipe, &adapter, &config, &cwd) {
         Ok(adapter_filters) => adapter_filters,
-        Err(error) => {
+        Err(reason) => {
             // Kill and reap the new pipe explicitly (its `Drop` is not enough), then surface the
-            // error with the old entry untouched and therefore still addressable.
+            // error with the old entry untouched and therefore still addressable. The status and the
+            // adapter's own words are what make a relaunch that cannot start diagnosable.
+            let exit = pipe.exit_code(STDERR_WAIT);
+            let said = stderr.wait(STDERR_WAIT);
             let _ = pipe.kill();
-            return Err(error);
+            return Err(format_start_failure(&adapter, &reason, &said, exit));
         }
     };
 

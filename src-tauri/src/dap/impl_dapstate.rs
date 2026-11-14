@@ -54,14 +54,18 @@ pub async fn dap_launch(
     let mut command = Command::new(&adapter);
     command.current_dir(&cwd);
     command.env("PATH", resolve::child_path(Path::new(&adapter)));
-    let mut pipe = ProcessPipe::spawn(&mut command)
+    let (mut pipe, stderr) = ProcessPipe::spawn_with_stderr(&mut command)
         .map_err(|error| format!("cannot start {ADAPTER} ({adapter}) for {root}: {error}"))?;
 
     let captured_filters = match handshake_launch(&mut pipe, &adapter, &config, &cwd) {
         Ok(filters) => filters,
-        Err(error) => {
+        Err(reason) => {
+            // The child is already gone or about to be: wait briefly so the message can carry the
+            // status it left and the adapter's own words, then make sure it is reaped.
+            let exit = pipe.exit_code(STDERR_WAIT);
+            let said = stderr.wait(STDERR_WAIT);
             let _ = pipe.kill();
-            return Err(error);
+            return Err(format_start_failure(&adapter, &reason, &said, exit));
         }
     };
 
@@ -96,15 +100,17 @@ pub async fn dap_attach(
 
     let mut command = Command::new(&adapter);
     command.env("PATH", resolve::child_path(Path::new(&adapter)));
-    let mut pipe = ProcessPipe::spawn(&mut command).map_err(|error| {
+    let (mut pipe, stderr) = ProcessPipe::spawn_with_stderr(&mut command).map_err(|error| {
         format!("cannot start {ADAPTER} ({adapter}) to attach to {pid}: {error}")
     })?;
 
     let (process_name, captured_filters) = match handshake_attach(&mut pipe, &adapter, pid) {
         Ok((name, filters)) => (name, filters),
-        Err(error) => {
+        Err(reason) => {
+            let exit = pipe.exit_code(STDERR_WAIT);
+            let said = stderr.wait(STDERR_WAIT);
             let _ = pipe.kill();
-            return Err(error);
+            return Err(format_start_failure(&adapter, &reason, &said, exit));
         }
     };
 
