@@ -107,7 +107,6 @@ async function main(): Promise<number> {
 		console.log(`${LOG}  directory  ${artifactList(build)}`);
 		return 1;
 	}
-
 	const client = new DapClient(adapter, root);
 	const checks = await assertDebugSession(client, {
 		program,
@@ -129,13 +128,21 @@ async function main(): Promise<number> {
 	return 0;
 }
 
-/** What the build tree holds, so a missing artefact names what is there instead. */
+/** What the build tree holds, so a missing artefact names what is there instead of just the path. */
 function artifactList(build: string): string {
+	const parts = [listing(build, "build")];
+	const configuration = join(build, CONFIGURATION);
+	if (existsSync(configuration)) parts.push(listing(configuration, `build/${CONFIGURATION}`));
+	return parts.join("; ");
+}
+
+/** One directory's first entries, named, or the reason it could not be read. */
+function listing(directory: string, label: string): string {
 	try {
-		const entries = readdirSync(build).slice(0, 12);
-		return entries.length === 0 ? "the build tree is empty" : entries.join(", ");
+		const entries = readdirSync(directory).slice(0, 12);
+		return `${label} holds ${entries.length === 0 ? "nothing" : entries.join(", ")}`;
 	} catch {
-		return "the build tree does not exist";
+		return `${label} does not exist`;
 	}
 }
 

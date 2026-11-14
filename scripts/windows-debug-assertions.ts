@@ -12,8 +12,8 @@
  */
 
 import type { DapClient } from "./windows-debug-dap-client";
+import { Checks } from "./windows-debug-checks";
 import {
-	Checks,
 	configurationDone,
 	evaluate,
 	integerValue,
@@ -47,17 +47,17 @@ export async function assertDebugSession(
 		await launchSession(client, { program: target.program, cwd: target.cwd });
 
 		// The verbatim spelling first, because the plain one is the breakpoint the session keeps:
-		// setting the same file again replaces it.
+		// setting the same file again replaces it. What the adapter does with the prefix is evidence,
+		// not a requirement — the product never sends it — so it is a note, not an assertion.
 		const verbatim = verbatimPath(target.breakpointPath);
 		if (verbatim !== null) {
 			from = client.mark();
 			const spelled = await setBreakpoint(client, verbatim, target.breakpointLine);
-			checks.add(
-				"breakpoint verified with Windows' verbatim path prefix",
-				spelled.verified,
-				spelled.message,
-				from,
-				client.mark(),
+			checks.note(
+				"the verbatim spelling the project tree carries",
+				spelled.verified
+					? "the adapter placed it"
+					: `the adapter refused it (${spelled.message || "no message"})`,
 			);
 		}
 

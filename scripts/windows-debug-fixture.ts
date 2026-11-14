@@ -10,7 +10,7 @@
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 /** The target's name, which the generator writes as `build/Debug/<name>.exe`. */
 export const TARGET = "parity_windows_debug";
@@ -74,15 +74,28 @@ export function lineOf(source: string, needle: string): number {
 /** The path the row sets its breakpoint in, relative to the project root. */
 export const MAIN_SOURCE = join("app", "main.cpp");
 
-/** Write the project into `root` and answer with the file the breakpoint belongs to. */
+/** Every file of the project, relative to the root it is written into. */
+export const FILES: { relative: string; text: string }[] = [
+	{ relative: "CMakeLists.txt", text: MANIFEST },
+	{ relative: join("include", "value.h"), text: HEADER },
+	{ relative: join("core", "value.cpp"), text: CORE },
+	{ relative: MAIN_SOURCE, text: MAIN },
+];
+
+/**
+ * Write the project into `root` and answer with the file the breakpoint belongs to.
+ *
+ * Every path is composed from `root` and every file's directory is created first: the first run of
+ * this row on Windows died here, with `writeFixture` writing `app/main.cpp` relative to the process
+ * cwd — a fixture that would pass on a machine whose cwd happened to hold a stale `app/`, and fail
+ * everywhere else. Nothing here may depend on a directory it did not create.
+ */
 export function writeFixture(root: string): string {
-	mkdirSync(join(root, "app"), { recursive: true });
-	mkdirSync(join(root, "core"), { recursive: true });
-	mkdirSync(join(root, "include"), { recursive: true });
-	writeFileSync(join(root, "CMakeLists.txt"), MANIFEST);
-	writeFileSync(join(root, "include", "value.h"), HEADER);
-	writeFileSync(join(root, "core", "value.cpp"), CORE);
-	writeFileSync(join(MAIN_SOURCE), MAIN);
+	for (const file of FILES) {
+		const path = join(root, file.relative);
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, file.text);
+	}
 	return join(root, MAIN_SOURCE);
 }
 

@@ -153,7 +153,8 @@ Not verified here, and therefore not claimed: cross-compilers other than the one
 and diagnostics parity beyond clangd's own output. The MSVC control run is reported as evidence rather
 than required — when clangd answers without `--query-driver`, the row says so. Both non-compiler rows
 run in the same job and their verdicts are the job's own output: the test-runner row has passed there,
-and the debugger row's first run is the measurement rather than a claim made here. A row that skips
+and the debugger row has no verdict yet — its first run died inside the probe's own fixture writer,
+before it reached an assertion, so nothing below the fixture has been measured. A row that skips
 (no GCC on the machine, no Visual Studio toolset, no lldb-dap) is a skip, never a pass.
 
 Both Windows rows analyse the configuration they built: the synthesised database holds one entry per

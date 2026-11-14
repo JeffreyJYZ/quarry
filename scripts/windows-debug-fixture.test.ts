@@ -8,17 +8,59 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DapClient } from "./windows-debug-dap-client";
-import { Checks, integerValue } from "./windows-debug-dap-session";
+import { Checks } from "./windows-debug-checks";
+import { integerValue } from "./windows-debug-dap-session";
 import {
 	BREAKPOINT_NEEDLE,
 	CONFIGURATION,
+	FILES,
 	MAIN,
+	MAIN_SOURCE,
 	STEP_NEEDLE,
 	lineOf,
 	programPath,
+	writeFixture,
 } from "./windows-debug-fixture";
+
+describe("the fixture's writer", () => {
+	/**
+	 * The row's first Windows run died in this function: it wrote `app/main.cpp` relative to the
+	 * process cwd, so the fixture landed beside the repository instead of inside it. A writer that
+	 * takes a root must only ever write under it, and must create each file's directory itself.
+	 */
+	test("writes every file under the root it is given, and nothing in the cwd", () => {
+		const root = realpathSync(mkdtempSync(join(tmpdir(), "quarry-fixture-")));
+		const before = readdirSync(process.cwd());
+
+		const main = writeFixture(root);
+
+		for (const file of FILES) {
+			const path = join(root, file.relative);
+			expect(existsSync(path)).toBe(true);
+			expect(readFileSync(path, "utf8")).toBe(file.text);
+		}
+		expect(main).toBe(join(root, MAIN_SOURCE));
+
+		const added = readdirSync(process.cwd()).filter((entry) => !before.includes(entry));
+		expect(added).toEqual([]);
+		expect(existsSync(join(process.cwd(), MAIN_SOURCE))).toBe(false);
+	});
+
+	test("one table names every file, so none of them can be left unrooted", () => {
+		const relatives = FILES.map((file) => file.relative).sort();
+		const expected = [
+			"CMakeLists.txt",
+			join("app", "main.cpp"),
+			join("core", "value.cpp"),
+			join("include", "value.h"),
+		];
+		expect(relatives).toEqual(expected.sort());
+	});
+});
 
 describe("the fixture the row builds", () => {
 	test("the breakpoint line and the step line come from the source's own text", () => {
@@ -70,6 +112,14 @@ describe("what a failing assertion prints", () => {
 		checks.add("stopped frame is app/main.cpp:7", true, "", 0, 1);
 		expect(checks.hadFailure).toBe(false);
 		expect(checks.count).toBe(1);
+		expect(checks.failures(client)).toEqual([]);
+	});
+
+	test("an evidence note is printed without deciding the run", () => {
+		const checks = new Checks();
+		checks.note("the verbatim spelling the project tree carries", "the adapter refused it");
+		expect(checks.count).toBe(0);
+		expect(checks.hadFailure).toBe(false);
 		expect(checks.failures(client)).toEqual([]);
 	});
 });
