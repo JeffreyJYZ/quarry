@@ -60,7 +60,16 @@ pub fn inspect(root: &str) -> Result<ProjectInfo, String> {
 
 #[tauri::command]
 pub fn open_project(root: String) -> Result<ProjectInfo, String> {
-    inspect(&root)
+    match inspect(&root) {
+        Ok(info) => {
+            crate::logging::project_opened(&info.root, &format!("{:?}", info.kind));
+            Ok(info)
+        }
+        Err(error) => {
+            crate::logging::project_failed(&root, &error);
+            Err(error)
+        }
+    }
 }
 
 pub struct Detected {

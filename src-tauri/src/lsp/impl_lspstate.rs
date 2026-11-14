@@ -26,12 +26,13 @@ impl LspState {
     /// Stops every language server; used when the window goes away and on exit, so none outlives
     /// it.
     pub fn shutdown_all(&self) {
-        let sessions: Vec<_> = lock(&self.sessions)
-            .drain()
-            .map(|(_, session)| session)
-            .collect();
-        for session in sessions {
-            lock(&session).stop();
+        let sessions: Vec<_> = lock(&self.sessions).drain().collect();
+        for (root, session) in sessions {
+            {
+                let mut guard = lock(&session);
+                guard.stop();
+            }
+            crate::logging::lsp_exited(&root, "stopped (app exit)");
         }
     }
 }
@@ -44,6 +45,7 @@ pub async fn stop_lsp(state: State<'_, LspState>, root: String) -> Result<(), St
     };
 
     lock(&session).stop();
+    crate::logging::lsp_exited(&root, "stopped");
     Ok(())
 }
 

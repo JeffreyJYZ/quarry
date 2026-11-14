@@ -2,6 +2,7 @@ import type { ServerKind } from "@/lib/lsp/served";
 import { autocompletion } from "@codemirror/autocomplete";
 import { EditorView, hoverTooltip, tooltips } from "@codemirror/view";
 import { createCompletionSource } from "@/lib/editor/completionSource";
+import { trackDocumentLength } from "@/lib/editor/liveDocument";
 import { toLspPosition } from "@/lib/editor/positions";
 import { renderMarkdown } from "@/lib/editor/markdown";
 import { tooltipSpace } from "@/lib/editor/tooltipSpace";
@@ -38,6 +39,9 @@ export function behaviourExtensions(deps: BehaviourDeps) {
 			},
 		}),
 		EditorView.updateListener.of((update) => {
+			// Recorded before the handlers below can throw: the length a failing transaction was
+			// computed against is the last one that committed, not the one it was replacing.
+			trackDocumentLength(update.view, update.state.doc.length);
 			if (update.docChanged) {
 				let typed = false;
 				update.changes.iterChanges((_from, _to, inserted) => {

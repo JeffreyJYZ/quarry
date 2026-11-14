@@ -1,30 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import AppErrorBoundary, { describe as describeFailure } from "@/ui/app/AppErrorBoundary";
+import AppErrorBoundary, { failureState } from "@/ui/app/AppErrorBoundary";
 import CrashPanel from "@/ui/app/CrashPanel";
-
-describe("describeFailure", () => {
-	test("an Error keeps its name, so a TypeError does not read as a plain bug", () => {
-		expect(describeFailure(new TypeError("x is not a function"))).toBe(
-			"TypeError: x is not a function",
-		);
-	});
-
-	test("a thrown string survives as itself", () => {
-		expect(describeFailure("boom")).toBe("boom");
-	});
-
-	test("a thrown object is serialised rather than dropped", () => {
-		expect(describeFailure({ code: 7 })).toBe('{"code":7}');
-	});
-
-	test("a circular object does not throw inside the error path", () => {
-		const loop: Record<string, unknown> = {};
-		loop.self = loop;
-		expect(describeFailure(loop)).toBe("[object Object]");
-	});
-});
 
 describe("AppErrorBoundary", () => {
 	test("a render error becomes a failure rather than unmounting the window", () => {
@@ -63,7 +41,7 @@ describe("a nested boundary", () => {
 	// the rest of the shell alive.
 	function crashed(region?: string): string {
 		const boundary = new AppErrorBoundary({ children: null, region });
-		boundary.state = { failure: { message: "TypeError: boom" } };
+		boundary.state = { failure: { message: "TypeError: boom" }, logPath: null };
 		return renderToStaticMarkup(boundary.render() as ReactElement);
 	}
 
@@ -75,5 +53,34 @@ describe("a nested boundary", () => {
 
 	test("the root boundary still says the window", () => {
 		expect(crashed()).toContain("quarry stopped drawing this window");
+	});
+});
+
+describe("a failure reaches the crash log without costing the error", () => {
+	test("the caught error is what the panel shows, before any log answer", () => {
+		const next = failureState(new RangeError("Position 61 is out of range"), {
+			componentStack: "\n    at Editor",
+		});
+		expect(next.failure?.message).toBe("RangeError: Position 61 is out of range");
+		expect(next.failure?.stack).toContain("at Editor");
+		expect(next.logPath).toBeNull();
+	});
+});
+describe("CrashPanel names the log file", () => {
+	test("prints the path once it is known", () => {
+		const html = renderToStaticMarkup(
+			CrashPanel({
+				message: "TypeError: nope",
+				logPath: "/Users/me/Library/Logs/quarry/quarry.log",
+			}),
+		);
+		expect(html).toContain(
+			"was written to <code>/Users/me/Library/Logs/quarry/quarry.log</code>",
+		);
+	});
+
+	test("says the error was logged even before the path arrives", () => {
+		const html = renderToStaticMarkup(CrashPanel({ message: "TypeError: nope" }));
+		expect(html).toContain("written to the crash log");
 	});
 });

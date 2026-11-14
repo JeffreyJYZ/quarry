@@ -11,11 +11,14 @@ export default function CrashPanel({
 	message,
 	stack,
 	region,
+	logPath,
 }: {
 	message: string;
 	stack?: string;
 	/** The part that failed, so a nested boundary does not claim the whole window died. */
 	region?: string;
+	/** Where the same failure was written, once the crash log answered. */
+	logPath?: string;
 }) {
 	return (
 		<div className="crash">
@@ -33,8 +36,15 @@ export default function CrashPanel({
 					</button>
 				</div>
 				<p className="crash-hint">
-					Reloading reopens the last project and its files. If it happens again, the
-					details above are what a bug report needs.
+					{logPath !== undefined ? (
+						<>
+							The same error was written to <code>{logPath}</code>.
+						</>
+					) : (
+						"The same error is written to the crash log."
+					)}{" "}
+					Reloading reopens the last project and its files. If it happens again, that file
+					is what a bug report needs.
 				</p>
 			</div>
 		</div>
