@@ -3,7 +3,7 @@
  * What the Windows debugger row builds and how it reads the answers back.
  *
  * The line numbers the breakpoint and the step use come from the fixture's own text rather than from
- * a number written twice, the artefact is the path the Visual Studio generator writes, an evaluated
+ * a number written twice, the artefact is the path a multi-config generator writes, an evaluated
  * result is read the way lldb spells it, and a failure carries the exchange it was judged on.
  */
 
@@ -17,6 +17,7 @@ import { integerValue } from "./windows-debug-dap-session";
 import {
 	BREAKPOINT_NEEDLE,
 	CONFIGURATION,
+	exeSuffix,
 	FILES,
 	MAIN,
 	MAIN_SOURCE,
@@ -75,6 +76,14 @@ describe("the fixture the row builds", () => {
 	test("the artefact is the configuration directory the generator writes", () => {
 		expect(programPath("C:\\project\\build", "win32")).toBe(
 			join("C:\\project\\build", CONFIGURATION, "parity_windows_debug.exe"),
+		);
+	});
+
+	test("the suffix is the platform's own, so a local build has none", () => {
+		expect(exeSuffix("win32")).toBe(".exe");
+		expect(exeSuffix("darwin")).toBe("");
+		expect(programPath("/project/build", "darwin")).toBe(
+			join("/project/build", CONFIGURATION, "parity_windows_debug"),
 		);
 	});
 });
