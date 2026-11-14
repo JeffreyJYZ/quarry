@@ -11,7 +11,7 @@ pub use serde_json::{Map, Value, json};
 pub use std::collections::HashMap;
 pub use std::fs;
 pub use std::io;
-pub use std::path::Path;
+pub use std::path::{Path, PathBuf};
 pub use std::process::Command;
 pub use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU32, AtomicU64, Ordering};
 pub use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
@@ -147,8 +147,29 @@ pub fn resolve_adapter() -> Result<String, String> {
         return Ok(found.path.to_string_lossy().into_owned());
     }
 
+    // A directory that carries `liblldb.dll` is where the adapter can actually start; one without it
+    // holds a binary that exits before the handshake, which is what a Windows image with a broken
+    // `%ProgramFiles%\LLVM` copy looks like. Preference, not exclusion: a build that links LLVM
+    // statically still works from its own directory, it is only tried later.
+    for directory in prefer_runnable(resolve::fallback_directories(), LOADER) {
+        if let Some(path) = resolve::on_path_in(&[directory], &name) {
+            return Ok(path.to_string_lossy().into_owned());
+        }
+    }
+
     Err(format!(
         "{name} not found on PATH or through the platform's tool lookup: {}",
         install_hint()
     ))
+}
+
+/// The library the Windows adapter loads from its own directory, which decides whether it can start.
+pub const LOADER: &str = "liblldb.dll";
+
+/// The same directories with the ones next to `library` first, everything else in its given order.
+pub fn prefer_runnable(directories: Vec<PathBuf>, library: &str) -> Vec<PathBuf> {
+    let (runnable, rest): (Vec<PathBuf>, Vec<PathBuf>) = directories
+        .into_iter()
+        .partition(|directory| directory.join(library).is_file());
+    runnable.into_iter().chain(rest).collect()
 }
