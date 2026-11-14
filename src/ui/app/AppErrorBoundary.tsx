@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { logUiError } from "@/lib/log/api";
+import { currentDocumentLength } from "@/lib/editor/liveDocument";
+import { describe, failureFromThrown, logUiError } from "@/lib/log/api";
 import CrashPanel from "@/ui/app/CrashPanel";
 
 type Failure = { message: string; stack?: string };
@@ -15,6 +16,9 @@ export type State = { failure: Failure | null; logPath: string | null };
  * The same failure goes to the crash log, because a reload discards the panel and the stack with
  * it. The write is fire-and-forget: a log that cannot be written must not replace the error the
  * panel is already showing, and the panel names the file once the answer arrives.
+ *
+ * This only sees throws during render. A CodeMirror dispatch throws inside an input handler, which
+ * reaches `window.onerror` instead (`src/lib/log/hooks.ts`); both paths write the same entry.
  *
  * Nest one around a region (the workspace, the overlays) and a throw there costs that region only;
  * the root boundary in `main.tsx` stays as the last resort.
@@ -32,11 +36,11 @@ export default class AppErrorBoundary extends Component<
 	componentDidCatch(error: unknown, info: ErrorInfo): void {
 		this.setState(failureState(error, info));
 		void logUiError({
-			name: nameOf(error),
-			message: error instanceof Error ? error.message : describe(error),
-			stack: error instanceof Error ? error.stack : undefined,
+			...failureFromThrown(error),
 			componentStack: info.componentStack ?? undefined,
 			region: this.props.region,
+			source: "boundary",
+			documentLength: currentDocumentLength() ?? undefined,
 		}).then((logPath) => {
 			if (logPath !== null) this.setState({ logPath });
 		});
@@ -64,20 +68,4 @@ export function failureState(error: unknown, info: ErrorInfo): State {
 		failure: { message: describe(error), stack: info.componentStack ?? undefined },
 		logPath: null,
 	};
-}
-
-/** The error as one line, so a non-Error throw still says something useful. */
-export function describe(error: unknown): string {
-	if (error instanceof Error) return `${error.name}: ${error.message}`;
-	if (typeof error === "string") return error;
-	try {
-		return JSON.stringify(error) ?? String(error);
-	} catch {
-		return String(error);
-	}
-}
-
-/** The name the log records; a thrown non-Error has no constructor to borrow one from. */
-function nameOf(error: unknown): string {
-	return error instanceof Error ? error.name : "Thrown";
 }

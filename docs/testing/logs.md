@@ -41,10 +41,26 @@ begins with a timestamp is always a new entry.
 - **`lsp`** — server and session id on start, and the session id with its status on exit.
 - **`dap`** — session id and program on launch, the attach target on attach, and the id on exit.
 - **`panic`** — every panic: message, file/line/column, and a backtrace when `RUST_BACKTRACE` is set.
-- **`ui`** — an error the React boundary caught, with the Error's stack and React's component stack.
+- **`ui`** — an error caught in the renderer: name, message, the Error's stack, React's component
+  stack when a boundary saw it, and the editor's document length. The `caught by` line names the
+  hook — `boundary`, `window.error` or `unhandledrejection`.
 
 That is the whole list. This is a crash log, not a tracing framework: adding a line here should
 answer "which line would a bug report need", and anything else belongs in a debugger.
+
+## Which hook sees a CodeMirror crash
+
+A React error boundary only catches a throw during render or a lifecycle method. CodeMirror builds
+and reads its transaction inside an input handler, so a range error from an editor extension is
+uncaught as far as React is concerned and reaches `window.error` instead. `src/ui/main.tsx` installs
+that listener plus `unhandledrejection` before the first render; both report through the same
+`log_ui_error` command as the boundary, so there is one entry shape whichever hook fires.
+
+The entry carries the editor's document length, read from `src/lib/editor/liveDocument.ts`: it
+records the length each view last committed, on mount and on every update. A failing transaction
+never reaches its own update listener, so the number reported is the document the broken changeset
+was built from — not the length the changeset in the message reports, which is a different number and
+is why both are kept.
 
 ## Why not `tauri-plugin-log`
 

@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-/** What the boundary caught, in the shape the Rust command records. */
+/** What a failure is recorded as, in the shape the Rust command takes. */
 export type UiFailure = {
 	/** `TypeError`, `ReferenceError`, or `Thrown` for a non-Error throw. */
 	name: string;
@@ -11,6 +11,10 @@ export type UiFailure = {
 	componentStack?: string;
 	/** The boundary's region, so a nested failure does not read as the whole window. */
 	region?: string;
+	/** `boundary`, `window.error` or `unhandledrejection` — which hook saw it first. */
+	source?: string;
+	/** The editor's document length at the moment it was caught. */
+	documentLength?: number;
 };
 
 /** The command that writes a renderer failure to the crash log, answering the log's path. */
@@ -19,9 +23,8 @@ export type SendLog = (failure: UiFailure) => Promise<string>;
 /**
  * Write a caught failure to the crash log and answer where it landed.
  *
- * Never rejects: the panel is already showing the original error, and a log that cannot be written
- * must not replace it with a second failure. `null` means the line did not make it, and the panel
- * simply says nothing about a path.
+ * Never rejects: a log that cannot be written must not replace the error being reported with a
+ * second one. `null` means the line did not make it, and the caller says nothing about a path.
  */
 export async function logUiError(
 	failure: UiFailure,
@@ -32,4 +35,23 @@ export async function logUiError(
 	} catch {
 		return null;
 	}
+}
+
+/** An error as one line, so a non-Error throw still says something useful. */
+export function describe(error: unknown): string {
+	if (error instanceof Error) return `${error.name}: ${error.message}`;
+	if (typeof error === "string") return error;
+	try {
+		return JSON.stringify(error) ?? String(error);
+	} catch {
+		return String(error);
+	}
+}
+
+/** Split a thrown value into the name, message and stack the log keeps. */
+export function failureFromThrown(thrown: unknown): Pick<UiFailure, "name" | "message" | "stack"> {
+	if (thrown instanceof Error) {
+		return { name: thrown.name, message: thrown.message, stack: thrown.stack };
+	}
+	return { name: "Thrown", message: describe(thrown) };
 }

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Compartment } from "@codemirror/state";
 import { documentCache, restoreDocument, saveDocument } from "@/lib/editor/documentCache";
+import { forgetDocumentLength, trackDocumentLength } from "@/lib/editor/liveDocument";
 import { snapshotState } from "@/lib/editor/stateSnapshot";
 import type { TestMarker } from "@/lib/tests/gutter";
 import { createEditorView } from "@/ui/editor/createEditorView";
@@ -62,7 +63,10 @@ export function useEditorMount(options: {
 			view.scrollDOM.scrollLeft = saved.scrollLeft;
 		}
 		refs.viewRef.current = view;
+		// The first length the crash log can report, before any keystroke.
+		trackDocumentLength(view, view.state.doc.length);
 		return () => {
+			forgetDocumentLength(view);
 			refs.viewRef.current = null;
 			refs.languageRef.current = null;
 			refs.testGutterRef.current = null;

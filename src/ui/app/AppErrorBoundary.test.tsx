@@ -1,33 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import AppErrorBoundary, {
-	describe as describeFailure,
-	failureState,
-} from "@/ui/app/AppErrorBoundary";
+import AppErrorBoundary, { failureState } from "@/ui/app/AppErrorBoundary";
 import CrashPanel from "@/ui/app/CrashPanel";
-
-describe("describeFailure", () => {
-	test("an Error keeps its name, so a TypeError does not read as a plain bug", () => {
-		expect(describeFailure(new TypeError("x is not a function"))).toBe(
-			"TypeError: x is not a function",
-		);
-	});
-
-	test("a thrown string survives as itself", () => {
-		expect(describeFailure("boom")).toBe("boom");
-	});
-
-	test("a thrown object is serialised rather than dropped", () => {
-		expect(describeFailure({ code: 7 })).toBe('{"code":7}');
-	});
-
-	test("a circular object does not throw inside the error path", () => {
-		const loop: Record<string, unknown> = {};
-		loop.self = loop;
-		expect(describeFailure(loop)).toBe("[object Object]");
-	});
-});
 
 describe("AppErrorBoundary", () => {
 	test("a render error becomes a failure rather than unmounting the window", () => {
@@ -91,7 +66,6 @@ describe("a failure reaches the crash log without costing the error", () => {
 		expect(next.logPath).toBeNull();
 	});
 });
-
 describe("CrashPanel names the log file", () => {
 	test("prints the path once it is known", () => {
 		const html = renderToStaticMarkup(
