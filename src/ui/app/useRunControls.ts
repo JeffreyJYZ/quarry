@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { EnvVar, LaunchConfig, RunConfiguration } from "@/lib/project/api";
+import type { EnvVar, LaunchConfig, RunConfiguration, RunFormEntry } from "@/lib/project/api";
 import { joinArgs } from "@/lib/debug/presets";
 import { isAbsoluteRunPath, runCwd } from "@/lib/run/cwd";
 import { splitArgs } from "@/lib/run/splitArgs";
@@ -22,15 +22,26 @@ export function useRunControls(options: {
 	root: string | null;
 	initialConfigurations: RunConfiguration[];
 	onConfigurationsChange: (next: RunConfiguration[]) => void;
+	/** The forms the settings file held, restored by the shell after the first render. */
+	initialRunForms?: RunFormEntry[];
+	onRunFormsChange?: (next: RunFormEntry[]) => void;
 	onNotice: (message: string) => void;
 }): RunControls {
-	const { root, initialConfigurations, onConfigurationsChange, onNotice } = options;
+	const {
+		root,
+		initialConfigurations,
+		onConfigurationsChange,
+		initialRunForms,
+		onRunFormsChange,
+		onNotice,
+	} = options;
 	const [panelOpen, setPanelOpen] = useState(false);
 	const [program, setProgram] = useState("");
 	const [args, setArgs] = useState("");
 	const [cwd, setCwd] = useState("");
 	const [env, setEnv] = useState<EnvVar[]>([]);
 	const [configurations, setConfigurations] = useState<RunConfiguration[]>(initialConfigurations);
+	const [runForms, setRunForms] = useState<RunFormEntry[]>(initialRunForms ?? []);
 	const [selected, setSelected] = useState<string | null>(null);
 	/** Something wants the console read even though no process is running (a failed build). */
 	const [consoleOpen, setConsoleOpen] = useState(false);
@@ -59,11 +70,16 @@ export function useRunControls(options: {
 	useRunFormMemory({
 		root,
 		form: { program, args, cwd, env },
+		initial: runForms,
 		onRestore: (next) => {
 			setProgram(next.program);
 			setArgs(next.args);
 			setCwd(next.cwd);
 			setEnv(next.env);
+		},
+		onChange: (next) => {
+			setRunForms(next);
+			onRunFormsChange?.(next);
 		},
 	});
 
@@ -132,6 +148,7 @@ export function useRunControls(options: {
 		env,
 		configurations,
 		selected,
+		runForms,
 		argv: [program, ...splitArgs(args)].join(" "),
 		setProgram,
 		setArgs,
@@ -152,5 +169,6 @@ export function useRunControls(options: {
 			proc.append(lines);
 		},
 		replaceConfigurations: (next: RunConfiguration[]) => setConfigurations(next),
+		replaceRunForms: (next: RunFormEntry[]) => setRunForms(next),
 	};
 }

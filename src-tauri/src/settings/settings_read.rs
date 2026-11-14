@@ -19,7 +19,7 @@ pub struct SettingsRead {
 }
 
 /// Every key `Settings` owns; a per-field repair may drop one of these and nothing else.
-const SETTINGS_KEYS: [&str; 13] = [
+const SETTINGS_KEYS: [&str; 14] = [
     "lastRoot",
     "openFiles",
     "activeFile",
@@ -30,6 +30,7 @@ const SETTINGS_KEYS: [&str; 13] = [
     "dockExpanded",
     "recentRoots",
     "runConfigurations",
+    "runForms",
     "recentFiles",
     "newProjectParent",
     "preferences",

@@ -81,4 +81,45 @@ mod tests_extra_round_trip {
         assert_eq!(back.format_on_save, Some(true));
         assert_eq!(back.build_profile.as_deref(), Some("release"));
     }
+
+    #[test]
+    fn a_run_form_round_trips_through_the_settings_file() {
+        let parsed: Settings = serde_json::from_str(
+            r#"{"runForms":[{"root":"/p","program":"/p/custom","args":"--manual","cwd":"/p/sub","env":[["A","1"]]}]}"#,
+        )
+        .expect("parses");
+
+        assert_eq!(parsed.run_forms.len(), 1);
+        let form = &parsed.run_forms[0];
+        assert_eq!(form.root, "/p");
+        assert_eq!(form.program, "/p/custom");
+        assert_eq!(form.env, vec![("A".to_string(), "1".to_string())]);
+
+        let text = serde_json::to_string(&parsed).expect("serializes");
+        assert!(
+            text.contains("\"runForms\""),
+            "the field was dropped: {text}"
+        );
+        let back: Settings = serde_json::from_str(&text).expect("parses");
+        assert_eq!(back.run_forms, parsed.run_forms);
+    }
+
+    #[test]
+    fn a_rootless_or_duplicate_run_form_is_dropped_on_read() {
+        let parsed: Settings = serde_json::from_str(
+            r#"{"runForms":[{"root":"  ","program":"a"},{"root":"/p","program":"first"},{"root":" /p ","program":"second"}]}"#,
+        )
+        .expect("parses");
+
+        assert_eq!(parsed.run_forms.len(), 1);
+        assert_eq!(parsed.run_forms[0].root, "/p");
+        assert_eq!(parsed.run_forms[0].program, "first");
+    }
+
+    #[test]
+    fn a_settings_file_without_run_forms_still_loads() {
+        let parsed: Settings = serde_json::from_str(r#"{"lastRoot":"/p"}"#).expect("parses");
+
+        assert!(parsed.run_forms.is_empty());
+    }
 }

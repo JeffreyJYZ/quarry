@@ -15,10 +15,32 @@ type BuildOutcome = {
  * Shown when a build succeeds without naming an executable.
  *
  * It is a result of the build, not a failure to launch, so it is reported in the same place a
- * compiler error goes instead of resolving a path the build never wrote.
+ * compiler error goes instead of resolving a path the build never wrote. The run form's hand-set
+ * program, when it is one the user can launch, is the one exception, and the caller passes it in.
  */
 export const NO_EXECUTABLE =
 	"the build succeeded but produced no executable to run: set the program in the run form";
+
+/**
+ * Shown when the only program available is the run form's, and it is not a file.
+ *
+ * The build result and the manual field are both empty of anything launchable, so this names the
+ * field the message points at and the exact path it held: a typo is readable, not guessed at.
+ */
+export function manualProgramMissing(program: string): string {
+	return `the build produced no executable to run and the run form's program does not exist: ${program}`;
+}
+
+/**
+ * The run form's configuration, used only when a build names no executable.
+ *
+ * `exists` answers whether the path is a file this machine can launch; the form is free text, so a
+ * path that was deleted since it was typed must be reported instead of handed to the launcher.
+ */
+export type ManualFallback = {
+	config: LaunchConfig;
+	exists: (program: string) => Promise<boolean>;
+};
 
 export type BuildThenResolveResult =
 	{ ok: true; config: LaunchConfig } | ({ ok: false } & LaunchFailure);
@@ -35,9 +57,9 @@ export type BuildThenResolveResult =
  * them is why a run used to fail with a bare "Build failed" and nothing to read.
  *
  * A successful build's `artifact` replaces the resolved `program`, because the binary the build just
- * wrote is the one to launch. A build that reports none produced nothing to run, and that is
- * reported here: falling back to the resolved path launches whatever an earlier build left there,
- * which is why Run used to start a stale binary after a build that wrote nothing.
+ * wrote is the one to launch. A build that reports none leaves the run form's hand-set program as
+ * the only candidate, and that is a fallback and nothing more: the build's answer still wins, so a
+ * stale binary is never launched after a build that wrote something else.
  */
 export async function buildThenResolve(options: {
 	root: string;
@@ -55,6 +77,8 @@ export async function buildThenResolve(options: {
 		diagnostics?: Diagnostic[];
 	}>;
 	resolve: (root: string, id: string, stopOnEntry: boolean) => Promise<LaunchConfig>;
+	/** The run form's fields, or null when it holds no program. */
+	fallback?: ManualFallback | null;
 }): Promise<BuildThenResolveResult> {
 	let report: BuildOutcome;
 	try {
@@ -73,14 +97,33 @@ export async function buildThenResolve(options: {
 		};
 	}
 	const artifact = report.artifact?.trim() ?? "";
-	if (artifact === "") {
+	if (artifact !== "") {
+		let config: LaunchConfig;
+		try {
+			config = await options.resolve(options.root, options.targetId, options.stopOnEntry);
+		} catch (error) {
+			return { ok: false, stage: "resolve", message: describeError(error), diagnostics: [] };
+		}
+		return { ok: true, config: { ...config, program: artifact } };
+	}
+	const fallback = options.fallback ?? null;
+	const manual = fallback?.config.program.trim() ?? "";
+	if (fallback === null || manual === "") {
 		return { ok: false, stage: "build", message: NO_EXECUTABLE, diagnostics: [] };
 	}
-	let config: LaunchConfig;
+	let exists = false;
 	try {
-		config = await options.resolve(options.root, options.targetId, options.stopOnEntry);
-	} catch (error) {
-		return { ok: false, stage: "resolve", message: describeError(error), diagnostics: [] };
+		exists = await fallback.exists(manual);
+	} catch {
+		exists = false;
 	}
-	return { ok: true, config: { ...config, program: artifact } };
+	if (!exists) {
+		return {
+			ok: false,
+			stage: "resolve",
+			message: manualProgramMissing(manual),
+			diagnostics: [],
+		};
+	}
+	return { ok: true, config: { ...fallback.config, program: manual } };
 }

@@ -99,6 +99,51 @@ pub struct RunConfiguration {
     pub env: Vec<(String, String)>,
 }
 
+/// One project's run form as the shell last left it, so a restart restores it.
+///
+/// It is the same snapshot shape as [`RunConfiguration`], keyed by project root instead of a name:
+/// a hand-set program belongs to the project it was typed in, and a project without an entry gets
+/// the default launch configuration again.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RunForm {
+    /// Absolute project root this form belongs to; entries with no root are dropped on read.
+    #[serde(default)]
+    pub root: String,
+    /// Program path exactly as the form showed it.
+    #[serde(default)]
+    pub program: String,
+    /// The args field verbatim, still split by the frontend at run time.
+    #[serde(default)]
+    pub args: String,
+    /// Working directory exactly as the form showed it.
+    #[serde(default)]
+    pub cwd: String,
+    /// Environment rows in form order, as `[name, value]` pairs.
+    #[serde(default)]
+    pub env: Vec<(String, String)>,
+}
+
+/// Drop forms the settings page could not tell apart: no root, or a repeat of a root.
+pub fn deserialize_run_forms<'de, D>(deserializer: D) -> Result<Vec<RunForm>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let values: Vec<RunForm> = Vec::deserialize(deserializer).unwrap_or_default();
+    let mut out: Vec<RunForm> = Vec::new();
+    for mut form in values {
+        form.root = form.root.trim().to_string();
+        if form.root.is_empty() {
+            continue;
+        }
+        if out.iter().any(|other| other.root == form.root) {
+            continue;
+        }
+        out.push(form);
+    }
+    Ok(out)
+}
+
 pub fn deserialize_panel_sizes<'de, D>(deserializer: D) -> Result<PanelSizes, D::Error>
 where
     D: serde::Deserializer<'de>,

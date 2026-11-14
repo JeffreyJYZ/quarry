@@ -171,6 +171,7 @@ export function useShellGlue(options: GlueOptions) {
 			onNewProjectParent: panels.setNewProjectParent,
 			onDockTab: panels.setDockTab,
 			onRunConfigurations: (next) => runs.replaceConfigurations(next),
+			onRunForms: (next) => runs.replaceRunForms(next),
 			onProject: workspace.setProject,
 			onBuffers: workspace.setBuffers,
 			onActivePath: workspace.setActivePath,

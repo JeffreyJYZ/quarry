@@ -19,6 +19,7 @@ export function snapshotSignature(snapshot: SessionSnapshot | null): string {
 		snapshot.recentFiles.join(","),
 		JSON.stringify(snapshot.preferences),
 		JSON.stringify(snapshot.runConfigurations),
+		JSON.stringify(snapshot.runForms),
 		snapshot.railCollapsed ? "1" : "0",
 		snapshot.gitOpen ? "1" : "0",
 		String(snapshot.panelOpen),

@@ -8,7 +8,7 @@ import type { Settings } from "@/lib/project/api";
 import { settingsFromSnapshot, type SessionSnapshot } from "@/ui/app/sessionSettings";
 import type { DockTab } from "@/ui/tests/TestsDock";
 import { isDockTab } from "@/ui/tests/parts";
-import type { ProjectInfo, RunConfiguration } from "@/lib/project/api";
+import type { ProjectInfo, RunConfiguration, RunFormEntry } from "@/lib/project/api";
 import { snapshotSignature } from "@/ui/app/sessionSignature";
 import { openProject } from "@/lib/project/api";
 
@@ -27,6 +27,7 @@ export type SessionSetters = {
 	onNewProjectParent: (value: string) => void;
 	onDockTab: (value: DockTab) => void;
 	onRunConfigurations: (value: RunConfiguration[]) => void;
+	onRunForms: (value: RunFormEntry[]) => void;
 	onProject: (value: ProjectInfo) => void;
 	onBuffers: (updater: (current: FileBuffer[]) => FileBuffer[]) => void;
 	onActivePath: (value: string | null) => void;
@@ -64,6 +65,7 @@ export function useSessionPersistence(options: {
 				setters.onRecentFiles(settings.recentFiles ?? []);
 				setters.onNewProjectParent(settings.newProjectParent ?? "");
 				setters.onRunConfigurations(settings.runConfigurations ?? []);
+				setters.onRunForms(settings.runForms ?? []);
 				const storedTab = settings.dockTab;
 				setters.onDockTab(isDockTab(storedTab) ? storedTab : "problems");
 				if (settings.lastRoot === null) return;

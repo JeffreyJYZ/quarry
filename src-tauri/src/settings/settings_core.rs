@@ -41,6 +41,9 @@ pub struct Settings {
     /// Saved run configurations for the run panel, in save order.
     #[serde(default, deserialize_with = "deserialize_run_configurations")]
     pub run_configurations: Vec<RunConfiguration>,
+    /// Each project's run form, so a hand-set program survives a restart.
+    #[serde(default, deserialize_with = "deserialize_run_forms")]
+    pub run_forms: Vec<RunForm>,
     /// Files opened most recently, newest first, capped at 20.
     #[serde(default)]
     pub recent_files: Vec<String>,
@@ -68,6 +71,7 @@ impl Default for Settings {
             dock_expanded: None,
             recent_roots: Vec::new(),
             run_configurations: Vec::new(),
+            run_forms: Vec::new(),
             recent_files: Vec::new(),
             new_project_parent: None,
             preferences: Preferences::default(),
