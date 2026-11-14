@@ -100,18 +100,44 @@ pub fn on_path(name: &str) -> Option<PathBuf> {
 
 /// Walk an explicit list of directories, in order.
 pub fn on_path_in(directories: &[PathBuf], name: &str) -> Option<PathBuf> {
+    let names = tool_candidates(name);
     directories.iter().find_map(|directory| {
         if directory.as_os_str().is_empty() {
             return None;
         }
 
-        let candidate = directory.join(name);
-        is_executable(&candidate).then_some(candidate)
+        names.iter().find_map(|name| {
+            let candidate = directory.join(name);
+            is_executable(&candidate).then_some(candidate)
+        })
     })
 }
 
+/// The file names one tool name can resolve to on this platform.
+///
+/// Windows binaries carry `.exe`, and this resolver stats the literal candidate: `Command::new`
+/// finds `cargo` there because Windows appends the suffix itself, but `on_path("cargo")` never
+/// matched `cargo.exe`, so the test dock reported cargo missing and Cargo discovery could not run.
+pub fn tool_candidates(name: &str) -> Vec<OsString> {
+    tool_candidates_on(name, cfg!(windows))
+}
+
+/// The same list for an explicit platform, so the Windows answer is a test on any machine.
+pub fn tool_candidates_on(name: &str, windows: bool) -> Vec<OsString> {
+    let mut names = vec![OsString::from(name)];
+    if windows && !name.to_ascii_lowercase().ends_with(".exe") {
+        names.push(OsString::from(format!("{name}.exe")));
+    }
+    names
+}
+
 /// Ask `xcrun` for the tool's path. A failure only means "not found".
+///
+/// `xcrun` is Apple's; on another platform the spawn can only fail, so it is not attempted.
 pub fn via_xcrun(name: &str) -> Option<PathBuf> {
+    if !cfg!(target_os = "macos") {
+        return None;
+    }
     let output = Command::new("xcrun").args(["--find", name]).output().ok()?;
     if !output.status.success() {
         return None;

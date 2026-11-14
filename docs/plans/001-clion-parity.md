@@ -137,14 +137,52 @@ row that cannot run there says why instead of passing.
 
 Not verified here, and therefore not claimed: cross-compilers other than the one toolchain file above,
 and diagnostics parity beyond clangd's own output. On Windows what stays unproven is narrower and
-named: no debugger or test-runner row runs there, and the MSVC control run is reported as evidence
-rather than required — when clangd answers without `--query-driver`, the row says so. A row that
-skips (no GCC on the machine, no Visual Studio toolset) is a skip, never a pass.
+named: no debugger row runs there, the test-runner row is written but its Windows verdict is pending
+(below), and the MSVC control run is reported as evidence rather than required — when clangd answers
+without `--query-driver`, the row says so. A row that skips (no GCC on the machine, no Visual Studio
+toolset) is a skip, never a pass.
 
 Both Windows rows analyse the configuration they built: the synthesised database holds one entry per
 source for that configuration, and the rows hover the define each configuration compiles with, so a
 database holding another configuration's command fails the row instead of passing on a plausible
 header.
+
+The Windows test-runner half is a second probe, `bun scripts/parity-windows-tests.ts`. It builds a
+CMake project whose suite is a GoogleTest-shaped program and a Cargo project with one integration
+test, then asks the product through `src-tauri/examples/quarry-tests.rs` → `test_plan`, so the dock's
+own `--gtest_list_tests` parse, `--gtest_filter=Suite.Case` argv and `cargo test -- --list --format
+terse` parse are what the row judges:
+
+| capability       | what it proves                                                                                                                            |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| gtest: discovery | the suite and case come from `.quarry/launch.json`'s program, named `Suite.Case` under `gtest`, and the program asked is the built `.exe` |
+| gtest: 20 s kill | a program that never answers is killed at the dock's own bound and reported as a note, not left to wedge the tree                         |
+| gtest: case run  | one case runs through `--gtest_filter=Suite.Case`, passes, and its own stdout reaches the report                                          |
+| cargo: discovery | `cargo test -- --list --format terse` names the integration test under suite `cargo`, which needs `cargo.exe` resolved on Windows         |
+| cargo: case run  | the named test runs and the report keeps cargo's own `1 passed` summary                                                                   |
+
+The GoogleTest half vendors a header-only runner rather than `FetchContent`ing googletest: quarry
+never links gtest, it only speaks the binary's `--gtest_list_tests` / `--gtest_filter=` contract, so
+a vendored build would add a network fetch and a multi-minute MSVC build to a row that measures the
+dock. The image ships no gtest package, and that contract is the whole of what the dock needs.
+
+A machine that is not Windows prints one SKIP line naming the reason and exits 0, a missing Visual
+Studio generator or C++ toolset skips the same way, and a fixture defect exits 2 where a product
+finding exits 1 — with the failing command, its exit code and its first stderr lines. **The row's
+Windows verdict is pending**: it has not run on `windows-latest` in this branch, so the claim here is
+that the row exists and says why it cannot run, nothing more. Locally, the same fixtures built by
+hand with Apple clang and the same `quarry-tests` binary answered: discovery named
+`ParitySuite.HoldsValues` from the built program, the case run carried `parity-case-output total=5`,
+a never-answering program was killed at 20.0 s with the dock's own note, and both Cargo answers named
+and ran `adds_two_and_three`.
+
+One defect was found by reading before the row could run: the shared resolver stat-ed a bare `cargo`
+and never `cargo.exe`, so the dock's Cargo discovery could not have spawned cargo on Windows. It is
+fixed in `src-tauri/src/resolve/source.rs` and unit-tested. Observed and not fixed: the Cargo list
+labels the integration test `adds_two_and_three` with the binary `src/lib.rs` rather than
+`tests/parity.rs`, because cargo prints its `Running …` headers on unbuffered stderr while the test
+names arrive on buffered stdout; the name the gutter runs by is correct, and the grouping label is a
+separate slice.
 
 Linux is the same probe run with `--linux` by the `linux` CI job on `ubuntu-latest`, where CLion's
 own default toolchain is GCC rather than Apple clang and every artefact is an ELF file with no
