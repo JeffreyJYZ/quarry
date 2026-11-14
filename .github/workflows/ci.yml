@@ -98,6 +98,12 @@ jobs:
                   QUARRY_PLAN_BIN: src-tauri\target\debug\examples\quarry-plan.exe
               run: bun scripts/cpp-parity-probe.ts --windows
 
+            # The debugger half of CLion parity: a Debug build from the Visual Studio generator,
+            # launched through the lldb-dap the image installed, stopped at a source line and stepped.
+            # It prints one line per assertion and the full request/response window on failure.
+            - name: Debugger row (Windows)
+              run: bun scripts/parity-windows-debug.ts
+
     # Linux is the third half of the compiler matrix, and the one where CLion's own default differs:
     # gcc/g++ rather than Apple clang, ELF objects rather than Mach-O, artefacts with no `.app` or
     # `.exe` beside them, and `cc`/`c++` recorded as the tree's compilers. The probe's Linux subset

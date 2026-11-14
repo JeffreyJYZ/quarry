@@ -34,18 +34,86 @@ pub struct Resolved {
 /// A Finder-launched app gets launchd's `PATH`, which on this machine is empty: the rustup shims
 /// (`rust-analyzer`, `cargo`) and the Homebrew bin are invisible, so a Rust project opened from the
 /// Dock would silently have no language server and therefore no diagnostics.
+///
+/// The same holds on Windows, where a Dock- or Start-menu-launched app gets the system `PATH` and not
+/// the one a developer's shell builds: LLVM installed beside the product (`%ProgramFiles%\LLVM`) and
+/// the LLVM Visual Studio ships inside itself (`…\VC\Tools\Llvm\<arch>\bin`, where `lldb-dap.exe`
+/// lives) are both absent from it. Listing the macOS paths on Windows was worse than useless: it made
+/// the search look complete while never finding the adapter the image actually installed.
 pub fn fallback_directories() -> Vec<PathBuf> {
-    let mut directories = vec![
-        PathBuf::from("/opt/homebrew/opt/rustup/bin"),
-        PathBuf::from("/opt/homebrew/bin"),
-        PathBuf::from("/usr/local/bin"),
-    ];
-    if let Some(home) = env::var_os("HOME") {
-        let home = PathBuf::from(home);
+    let mut directories = Vec::new();
+
+    #[cfg(target_os = "macos")]
+    {
+        directories.push(PathBuf::from("/opt/homebrew/opt/rustup/bin"));
+        directories.push(PathBuf::from("/opt/homebrew/bin"));
+        directories.push(PathBuf::from("/usr/local/bin"));
+    }
+
+    #[cfg(windows)]
+    {
+        for variable in ["ProgramFiles", "ProgramW6432", "ProgramFiles(x86)"] {
+            let Some(root) = env::var_os(variable) else {
+                continue;
+            };
+            directories.push(PathBuf::from(&root).join("LLVM").join("bin"));
+        }
+        let home = env::var_os("USERPROFILE").map(PathBuf::from);
+        if let Some(home) = &home {
+            directories.push(home.join(".cargo").join("bin"));
+            directories.push(home.join(".local").join("bin"));
+            if let Some(local) = env::var_os("LOCALAPPDATA") {
+                directories.push(
+                    PathBuf::from(local)
+                        .join("Programs")
+                        .join("LLVM")
+                        .join("bin"),
+                );
+            }
+        }
+        directories.extend(visual_studio_llvm());
+    }
+
+    let home = env::var_os("HOME").map(PathBuf::from);
+    if let Some(home) = home {
         directories.push(home.join(".cargo").join("bin"));
         directories.push(home.join(".local").join("bin"));
     }
     directories
+}
+
+/// The LLVM directories Visual Studio ships inside itself.
+///
+/// The layout is `…\Microsoft Visual Studio\<year>\<edition>\VC\Tools\Llvm\<arch>\bin`, with one
+/// directory per year and per edition, so the years and editions are read off disk rather than
+/// guessed: an image with only 2022 installed must not be searched for a 2026 that is not there.
+#[cfg(windows)]
+fn visual_studio_llvm() -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    for variable in ["ProgramFiles", "ProgramW6432"] {
+        let Some(root) = env::var_os(variable) else {
+            continue;
+        };
+        let studio = PathBuf::from(root).join("Microsoft Visual Studio");
+        let Ok(years) = fs::read_dir(&studio) else {
+            continue;
+        };
+        for year in years.flatten() {
+            let Ok(editions) = fs::read_dir(year.path()) else {
+                continue;
+            };
+            for edition in editions.flatten() {
+                let llvm = edition.path().join("VC").join("Tools").join("Llvm");
+                let Ok(architectures) = fs::read_dir(&llvm) else {
+                    continue;
+                };
+                for architecture in architectures.flatten() {
+                    found.push(architecture.path().join("bin"));
+                }
+            }
+        }
+    }
+    found
 }
 
 /// Find `name` on `PATH`, then in the toolchain directories a GUI launch cannot see, then `xcrun`.

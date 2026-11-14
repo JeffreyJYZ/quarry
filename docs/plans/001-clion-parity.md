@@ -135,11 +135,24 @@ row that cannot run there says why instead of passing.
 | generator: Visual Studio | the generator writes no `compile_commands.json`, the file-API synthesis produces one, `--config` carries `Debug`/`Release`, and the artefact the plan names is `build/<Config>/<target>.exe`                                                             |
 | toolchain: MSVC          | the database's command runs `cl.exe` with `/I…`, the hand-off's `--query-driver` names `cl.exe`, and analysis resolves a project header, MSVC's `_MSC_VER` overload and `<vector>`; a control run records whether clangd needs the query on that machine |
 
+Two more rows run in the same `windows` job, from their own scripts, because they measure the app's
+other seams rather than the compiler's:
+
+| capability  | script                            | what it proves                                                                                                                                                                                                                          |
+| ----------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| test-runner | `scripts/parity-windows-tests.ts` | GoogleTest cases are discovered from `<program> --gtest_list_tests` under a 20 s kill and one runs through `--gtest_filter=Suite.Case` without its sibling's output; Cargo discovery names and runs its integration test                |
+| debugger    | `scripts/parity-windows-debug.ts` | a Debug build from the Visual Studio generator launches through the image's `lldb-dap`, a breakpoint verifies at the statement, the stopped frame names that line, `evaluate` reads a local before and after a step, and continue exits |
+
+Neither hardcodes what the image ships: the generator is discovered with `cmake --help` plus a real
+configure per candidate, and `lldb-dap` is looked for on `PATH`, in `%ProgramFiles%\LLVM\bin` and in
+each `…\Microsoft Visual Studio\<year>\<edition>\VC\Tools\Llvm\<arch>\bin` directory read off disk —
+which is also what the product's own resolver now does, so an install that only ships LLVM inside
+Visual Studio is not invisible to the app.
+
 Not verified here, and therefore not claimed: cross-compilers other than the one toolchain file above,
-and diagnostics parity beyond clangd's own output. On Windows what stays unproven is narrower and
-named: no debugger or test-runner row runs there, and the MSVC control run is reported as evidence
-rather than required — when clangd answers without `--query-driver`, the row says so. A row that
-skips (no GCC on the machine, no Visual Studio toolset) is a skip, never a pass.
+and diagnostics parity beyond clangd's own output. The MSVC control run is reported as evidence rather
+than required — when clangd answers without `--query-driver`, the row says so. A row that skips (no
+GCC on the machine, no Visual Studio toolset) is a skip, never a pass.
 
 Both Windows rows analyse the configuration they built: the synthesised database holds one entry per
 source for that configuration, and the rows hover the define each configuration compiles with, so a
