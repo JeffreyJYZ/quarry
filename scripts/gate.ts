@@ -29,6 +29,16 @@ type Step = {
 const FRONTEND: Step[] = [
 	{ name: "file size (200 lines)", command: "bun", args: ["scripts/check-file-size.ts"] },
 	{ name: "types (bun check)", command: "bun", args: ["check"] },
+	/**
+	 * `tsconfig.json` only includes `src`, so the scripts — including the parity probe that certifies
+	 * C/C++ parity — were never type-checked by the gate. A misspelt identifier there is a
+	 * `ReferenceError` at runtime, and one shipped to CI's Windows job and cost a run.
+	 */
+	{
+		name: "types (scripts)",
+		command: "bunx",
+		args: ["tsc", "--noEmit", "-p", "tsconfig.scripts.json"],
+	},
 	{ name: "docs dependencies", command: "bun", args: ["scripts/docs-deps.ts"] },
 	{ name: "unstyled classes", command: "bun", args: ["scripts/unstyled-classes.ts"] },
 	{ name: "format (bun fmt --check)", command: "bun", args: ["fmt", "--check"] },

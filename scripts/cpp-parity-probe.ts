@@ -1333,7 +1333,7 @@ async function judgeMultiConfig(
 			analysed = false;
 			const database = session.handoff?.databaseDir ?? null;
 			findings.push(
-				`${directory}: the ${half.profile} analysis must read the ${half.configuration} compile command, which defines PARITY_LEVEL=${half.level}, but \`cd ${directory} && ${clangdCommand}\` answers ${describe(hover)}${diagnostics.length > 0 ? `, with "${diagnostics[0]}"` : ""}. ${database === null ? "The plan named no compile database" : relative(root, database)} must hold one entry per source for ${half.configuration}, so the hover and the build agree.`,
+				`${directory}: the ${half.profile} analysis must read the ${half.configuration} compile command, which defines PARITY_LEVEL=${half.level}, but \`cd ${directory} && ${clangdCommand}\` answers ${describe(hover)}${diagnostics.length > 0 ? `, with "${diagnostics[0]}"` : ""}. ${database === null ? "The plan named no compile database" : relativeTo(root, database)} must hold one entry per source for ${half.configuration}, so the hover and the build agree.`,
 			);
 		}
 	}
@@ -1493,7 +1493,7 @@ async function judge(
 	if (cacheBefore !== null && cacheAfter !== cacheBefore && fixtureCache !== null) {
 		row.details.push("handoff      FAIL  opening re-configured the project's own tree");
 		findings.push(
-			`${directory}: opening the project re-configured ${relative(dirname(userDb))}, though its compile_commands.json was current — \`cd ${directory} && ls -l --time-style=full-iso ${relative(fixtureCache)}\` changes across \`quarry-plan .\`.`,
+			`${directory}: opening the project re-configured ${relativeTo(root, dirname(fixtureCache))}, though its compile_commands.json was current — \`cd ${directory} && ls -l --time-style=full-iso ${relativeTo(root, fixtureCache)}\` changes across \`quarry-plan .\`.`,
 		);
 	}
 
@@ -2012,6 +2012,9 @@ function report(rows: Row[], findings: string[], broken: boolean, started: numbe
 }
 
 main().catch((error) => {
-	console.error(`cpp-parity-probe: ${error instanceof Error ? error.message : String(error)}`);
+	// The message alone cannot diagnose a harness defect: `fixture is not defined` named no line, and
+	// that cost a Windows CI run. The stack goes out whenever the runtime has one.
+	const detail = error instanceof Error ? (error.stack ?? error.message) : String(error);
+	console.error(`cpp-parity-probe: ${detail}`);
 	process.exit(2);
 });

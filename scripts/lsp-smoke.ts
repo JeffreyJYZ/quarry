@@ -78,7 +78,7 @@ function fileUri(path: string): string {
 class LspClient {
 	private child: ChildProcess;
 	private buffer = Buffer.alloc(0);
-	private stderr = "";
+	stderr = "";
 	readonly notifications: Json[] = [];
 	readonly responses: Json[] = [];
 	exited = false;
