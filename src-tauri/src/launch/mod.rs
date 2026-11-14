@@ -64,6 +64,9 @@ pub use tests_6::*;
 mod tests_cmake_targets;
 pub use tests_cmake_targets::*;
 
+mod tests_multi_config;
+pub use tests_multi_config::*;
+
 /// The launch configuration for a project that has no preset, chosen by project kind.
 ///
 /// Cargo resolves a binary from the manifest and refuses a project that is not Cargo; every other

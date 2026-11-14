@@ -22,12 +22,16 @@ pub use tauri::{AppHandle, Emitter, State};
 
 use super::*;
 
-/// The directory's real path, with every symlink resolved.
+/// The directory's real path, with every symlink resolved and Windows' verbatim prefix dropped.
+///
+/// `canonicalize` answers `\\?\C:\…` on Windows and `/private/var/…` on macOS; the child gets the
+/// directory in the spelling the debug info holds, because LLDB resolves a relative source path
+/// against it and compares the result as written.
 pub fn real_directory(path: &str) -> Result<String, String> {
     let resolved = fs::canonicalize(path)
         .map_err(|error| format!("cannot resolve the launch directory {path}: {error}"))?;
 
-    Ok(resolved.to_string_lossy().into_owned())
+    Ok(source_path(&resolved.to_string_lossy()))
 }
 #[cfg(test)]
 #[allow(dead_code)]

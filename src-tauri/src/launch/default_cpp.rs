@@ -15,7 +15,9 @@ pub use crate::build_task::BUILD_DIR as CMAKE_BUILD_DIR;
 pub use crate::build_task::QUARRY_BUILD_DIR;
 
 /// Subdirectories a multi-config generator (Xcode, Visual Studio) adds under the build directory.
-pub const MULTI_CONFIG_DIRS: [&str; 2] = ["Debug", "Release"];
+/// The build task's own list: a copy here knew two of the four, so a `RelWithDebInfo` build was
+/// launched from a path nothing wrote.
+pub use crate::build_task::MULTI_CONFIG_DIRS;
 
 /// Out-of-source directories CLion creates by convention.
 pub use crate::build_task::CLION_BUILD_DIRS;

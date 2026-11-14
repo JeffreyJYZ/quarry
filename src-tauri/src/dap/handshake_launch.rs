@@ -37,7 +37,9 @@ pub fn handshake_launch(
         "type": "request",
         "command": "launch",
         "arguments": {
-            "program": &config.program,
+            // The spelling the debug info holds: a preset may name the program through a path the
+            // project tree canonicalised, and lldb opens what it is handed.
+            "program": source_path(&config.program),
             "args": &config.args,
             "cwd": cwd,
             "stopOnEntry": config.stop_on_entry,
