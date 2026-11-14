@@ -120,14 +120,20 @@ pub mod stop_tests {
 
     /// The `cargo build` shape: the direct child dies on the polite signal but the `rustc` it started
     /// would keep working unless the signal reaches the whole group.
+    ///
+    /// The grandchild's *pid* is the witness, not a file it would have written later: a CI runner
+    /// under load can take longer than the child's own deadline to signal, and the old assertion read
+    /// that as a surviving grandchild — measured failing once on Linux with the same product code
+    /// that passes here. Asking whether that pid still exists has no timing window at all.
     #[test]
     fn the_group_signal_reaches_a_grandchild_that_outlives_its_parent() {
         let dir = TempDir::new("group-kill");
-        let late = dir.path().join("late.txt");
-        let script = format!("(sleep 1; echo late > '{}') & wait", late.display());
+        let pid_file = dir.path().join("grandchild.pid");
+        let script = format!("(echo $$ > '{}'; sleep 30) & wait", pid_file.display());
         let mut command = grouped("/bin/sh", "-c");
         command.args([&script]);
         let child = command.spawn().expect("spawn a shell with a grandchild");
+        let grandchild = wait_for_pid(&pid_file);
 
         match terminate(
             child,
@@ -138,11 +144,41 @@ pub mod stop_tests {
             Terminated::Failed { .. } => panic!("the group must be signalled"),
         }
 
-        // Past the point the grandchild would have written on its own.
-        thread::sleep(Duration::from_millis(1400));
+        // The group signal reaches every member, so the grandchild is gone within a grace of the stop.
         assert!(
-            !late.exists(),
-            "a grandchild survived the stop and kept running"
+            wait_until_gone(grandchild, Duration::from_secs(3)),
+            "a grandchild survived the stop and kept running (pid {grandchild})"
         );
+    }
+
+    /// The grandchild's pid, once it has written it.
+    fn wait_for_pid(path: &std::path::Path) -> u32 {
+        for _ in 0..200 {
+            if let Ok(text) = std::fs::read_to_string(path)
+                && let Ok(pid) = text.trim().parse()
+            {
+                return pid;
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+        panic!("the grandchild never wrote its pid to {}", path.display());
+    }
+
+    /// Whether a process is gone, bounded: `kill -0` probes existence without signalling anything.
+    fn wait_until_gone(pid: u32, limit: Duration) -> bool {
+        let started = Instant::now();
+        while started.elapsed() < limit {
+            let alive = Command::new("kill")
+                .args(["-0", &pid.to_string()])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .is_ok_and(|status| status.success());
+            if !alive {
+                return true;
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+        false
     }
 }
