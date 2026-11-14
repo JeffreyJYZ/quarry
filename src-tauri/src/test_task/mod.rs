@@ -42,3 +42,14 @@ pub use tests_2::*;
 
 mod tests_3;
 pub use tests_3::*;
+
+/// Everything the dock's test tree holds, named once so a caller outside this module does not have
+/// to know that `default_cargo::list` and `dispatch::list` share a bare name.
+pub fn discover(root: &str) -> Result<TestDiscovery, String> {
+    dispatch::list(root)
+}
+
+/// One case's report, routed exactly as the dock's Run button routes it.
+pub fn run_case(root: &str, name: &str) -> Result<TestReport, String> {
+    dispatch::run(root, name)
+}
