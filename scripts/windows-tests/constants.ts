@@ -17,9 +17,9 @@ export const CASE_OUTPUT = `parity-case-output total=${CASE_VALUE}`;
 export const OTHER_CASE = "OtherValues";
 export const OTHER_OUTPUT = "parity-other-output";
 
-/** The executable names, as a link on Windows names them. */
-export const GTEST_PROGRAM = "parity_gtest.exe";
-export const GTEST_HANG_PROGRAM = "parity_gtest_hang.exe";
+/** The CMake targets: the file each writes is the platform's own name for it (`<target>` or `.exe`). */
+export const GTEST_TARGET = "parity_gtest";
+export const GTEST_HANG_TARGET = "parity_gtest_hang";
 
 /** The Cargo test the dock's Cargo discovery must name. */
 export const CARGO_TEST = "adds_two_and_three";

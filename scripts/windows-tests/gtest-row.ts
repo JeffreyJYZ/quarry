@@ -11,10 +11,10 @@ import { basename, join } from "node:path";
 import {
 	CASE_OUTPUT,
 	GTEST_CASE,
-	GTEST_HANG_PROGRAM,
+	GTEST_HANG_TARGET,
 	GTEST_NAME,
-	GTEST_PROGRAM,
 	GTEST_SUITE,
+	GTEST_TARGET,
 	OTHER_OUTPUT,
 	findExecutable,
 	relativeProgram,
@@ -30,48 +30,65 @@ import {
 	onlyCaseRan,
 	timeoutNote,
 } from "./judge";
+import { layoutOf, spell } from "./platform";
 import { type Harness, type Row, ask, command, newRow } from "./row";
 import { firstError, run } from "./tools";
 
-/** Build the fixture Debug, then ask the dock the three questions this row exists for. */
+/** Build the fixture with this platform's tree, then ask the dock the three questions this row exists for. */
 export async function gtestRow(harness: Harness): Promise<Row> {
 	const row = newRow("gtest: discovery and one case");
 	const root = join(harness.scratch, "gtest");
 	const build = join(root, "build");
 	writeGtestProject(root);
 
-	const configure = await run(
-		harness.cmake,
-		["-S", root, "-B", build, "-G", harness.generator, "-A", "x64"],
-		root,
-		300_000,
-	);
+	const configureArgs = ["-S", root, "-B", build, ...harness.profile.configure];
+	const configure = await run(harness.cmake, configureArgs, root, 300_000);
 	row.commands.push(
-		command(`cmake -S . -B build -G "${harness.generator}" -A x64`, root, configure),
+		command(
+			spell(["cmake", "-S", ".", "-B", "build", ...harness.profile.configure]),
+			root,
+			configure,
+		),
 	);
 	if (configure.code !== 0) {
 		row.broken = true;
 		row.details.push(`fixture FAIL  configure: ${firstError(configure.stderr)}`);
 		return row;
 	}
-	const built = await run(harness.cmake, ["--build", build, "--config", "Debug"], root, 300_000);
-	row.commands.push(command("cmake --build build --config Debug", root, built));
+	const buildArgs = ["--build", build, ...harness.profile.build];
+	const built = await run(harness.cmake, buildArgs, root, 300_000);
+	row.commands.push(
+		command(spell(["cmake", "--build", "build", ...harness.profile.build]), root, built),
+	);
 	if (built.code !== 0) {
 		row.broken = true;
 		row.details.push(`fixture FAIL  build: ${firstError(built.stderr)}`);
 		return row;
 	}
 
-	const program = findExecutable(root, GTEST_PROGRAM);
-	const hang = findExecutable(root, GTEST_HANG_PROGRAM);
+	const programName = harness.profile.executable(GTEST_TARGET);
+	const hangName = harness.profile.executable(GTEST_HANG_TARGET);
+	const program = findExecutable(root, programName);
+	const hang = findExecutable(root, hangName);
 	if (program === null || hang === null) {
 		row.broken = true;
 		row.details.push(
-			`fixture FAIL  the Debug build wrote ${program === null ? "no" : "the"} ${GTEST_PROGRAM} and ${hang === null ? "no" : "the"} ${GTEST_HANG_PROGRAM}`,
+			`fixture FAIL  the build wrote ${program === null ? "no" : "the"} ${programName} and ${hang === null ? "no" : "the"} ${hangName}`,
 		);
 		return row;
 	}
 	row.details.push(`build        PASS  ${relativeProgram(root, program)}`);
+
+	// The tree is the platform fact this row exists to pin: a single-config generator writes the
+	// artefact straight into `build/`, with no `<Config>` level, so that is the program a launch file
+	// names and the one the dock is asked. A layout the profile did not predict would make every
+	// assertion below measure the wrong file.
+	const layout = layoutOf(program, harness.profile);
+	row.details.push(`layout       ${layout.ok ? "PASS" : "FAIL"}  ${layout.detail}`);
+	if (!layout.ok) {
+		row.broken = true;
+		return row;
+	}
 
 	// 1. A program that never answers must be killed at the dock's own 20 s bound, not wedge the
 	//    tree. This is the only row that measures the bound instead of restating the constant.

@@ -138,10 +138,10 @@ row that cannot run there says why instead of passing.
 Two more rows run in the same `windows` job, from their own scripts, because they measure the app's
 other seams rather than the compiler's:
 
-| capability  | script                            | what it proves                                                                                                                                                                                                                                                                             |
-| ----------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| test-runner | `scripts/parity-windows-tests.ts` | GoogleTest cases are discovered from `<program> --gtest_list_tests` under a 20 s kill and one runs through `--gtest_filter=Suite.Case` without its sibling's output; Cargo discovery labels the integration test with the file it lives in and runs it                                     |
-| debugger    | `scripts/parity-windows-debug.ts` | a Debug build from the discovered Visual Studio generator — or the generator `PARITY_DEBUG_GENERATOR` names — launches through `lldb-dap`, a breakpoint verifies at the statement, the stopped frame names that line, `evaluate` reads a local before and after a step, and continue exits |
+| capability  | script                                                          | what it proves                                                                                                                                                                                                                                                                             |
+| ----------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| test-runner | `scripts/parity-windows-tests.ts` (`--linux` for the Linux row) | GoogleTest cases are discovered from `<program> --gtest_list_tests` under a 20 s kill and one runs through `--gtest_filter=Suite.Case` without its sibling's output; Cargo discovery labels the integration test with the file it lives in and runs it                                     |
+| debugger    | `scripts/parity-windows-debug.ts`                               | a Debug build from the discovered Visual Studio generator — or the generator `PARITY_DEBUG_GENERATOR` names — launches through `lldb-dap`, a breakpoint verifies at the statement, the stopped frame names that line, `evaluate` reads a local before and after a step, and continue exits |
 
 On Windows neither hardcodes what the image ships: the generator is discovered with `cmake --help`
 plus a real configure per candidate, and `lldb-dap` is looked for on `PATH`, in `%ProgramFiles%\LLVM\bin`
@@ -225,11 +225,11 @@ never links gtest, it only speaks the binary's `--gtest_list_tests` / `--gtest_f
 a vendored build would add a network fetch and a multi-minute MSVC build to a row that measures the
 dock. The image ships no gtest package, and that contract is the whole of what the dock needs.
 
-A machine that is not Windows prints one SKIP line naming the reason and exits 0, a missing Visual
-Studio generator or C++ toolset skips the same way, and a fixture defect exits 2 where a product
-finding exits 1 — with the failing command, its exit code and its first stderr lines. **The row's
-Windows verdict is pending**: it has not run on `windows-latest` in this branch, so the claim here is
-that the row exists and says why it cannot run, nothing more. Locally, the same fixtures built by
+The Windows mode skips by name on a machine that is not Windows, a missing Visual Studio generator or
+C++ toolset skips the same way, and a fixture defect exits 2 where a product finding exits 1 — with
+the failing command, its exit code and its first stderr lines. **The row's Windows verdict is
+pending**: it has not run on `windows-latest` in this branch, so the claim here is that the row
+exists and says why it cannot run, nothing more. Locally, the same fixtures built by
 hand with Apple clang and the same `quarry-tests` binary answered: discovery named
 `ParitySuite.HoldsValues` from the built program, the case run carried `parity-case-output total=5`,
 a never-answering program was killed at 20.0 s with the dock's own note, and both Cargo answers
@@ -251,20 +251,21 @@ Linux is the same probe run with `--linux` by the `linux` CI job on `ubuntu-late
 own default toolchain is GCC rather than Apple clang and every artefact is an ELF file with no
 `.app`/`.exe` beside it:
 
-| capability                       | what it proves on Linux                                                                                      |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| presets                          | configure goes through `--preset` into the preset's `binaryDir`, with `-DCMAKE_BUILD_TYPE` from the profile  |
-| toolchain file                   | `CMAKE_TOOLCHAIN_FILE` reaches the configure and its define reaches the compiler                             |
-| multi-target                     | a library header and an `extern` resolve from `target_include_directories`, listed from CMake's model        |
-| generator: Ninja Multi-Config    | the generator writes no database, the file API synthesis makes one in the plan's tree                        |
-| system-headers                   | `std::format` and a C API resolve through `/usr/bin/c++`, which only `--query-driver` teaches clangd to read |
-| plain                            | a project with no CMake analyses from flags its own build derives                                            |
-| mixed-languages                  | the `.c` unit is compiled and analysed as C, the `.cpp` as C++, and the link crosses `extern "C"`            |
-| profile                          | `RelWithDebInfo`/`MinSizeRel` reach the compiler, and the session follows the tree the profile built         |
-| two-targets                      | `--target parity_one` writes one binary, no target writes both                                               |
-| multi-config                     | each configuration writes its own artefact under `build/<Config>/`, and debug info is read with `readelf -S` |
-| toolchain: gcc                   | a compiler clangd cannot recognise is queried for its include paths                                          |
-| toolchain: gcc behind a launcher | the same, with the compiler behind a `ccache`-shaped wrapper                                                 |
+| capability                       | what it proves on Linux                                                                                                                                                                                                                                                               |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| presets                          | configure goes through `--preset` into the preset's `binaryDir`, with `-DCMAKE_BUILD_TYPE` from the profile                                                                                                                                                                           |
+| toolchain file                   | `CMAKE_TOOLCHAIN_FILE` reaches the configure and its define reaches the compiler                                                                                                                                                                                                      |
+| multi-target                     | a library header and an `extern` resolve from `target_include_directories`, listed from CMake's model                                                                                                                                                                                 |
+| generator: Ninja Multi-Config    | the generator writes no database, the file API synthesis makes one in the plan's tree                                                                                                                                                                                                 |
+| system-headers                   | `std::format` and a C API resolve through `/usr/bin/c++`, which only `--query-driver` teaches clangd to read                                                                                                                                                                          |
+| plain                            | a project with no CMake analyses from flags its own build derives                                                                                                                                                                                                                     |
+| mixed-languages                  | the `.c` unit is compiled and analysed as C, the `.cpp` as C++, and the link crosses `extern "C"`                                                                                                                                                                                     |
+| profile                          | `RelWithDebInfo`/`MinSizeRel` reach the compiler, and the session follows the tree the profile built                                                                                                                                                                                  |
+| two-targets                      | `--target parity_one` writes one binary, no target writes both                                                                                                                                                                                                                        |
+| multi-config                     | each configuration writes its own artefact under `build/<Config>/`, and debug info is read with `readelf -S`                                                                                                                                                                          |
+| toolchain: gcc                   | a compiler clangd cannot recognise is queried for its include paths                                                                                                                                                                                                                   |
+| toolchain: gcc behind a launcher | the same, with the compiler behind a `ccache`-shaped wrapper                                                                                                                                                                                                                          |
+| test-runner                      | GoogleTest is discovered from `build/parity_gtest` — no `.exe`, no `<Config>` directory — under the dock's 20 s kill, one case runs through `--gtest_filter` without its sibling's output, and Cargo discovery labels `tests/parity.rs` and runs its binary from `target/debug/deps/` |
 
 Three things on that list are Linux-only or Linux-different, and each is named rather than assumed:
 `readelf -S` replaces `otool -l` as the DWARF reader (`scripts/cpp-parity-debug-info.ts`), because ELF
@@ -275,12 +276,29 @@ evidence instead of a hard requirement, because clang and GCC there share libstd
 clangd still finds the headers and the control cannot discriminate. The Visual Studio and MSVC rows
 are skipped by the same line a machine without the generator prints everywhere.
 
+The test dock has its own Linux row, `bun scripts/parity-windows-tests.ts --linux`, because the
+Windows row measures a tree Linux never builds. It configures the same two fixtures with the first
+single-config generator that actually configures — Ninja, then Unix Makefiles, then CMake's default,
+each proved by a minimal project rather than by being listed — and judges the same assertions through
+`quarry-tests`.
+
+The platform facts are values in `scripts/windows-tests/platform.ts`, not branches inside an
+assertion: the artefact is `build/parity_gtest` with no `.exe`; no `--config` is passed, and the row
+asserts the artefact sits directly in `build/` because a single-config generator writes no
+configuration directory; nothing is spawned through a shell, since the dock spawns the binary it was
+given; and the Cargo fixture's test binary is asserted under `target/debug/deps/` before a case run
+counts. A machine without cmake, cargo or a C++ toolchain skips by name. On a non-Linux POSIX machine
+the row still builds the same single-config tree and says so in its `platform` line, because only
+`ubuntu-latest` can prove the Linux toolchain behind those assertions. **The Linux verdict is that
+job's first run, not this document's.**
+
 The table is the job's own measurement, not a claim transferred from macOS: the first run on
 `ubuntu-latest` is what proves it, the same way the Windows rows are proved by theirs.
 
-On Linux what stays unproven is narrower still: no debugger or test-runner row runs, the plain and
-mixed-language rows compile with clang (the product's plain build names `clang`/`clang++`), so a Linux
-box without clang is not covered, and no cross-toolchain beyond the one toolchain file is measured.
+On Linux what stays unproven is narrower still: no debugger row runs, the test-runner row's Linux
+verdict is the `linux` job's own first run, the plain and mixed-language rows compile with clang (the
+product's plain build names `clang`/`clang++`), so a Linux box without clang is not covered, and no
+cross-toolchain beyond the one toolchain file is measured.
 
 The generator version is discovered, never assumed: `cmake --help` names what that cmake supports,
 and a runner image can list a generator whose Visual Studio instance is absent, so the probe
