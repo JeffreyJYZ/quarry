@@ -25,6 +25,9 @@ mod search;
 mod settings;
 mod shutdown;
 mod teardown;
+/// The test dock's discovery and single-case run, printed by `examples/quarry-tests.rs` for the
+/// parity probe.
+pub mod test_plan;
 #[cfg(test)]
 pub mod test_support;
 mod test_task;

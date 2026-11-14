@@ -98,6 +98,13 @@ jobs:
                   QUARRY_PLAN_BIN: src-tauri\target\debug\examples\quarry-plan.exe
               run: bun scripts/cpp-parity-probe.ts --windows
 
+            # The test dock's half of CLion parity: GoogleTest discovery and a filtered case run, and
+            # Cargo discovery, judged through the same seam the app uses rather than a re-parse.
+            - name: Test-runner row (Windows)
+              env:
+                  QUARRY_TESTS_BIN: src-tauri\target\debug\examples\quarry-tests.exe
+              run: bun scripts/parity-windows-tests.ts
+
     # Linux is the third half of the compiler matrix, and the one where CLion's own default differs:
     # gcc/g++ rather than Apple clang, ELF objects rather than Mach-O, artefacts with no `.app` or
     # `.exe` beside them, and `cc`/`c++` recorded as the tree's compilers. The probe's Linux subset
