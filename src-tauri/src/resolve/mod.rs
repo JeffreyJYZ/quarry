@@ -18,6 +18,10 @@ pub use std::process::Command;
 mod source;
 pub use source::*;
 
+/// Where a Windows install keeps the toolchain a Start-menu launch cannot see.
+#[cfg(windows)]
+mod windows_llvm;
+
 mod child_path;
 pub use child_path::*;
 

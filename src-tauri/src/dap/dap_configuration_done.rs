@@ -80,7 +80,7 @@ pub async fn dap_set_breakpoints(
     let body = session_for(&state, &session)?.request(
         "setBreakpoints",
         json!({
-            "source": { "path": path },
+            "source": { "path": source_path(&path) },
             "breakpoints": breakpoints,
             "sourceModified": false,
         }),
@@ -103,7 +103,7 @@ pub async fn dap_set_breakpoints_ex(
     let body = session_for(&state, &session)?.request(
         "setBreakpoints",
         json!({
-            "source": { "path": path },
+            "source": { "path": source_path(&path) },
             "breakpoints": source_breakpoints(&breakpoints),
             "sourceModified": false,
         }),

@@ -140,3 +140,9 @@ pub use dap_evaluate::*;
 
 mod exception_filters_from;
 pub use exception_filters_from::*;
+
+mod source_path;
+pub use source_path::*;
+
+mod tests_7;
+pub use tests_7::*;
