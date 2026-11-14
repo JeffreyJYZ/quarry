@@ -46,4 +46,58 @@ pub mod tests_group_2 {
             );
         }
     }
+
+    #[test]
+    pub fn test_binaries_read_test_targets_only_and_label_by_source() {
+        let stdout = [
+            r#"{"reason":"compiler-artifact","profile":{"test":true},"target":{"name":"parity","src_path":"/p/demo/tests/parity.rs"},"executable":"/p/demo/target/debug/deps/parity-abc"}"#,
+            r#"{"reason":"compiler-artifact","profile":{"test":false},"target":{"name":"serde","src_path":"/r/serde/src/lib.rs"},"executable":null}"#,
+            r#"{"reason":"build-finished","success":true}"#,
+            "cargo prints prose too",
+            r#"{"reason":"compiler-artifact","profile":{"test":true},"target":{"name":"parity_cargo_tests","src_path":"/p/demo/src/lib.rs"},"executable":"/p/demo/target/debug/deps/parity_cargo_tests-def"}"#,
+            r#"{"reason":"compiler-artifact","profile":{"test":true},"target":{"name":"parity_again","src_path":"/p/demo/tests/parity.rs"},"executable":"/p/demo/target/debug/deps/parity-abc"}"#,
+        ]
+        .join("\n");
+
+        let binaries = test_binaries(&stdout, "/p/demo");
+
+        let labels: Vec<&str> = binaries.iter().map(|one| one.label.as_str()).collect();
+        assert_eq!(labels, ["src/lib.rs", "tests/parity.rs"]);
+        assert_eq!(
+            binaries[1].executable,
+            "/p/demo/target/debug/deps/parity-abc"
+        );
+    }
+
+    #[test]
+    pub fn a_windows_root_and_a_verbatim_one_label_the_same_target() {
+        let artifact = r#"{"reason":"compiler-artifact","profile":{"test":true},"target":{"src_path":"C:\\work\\demo\\tests\\parity.rs"},"executable":"C:\\work\\demo\\target\\debug\\deps\\parity.exe"}"#;
+
+        for root in [r"C:\work\demo", r"\\?\C:\work\demo"] {
+            let binaries = test_binaries(artifact, root);
+            assert_eq!(binaries.len(), 1, "root {root} answered nothing");
+            assert_eq!(binaries[0].label, "tests/parity.rs");
+        }
+    }
+
+    #[test]
+    pub fn a_source_outside_the_root_keeps_its_whole_path() {
+        assert_eq!(
+            source_label("/p/demo", "/p/other/tests/parity.rs"),
+            "/p/other/tests/parity.rs"
+        );
+        assert_eq!(
+            source_label("/p/demo", "/p/demoish/src/lib.rs"),
+            "/p/demoish/src/lib.rs"
+        );
+    }
+
+    #[test]
+    pub fn a_per_binary_listing_is_labelled_with_that_binary() {
+        let items = parse_tests("adds_two_and_three: test\n", "tests/parity.rs");
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].binary, "tests/parity.rs");
+        assert_eq!(items[0].name, "adds_two_and_three");
+    }
 }

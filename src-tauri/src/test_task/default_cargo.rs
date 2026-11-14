@@ -16,8 +16,11 @@ pub const DEFAULT_CARGO: &str = "cargo";
 /// Environment variable cargo sets for build scripts and that rustup honours.
 pub const CARGO_ENV: &str = "CARGO";
 
-/// Hard limit on discovery: `--list` compiles the workspace before it lists anything.
+/// Hard limit on discovery: the build behind `--no-run` compiles the workspace first.
 pub const LIST_TIMEOUT: Duration = Duration::from_secs(120);
+
+/// Hard limit on one built test binary answering `--list`; it does not compile anything.
+pub const EXE_LIST_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Hard limit on one test run, which may also compile before it executes.
 pub const RUN_TIMEOUT: Duration = Duration::from_secs(300);
@@ -47,24 +50,41 @@ pub const CARGO_SUITE: &str = "cargo";
 /// Suffix cargo prints for an ordinary test in `--format terse`.
 pub const TEST_SUFFIX: &str = ": test";
 
-/// Discovery for a Cargo project: one `--list` run, no build ahead of it.
+/// Discovery for a Cargo project, one listing per test binary.
+///
+/// `cargo test --no-run --message-format=json` builds every test target and names its source file
+/// and executable, and each executable then answers `--list --format terse` itself. Asking the
+/// binaries directly is what makes the label honest: a single `cargo test -- --list` run prints its
+/// `Running unittests …` / `Running tests/…` headers on unbuffered stderr while the names leave
+/// buffered stdout, so a merged stream attributes every name to whichever header the merge happened
+/// to put first. One binary's own output has no header to merge with.
 pub fn list(info: &ProjectInfo) -> Result<Vec<TestItem>, String> {
     require_cargo(info.kind)?;
 
-    let captured = capture(
+    let built = capture(
         "list tests",
         &info.build_root,
-        &["test", "--", "--list", "--format", "terse"],
+        &["test", "--no-run", "--message-format=json"],
         LIST_TIMEOUT,
     )?;
+    let binaries = test_binaries(&stdout_text(&built.lines), &info.build_root);
+    if binaries.is_empty() {
+        if !built.status.success() {
+            return Err(failure_error("list tests", &info.build_root, &built.lines));
+        }
+        return Ok(Vec::new());
+    }
 
-    let items = parse_tests(&merged_text(&captured.lines), &info.name);
-    if items.is_empty() && !captured.status.success() {
-        return Err(failure_error(
+    let mut items = Vec::new();
+    for binary in &binaries {
+        let listed = capture_program(
             "list tests",
             &info.build_root,
-            &captured.lines,
-        ));
+            &binary.executable,
+            &["--list", "--format", "terse"],
+            EXE_LIST_TIMEOUT,
+        )?;
+        items.extend(parse_tests(&stdout_text(&listed.lines), &binary.label));
     }
     Ok(items)
 }
