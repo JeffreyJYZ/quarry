@@ -78,8 +78,8 @@ jobs:
 
             # Built here rather than by the probe so a compile error is one named step, and so the
             # probe measures the planner this job reports on instead of rebuilding it.
-            - name: Build quarry-plan
-              run: cargo build --example quarry-plan --manifest-path src-tauri/Cargo.toml
+            - name: Build the plan and test seams
+              run: cargo build --example quarry-plan --example quarry-tests --manifest-path src-tauri/Cargo.toml
 
             # A missing toolchain should name itself, in one line per tool. The generator list is
             # printed in full because it is what the probe selects from: the rows used to hardcode
