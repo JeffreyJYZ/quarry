@@ -8,7 +8,7 @@
  * where it said why.
  */
 
-import { describeExit } from "./windows-debug-exit";
+import { AdapterGone } from "./windows-debug-dap-errors";
 import { describeWay, spawnArgs, type Way } from "./windows-debug-launch";
 import { readFrames } from "./windows-debug-dap-frames";
 import { type Exchange, type SessionTrace, stderrTail } from "./windows-debug-dap-report";
@@ -101,13 +101,7 @@ export class DapClient implements SessionTrace {
 				clearTimeout(timer);
 				this.pending.delete(seq);
 				await this.settle();
-				const said = stderrTail(this.errors).join(" ");
-				reject(
-					new Error(
-						`${command} was never answered: the adapter exited ${describeExit(code)}` +
-							(said === "" ? "; it printed nothing" : `; it said: ${said}`),
-					),
-				);
+				reject(new AdapterGone(command, code, stderrTail(this.errors).join(" ")));
 			});
 		});
 	}

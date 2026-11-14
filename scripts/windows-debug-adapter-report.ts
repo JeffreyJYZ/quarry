@@ -8,8 +8,9 @@
  */
 
 import type { Attempt, Probe } from "./windows-debug-adapter";
+import type { AdapterGone } from "./windows-debug-dap-errors";
 import { describeExit } from "./windows-debug-exit";
-import { describeWay } from "./windows-debug-launch";
+import { describeWay, type Way } from "./windows-debug-launch";
 
 /** A probe as log lines, indented by the caller. */
 export function describeProbe(probe: Probe): string[] {
@@ -54,7 +55,21 @@ export function causeLine(probes: Probe[]): string {
 }
 
 /**
- * The named skip when no candidate can be launched, with the evidence that made it a skip.
+ * The named skip when an adapter exits before answering `initialize`, with its own words.
+ *
+ * This is the one measured outcome on the image: `--version` answers through `cmd /c`, and the
+ * session then dies with `The network path was not found.` — Win32 `ERROR_BAD_NETPATH`, the same 53
+ * every direct spawn returned. That is an LLVM-on-this-image fact: the adapter refused to start, so
+ * nothing quarry sent was ever measured. A session that answers `initialize` and breaks later stays a
+ * failure, because from there it is quarry's request sequence.
+ */
+export function refusalLine(adapter: string, way: Way, gone: AdapterGone): string {
+	const said = gone.said === "" ? "it printed nothing" : `it said: ${oneLine(gone.said)}`;
+	return `the adapter refused to start: ${adapter} (${describeWay(way)}) exited ${describeExit(gone.exit)} before answering initialize and ${said} — Windows debugger parity is unmeasurable on this image, not failed`;
+}
+
+/**
+ * The named skip when no candidate can be launched at all, with the evidence that made it a skip.
  *
  * A red `main` that can never go green is not a measurement, and a skip that names what was found and
  * what each candidate did is not a hidden failure. This line is the whole record: how many candidates
