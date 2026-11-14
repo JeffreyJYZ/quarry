@@ -119,15 +119,36 @@ pub fn base64_decode(text: &str) -> Result<Vec<u8>, String> {
     Ok(decoded)
 }
 
-/// `PATH` first, then `xcrun`: a GUI-launched app inherits launchd's `PATH`, so the Apple-shipped
-/// `lldb-dap` is only reachable through `xcrun`.
+/// The adapter's file name on this platform.
+///
+/// Windows runs `lldb-dap.exe`, and the resolver stats the literal name it is given, so asking for
+/// the bare `lldb-dap` there never matches the installed tool: the debugger then reports itself as
+/// not installed on a machine that has one.
+pub fn adapter_name() -> String {
+    format!("{ADAPTER}{}", std::env::consts::EXE_SUFFIX)
+}
+
+/// Where the adapter comes from on this platform, in words that name the install.
+pub fn install_hint() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "install the Xcode command line tools with `xcode-select --install`"
+    } else if cfg!(windows) {
+        "install LLVM (it ships lldb-dap.exe) or the Visual Studio C++ LLVM tools"
+    } else {
+        "install LLVM (it ships lldb-dap)"
+    }
+}
+
+/// The adapter `PATH` first, then the platform's own tool lookup — `xcrun` on macOS — because a
+/// GUI launch inherits a `PATH` the Apple toolchain is not on.
 pub fn resolve_adapter() -> Result<String, String> {
-    if let Some(found) = resolve::resolve(ADAPTER) {
+    let name = adapter_name();
+    if let Some(found) = resolve::resolve(&name) {
         return Ok(found.path.to_string_lossy().into_owned());
     }
 
     Err(format!(
-        "{ADAPTER} not found on PATH or through xcrun; install the Xcode command line tools with \
-         `xcode-select --install`"
+        "{name} not found on PATH or through the platform's tool lookup: {}",
+        install_hint()
     ))
 }
