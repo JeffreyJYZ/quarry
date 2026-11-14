@@ -3,6 +3,7 @@
  * one command line kept with its exit code and first stderr lines.
  */
 
+import type { Profile } from "./platform";
 import type { Verdict } from "./judge";
 import { type RunResult, firstError, productAnswer, run } from "./tools";
 
@@ -12,8 +13,8 @@ export interface Harness {
 	tests: string;
 	/** Where the fixtures are written; findings print absolute paths under it. */
 	scratch: string;
-	/** The Visual Studio generator this machine can configure with. */
-	generator: string;
+	/** The CMake tree this platform builds: generator, argv and artefact names. */
+	profile: Profile;
 	cmake: string;
 }
 

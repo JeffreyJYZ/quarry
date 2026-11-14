@@ -133,6 +133,13 @@ export function visualStudioGenerators(help: string): string[] {
 const PROBE_MANIFEST = "cmake_minimum_required(VERSION 3.20)\nproject(quarry_runtime_probe CXX)\n";
 const PROBE_SOURCE = "int main() { return 0; }\n";
 
+/** A minimal C++ project under `root`, so a generator is proved by configuring it. */
+export function writeConfigureProbe(root: string): void {
+	mkdirSync(root, { recursive: true });
+	writeFileSync(join(root, "CMakeLists.txt"), PROBE_MANIFEST);
+	writeFileSync(join(root, "main.cpp"), PROBE_SOURCE);
+}
+
 export interface GeneratorSearch {
 	generator: string | null;
 	attempts: string[];
@@ -144,9 +151,7 @@ export async function detectGenerator(cmake: string, scratch: string): Promise<G
 	const attempts: string[] = [];
 	for (const name of visualStudioGenerators(help.stdout)) {
 		const root = join(scratch, name.replace(/[^A-Za-z0-9]+/g, "-"));
-		mkdirSync(root, { recursive: true });
-		writeFileSync(join(root, "CMakeLists.txt"), PROBE_MANIFEST);
-		writeFileSync(join(root, "main.cpp"), PROBE_SOURCE);
+		writeConfigureProbe(root);
 		const result = await run(
 			cmake,
 			["-S", root, "-B", join(root, "build"), "-G", name, "-A", "x64"],
