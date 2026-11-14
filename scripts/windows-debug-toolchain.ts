@@ -11,8 +11,8 @@
 
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import type { RunResult } from "./cpp-parity-probe";
-import { NO_TOOLSET, NO_VS } from "./cpp-parity-windows";
+import type { RunResult } from "./cpp-parity/types";
+import { NO_TOOLSET, NO_VS } from "./cpp-parity/windows";
 
 /** Why a machine with neither installer skips the row, in words that name the fix. */
 export const NO_ADAPTER =

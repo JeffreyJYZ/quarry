@@ -27,7 +27,7 @@ import {
 	NO_TOOLSET,
 	toolsetMissing,
 	vsGenerators,
-} from "./cpp-parity-windows";
+} from "./cpp-parity/windows";
 import { assertDebugSession } from "./windows-debug-assertions";
 import { DapClient } from "./windows-debug-dap-client";
 import {

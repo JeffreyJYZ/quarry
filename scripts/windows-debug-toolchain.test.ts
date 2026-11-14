@@ -11,7 +11,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { NO_TOOLSET, NO_VS } from "./cpp-parity-windows";
+import { NO_TOOLSET, NO_VS } from "./cpp-parity/windows";
 import {
 	NO_ADAPTER,
 	NO_CMAKE,
