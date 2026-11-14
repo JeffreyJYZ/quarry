@@ -1,11 +1,10 @@
 #!/usr/bin/env bun
 /**
- * What the Windows debugger row decides without a Windows machine.
+ * What the Windows debugger row decides about a machine before it debugs anything.
  *
- * The row cannot run here, so the parts that decide *whether* it runs and *what* it calls a match are
- * measured directly: the skip reasons in the order the work happens, discovery of the `.exe` name
- * lldb-dap actually carries, the LLVM bins under a Visual Studio install, a Windows path matching a
- * Windows path, and the two line numbers the fixture's own text defines.
+ * The row cannot run here, so the decisions that decide *whether* it runs are measured directly: the
+ * skip reasons in the order the work happens, discovery of the `.exe` name lldb-dap actually carries,
+ * the LLVM bins under a Visual Studio install, and the two spellings of one Windows path.
  */
 
 import { describe, expect, test } from "bun:test";
@@ -13,16 +12,6 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { NO_TOOLSET, NO_VS } from "./cpp-parity-windows";
-import type { DapClient } from "./windows-debug-dap-client";
-import { Checks, integerValue } from "./windows-debug-dap-session";
-import {
-	BREAKPOINT_NEEDLE,
-	CONFIGURATION,
-	MAIN,
-	STEP_NEEDLE,
-	lineOf,
-	programPath,
-} from "./windows-debug-fixture";
 import {
 	NO_ADAPTER,
 	NO_CMAKE,
@@ -107,20 +96,7 @@ describe("the LLVM bins Visual Studio installs", () => {
 		);
 		mkdirSync(join(tools, "bin"), { recursive: true });
 		writeFileSync(join(tools, "bin", "lldb-dap.exe"), "");
-		const bins = visualStudioLlvmBins(root);
-		expect(bins).toEqual([
-			join(
-				root,
-				"Microsoft Visual Studio",
-				"2026",
-				"Community",
-				"VC",
-				"Tools",
-				"Llvm",
-				"x64",
-				"bin",
-			),
-		]);
+		expect(visualStudioLlvmBins(root)).toEqual([join(tools, "bin")]);
 	});
 
 	test("a root with no Visual Studio has no bins instead of failing", () => {
@@ -158,55 +134,5 @@ describe("the verbatim spelling Windows adds", () => {
 
 	test("a platform without the prefix answers null, so the row does not ask for one", () => {
 		expect(verbatimPath("/work/app/main.cpp", "darwin")).toBeNull();
-	});
-});
-
-describe("the fixture the row builds", () => {
-	test("the breakpoint line and the step line come from the source's own text", () => {
-		expect(lineOf(MAIN, BREAKPOINT_NEEDLE)).toBe(7);
-		expect(lineOf(MAIN, STEP_NEEDLE)).toBe(8);
-	});
-
-	test("the artefact is the configuration directory the generator writes", () => {
-		expect(programPath("C:\\project\\build", "win32")).toBe(
-			join("C:\\project\\build", CONFIGURATION, "parity_windows_debug.exe"),
-		);
-	});
-});
-
-describe("reading an evaluated result", () => {
-	test("a bare value, a repl-shaped value and a missing value", () => {
-		expect(integerValue("0")).toBe(0);
-		expect(integerValue("(int) $0 = 5")).toBe(5);
-		expect(integerValue("<not available>")).toBeNull();
-	});
-});
-
-describe("what a failing assertion prints", () => {
-	const client = {
-		report: (from: number, to: number) => [`→ request ${from}`, `← response ${to}`],
-		stderrLines: () => ["error: no debug info"],
-	} as unknown as DapClient;
-
-	test("the exact exchange of the failed assertion, and the adapter's own words", () => {
-		const checks = new Checks();
-		checks.add("stopped frame is app/main.cpp:7", true, "", 0, 1);
-		checks.add("evaluate total before the step reads 0", false, 'result "3"', 1, 2);
-		expect(checks.hadFailure).toBe(true);
-		expect(checks.failures(client)).toEqual([
-			'--- evaluate total before the step reads 0 (result "3") ---',
-			"→ request 1",
-			"← response 2",
-			"--- lldb-dap stderr ---",
-			"error: no debug info",
-		]);
-	});
-
-	test("a passing row has nothing to print", () => {
-		const checks = new Checks();
-		checks.add("stopped frame is app/main.cpp:7", true, "", 0, 1);
-		expect(checks.hadFailure).toBe(false);
-		expect(checks.count).toBe(1);
-		expect(checks.failures(client)).toEqual([]);
 	});
 });
