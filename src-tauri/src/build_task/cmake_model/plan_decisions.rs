@@ -56,6 +56,52 @@ pub fn build_type(
     Some(configuration.to_string())
 }
 
+/// The explicit recipe a project with no preset runs, and why each flag is there.
+///
+/// The build type is the one decision a tree with no preset cannot make from its files: a
+/// single-config generator needs it at configure time, or it compiles without `-g`, and a
+/// multi-config one ignores it. So an unconfigured tree keeps the type — losing debug info on every
+/// single-config project to spare a generator that only appears on some machines is the worse trade
+/// — and the note says the generator is CMake's to choose. Measured with cmake 4.5 and
+/// `Ninja Multi-Config`, that guess is recorded in the cache as `CMAKE_BUILD_TYPE:UNINITIALIZED=`;
+/// it stays there, because the tree may be the user's own, and the next plan reads its cache and
+/// passes no build type from then on.
+pub struct RecipeConfigure {
+    pub configure: Vec<String>,
+    /// The build type this configure passes, or `None` when the generator takes none.
+    pub build_type: Option<String>,
+}
+
+/// The explicit `-S … -B …` configure, for a tree whose project declares no usable preset.
+pub fn recipe_configure(
+    source_root: &str,
+    dir: &str,
+    build_root: &Path,
+    profile: BuildProfile,
+    notes: &mut Vec<String>,
+) -> RecipeConfigure {
+    let standing = generator_standing(build_root, None);
+    let configuration = cmake_config(profile);
+    let typed = standing != GeneratorStanding::MultiConfig;
+    if standing == GeneratorStanding::Unknown {
+        notes.push(format!(
+            "no preset, cache or reply names a generator, so cmake picks one; \
+             -DCMAKE_BUILD_TYPE={configuration} keeps debug info on a single-config one, \
+             and a multi-config one ignores it and builds --config {configuration}"
+        ));
+    }
+    let build_type = typed.then(|| configuration.to_string());
+    let configure = if typed {
+        cmake_configure_argv(source_root, dir, profile)
+    } else {
+        cmake_configure_argv_with(source_root, dir, None)
+    };
+    RecipeConfigure {
+        configure,
+        build_type,
+    }
+}
+
 /// Whether a compiler database will be written, honouring a value the project set itself.
 pub fn compile_database(
     preset: &ResolvedConfigure,

@@ -31,7 +31,7 @@ pub mod tests_cmake_argv {
     }
 
     #[test]
-    fn no_preset_keeps_the_explicit_recipe_byte_for_byte() {
+    fn no_preset_keeps_the_explicit_recipe_and_says_the_generator_is_cmakes() {
         let (_directory, root) = root("cmake-argv-plain");
         let plan = plan_for(&root, false, &CmakeOptions::default());
         let build = root.join(BUILD_DIR);
@@ -59,7 +59,12 @@ pub mod tests_cmake_argv {
             ]
         );
         assert_eq!(plan.build_root, build);
-        assert_eq!(plan.note, None);
+        // Nothing on disk names a generator, so the type is passed for debug info and the choice is
+        // reported rather than silent.
+        let note = plan.note.expect("the generator cmake picks is reported");
+        assert!(note.contains("cmake picks one"), "note: {note}");
+        assert!(note.contains("-DCMAKE_BUILD_TYPE=Debug"), "note: {note}");
+        assert!(note.contains("--config Debug"), "note: {note}");
     }
 
     #[test]

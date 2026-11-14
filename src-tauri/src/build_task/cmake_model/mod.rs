@@ -99,3 +99,9 @@ pub use tests_stale_fixture::*;
 
 mod tests_stale_preset;
 pub use tests_stale_preset::*;
+
+mod tests_first_configure;
+pub use tests_first_configure::*;
+
+mod tests_first_configure_build;
+pub use tests_first_configure_build::*;
