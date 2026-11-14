@@ -64,6 +64,9 @@ export class LspClient {
 		this.child.stderr?.on("data", (c: Buffer) => {
 			this.stderr += c.toString("utf8");
 		});
+		this.child.on("error", (error) => {
+			this.stderr += `\n[child error: ${error.message}]\n`;
+		});
 		this.child.on("exit", (code, signal) => {
 			this.exited = true;
 			this.stderr += `\n[exit code=${code} signal=${signal}]\n`;
@@ -144,7 +147,10 @@ export class LspClient {
 			if (he < 0) return;
 			const header = this.buffer.subarray(0, he).toString("ascii");
 			const match = /Content-Length:\s*(\d+)/i.exec(header);
-			if (!match) return;
+			if (!match) {
+				this.stderr += `\n[malformed header: ${JSON.stringify(header)}]\n`;
+				return;
+			}
 			const len = Number(match[1]);
 			const start = he + 4;
 			if (this.buffer.length < start + len) return;
@@ -155,7 +161,7 @@ export class LspClient {
 				if (message.method === undefined) this.responses.push(message);
 				else this.notifications.push(message);
 			} catch {
-				// A frame that is not JSON is not ours to interpret; the next frame still parses.
+				this.stderr += `\n[unparseable payload: ${raw.slice(0, 200)}]\n`;
 			}
 		}
 	}
