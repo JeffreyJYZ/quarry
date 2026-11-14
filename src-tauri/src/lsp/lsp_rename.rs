@@ -33,13 +33,19 @@ pub async fn lsp_rename(
 ) -> Result<Vec<FileEdit>, String> {
     let session = session_for(&state, &root)?;
     ensure_open_for(&session, &path)?;
+    // The versions the server holds right now: a `changes` answer cannot carry one, so the one
+    // captured here is what lets the editor refuse a result computed against other text.
+    let versions = lock(&session).documents.clone();
     let params = json!({
         "textDocument": { "uri": path_to_uri(&path) },
         "position": { "line": line, "character": character },
         "newName": new_name,
     });
     let result = send_request(&session, "textDocument/rename", params).await?;
-    Ok(parse_workspace_edit(&result))
+    Ok(with_captured_versions(
+        parse_workspace_edit(&result),
+        &versions,
+    ))
 }
 
 #[tauri::command]
@@ -53,9 +59,15 @@ pub async fn lsp_code_actions(
 ) -> Result<Vec<CodeAction>, String> {
     let session = session_for(&state, &root)?;
     ensure_open_for(&session, &path)?;
+    let versions = lock(&session).documents.clone();
     let params = code_action_params(&path, line, character, &diagnostics.unwrap_or_default());
     let result = send_request(&session, "textDocument/codeAction", params).await?;
-    Ok(parse_code_actions(&result))
+    let mut actions = parse_code_actions(&result);
+    for action in actions.iter_mut() {
+        let edits = std::mem::take(&mut action.edits);
+        action.edits = with_captured_versions(edits, &versions);
+    }
+    Ok(actions)
 }
 
 /// Flatten a `WorkspaceEdit` into the IDE's `FileEdit` list.

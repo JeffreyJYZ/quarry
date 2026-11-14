@@ -82,6 +82,9 @@ export function applyEdits(text: string, edits: TextEdit[]): string {
  * An unsaved buffer is refused whatever the server declared: its live text is not what any edit
  * computed against disk describes. A declared version then has to match the one the server last
  * acknowledged for this path, so a rename that raced a `didChange` is refused instead of merged.
+ * A `null` version is a server that answered in a shape which cannot carry one (`changes`, which
+ * clangd uses), so nothing can be compared and the edit is refused rather than applied blind; an
+ * absent version is a caller that does not track versions at all.
  */
 function refusalReason(
 	fileEdit: FileEdit,
@@ -90,13 +93,32 @@ function refusalReason(
 ): string | null {
 	if (isDirty(buffer)) return "the buffer has unsaved changes";
 	const declared = fileEdit.version;
-	if (declared === undefined || declared === null) return null;
+	if (declared === undefined) return null;
+	if (declared === null) return "the server did not say which version it computed against";
 	const current = versionOf(fileEdit.path);
 	if (current === null) return "the editor has no version record for it";
 	if (current !== declared) {
 		return `the server computed it against version ${declared}, the editor is at version ${current}`;
 	}
 	return null;
+}
+
+/**
+ * The buffer list as it is now.
+ *
+ * `setBuffers` is the only handle on the live tree, so reading it is a call whose updater keeps the
+ * state it was given: React bails out of a re-render for an identical array, and the caller's copy
+ * — a render-time snapshot in `useProblemActions` — is never mistaken for the live one.
+ */
+function liveBuffers(
+	setBuffers: (updater: (current: FileBuffer[]) => FileBuffer[]) => void,
+): FileBuffer[] {
+	let live: FileBuffer[] = [];
+	setBuffers((current) => {
+		live = current;
+		return current;
+	});
+	return live;
 }
 
 /**
@@ -122,7 +144,21 @@ export async function applyFileEdits(
 				refused.push({ path: fileEdit.path, reason });
 				continue;
 			}
-			const nextText = applyEdits(buffer.text, fileEdit.edits);
+			// The edit was computed against the buffer the caller had. If the live buffer is no
+			// longer that text, its ranges name nothing meaningful and are refused, never merged.
+			const live = liveBuffers(setBuffers).find((b) => b.path === fileEdit.path);
+			if (live === undefined) {
+				refused.push({ path: fileEdit.path, reason: "it was closed while it was applied" });
+				continue;
+			}
+			if (live.text !== buffer.text) {
+				refused.push({
+					path: fileEdit.path,
+					reason: "the buffer changed after the edit was computed",
+				});
+				continue;
+			}
+			const nextText = applyEdits(live.text, fileEdit.edits);
 			setBuffers((current) =>
 				current.map((b) => (b.path === fileEdit.path ? { ...b, text: nextText } : b)),
 			);

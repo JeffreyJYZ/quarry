@@ -116,6 +116,9 @@ pub use parse_workspace_symbols::*;
 mod lsp_rename;
 pub use lsp_rename::*;
 
+mod workspace_edit_versions;
+pub use workspace_edit_versions::*;
+
 mod parse_code_actions;
 pub use parse_code_actions::*;
 

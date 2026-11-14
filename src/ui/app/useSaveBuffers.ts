@@ -95,11 +95,11 @@ export function useSaveBuffers(context: SaveContext) {
 					}
 					if (hasFormatter) {
 						const formatted = await editorRef.current?.formatText();
-						if (
-							formatted !== null &&
-							formatted !== undefined &&
-							formatted !== buffer.text
-						) {
+						// Typing while the formatter runs makes its answer stale; the live buffer wins.
+						const live = buffersRef.current.find((entry) => entry.path === path);
+						if (live !== undefined && live.text !== buffer.text) {
+							buffer = live;
+						} else if (formatted != null && formatted !== buffer.text) {
 							buffer = { ...buffer, text: formatted };
 							const next: FileBuffer = buffer;
 							setBuffers((current) =>
