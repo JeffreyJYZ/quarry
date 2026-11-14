@@ -2,19 +2,17 @@
 /**
  * A DAP client that keeps every message it saw, so a CI log diagnoses itself.
  *
- * The row asserts something and, when the assertion fails, prints the request and the response that
- * produced it — not a summary. So every message travels through one log, in arrival order, and the
- * caller reports the window its assertion occupied. lldb-dap's own stderr is kept beside it: on
- * Windows a refused launch says why there, and the DAP response only says `failed`.
+ * Transport only: framing, request correlation, the child's streams, and its exit. What a failure
+ * looks like is `windows-debug-dap-report.ts`, because the one thing this row must never do is lose
+ * the reason a process died — an adapter that ends at startup answers nothing, and its stderr is
+ * where it said why.
  */
 
-type Json = Record<string, unknown>;
+import { describeExit } from "./windows-debug-adapter";
+import { readFrames } from "./windows-debug-dap-frames";
+import { type Exchange, type SessionTrace, stderrTail } from "./windows-debug-dap-report";
 
-/** One message the client sent or saw, in the order it crossed the pipe. */
-export interface Exchange {
-	kind: "request" | "response" | "event";
-	message: Json;
-}
+type Json = Record<string, unknown>;
 
 /** How long one request may take; a Windows launch starts a process the first time. */
 const REQUEST_TIMEOUT = 30_000;
@@ -22,26 +20,40 @@ const REQUEST_TIMEOUT = 30_000;
 /** How often the client looks for an event the adapter already sent. */
 const POLL = 20;
 
-export class DapClient {
+export class DapClient implements SessionTrace {
+	readonly log: Exchange[] = [];
+	readonly errors: string[] = [];
+	/** The command line and directory the adapter was started with, quoted on failure. */
+	readonly spawn: string;
 	private readonly decoder = new TextDecoder();
 	private readonly errorDecoder = new TextDecoder();
-	private readonly log: Exchange[] = [];
-	private readonly errors: string[] = [];
 	private readonly pending = new Map<number, (message: Json) => void>();
 	private readonly child: ReturnType<typeof Bun.spawn>;
+	private readonly readers: Promise<void>[];
+	private finished: number | null = null;
 	private buffer = "";
 	private seq = 0;
 
 	/** Start one adapter in `cwd`, which is the directory the product launches it in. */
 	constructor(adapter: string, cwd: string) {
+		this.spawn = `${adapter} (cwd ${cwd})`;
 		this.child = Bun.spawn([adapter], {
 			cwd,
 			stdin: "pipe",
 			stdout: "pipe",
 			stderr: "pipe",
 		});
-		void this.read();
-		void this.readErrors();
+		void this.child.exited.then((code) => {
+			this.finished = code;
+		});
+		// Both reader loops are kept so a failure can wait for them: an adapter's last words arrive
+		// on a stream, not in its exit status, and a startup death is exactly when that matters.
+		this.readers = [this.read(), this.readErrors()];
+	}
+
+	/** The status the adapter left, once it has ended. */
+	get exit(): number | null {
+		return this.finished;
 	}
 
 	/** The index of the next message, which is an assertion's window start. */
@@ -49,7 +61,12 @@ export class DapClient {
 		return this.log.length;
 	}
 
-	/** Send one request and wait for its response, or fail with the request's own name. */
+	/**
+	 * Send one request and wait for its response, or fail with the reason it will never come.
+	 *
+	 * The wait races the child as well as the clock: an adapter that dies at startup answers nothing,
+	 * and calling that a 30 s timeout hides the one fact that matters — it is gone, with a status.
+	 */
 	send(command: string, arguments_: Json = {}): Promise<Json> {
 		this.seq += 1;
 		const seq = this.seq;
@@ -73,6 +90,18 @@ export class DapClient {
 					return;
 				}
 				resolve(message);
+			});
+			void this.child.exited.then(async (code) => {
+				clearTimeout(timer);
+				this.pending.delete(seq);
+				await this.settle();
+				const said = stderrTail(this.errors).join(" ");
+				reject(
+					new Error(
+						`${command} was never answered: the adapter exited ${describeExit(code)}` +
+							(said === "" ? "; it printed nothing" : `; it said: ${said}`),
+					),
+				);
 			});
 		});
 	}
@@ -100,29 +129,22 @@ export class DapClient {
 		}
 	}
 
-	/** The messages between two marks, untruncated: a failure quotes the exchange exactly. */
-	report(from: number, to: number = this.log.length): string[] {
-		return this.log.slice(from, to).map(({ kind, message }) => {
-			const arrow = kind === "request" ? "→" : kind === "response" ? "←" : "•";
-			return `${arrow} ${JSON.stringify(message)}`;
-		});
-	}
-
-	/** lldb-dap's own last words, which carry the cause a refused request does not. */
-	stderrLines(limit = 12): string[] {
-		return this.errors.flatMap((chunk) => chunk.split(/\r?\n/)).slice(-limit);
-	}
-
-	/** How many events of one name arrived at or after `from`. */
-	eventsSince(name: string, from: number): number {
-		return this.log
-			.slice(from)
-			.filter((entry) => entry.kind === "event" && entry.message.event === name).length;
-	}
-
-	/** Wait for the adapter to end on its own; null when it is still alive at the deadline. */
+	/** Wait for the adapter to end on its own, then for its streams, so nothing it said is lost. */
 	async waitForExit(timeoutMs = 10_000): Promise<number | null> {
-		return await Promise.race([this.child.exited, Bun.sleep(timeoutMs).then(() => null)]);
+		this.finished ??= await Promise.race([
+			this.child.exited,
+			Bun.sleep(timeoutMs).then(() => null),
+		]);
+		await this.settle();
+		return this.finished;
+	}
+
+	/** Wait for both reader loops to end; a dead child's streams end within a moment. */
+	async settle(timeoutMs = 2000): Promise<void> {
+		await Promise.race([
+			Promise.allSettled(this.readers),
+			Bun.sleep(timeoutMs).then(() => undefined),
+		]);
 	}
 
 	/** Kill the adapter and wait, so no child outlives the row. */
@@ -135,7 +157,9 @@ export class DapClient {
 		const stream = this.child.stdout as ReadableStream<Uint8Array>;
 		for await (const chunk of stream) {
 			this.buffer += this.decoder.decode(chunk, { stream: true });
-			this.drain();
+			const { messages, rest } = readFrames(this.buffer);
+			this.buffer = rest;
+			for (const message of messages) this.accept(message);
 		}
 	}
 
@@ -143,21 +167,6 @@ export class DapClient {
 		const stream = this.child.stderr as ReadableStream<Uint8Array>;
 		for await (const chunk of stream) {
 			this.errors.push(this.errorDecoder.decode(chunk, { stream: true }));
-		}
-	}
-
-	private drain(): void {
-		for (;;) {
-			const header = this.buffer.indexOf("\r\n\r\n");
-			if (header < 0) return;
-			const match = /Content-Length: (\d+)/i.exec(this.buffer.slice(0, header));
-			if (match === null) return;
-			const length = Number(match[1]);
-			const start = header + 4;
-			if (this.buffer.length < start + length) return;
-			const body = this.buffer.slice(start, start + length);
-			this.buffer = this.buffer.slice(start + length);
-			this.accept(JSON.parse(body) as Json);
 		}
 	}
 

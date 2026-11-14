@@ -139,6 +139,21 @@ export async function runToExit(
 	return String(event.event);
 }
 
+/**
+ * End the session the way the product's shutdown does.
+ *
+ * lldb-dap stays alive after `terminated` until it is told to disconnect, so a row that only waits
+ * for the process to leave on its own waits out its whole timeout and then kills it. A refusal is
+ * expected when the session is already gone, and is not a failure.
+ */
+export async function disconnect(client: DapClient): Promise<void> {
+	try {
+		await client.send("disconnect", { terminateDebuggee: true, restart: false });
+	} catch {
+		// The adapter had already exited; there is nothing left to disconnect.
+	}
+}
+
 /** The integer an evaluated result carries, or null when it carries none.
  *
  * The last number, not the first: lldb's repl form prepends `(int) $0 = `, whose `$0` is the
