@@ -41,15 +41,23 @@ export default function StructurePalette(props: StructurePaletteProps) {
 	const source = structureSource(activePath, session);
 	const { symbols, loading, error } = useStructureSymbols(source, session, activePath, load);
 	const [query, setQuery] = useState("");
-	const [active, setActive] = useState(0);
+	/**
+	 * The row the user chose, tagged with the file it was chosen in.
+	 *
+	 * The highlight is derived from this plus the caret, never assigned by an effect: an effect runs
+	 * a commit after the rows, so the list would paint once with the wrong row highlighted and then
+	 * jump — a visible flicker, and the frame the old test caught only by luck. The file tag keeps a
+	 * choice made in one file from pointing at an unrelated row in the next.
+	 */
+	const [picked, setPicked] = useState<{ path: string | null; index: number } | null>(null);
 	const listRef = useRef<HTMLUListElement>(null);
-	const seededFor = useRef<string | null>(null);
 	const { panelRef, onKeyDown } = useDialogFocus(true, {
 		initialFocus: ".goto-input",
 		onClose,
 	});
 
 	const rows = useMemo(() => structureRows(symbols, query), [symbols, query]);
+	const caret = useMemo(() => caretSymbolIndex(symbols, cursor), [symbols, cursor]);
 	const status = structureStatus({
 		source,
 		loading,
@@ -58,20 +66,11 @@ export default function StructurePalette(props: StructurePaletteProps) {
 		rowCount: rows.length,
 	});
 
-	// The caret's symbol is what the popup is usually asked for and it is only known once the server
-	// answers, so the first list settles on it; the per-file guard keeps a later list from moving the
-	// selection the user already made. It runs after the clamp above so a new list cannot overwrite
-	// the seed with the row index it held a moment ago.
-	useEffect(() => {
-		setActive((current) => clampActive(current, rows.length));
-	}, [rows.length]);
-
-	useEffect(() => {
-		if (activePath === null || symbols.length === 0) return;
-		if (seededFor.current === activePath) return;
-		seededFor.current = activePath;
-		setActive(initialActive(rows, caretSymbolIndex(symbols, cursor)));
-	}, [activePath, symbols, rows, cursor]);
+	// The caret's symbol is what the popup is usually asked for, and it is only known once the
+	// server answers; deriving it means the very first frame that has rows already carries it.
+	const chosen = picked !== null && picked.path === activePath ? picked.index : null;
+	const seed = initialActive(rows, caret);
+	const active = clampActive(chosen ?? seed, rows.length);
 
 	useEffect(() => {
 		const item = listRef.current?.children[active] as HTMLElement | undefined;
@@ -82,6 +81,10 @@ export default function StructurePalette(props: StructurePaletteProps) {
 		if (activePath === null) return;
 		onNavigate(activePath, symbol.range.start.line, symbol.range.start.character);
 		onClose();
+	};
+
+	const choose = (index: number) => {
+		setPicked({ path: activePath, index });
 	};
 
 	const submit = () => {
@@ -123,17 +126,17 @@ export default function StructurePalette(props: StructurePaletteProps) {
 					autoComplete="off"
 					onInput={(event) => {
 						setQuery(event.currentTarget.value);
-						setActive(0);
+						choose(0);
 					}}
 					onKeyDown={(event) => {
 						if (event.key === "ArrowDown") {
 							event.preventDefault();
-							setActive((current) => stepActive(current, rows.length, 1));
+							choose(stepActive(active, rows.length, 1));
 							return;
 						}
 						if (event.key === "ArrowUp") {
 							event.preventDefault();
-							setActive((current) => stepActive(current, rows.length, -1));
+							choose(stepActive(active, rows.length, -1));
 							return;
 						}
 						if (event.key === "Enter") {
@@ -155,7 +158,7 @@ export default function StructurePalette(props: StructurePaletteProps) {
 						rows={rows}
 						active={active}
 						listRef={listRef}
-						onHover={setActive}
+						onHover={choose}
 						onPick={pick}
 					/>
 				)}
