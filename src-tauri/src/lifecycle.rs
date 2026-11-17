@@ -4,6 +4,11 @@
 //! what makes macOS report quarry as still running after its window is gone. macOS does not quit on
 //! the last window close, so the children are taken down with the window itself rather than only on
 //! exit — both paths go through the same [`shutdown::Children`] so they cannot drift.
+//!
+//! The app can hold several windows of the same frontend, and the children belong to the process
+//! rather than to any one of them: closing a second window leaves the servers and shells of the
+//! others alone, and only the last close takes them down. That rule is
+//! [`shutdown::closes_last_window`], pure so it is pinned by a test without an event loop.
 
 use crate::shutdown;
 use crate::startup::{process_start, startup_enabled};

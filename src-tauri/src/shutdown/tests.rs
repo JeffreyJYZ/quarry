@@ -44,6 +44,29 @@ fn shutdown_empties_every_state_and_a_second_call_is_a_no_op() {
     assert!(states.pty.session("shell").is_err());
 }
 
+#[test]
+fn a_second_window_closing_does_not_close_the_last_one() {
+    // `closing_last_window` reads the live labels minus the one being destroyed, so several
+    // windows must keep the children alive when one of them goes.
+    let live = ["main", "window-2", "window-3"];
+    assert!(!closes_last_window(live.into_iter(), "window-2"));
+    assert!(!closes_last_window(live.into_iter(), "main"));
+    assert!(!closes_last_window(live.into_iter(), "window-3"));
+}
+
+#[test]
+fn the_last_window_closing_still_takes_the_children_down() {
+    // `main` already went, so `window-2` is the only one left.
+    assert!(closes_last_window(["window-2"].into_iter(), "window-2"));
+    // Two labels in the map and only one of them closing is not the last window.
+    assert!(!closes_last_window(
+        ["window-2", "window-9"].into_iter(),
+        "window-9"
+    ));
+    // A label with no window at all leaves the live one behind.
+    assert!(!closes_last_window(["main"].into_iter(), "window-9"));
+}
+
 #[cfg(unix)]
 #[test]
 fn a_live_shell_does_not_outlive_its_window() {

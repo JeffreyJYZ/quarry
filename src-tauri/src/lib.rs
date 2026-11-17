@@ -35,6 +35,7 @@ mod test_task;
 mod toolchain;
 mod types;
 mod watch;
+mod windows;
 mod workspace;
 
 #[tauri::command]
@@ -66,6 +67,7 @@ pub fn run() {
         .manage(watch::WatchState::default())
         .invoke_handler(tauri::generate_handler![
             version,
+            windows::new_window_command,
             startup_ms,
             logging::log_ui_error,
             logging::log_path,

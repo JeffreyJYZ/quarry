@@ -54,5 +54,13 @@ impl<'a> Children<'a> {
 /// True when closing `closed` leaves no window behind. macOS keeps the process alive after that,
 /// so the children have to go down with the window.
 pub fn closing_last_window<R: Runtime>(app: &AppHandle<R>, closed: &str) -> bool {
-    !app.webview_windows().keys().any(|label| label != closed)
+    closes_last_window(app.webview_windows().keys().map(String::as_str), closed)
+}
+
+/// The rule as a pure function: closing `closed` leaves nothing behind.
+///
+/// Every child belongs to the process, not to a window, so a second window closing must leave the
+/// shells, servers and tasks of the first alone; only the last close takes them down.
+pub fn closes_last_window<'a>(live: impl Iterator<Item = &'a str>, closed: &str) -> bool {
+    !live.into_iter().any(|label| label != closed)
 }
