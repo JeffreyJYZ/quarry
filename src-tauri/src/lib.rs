@@ -2,6 +2,7 @@ mod atomic_write;
 mod bookmarks;
 mod build_task;
 mod dap;
+mod dock;
 mod extensions;
 mod files;
 mod format;
@@ -185,6 +186,7 @@ pub fn run() {
         .setup(|app| {
             let menu = menu::build_menu(app.handle())?;
             app.set_menu(menu)?;
+            dock::install_for(app.handle());
             Ok(())
         })
         .build(tauri::generate_context!())
