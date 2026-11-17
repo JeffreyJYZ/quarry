@@ -44,6 +44,8 @@ export type CommandContext = {
 	openNotes: () => void;
 	toggleBlame: () => void;
 	newProject: () => void;
+	/** Open another window of the same frontend; no project is required. */
+	newWindow: () => void;
 	checkUpdates: () => void;
 };
 
