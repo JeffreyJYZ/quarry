@@ -14,10 +14,18 @@ pub fn install_for(app: &AppHandle) {
     let handle = app.clone();
     let result = super::install(app, move || {
         if let Err(error) = crate::windows::open_window(&handle) {
-            eprintln!("quarry: dock New Window failed: {error}");
+            crate::logging::write(
+                crate::logging::Level::Error,
+                "dock",
+                &format!("dock New Window failed: {error}"),
+            );
         }
     });
     if let Err(error) = result {
-        eprintln!("quarry: dock menu unavailable: {error}");
+        crate::logging::write(
+            crate::logging::Level::Error,
+            "dock",
+            &format!("dock menu unavailable: {error}"),
+        );
     }
 }
