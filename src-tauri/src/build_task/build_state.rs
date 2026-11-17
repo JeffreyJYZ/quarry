@@ -11,7 +11,7 @@ pub use std::time::Instant;
 pub use tauri::State;
 
 use super::*;
-use crate::run_task::{Stop, Terminated, lock, stop_tree};
+use crate::run_task::{Stop, Terminated, lock};
 
 /// A second build is refused rather than clobbering the child the first one still needs a stop for.
 pub const ALREADY_BUILDING: &str = "a build is already running: stop it before starting another";
@@ -38,7 +38,7 @@ impl BuildState {
         let mut current = lock(&self.current);
         if current.is_some() {
             drop(current);
-            let _ = stop_tree(child);
+            let _ = stop_group(child);
             return Err(ALREADY_BUILDING.to_string());
         }
         let slot: Slot = Arc::new(Mutex::new(Some(child)));
@@ -94,7 +94,7 @@ impl BuildState {
             return Ok(Stop::quiet());
         };
 
-        match stop_tree(child) {
+        match stop_group(child) {
             Terminated::Stopped(stop) => Ok(stop),
             Terminated::Failed { child, error } => {
                 // Hand it back so the wait, or the run's own cleanup, kills it rather than leaking
@@ -111,7 +111,7 @@ impl BuildState {
             return;
         };
         if let Some(child) = lock(&slot).take() {
-            let _ = stop_tree(child);
+            let _ = stop_group(child);
         }
     }
 }
