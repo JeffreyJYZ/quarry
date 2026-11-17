@@ -157,6 +157,7 @@ export function useShellGlue(options: GlueOptions) {
 		split,
 		bookmarks,
 		stepBookmark,
+		onNotice,
 	});
 
 	useSessionPersistence({

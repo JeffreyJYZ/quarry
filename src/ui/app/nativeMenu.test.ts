@@ -47,6 +47,7 @@ const IDLE_CONTEXT: CommandContext = {
 	refreshGit: noop,
 	toggleBlame: noop,
 	newProject: noop,
+	newWindow: noop,
 	checkUpdates: noop,
 	workspaceSymbol: noop,
 	gotoImplementation: noop,

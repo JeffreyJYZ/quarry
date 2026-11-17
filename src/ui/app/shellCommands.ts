@@ -9,6 +9,7 @@ import type { useWorkspace } from "@/ui/app/useWorkspace";
 import type { Command } from "@/ui/palette/CommandPalette";
 import { buildCommands } from "@/ui/app/commands";
 import { openDisassembly } from "@/lib/debug/disasm";
+import { newWindow as openNewWindow } from "@/lib/project/api";
 import type { LspCommandHandlers } from "@/ui/app/lspCommandHandlers";
 import type { SplitEditor } from "@/ui/app/useSplit";
 import type { BookmarksController } from "@/ui/app/useBookmarks";
@@ -41,6 +42,8 @@ export function shellCommands(options: {
 	run: () => void;
 	debugNow: () => void;
 	restartLsp: () => void;
+	/** Where a command reports a failure that has nowhere else to go. */
+	onNotice?: (message: string | null) => void;
 }): Command[] {
 	const { root, activePath, cursor, panelExpanded, workspace, overlays, panels } = options;
 	const { git, save, build, runs, debug, lsp, split, bookmarks, stepBookmark } = options;
@@ -89,6 +92,13 @@ export function shellCommands(options: {
 		openNotes: () => overlays.setNotesOpen(true),
 		toggleBlame: () => git.setBlameOn((current) => !current),
 		newProject: () => panels.setNewProjectOpen(true),
+		newWindow: () => {
+			// A rejected invoke is a backend that could not create the window; surface it rather than
+			// letting an unhandled rejection vanish the way an empty palette row would.
+			void openNewWindow().catch((error: unknown) => {
+				options.onNotice?.(`Could not open a window: ${String(error)}`);
+			});
+		},
 		checkUpdates: () => {
 			void import("@/lib/updates/store").then((updates) => updates.checkForUpdates());
 		},

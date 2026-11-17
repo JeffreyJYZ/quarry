@@ -36,6 +36,12 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
 				note: "The in-app generate binding on this chord never runs and has no other route.",
 			},
 			{
+				keys: ["Cmd", "Shift", "N"],
+				action: "New window",
+				menu: true,
+				note: 'File ▸ New Window owns this chord, so the in-app binding never runs; the palette row "New window" opens one instead.',
+			},
+			{
 				keys: ["Cmd", "O"],
 				action: "Open project",
 				menu: true,

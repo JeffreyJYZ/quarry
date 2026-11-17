@@ -154,6 +154,13 @@ export function buildCommands(context: CommandContext): Command[] {
 			run: context.newProject,
 		},
 		{
+			id: "new-window",
+			label: "New window",
+			hint: "Cmd+Shift+N",
+			// No project required: a second window of the same frontend is always available.
+			run: context.newWindow,
+		},
+		{
 			id: "check-updates",
 			label: "Check for updates",
 			hint: "",
