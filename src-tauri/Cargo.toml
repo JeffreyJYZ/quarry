@@ -37,16 +37,16 @@ encoding_rs = "0.8.44"
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = { version = "0.6", features = ["std"] }
 objc2-app-kit = { version = "0.3", default-features = false, features = [
-    "std",
-    "NSApplication",
-    "NSMenu",
-    "NSMenuItem",
-    "NSResponder",
+	"std",
+	"NSApplication",
+	"NSMenu",
+	"NSMenuItem",
+	"NSResponder",
 ] }
 objc2-foundation = { version = "0.3", default-features = false, features = [
-    "std",
-    "NSObject",
-    "NSString",
+	"std",
+	"NSObject",
+	"NSString",
 ] }
 
 

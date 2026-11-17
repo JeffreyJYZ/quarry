@@ -35,6 +35,9 @@
 #![allow(dead_code)]
 
 mod spec;
+mod wire;
+
+pub use wire::install_for;
 
 #[cfg(test)]
 mod tests_spec;
