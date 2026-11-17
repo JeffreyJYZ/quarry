@@ -34,7 +34,7 @@ const FORWARDED: [&str; 21] = [
 pub fn on_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
     let id = event.id().0.as_str();
     if id == "new-window" {
-        if let Err(error) = crate::windows::new_window(app) {
+        if let Err(error) = crate::windows::open_window(app) {
             eprintln!("quarry: {error}");
         }
         return;

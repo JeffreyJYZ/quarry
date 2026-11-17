@@ -44,7 +44,7 @@ fn new_window_is_handled_in_rust_and_not_forwarded() {
         "the row should be matched in the event handler"
     );
     assert!(
-        events.contains("windows::new_window"),
+        events.contains("windows::open_window"),
         "the handler should create the window itself"
     );
 

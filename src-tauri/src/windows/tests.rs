@@ -61,10 +61,10 @@ fn the_builder_matches_the_window_the_conf_declares() {
 
 #[test]
 fn the_command_is_registered_under_the_contract_name() {
-    // The contract names the command `new_window`, and the function carries the rename attribute
-    // so a Rust-idiomatic name does not leak into the IPC surface.
+    // The contract names the command `new_window`, and the function carries the same name so the
+    // `generate_handler!` scan in `src/lib/project/api/commands.test.ts` can see it.
     assert_eq!(
-        __tauri_command_name_new_window_command!(),
+        __tauri_command_name_new_window!(),
         "new_window",
         "the IPC command must be called new_window"
     );

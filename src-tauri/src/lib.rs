@@ -67,7 +67,7 @@ pub fn run() {
         .manage(watch::WatchState::default())
         .invoke_handler(tauri::generate_handler![
             version,
-            windows::new_window_command,
+            windows::new_window,
             startup_ms,
             logging::log_ui_error,
             logging::log_path,
