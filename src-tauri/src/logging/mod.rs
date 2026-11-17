@@ -31,3 +31,5 @@ mod tests_rotate;
 pub use breadcrumbs::*;
 pub use commands::*;
 pub use global::install;
+pub(crate) use global::write;
+pub(crate) use level::Level;
