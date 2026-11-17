@@ -11,7 +11,7 @@ pub use std::thread::{self, JoinHandle};
 pub use std::time::{Duration, Instant};
 
 use super::*;
-use crate::run_task::{Exit, Reap, lock, reap, stop_tree};
+use crate::run_task::{Exit, Reap, lock, reap};
 use crate::teardown::until_gone;
 
 /// How long one bounded wait looks at the child before looking again.
@@ -65,7 +65,7 @@ pub fn run_child(
 ) -> Result<Captured, String> {
     let mut child = spawn(command, label, cwd)?;
     let (Some(stdout), Some(stderr)) = (child.stdout.take(), child.stderr.take()) else {
-        let _ = stop_tree(child);
+        let _ = stop_group(child);
         return Err(format!(
             "cannot capture the output of {label}: its pipes were not created"
         ));
@@ -76,7 +76,7 @@ pub fn run_child(
     let readers = match read_both(label, stdout, stderr) {
         Ok(readers) => readers,
         Err(error) => {
-            let _ = stop_tree(child);
+            let _ = stop_group(child);
             return Err(format!("cannot read the output of {label}: {error}"));
         }
     };
@@ -91,7 +91,7 @@ pub fn run_child(
     // Whatever is still in the slot was never reaped (a failed stop hands the child back), so it is
     // killed here rather than left running behind a report that already called the build finished.
     if let Some(child) = lock(&slot).take() {
-        let _ = stop_tree(child);
+        let _ = stop_group(child);
     }
     state.finish(&slot);
 

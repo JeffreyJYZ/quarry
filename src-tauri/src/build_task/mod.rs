@@ -34,6 +34,9 @@ pub use build_state::*;
 mod run_child;
 pub use run_child::*;
 
+mod stop_group;
+pub use stop_group::*;
+
 mod default_cargo;
 pub use default_cargo::*;
 

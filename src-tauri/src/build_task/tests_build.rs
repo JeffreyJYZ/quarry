@@ -43,6 +43,19 @@ pub mod build_state_tests {
         false
     }
 
+    /// The group's members as `pid stat`, for a failing assertion to say what actually survived.
+    fn group_members(pid: u32) -> String {
+        Command::new("/bin/ps")
+            .args(["-o", "pid=,stat=,command=", "-g", &pid.to_string()])
+            .output()
+            .map(|out| {
+                String::from_utf8_lossy(&out.stdout)
+                    .trim()
+                    .replace('\n', " | ")
+            })
+            .unwrap_or_else(|error| format!("ps failed: {error}"))
+    }
+
     #[test]
     fn a_running_build_is_reachable_from_the_state() {
         let state = BuildState::default();
@@ -66,7 +79,42 @@ pub mod build_state_tests {
 
         assert!(
             group_gone(pid),
-            "the group survived the stop, so the grandchild kept running"
+            "the group survived the stop, so the grandchild kept running: {}",
+            group_members(pid)
+        );
+    }
+
+    /// A shell that forks a child from its own TERM handler, so the new member is created *after*
+    /// the group was signalled and can never have received it. The direct child then exits, so the
+    /// polite path sees it dead and never escalates — which is exactly how a `cargo` that was
+    /// between `fork` and `exec` when the stop arrived leaves a `rustc` running.
+    #[test]
+    fn stop_build_reaches_a_child_forked_after_the_group_was_signalled() {
+        use std::io::{BufRead, BufReader};
+
+        let state = BuildState::default();
+        let script = "trap 'sleep 30 & exit 0' TERM; echo ready; while :; do :; done";
+        let mut command = Command::new("/bin/sh");
+        command.arg("-c").arg(script);
+        let mut child = spawn(&mut command, "sh", "/").expect("spawn a TERM-trapping build");
+        let pid = child.id();
+        let mut ready = String::new();
+        BufReader::new(child.stdout.take().expect("the shell's stdout"))
+            .read_line(&mut ready)
+            .expect("read the trap marker");
+        assert_eq!(
+            ready.trim(),
+            "ready",
+            "the shell must install its trap first"
+        );
+        state.begin(child).expect("take the build slot");
+
+        state.stop().expect("stop the fake build");
+
+        assert!(
+            group_gone(pid),
+            "a member forked after the signal survived the stop: {}",
+            group_members(pid)
         );
     }
 
