@@ -1,5 +1,12 @@
+use tauri::AppHandle;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
-use tauri::{AppHandle, Emitter};
+
+mod events;
+
+#[cfg(test)]
+mod tests;
+
+pub use events::on_menu_event;
 
 pub fn build_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, tauri::Error> {
     let about = PredefinedMenuItem::about(app, Some("About quarry"), None)?;
@@ -30,6 +37,9 @@ pub fn build_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, taur
         .build()?;
 
     // File
+    let new_window = MenuItemBuilder::with_id("new-window", "New Window")
+        .accelerator("CmdOrCtrl+Shift+N")
+        .build(app)?;
     let new_project = MenuItemBuilder::with_id("new-project", "New project…")
         .accelerator("CmdOrCtrl+N")
         .build(app)?;
@@ -45,6 +55,7 @@ pub fn build_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, taur
     let close_window = PredefinedMenuItem::close_window(app, None)?;
 
     let file_sub = SubmenuBuilder::new(app, "File")
+        .item(&new_window)
         .item(&new_project)
         .item(&open_project)
         .separator()
@@ -163,34 +174,4 @@ pub fn build_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, taur
         .item(&window_sub)
         .item(&help_sub)
         .build()
-}
-
-pub fn on_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
-    let id = event.id().0.as_str();
-    let custom = [
-        "check-updates",
-        "open-settings",
-        "new-project",
-        "open-project",
-        "save",
-        "save-all",
-        "find-in-project",
-        "quick-open",
-        "toggle-rail",
-        "toggle-dock",
-        "toggle-terminal",
-        "toggle-source-control",
-        "toggle-debug",
-        "toggle-blame",
-        "show-shortcuts",
-        "build",
-        "run",
-        "stop-run",
-        "run-to-cursor",
-        "refresh-git",
-        "reveal-active-file",
-    ];
-    if custom.contains(&id) {
-        let _ = app.emit("menu-command", id.to_string());
-    }
 }
