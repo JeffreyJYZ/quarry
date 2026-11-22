@@ -14,7 +14,7 @@ import {
 	manifestUrl,
 	type PublishedManifest,
 } from "../release-manifest";
-import { notesFromGit } from "./notes";
+import { notesFromGit } from "./notes-sources";
 import { assetUrl, LATEST, RELEASE_DIR } from "./paths";
 import { arg, fail, log, REPO } from "./process";
 
@@ -25,7 +25,7 @@ export interface Manifest {
 	platforms: Record<string, { signature: string; url: string }>;
 }
 
-/** Writes `latest.json`; the notes come from `--notes FILE` or the commits since the last tag. */
+/** Writes `latest.json`; the notes come from `--notes FILE` or the PRs since the last tag. */
 export function writeManifest(
 	version: string,
 	tag: string,
@@ -44,7 +44,7 @@ export function writeManifest(
 	writeFileSync(LATEST, `${JSON.stringify(latest, null, 2)}\n`);
 
 	if (notesArg === null) {
-		latest.notes = notesFromGit(sha);
+		latest.notes = notesFromGit(sha, version);
 		writeFileSync(LATEST, `${JSON.stringify(latest, null, 2)}\n`);
 	}
 	return latest;
