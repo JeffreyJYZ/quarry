@@ -8,17 +8,17 @@ import {
 	type RawOutputHandler,
 	type Session,
 } from "@/lib/terminal/sessions";
-import { parentDir } from "@/lib/project/paths";
 import { ptyGate, usePtyEvents } from "@/ui/terminal/usePtyEvents";
 /** The terminal's sessions: one PTY each, plus the global event wiring. It owns nothing visual. */
 export function useTerminalSessions(options: {
 	root: string;
-	activePath: string | null | undefined;
+	/** Accepted for callers that still pass it; a new shell never derives its cwd from a file. */
+	activePath?: string | null;
 	defaultFontSize: number | undefined;
 	containerRef: React.RefObject<HTMLDivElement | null>;
 	onNotice?: (message: string) => void;
 }) {
-	const { root, activePath, defaultFontSize, containerRef, onNotice } = options;
+	const { root, defaultFontSize, containerRef, onNotice } = options;
 	const writeFailed = useRef<Set<number>>(new Set());
 	const [sessions, setSessions] = useState<Session[]>([]);
 	const [activeId, setActiveId] = useState<number | null>(null);
@@ -47,10 +47,7 @@ export function useTerminalSessions(options: {
 	const openSession = useCallback(async () => {
 		const id = nextId.current;
 		nextId.current += 1;
-		const cwd =
-			activePath !== null && activePath !== undefined
-				? (parentDir(activePath) ?? root)
-				: root;
+		const cwd = root;
 		setSessions((current) => {
 			// The ref the open guard reads must already hold the row, before React renders it.
 			const next = [...current, emptySession(id, cwd, defaultFontSize)];
@@ -82,7 +79,7 @@ export function useTerminalSessions(options: {
 				opening: false,
 			}));
 		}
-	}, [root, activePath, updateSession, defaultFontSize, containerRef, buffer, listeners]);
+	}, [root, updateSession, defaultFontSize, containerRef, buffer, listeners]);
 	// The root effect reads this, so a project switch opens a tab through the newest closure.
 	useEffect(() => {
 		openSessionRef.current = openSession;

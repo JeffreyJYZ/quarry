@@ -23,16 +23,16 @@ import { useTerminalSessions } from "@/ui/terminal/useTerminalSessions";
 
 const containerRef = { current: null };
 
-function harness(root: string) {
+function harness(root: string, activePath: string | null = null) {
 	return renderHook(
-		({ root }: { root: string }) =>
+		({ root, activePath }: { root: string; activePath: string | null }) =>
 			useTerminalSessions({
 				root,
-				activePath: null,
+				activePath,
 				defaultFontSize: 12,
 				containerRef,
 			}),
-		{ initialProps: { root } },
+		{ initialProps: { root, activePath } },
 	);
 }
 
@@ -51,7 +51,7 @@ describe("terminal sessions across a project root change", () => {
 		await waitFor(() => expect(view.result.current.sessions[0]?.ptyId).toBe("pty:/one"));
 
 		await act(async () => {
-			view.rerender({ root: "/two" });
+			view.rerender({ root: "/two", activePath: null });
 		});
 
 		await waitFor(() => expect(closed).toContain("pty:/one"));
@@ -71,5 +71,28 @@ describe("terminal sessions across a project root change", () => {
 		view.unmount();
 
 		await waitFor(() => expect(closed).toContain("pty:/one"));
+	});
+});
+
+describe("default cwd for a new terminal", () => {
+	test("a file open in src does not pull a new shell into src", async () => {
+		const view = harness("/proj", "/proj/src/main.cpp");
+		act(() => {
+			void view.result.current.openSession();
+		});
+
+		await waitFor(() => expect(view.result.current.sessions[0]?.ptyId).toBe("pty:/proj"));
+		expect(opened).toEqual(["/proj"]);
+		expect(view.result.current.sessions[0]?.cwd).toBe("/proj");
+	});
+
+	test("no active file opens at the root too", async () => {
+		const view = harness("/proj");
+		act(() => {
+			void view.result.current.openSession();
+		});
+
+		await waitFor(() => expect(view.result.current.sessions[0]?.ptyId).toBe("pty:/proj"));
+		expect(opened).toEqual(["/proj"]);
 	});
 });
