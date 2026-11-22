@@ -153,6 +153,7 @@ pub fn run() {
             settings::read_project_settings,
             settings::write_project_settings,
             new_project::create_project,
+            new_project::init_project,
             git::git_status,
             git::git_file_diff,
             git::git_stage,
