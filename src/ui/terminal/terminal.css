@@ -1,4 +1,5 @@
 /* Terminal chrome: one quiet header row — tabs as labels, actions as icon buttons. */
+/* The header, body and status row are one flat `--panel` surface: no rule draws their seam. */
 
 .terminal-chrome {
 	display: flex;
@@ -7,7 +8,6 @@
 	flex: 0 0 auto;
 	height: 30px;
 	padding: 0 6px 0 8px;
-	border-bottom: 1px solid var(--line);
 	background: var(--panel);
 }
 
@@ -161,7 +161,6 @@
 	gap: 10px;
 	height: 26px;
 	padding: 0 10px;
-	border-top: 1px solid var(--line);
 	background: var(--panel);
 	font-family: var(--mono);
 	font-size: 10.5px;

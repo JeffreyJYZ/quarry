@@ -2,7 +2,7 @@ import type { ITerminalOptions, Terminal } from "@xterm/xterm";
 
 import type { TerminalCursorStyle } from "@/lib/settings/terminal";
 import { MONO_STACK } from "@/lib/consts/terminal";
-import { XTERM_THEME } from "@/ui/terminal/xtermTheme";
+import { xtermTheme } from "@/ui/terminal/xtermTheme";
 
 export { MONO_STACK, SCROLLBACK } from "@/lib/consts/terminal";
 
@@ -24,7 +24,7 @@ export type XtermAppearance = {
 
 export function xtermOptions(appearance: XtermAppearance): ITerminalOptions {
 	return {
-		theme: XTERM_THEME,
+		theme: xtermTheme(),
 		fontFamily: xtermFontFamily(appearance.fontFamily),
 		fontSize: appearance.fontSize,
 		lineHeight: appearance.lineHeight,

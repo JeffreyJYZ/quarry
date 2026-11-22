@@ -5,7 +5,7 @@
 	display: flex;
 	flex: 1 1 auto;
 	min-height: 0;
-	background: var(--bg);
+	background: var(--panel);
 }
 
 /* Beats `.terminal-body` in the shared sheet: the host carries the padding, xterm carries none. */
@@ -15,18 +15,19 @@
 	min-height: 0;
 	padding: 6px 10px 4px;
 	overflow: hidden;
-	background: var(--bg);
+	background: var(--panel);
 }
 
 .terminal-xterm .xterm {
 	height: 100%;
 	padding: 0;
-	background: var(--bg);
+	background: var(--panel);
 }
 
-/* Keep the viewport (the scrollable backing) on the app surface so nothing flashes black. */
+/* The screen and the scrollable viewport stay on the pane surface: no second shade underneath. */
+.terminal .terminal-xterm .xterm .xterm-screen,
 .terminal .terminal-xterm .xterm .xterm-viewport {
-	background-color: var(--bg);
+	background-color: var(--panel);
 }
 
 /* Selection and cursor come from xtermTheme.ts; keep the selection layer above the canvas. */
