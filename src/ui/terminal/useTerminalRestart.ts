@@ -1,8 +1,8 @@
 import { useCallback } from "react";
 import { ptyClose, ptyOpen } from "@/lib/project/api";
 import { DEFAULT_FONT_SIZE } from "@/lib/terminal/fontSize";
-import { parentDir } from "@/lib/project/paths";
 import { ptySize, type Session } from "@/lib/terminal/sessions";
+import { restartCwd } from "@/ui/terminal/sessionCwd";
 
 /**
  * Restarts a tab in place: same cwd, same font size, a fresh shell.
@@ -11,25 +11,24 @@ import { ptySize, type Session } from "@/lib/terminal/sessions";
  */
 export function useTerminalRestart(options: {
 	root: string;
-	activePath: string | null | undefined;
+	/** Accepted for callers that still pass it; a restart never moves a shell to the active file. */
+	activePath?: string | null;
 	activeId: number | null;
 	sessions: Session[];
 	containerRef: React.RefObject<HTMLDivElement | null>;
 	updateSession: (id: number, updater: (s: Session) => Session) => void;
+	/** Injected by tests; production probes the backend through `sessionCwd`. */
+	dirExists?: (path: string) => Promise<boolean>;
 }) {
-	const { root, activePath, activeId, sessions, containerRef, updateSession } = options;
+	const { root, activeId, sessions, containerRef, updateSession, dirExists } = options;
 
-	return useCallback(() => {
+	return useCallback(async () => {
 		if (activeId === null) return;
 		const session = sessions.find((s) => s.id === activeId);
 		if (session?.ptyId !== null && session?.ptyId !== undefined) {
 			void ptyClose(session.ptyId).catch(() => undefined);
 		}
-		const cwd =
-			session?.cwd ??
-			(activePath !== null && activePath !== undefined
-				? (parentDir(activePath) ?? root)
-				: root);
+		const cwd = await restartCwd(session?.cwd, root, dirExists);
 		updateSession(activeId, (s) => ({
 			...s,
 			ptyId: null,
@@ -59,5 +58,5 @@ export function useTerminalRestart(options: {
 				}));
 			}
 		})();
-	}, [activeId, sessions, root, activePath, containerRef, updateSession]);
+	}, [activeId, sessions, root, containerRef, updateSession, dirExists]);
 }
