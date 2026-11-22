@@ -6,6 +6,7 @@ import Breadcrumb from "@/ui/breadcrumb/Breadcrumb";
 import LazyEditor from "@/ui/editor/LazyEditor";
 import TabStrip from "@/ui/components/TabStrip";
 import Welcome from "@/ui/components/Welcome";
+import InitializePanel from "@/ui/projects/InitializePanel";
 import DisasmSplitPane from "@/ui/app/DisasmSplitPane";
 import SplitPane, { type SplitView } from "@/ui/app/SplitPane";
 import type { Location, ProjectInfo } from "@/lib/project/api";
@@ -30,6 +31,8 @@ export type EditorStageProps = {
 	recentRoots: string[];
 	onOpenRecent: (root: string) => void;
 	onOpenProject: () => void;
+	/** An inspected project returned by an in-place init, activated like any opened project. */
+	onInitialized: (info: ProjectInfo) => void;
 	saving: ReadonlySet<string>;
 	confirmClose: string | null;
 	cursor: { line: number; character: number } | null;
@@ -80,7 +83,17 @@ export type EditorStageProps = {
 export default function EditorStage(props: EditorStageProps) {
 	const reveal = useEditorReveal(props.revealTarget, props.revealToken);
 	const active = props.active;
-	if (active === null)
+	if (active === null) {
+		// `unknown` is the only trigger: a folder that already has a marker keeps the welcome screen,
+		// and no project at all is the "open a project" state, not an initialize state.
+		if (props.project?.kind === "unknown")
+			return (
+				<InitializePanel
+					root={props.project.openedRoot}
+					onInitialized={props.onInitialized}
+					onNotice={props.onNotice}
+				/>
+			);
 		return (
 			<Welcome
 				project={props.project}
@@ -89,6 +102,7 @@ export default function EditorStage(props: EditorStageProps) {
 				onOpenProject={props.onOpenProject}
 			/>
 		);
+	}
 
 	return (
 		<>

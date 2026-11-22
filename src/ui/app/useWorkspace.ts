@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { startupMark } from "@/lib/startupMarks";
-import { type FileEdit, type ProjectInfo, openProject, rememberRoot } from "@/lib/project/api";
+import type { FileEdit, ProjectInfo } from "@/lib/project/api";
 import type { FileBuffer } from "@/lib/project/buffer";
-import { describeError } from "@/lib/project/errors";
 import { applyEditsWithNotice } from "@/ui/app/applyEdits";
+import { useProjectActivation } from "@/ui/app/useProjectActivation";
 import { externalChangeHandler } from "@/ui/app/externalChanges";
 import type { DiagnosticsLifecycleEvent } from "@/lib/lsp/lifecycle";
 import { useTabClose } from "@/ui/app/useTabClose";
@@ -52,35 +51,19 @@ export function useWorkspace(options: WorkspaceOptions) {
 	buffersRef.current = buffers;
 	const activePathRef = useRef<string | null>(activePath);
 	activePathRef.current = activePath;
-	const openRoot = useCallback(
-		async (nextRoot: string) => {
-			setOpening(true);
-			options.onNotice(null);
-			try {
-				const next = await openProject(nextRoot);
-				setProject(next);
-				setBuffers([]);
-				setActivePath(null);
-				setConfirmClose(null);
-				// Recents are file paths in the project that was open; keeping them lists another
-				// tree's files under this one and stamps them into this project's settings.
-				setRecentFiles([]);
-				options.onProjectOpened();
-				try {
-					setRecentRoots(await rememberRoot(nextRoot));
-				} catch {
-					/* the recents list is a convenience, not a dependency */
-				}
-				startupMark("project-open");
-			} catch (error) {
-				options.onNotice(`Could not open ${nextRoot}: ${describeError(error)}`);
-				setRecentRoots((current) => current.filter((entry) => entry !== nextRoot));
-			} finally {
-				setOpening(false);
-			}
-		},
-		[options],
-	);
+	// Both a folder open and an in-place init land in the same activation path: the info from
+	// init_project is already inspected, so nothing re-opens the folder behind the user's back.
+	const { openRoot, activate } = useProjectActivation({
+		onNotice: options.onNotice,
+		onProjectOpened: options.onProjectOpened,
+		setProject,
+		setBuffers,
+		setActivePath,
+		setConfirmClose,
+		setRecentFiles,
+		setRecentRoots,
+		setOpening,
+	});
 	// Openers live in their own module: this hook is at the file-size limit.
 	const { openPath, handleOpenFile, handleOpenProject } = useFileOpening({
 		options,
@@ -173,6 +156,7 @@ export function useWorkspace(options: WorkspaceOptions) {
 		confirmClose,
 		setConfirmClose,
 		openRoot,
+		activate,
 		handleOpenProject,
 		openPath,
 		handleOpenFile,
