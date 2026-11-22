@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { ALPHA107_BODY, ALPHA107_BLOCKS } from "@/lib/updates/fixtures";
 import {
 	fetchReleaseNotes,
 	notesTagFor,
@@ -18,21 +19,38 @@ describe("notesTagFor", () => {
 });
 
 describe("parseNotes", () => {
-	test("headings, bullets and bold lose their markers", () => {
-		const body = ["## Changes", "", "- **feat**: restart lsp", "- fix: tree indent"].join("\n");
-		expect(parseNotes(body)).toEqual(["Changes", "feat: restart lsp", "fix: tree indent"]);
+	test("the alpha107 body becomes a lead, headings, entries and bodies", () => {
+		expect(parseNotes(ALPHA107_BODY)).toEqual(ALPHA107_BLOCKS);
+	});
+
+	test("inline code, bold, italic and a link lose their markers at parse time", () => {
+		const body = [
+			"## Changes",
+			"",
+			"- [restart](https://example.com) the `lsp` with **force** and *care* (#42)",
+		].join("\n");
+		expect(parseNotes(body)).toEqual([
+			{ kind: "heading", text: "Changes" },
+			{ kind: "entry", text: "restart the lsp with force and care", number: "42" },
+		]);
 	});
 
 	test("fences are dropped whole", () => {
 		const body = ["- one", "```", "code here", "```", "- two"].join("\n");
-		expect(parseNotes(body)).toEqual(["one", "two"]);
+		expect(parseNotes(body)).toEqual([
+			{ kind: "entry", text: "one", number: null },
+			{ kind: "entry", text: "two", number: null },
+		]);
 	});
 
-	test("numbered entries keep their text", () => {
-		expect(parseNotes("1. first\n2. second")).toEqual(["first", "second"]);
+	test("numbered items are entries without a PR number", () => {
+		expect(parseNotes("1. first\n2. second")).toEqual([
+			{ kind: "entry", text: "first", number: null },
+			{ kind: "entry", text: "second", number: null },
+		]);
 	});
 
-	test("an empty body yields no lines", () => {
+	test("an empty body yields no blocks", () => {
 		expect(parseNotes("\n\n  \n")).toEqual([]);
 	});
 });
@@ -71,7 +89,17 @@ describe("fetchReleaseNotes", () => {
 			return Promise.resolve(okBody);
 		});
 		expect(asked).toContain("/releases/tags/quarry-alpha77");
-		expect(notes).toEqual(["one", "two"]);
+		expect(notes).toEqual([
+			{ kind: "entry", text: "one", number: null },
+			{ kind: "entry", text: "two", number: null },
+		]);
+	});
+
+	test("an empty body is no notes, distinct from a failed lookup", async () => {
+		const notes = await fetchReleaseNotes("0.1.0-alpha.77", () =>
+			Promise.resolve({ ok: true, json: async () => ({ body: "  \n\n" }) }),
+		);
+		expect(notes).toEqual([]);
 	});
 
 	test("a missing release is null, not a throw", async () => {

@@ -2,12 +2,18 @@
  * Release notes: what changed in a version, taken from that version's GitHub release.
  *
  * The notes are written by `scripts/release-local.ts` from the commits since the previous tag, so this
- * module only maps a version to its release tag, fetches the body once, and turns the markdown into the
- * short list the panel draws. Nothing here renders markdown: the body is a commit list, and a line
- * per entry is what makes it readable in a 300px panel.
+ * module only maps a version to its release tag, fetches the body once, and parses the markdown into
+ * blocks. The panel renders each block by kind, so structure survives from release body to screen.
  */
 
 const REPOSITORY = "JeffreyJYZ/quarry";
+
+/** One thing the panel draws. The kind is what decides its weight, dot and spacing. */
+export type NoteBlock =
+	| { kind: "lead"; text: string }
+	| { kind: "heading"; text: string }
+	| { kind: "entry"; text: string; number: string | null }
+	| { kind: "body"; text: string };
 
 /** `0.1.0-alpha.76` → `quarry-alpha76`, `1.2.3` → `v1.2.3`. */
 export function notesTagFor(version: string): string {
@@ -17,31 +23,66 @@ export function notesTagFor(version: string): string {
 }
 
 /**
- * The lines of a release body worth showing.
- *
- * Headings and bullets lose their markers, code fences and blank lines are dropped, and `**bold**`
- * keeps its words. A body of only commit subjects therefore reads as a plain list of changes.
+ * Markdown that must not reach the DOM: code loses its backticks, emphasis loses its asterisks, and a
+ * link keeps only the words a reader needs. Done here so the panel can render plain text, never HTML.
  */
-export function parseNotes(markdown: string): string[] {
-	const lines: string[] = [];
+function stripInline(text: string): string {
+	return text
+		.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+		.replace(/`([^`]+)`/g, "$1")
+		.replace(/\*\*([^*]+)\*\*/g, "$1")
+		.replace(/\*([^*]+)\*/g, "$1");
+}
+
+const LEAD = /^\d+\s+changes?\b/i;
+const BULLET = /^(?:[-*+]|\d+\.)\s+/;
+const PR_NUMBER = /\s*\((?:#)?(\d+)\)$/;
+
+/**
+ * A real release body: a summary line, `##` sections, `- title (#NNN)` entries and indented paragraphs.
+ * The first qualifying plain line is the lead; every later plain line is a body under the entry before
+ * it, or a loose body when no entry precedes it (the "How to update" paragraph).
+ */
+export function parseNotes(markdown: string): NoteBlock[] {
+	const blocks: NoteBlock[] = [];
 	let inFence = false;
+	let seenStructure = false;
+
 	for (const raw of markdown.split("\n")) {
-		const line = raw.trim();
-		if (line.startsWith("```")) {
+		if (raw.trim().startsWith("```")) {
 			inFence = !inFence;
 			continue;
 		}
-		if (inFence || line === "") continue;
-		const cleaned = line
-			.replace(/^#{1,6}\s*/, "")
-			.replace(/^[-*+]\s+/, "")
-			.replace(/^\d+\.\s+/, "")
-			.replace(/\*\*([^*]+)\*\*/g, "$1")
-			.trim();
-		if (cleaned === "") continue;
-		lines.push(cleaned);
+		if (inFence) continue;
+		const line = raw.trim();
+		if (line === "") continue;
+
+		if (/^#{1,6}\s+/.test(line)) {
+			blocks.push({ kind: "heading", text: stripInline(line.replace(/^#{1,6}\s+/, "")) });
+			seenStructure = true;
+			continue;
+		}
+
+		if (BULLET.test(line)) {
+			const text = stripInline(line.replace(BULLET, ""));
+			const match = PR_NUMBER.exec(text);
+			blocks.push({
+				kind: "entry",
+				text: match === null ? text : text.slice(0, match.index).trimEnd(),
+				number: match?.[1] ?? null,
+			});
+			seenStructure = true;
+			continue;
+		}
+
+		const text = stripInline(line);
+		if (blocks.length === 0 && !seenStructure && (LEAD.test(text) || text.endsWith(":"))) {
+			blocks.push({ kind: "lead", text });
+			continue;
+		}
+		blocks.push({ kind: "body", text });
 	}
-	return lines;
+	return blocks;
 }
 
 export type NotesFetch = (url: string) => Promise<{ ok: boolean; json: () => Promise<unknown> }>;
@@ -49,12 +90,15 @@ export type NotesFetch = (url: string) => Promise<{ ok: boolean; json: () => Pro
 /** How long a release lookup may take before the panel is told it failed. */
 export const NOTES_TIMEOUT_MS = 8000;
 
-/** The notes for one version, or `null` when the release or its body cannot be read. */
+/**
+ * The blocks for one version, `[]` for a release whose body has nothing to show, or `null` when the
+ * release or its body cannot be read. The panel says a different thing for the last two.
+ */
 export async function fetchReleaseNotes(
 	version: string,
 	fetchImpl: NotesFetch = fetch as unknown as NotesFetch,
 	timeoutMs: number = NOTES_TIMEOUT_MS,
-): Promise<string[] | null> {
+): Promise<NoteBlock[] | null> {
 	const tag = notesTagFor(version);
 	try {
 		const response = await withTimeout(
@@ -64,8 +108,7 @@ export async function fetchReleaseNotes(
 		if (!response.ok) return null;
 		const body = (await withTimeout(response.json(), timeoutMs)) as { body?: unknown };
 		if (typeof body.body !== "string") return null;
-		const notes = parseNotes(body.body);
-		return notes.length === 0 ? null : notes;
+		return parseNotes(body.body);
 	} catch {
 		return null;
 	}
