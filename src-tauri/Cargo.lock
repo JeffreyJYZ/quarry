@@ -2965,7 +2965,7 @@ dependencies = [
 
 [[package]]
 name = "quarry"
-version = "0.1.0-alpha.106"
+version = "0.1.0-alpha.107"
 dependencies = [
  "encoding_rs",
  "libc",
