@@ -9,6 +9,7 @@ export * from "./bookmarks";
 export * from "./dap";
 export * from "./dap-types";
 export * from "./git";
+export * from "./init";
 export * from "./lsp";
 export * from "./lsp-types";
 export * from "./run";
