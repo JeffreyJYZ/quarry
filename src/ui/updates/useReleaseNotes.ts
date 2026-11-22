@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { fetchReleaseNotes } from "@/lib/updates/notes";
+import { type NoteBlock, fetchReleaseNotes } from "@/lib/updates/notes";
 
 export type NotesState = {
-	/** The lines to show, once they arrived. */
-	notes: string[] | null;
+	/** The blocks to show, once they arrived. `[]` means a release with no notes. */
+	notes: NoteBlock[] | null;
 	/** True when the release or its body could not be read; the panel says so rather than spinning. */
 	failed: boolean;
 };
@@ -14,10 +14,10 @@ export type NotesState = {
  * Fetched once per version: an answer is kept in a module-level cache so opening the prompt, the
  * panel and the palette row in one session costs a single request. Only a real answer is cached —
  * a lookup that failed (offline, rate limited, timed out) is retried the next time the panel opens,
- * because a cached failure would tell the user "No notes for this version" for the rest of the
- * session over one bad moment on the network.
+ * because a cached failure would tell the user "Could not load release notes" for the rest of the
+ * session over one bad moment on the network. An empty body is retried too.
  */
-const cache = new Map<string, string[] | null>();
+const cache = new Map<string, NoteBlock[]>();
 
 export function useReleaseNotes(version: string | null): NotesState {
 	const [state, setState] = useState<NotesState>(() =>
@@ -29,14 +29,15 @@ export function useReleaseNotes(version: string | null): NotesState {
 			setState({ notes: null, failed: false });
 			return;
 		}
-		if (cache.has(version)) {
-			setState(cached(version));
+		const saved = cache.get(version);
+		if (saved !== undefined) {
+			setState({ notes: saved, failed: false });
 			return;
 		}
 		let live = true;
 		const result = fetchReleaseNotes(version);
 		void result.then((notes) => {
-			if (notes !== null) cache.set(version, notes);
+			if (notes !== null && notes.length > 0) cache.set(version, notes);
 			if (live) setState({ notes, failed: notes === null });
 		});
 		return () => {
@@ -48,6 +49,5 @@ export function useReleaseNotes(version: string | null): NotesState {
 }
 
 function cached(version: string): NotesState {
-	const notes = cache.get(version) ?? null;
-	return { notes, failed: notes === null && cache.has(version) };
+	return { notes: cache.get(version) ?? null, failed: false };
 }

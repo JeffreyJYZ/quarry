@@ -58,6 +58,40 @@
 	color: var(--muted);
 }
 
+.notes-content {
+	min-width: 0;
+}
+
+/* The summary sentence: slightly larger than a body paragraph, still not a bullet. */
+.notes-lead {
+	margin: 0 0 6px;
+	font-size: 12px;
+	line-height: 1.5;
+	color: var(--text);
+}
+
+/* Section labels are signposts, not changes: no dot, small, upper-case. */
+.notes-heading {
+	margin: 10px 0 4px;
+	font-size: 10px;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.notes-section + .notes-section .notes-heading {
+	margin-top: 14px;
+}
+
+/* A paragraph that follows a heading without an entry above it. */
+.notes-body {
+	margin: 4px 0;
+	font-size: 11px;
+	line-height: 1.45;
+	color: var(--muted);
+}
+
 .notes-list {
 	margin: 0;
 	padding-left: 16px;
@@ -68,6 +102,29 @@
 
 .notes-list li + li {
 	margin-top: 3px;
+}
+
+.notes-entry {
+	font-weight: 400;
+}
+
+.notes-entry-title {
+	font-weight: 400;
+}
+
+/* The PR number stays visible but quiet, never as loud as the title. */
+.notes-entry-number {
+	margin-left: 4px;
+	font-size: 10px;
+	color: var(--muted);
+}
+
+/* The paragraph under a title: muted and tighter, never a second bullet. */
+.notes-entry-body {
+	margin: 3px 0 2px;
+	font-size: 11px;
+	line-height: 1.4;
+	color: var(--muted);
 }
 
 .notes-scrim {
@@ -106,23 +163,11 @@
 	color: var(--text);
 }
 
-.notes-panel .notes-list,
-.notes-panel .notes-empty {
+.notes-panel .notes-content {
 	padding: 12px 16px 16px;
 	overflow: auto;
 }
 
 .notes-panel .notes-list {
-	padding-left: 30px;
-}
-
-/* The "Changes since <tag>:" line is a heading, so it keeps a heading's weight and no bullet. */
-.notes-lead {
-	margin: 0 0 6px;
-	font-size: 11px;
-	color: var(--muted);
-}
-
-.notes-panel .notes-lead {
-	padding: 12px 16px 0;
+	padding-left: 20px;
 }

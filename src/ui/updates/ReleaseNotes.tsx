@@ -1,7 +1,98 @@
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
+import { NOTES_EMPTY, NOTES_FAILED, NOTES_LOADING } from "@/lib/updates/messages";
+import type { NoteBlock } from "@/lib/updates/notes";
 import { useDialogFocus } from "@/ui/app/useDialogFocus";
 import { useReleaseNotes } from "@/ui/updates/useReleaseNotes";
 import "@/ui/updates/updates.css";
+
+/** An entry and the paragraph blocks that follow it, kept as siblings for the panel to render. */
+type Entry = { text: string; number: string | null; bodies: string[] };
+type Section = { heading: string | null; entries: Entry[]; loose: string[] };
+
+/**
+ * Rebuild the hierarchy the markdown had: a heading starts a section, an entry starts a bullet, and a
+ * body belongs to the entry before it. A body under a heading with no entry stays loose.
+ */
+function sectionsOf(blocks: NoteBlock[]): { lead: string | null; sections: Section[] } {
+	const sections: Section[] = [];
+	let current: Section = { heading: null, entries: [], loose: [] };
+	let entry: Entry | null = null;
+	let lead: string | null = null;
+
+	const finishEntry = () => {
+		if (entry !== null) {
+			current.entries.push(entry);
+			entry = null;
+		}
+	};
+	const finishSection = () => {
+		finishEntry();
+		if (current.heading !== null || current.entries.length > 0 || current.loose.length > 0) {
+			sections.push(current);
+		}
+		current = { heading: null, entries: [], loose: [] };
+	};
+
+	for (const block of blocks) {
+		if (block.kind === "lead") {
+			lead = block.text;
+		} else if (block.kind === "heading") {
+			finishSection();
+			current.heading = block.text;
+		} else if (block.kind === "entry") {
+			finishEntry();
+			entry = { text: block.text, number: block.number, bodies: [] };
+		} else if (entry !== null) {
+			entry.bodies.push(block.text);
+		} else {
+			current.loose.push(block.text);
+		}
+	}
+	finishSection();
+	return { lead, sections };
+}
+
+/** Each kind gets its own element: only entries are bullets. */
+function NotesBody({ blocks }: { blocks: NoteBlock[] }): ReactNode {
+	const { lead, sections } = sectionsOf(blocks);
+	return (
+		<>
+			{lead === null ? null : <p className="notes-lead">{lead}</p>}
+			{sections.map((section) => (
+				<div
+					className="notes-section"
+					key={section.heading ?? section.entries[0]?.text ?? section.loose[0]}
+				>
+					{section.heading === null ? null : (
+						<p className="notes-heading">{section.heading}</p>
+					)}
+					{section.loose.map((text) => (
+						<p className="notes-body" key={text}>
+							{text}
+						</p>
+					))}
+					{section.entries.length === 0 ? null : (
+						<ul className="notes-list">
+							{section.entries.map((item) => (
+								<li className="notes-entry" key={item.text}>
+									<span className="notes-entry-title">{item.text}</span>
+									{item.number === null ? null : (
+										<span className="notes-entry-number">#{item.number}</span>
+									)}
+									{item.bodies.map((text) => (
+										<p className="notes-entry-body" key={text}>
+											{text}
+										</p>
+									))}
+								</li>
+							))}
+						</ul>
+					)}
+				</div>
+			))}
+		</>
+	);
+}
 
 /**
  * What changed in a version, as a panel.
@@ -30,25 +121,15 @@ export default function ReleaseNotes({
 		return () => window.removeEventListener("keydown", handle);
 	}, [variant, onClose]);
 
-	// A body written by release-local opens with "Changes since <tag>:", which is a heading, not
-	// a change: drawn as a bullet it reads like the first entry in its own list.
-	const lead = notes !== null && notes.length > 0 && notes[0].endsWith(":") ? notes[0] : null;
-	const items: string[] = notes === null ? [] : lead === null ? notes : notes.slice(1);
-
 	const body =
 		notes === null ? (
-			<p className="notes-empty">
-				{failed ? "No release notes published for this version" : "Loading notes…"}
-			</p>
+			<p className="notes-empty">{failed ? NOTES_FAILED : NOTES_LOADING}</p>
+		) : notes.length === 0 ? (
+			<p className="notes-empty">{NOTES_EMPTY}</p>
 		) : (
-			<>
-				{lead === null ? null : <p className="notes-lead">{lead}</p>}
-				<ul className="notes-list">
-					{items.map((line) => (
-						<li key={line}>{line}</li>
-					))}
-				</ul>
-			</>
+			<div className="notes-content">
+				<NotesBody blocks={notes} />
+			</div>
 		);
 
 	if (variant === "inline") {
