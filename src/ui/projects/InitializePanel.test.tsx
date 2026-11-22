@@ -63,4 +63,34 @@ describe("initialize an unknown folder", () => {
 		expect(view.getByRole("alert").textContent).toBe("folder is not empty");
 		expect(onInitialized).not.toHaveBeenCalled();
 	});
+
+	it("names the action instead of diagnosing the folder", () => {
+		const { view } = setup();
+		expect(view.getByRole("heading").textContent).toBe("Initialize this folder");
+		expect(view.container.textContent).not.toMatch(/not a project/i);
+	});
+
+	it("keeps the same heading through a successful initialize", async () => {
+		const { view, onInitialized } = setup();
+		fireEvent.click(view.getByRole("button", { name: "Initialize project" }));
+		expect(view.getByRole("heading").textContent).toBe("Initialize this folder");
+		fireEvent.click(view.getByRole("button", { name: "Initialize" }));
+		await waitFor(() => expect(onInitialized).toHaveBeenCalledWith(info));
+		expect(view.getByRole("heading").textContent).toBe("Initialize this folder");
+		expect(view.container.textContent).not.toMatch(/not a project/i);
+	});
+
+	it("keeps the heading when the backend refuses the folder", async () => {
+		init.mockImplementation(async () => {
+			throw "folder is not empty";
+		});
+		const { view } = setup();
+		fireEvent.click(view.getByRole("button", { name: "Initialize project" }));
+		fireEvent.click(view.getByRole("button", { name: "Initialize" }));
+		await waitFor(() =>
+			expect(view.getByRole("alert").textContent).toBe("folder is not empty"),
+		);
+		expect(view.getByRole("heading").textContent).toBe("Initialize this folder");
+		expect(view.container.textContent).not.toMatch(/not a project/i);
+	});
 });

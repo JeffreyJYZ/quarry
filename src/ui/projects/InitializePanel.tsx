@@ -59,11 +59,8 @@ export default function InitializePanel({
 	return (
 		<div className="init-wrap">
 			<section className="init-panel" aria-labelledby="init-title">
-				<h1 id="init-title">This folder is not a project</h1>
-				<p>
-					quarry found no Cargo.toml, CMakeLists.txt or compile_commands.json here.
-					Initialize the folder to start a project in place.
-				</p>
+				<h1 id="init-title">Initialize this folder</h1>
+				<p>quarry found no Cargo.toml, CMakeLists.txt or compile_commands.json here.</p>
 				{expanded ? (
 					<div className="init-form">
 						<KindPicker kind={kind} onSelect={selectKind} />
