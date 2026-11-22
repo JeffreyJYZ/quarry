@@ -15,6 +15,9 @@ pub use templates::*;
 mod create_project;
 pub use create_project::*;
 
+mod init_project;
+pub use init_project::*;
+
 mod resolve_standard;
 pub use resolve_standard::*;
 
@@ -23,3 +26,6 @@ pub use tests_1::*;
 
 mod tests_2;
 pub use tests_2::*;
+
+mod tests_init;
+pub use tests_init::*;
